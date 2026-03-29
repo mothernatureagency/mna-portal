@@ -1,5 +1,5 @@
 import type { Metadata } from 'next';
-import './globals.css';
+import './
 import { ClientProvider } from '@/context/ClientContext';
 import DashboardLayout from '@/components/layout/DashboardLayout';
 import { ReactNode } from 'react';
