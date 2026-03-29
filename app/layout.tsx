@@ -1,8 +1,9 @@
 import type { Metadata } from 'next';
-import './
+import './globals.css';
+import { ReactNode } from 'react';
+
 import { ClientProvider } from '@/context/ClientContext';
 import DashboardLayout from '@/components/layout/DashboardLayout';
-import { ReactNode } from 'react';
 
 export const metadata: Metadata = {
   title: 'MNA Dashboard — Mother Nature Agency',
@@ -11,7 +12,7 @@ export const metadata: Metadata = {
 
 export default function RootLayout({ children }: { children: ReactNode }) {
   return (
-    <html lang="en">
+    <html lang="en" suppressHydrationWarning>
       <body>
         <ClientProvider>
           <DashboardLayout>{children}</DashboardLayout>
