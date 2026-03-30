@@ -63,7 +63,7 @@ export async function ensureSchema() {
 
 export async function query<T = any>(text: string, params?: any[]): Promise<{ rows: T[] }> {
     await ensureSchema();
-    return getPool().query(text, params);
+    return getPool().query<T>(text, params).then(r => ({ rows: r.rows }));
 }
 
 export async function closePool() {
