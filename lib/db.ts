@@ -53,7 +53,15 @@ async function initSchema() {
                                                                                                                                                         assigned_role text,
                                                                                                                                                               created_at timestamptz not null default now()
                                                                                                                                                                   );
-                                                                                                                                                                    `);
+                                                                                                                                                                    
+   create table if not exists users (
+     id uuid primary key default uuid_generate_v4(),
+     username text not null unique,
+     password_hash text not null,
+     role text not null default 'viewer',
+     created_at timestamptz not null default now()
+   );
+`);
 }
 
 export async function ensureSchema() {
