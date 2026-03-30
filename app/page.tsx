@@ -7,7 +7,7 @@ import CRMSnapshot from '@/components/dashboard/CRMSnapshot';
 import ContentSection from '@/components/dashboard/ContentSection';
 import AIInsightsPanel from '@/components/dashboard/AIInsightsPanel';
 import FinancialProjections from '@/components/dashboard/FinancialProjections';
-import LeadFollowUp from '@/components/dashboard/LeadFollowUp';
+import LeadFollowUp from '@/componentsdashboard/LeadFollowUp';
 import ContentCalendar from '@/components/dashboard/ContentCalendar';
 import Card from '@/components/ui/Card';
 
@@ -36,7 +36,7 @@ function SectionLabel({ children }: { children: React.ReactNode }) {
     return (
           <div className="text-[10px] font-bold tracking-[0.15em] uppercase text-gray-300 mb-3 pl-0.5">
             {children}
-          </div>div>
+          </div>
         );
 }
 
