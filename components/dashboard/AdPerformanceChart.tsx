@@ -5,13 +5,6 @@ import { PieChart, Pie } from 'recharts';
 import { adPerformanceData, platformBreakdownData } from '@/lib/demoData';
 import { useClient } from '@/context/ClientContext';
 import Card from '@/components/ui/Card';
-'use client';
-import React from 'react';
-import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Cell } from 'recharts';
-import { PieChart, Pie } from 'recharts';
-import { adPerformanceData, platformBreakdownData } from '@/lib/demoData';
-import { useClient } from '@/context/ClientContext';
-import Card from '@/components/ui/Card';
 
 export default function AdPerformanceChart() {
     const { activeClient } = useClient();
