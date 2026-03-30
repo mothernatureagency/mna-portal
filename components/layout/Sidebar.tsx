@@ -37,21 +37,13 @@ export default function Sidebar() {
         href={href}
         className={clsx(
           'group flex items-center gap-3 px-3 py-[9px] rounded-xl text-[13px] font-medium transition-all duration-200 relative',
-          isActive
-            ? 'text-white nav-active-glow'
-            : 'text-gray-400 hover:text-gray-700 hover:bg-gray-50/80'
+          isActive ? 'text-white' : 'text-gray-500 hover:text-gray-800 hover:bg-white/60'
         )}
         style={isActive ? {
           background: `linear-gradient(135deg, ${gradientFrom} 0%, ${gradientTo} 100%)`,
+          boxShadow: `0 4px 12px ${gradientFrom}40, 0 1px 3px rgba(0,0,0,0.1)`,
         } : {}}
       >
-        {/* Active left indicator glow */}
-        {isActive && (
-          <span
-            className="absolute left-0 top-1/2 -translate-y-1/2 w-0.5 h-5 rounded-full opacity-0"
-            style={{ background: gradientTo }}
-          />
-        )}
         <Icon
           size={15}
           className={clsx(
@@ -61,22 +53,16 @@ export default function Sidebar() {
         />
         <span className="flex-1 tracking-[-0.01em]">{label}</span>
         {isActive && (
-          <span className="w-1.5 h-1.5 rounded-full bg-white/50 flex-shrink-0" />
+          <span className="w-1.5 h-1.5 rounded-full bg-white/60 flex-shrink-0" />
         )}
       </Link>
     );
   };
 
   return (
-    <aside
-      className="w-64 min-h-screen flex flex-col flex-shrink-0"
-      style={{
-        background: '#ffffff',
-        borderRight: '1px solid rgba(0,0,0,0.05)',
-      }}
-    >
+    <aside className="glass-sidebar w-64 min-h-screen flex flex-col flex-shrink-0 relative z-10">
       {/* Logo */}
-      <div className="h-16 flex items-center px-5" style={{ borderBottom: '1px solid rgba(0,0,0,0.04)' }}>
+      <div className="h-16 flex items-center px-5" style={{ borderBottom: '1px solid rgba(255,255,255,0.4)' }}>
         <Logo variant="sidebar" />
       </div>
 
@@ -95,7 +81,7 @@ export default function Sidebar() {
       </nav>
 
       {/* Divider */}
-      <div className="mx-5 h-px bg-gray-100" />
+      <div className="mx-5 h-px" style={{ background: 'rgba(0,0,0,0.06)' }} />
 
       {/* Bottom nav */}
       <div className="px-3 py-3">
@@ -109,19 +95,17 @@ export default function Sidebar() {
         <div
           className="rounded-2xl p-4 relative overflow-hidden"
           style={{
-            background: `linear-gradient(135deg, ${gradientFrom}12 0%, ${gradientTo}18 100%)`,
-            border: `1px solid ${gradientFrom}20`,
+            background: `linear-gradient(135deg, ${gradientFrom}14 0%, ${gradientTo}20 100%)`,
+            border: `1px solid ${gradientFrom}25`,
+            backdropFilter: 'blur(10px)',
           }}
         >
-          {/* Decorative dot */}
+          {/* Glowing dot */}
           <div
-            className="absolute top-3 right-3 w-2 h-2 rounded-full animate-pulse-slow"
-            style={{ background: gradientTo }}
+            className="absolute top-3 right-3 w-2 h-2 rounded-full"
+            style={{ background: gradientTo, boxShadow: `0 0 6px ${gradientTo}80` }}
           />
-          <div
-            className="text-[11px] font-bold mb-0.5"
-            style={{ color: gradientFrom }}
-          >
+          <div className="text-[11px] font-bold mb-0.5" style={{ color: gradientFrom }}>
             Pro Plan Active
           </div>
           <div className="text-[11px] text-gray-400 leading-relaxed">
