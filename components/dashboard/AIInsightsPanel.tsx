@@ -38,6 +38,14 @@ const typeIcon = (type: string) => {
   return <TrendingUp size={13} />;
 };
 
+// Condense each insight description into a short bullet fragment
+const shortDesc: Record<string, string> = {
+  'Boost TikTok Budget 20%': 'TikTok CPL 6% lower than Meta — reallocate $640 for ~15 extra leads',
+  'Refresh Meta Ad Creatives': 'Ads 18 days old — CTR down 12% — new creative sets recover performance',
+  '8 Hot Leads Uncontacted 48h+': '48h+ delay = 3× lower close rate — trigger follow-up sequence now',
+  'LinkedIn Opportunity': 'Organic engagement +34% MoM — add $500/mo in sponsored posts to amplify',
+};
+
 export default function AIInsightsPanel() {
   const { activeClient } = useClient();
   const { gradientFrom, gradientTo } = activeClient.branding;
@@ -47,30 +55,24 @@ export default function AIInsightsPanel() {
       className="rounded-[20px] overflow-hidden"
       style={{
         border: '1px solid rgba(0,0,0,0.05)',
-        boxShadow: `0 1px 2px rgba(0,0,0,0.04), 0 4px 12px rgba(0,0,0,0.04), 0 12px 40px ${gradientFrom}12`,
+        boxShadow: '0 1px 2px rgba(0,0,0,0.04), 0 4px 12px rgba(0,0,0,0.04), 0 12px 40px ' + gradientFrom + '12',
       }}
     >
       {/* Header band */}
       <div
         className="px-6 py-5 flex items-center gap-4"
-        style={{
-          background: `linear-gradient(135deg, ${gradientFrom} 0%, ${gradientTo} 100%)`,
-        }}
+        style={{ background: 'linear-gradient(135deg, ' + gradientFrom + ' 0%, ' + gradientTo + ' 100%)' }}
       >
-        {/* Icon */}
         <div
           className="w-10 h-10 rounded-2xl flex items-center justify-center flex-shrink-0 animate-glow-pulse"
           style={{ background: 'rgba(255,255,255,0.2)', backdropFilter: 'blur(8px)' }}
         >
           <Brain size={18} className="text-white" />
         </div>
-
         <div className="flex-1">
           <div className="text-white font-bold text-[15px] tracking-tight">AI Intelligence Panel</div>
           <div className="text-white/60 text-[11px] mt-0.5">Smart recommendations powered by your data</div>
         </div>
-
-        {/* Live badge */}
         <div
           className="flex items-center gap-1.5 px-3 py-1.5 rounded-full"
           style={{ background: 'rgba(255,255,255,0.15)', backdropFilter: 'blur(8px)' }}
@@ -81,21 +83,18 @@ export default function AIInsightsPanel() {
       </div>
 
       {/* Insights list */}
-      <div className="bg-white px-6 py-5 space-y-3">
+      <div className="bg-white px-6 py-5 space-y-2.5">
         {aiInsights.map((insight, i) => {
           const config = priorityConfig[insight.priority as keyof typeof priorityConfig];
           return (
             <div
               key={i}
-              className="flex gap-4 p-4 rounded-2xl cursor-pointer transition-all duration-200 hover:scale-[1.01] group"
-              style={{
-                background: config.rowBg,
-                border: `1px solid ${config.rowBorder}`,
-              }}
+              className="flex gap-3 px-4 py-3 rounded-2xl cursor-pointer transition-all duration-200 hover:scale-[1.01] group"
+              style={{ background: config.rowBg, border: '1px solid ' + config.rowBorder }}
             >
               {/* Type icon */}
               <div
-                className="w-8 h-8 rounded-xl flex items-center justify-center flex-shrink-0 mt-0.5"
+                className="w-7 h-7 rounded-xl flex items-center justify-center flex-shrink-0 mt-0.5"
                 style={{ background: config.badgeBg, color: config.badgeText }}
               >
                 {typeIcon(insight.type)}
@@ -115,7 +114,9 @@ export default function AIInsightsPanel() {
                     {config.label}
                   </span>
                 </div>
-                <p className="text-[12px] text-gray-500 leading-relaxed">{insight.description}</p>
+                <p className="text-[11px] text-gray-500 leading-snug">
+                  {shortDesc[insight.title] ?? insight.description}
+                </p>
               </div>
 
               <ArrowRight
@@ -131,10 +132,7 @@ export default function AIInsightsPanel() {
       {/* Footer */}
       <div
         className="px-6 py-4 flex items-center justify-between"
-        style={{
-          background: 'rgba(248,250,252,0.8)',
-          borderTop: '1px solid rgba(0,0,0,0.04)',
-        }}
+        style={{ background: 'rgba(248,250,252,0.8)', borderTop: '1px solid rgba(0,0,0,0.04)' }}
       >
         <div className="flex items-center gap-2">
           <Sparkles size={11} style={{ color: gradientTo }} />
@@ -144,8 +142,7 @@ export default function AIInsightsPanel() {
           className="flex items-center gap-1.5 text-[12px] font-semibold transition-all hover:gap-2"
           style={{ color: gradientFrom }}
         >
-          View all insights
-          <ArrowRight size={12} />
+          View all insights <ArrowRight size={12} />
         </button>
       </div>
     </div>
