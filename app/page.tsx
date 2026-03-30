@@ -1,14 +1,5 @@
 'use client';
 import React from 'react';
-import { Users, DollarSign, TrendingUp, CreditCard, Calendar, Award } from 'lucide-react';
-import KPICard from '@/components/dashboard/KPICard';
-import LeadTrendsChart from '@/components/dashboard/LeadTrendsChart';
-import AdPerformanceChart from '@/components/dashboard/AdPerformanceChart';
-import CRMSnapshot from '@/components/dashboard/CRMSnapshot';
-import ContentSection from '@/components/dashboard/ContentSection';
-import AIInsightsPanel from '@/components/dashboard/AIInsightsPanel';
-'use client';
-import React from 'react';
 import { useClient } from '@/context/ClientContext';
 import LeadTrendsChart from '@/components/dashboard/LeadTrendsChart';
 import AdPerformanceChart from '@/components/dashboard/AdPerformanceChart';
