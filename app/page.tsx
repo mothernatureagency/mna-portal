@@ -7,7 +7,7 @@ import CRMSnapshot from '@/components/dashboard/CRMSnapshot';
 import ContentSection from '@/components/dashboard/ContentSection';
 import AIInsightsPanel from '@/components/dashboard/AIInsightsPanel';
 import FinancialProjections from '@/components/dashboard/FinancialProjections';
-import LeadFollowUp from '@/componentsdashboard/LeadFollowUp';
+import LeadFollowUp from '@/components/dashboard/LeadFollowUp';
 import ContentCalendar from '@/components/dashboard/ContentCalendar';
 import Card from '@/components/ui/Card';
 
