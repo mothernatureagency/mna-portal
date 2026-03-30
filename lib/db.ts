@@ -1,67 +1,71 @@
 import { Pool } from 'pg';
 
-const connectionString = process.env.POSTGRES_URL;
+let _pool: Pool | null = null;
 
-if (!connectionString) {
-  throw new Error('POSTGRES_URL is not set.');
+function getPool(): Pool {
+    if (_pool) return _pool;
+    const connectionString = process.env.POSTGRES_URL;
+    if (!connectionString) {
+          throw new Error('POSTGRES_URL is not set.');
+    }
+    _pool = new Pool({
+          connectionString,
+          ssl: { rejectUnauthorized: false },
+          max: 1,
+          min: 0,
+    });
+    return _pool;
 }
-
-const pool = new Pool({
-  connectionString,
-  ssl: { rejectUnauthorized: false },
-  max: 1,
-  min: 0,
-});
 
 let schemaReady: Promise<void> | null = null;
 
 async function initSchema() {
-  await pool.query(`
-    create extension if not exists "uuid-ossp";
-    create extension if not exists "pgcrypto";
+    await getPool().query(`
+        create extension if not exists "uuid-ossp";
+            create extension if not exists "pgcrypto";
 
-    create table if not exists projects (
-      id uuid primary key default uuid_generate_v4(),
-      name text not null,
-      client_name text,
-      created_at timestamptz not null default now()
-    );
+                create table if not exists projects (
+                      id uuid primary key default uuid_generate_v4(),
+                            name text not null,
+                                  client_name text,
+                                        created_at timestamptz not null default now()
+                                            );
 
-    create table if not exists tasks (
-      id uuid primary key default uuid_generate_v4(),
-      project_id uuid not null references projects(id) on delete cascade,
-      title text not null,
-      role text not null,
-      status text not null default 'Draft',
-      due_date date,
-      notes text,
-      created_at timestamptz not null default now()
-    );
-
-    create table if not exists content_calendar (
-      id uuid primary key default uuid_generate_v4(),
-      project_id uuid not null references projects(id) on delete cascade,
-      post_date date not null,
-      platform text not null,
-      content_type text,
-      title text,
-      status text not null default 'Draft',
-      assigned_role text,
-      created_at timestamptz not null default now()
-    );
-  `);
+                                                create table if not exists tasks (
+                                                      id uuid primary key default uuid_generate_v4(),
+                                                            project_id uuid not null references projects(id) on delete cascade,
+                                                                  title text not null,
+                                                                        role text not null,
+                                                                              status text not null default 'Draft',
+                                                                                    due_date date,
+                                                                                          notes text,
+                                                                                                created_at timestamptz not null default now()
+                                                                                                    );
+                                                                                                    
+                                                                                                        create table if not exists content_calendar (
+                                                                                                              id uuid primary key default uuid_generate_v4(),
+                                                                                                                    project_id uuid not null references projects(id) on delete cascade,
+                                                                                                                          post_date date not null,
+                                                                                                                                platform text not null,
+                                                                                                                                      content_type text,
+                                                                                                                                            title text,
+                                                                                                                                                  status text not null default 'Draft',
+                                                                                                                                                        assigned_role text,
+                                                                                                                                                              created_at timestamptz not null default now()
+                                                                                                                                                                  );
+                                                                                                                                                                    `);
 }
 
 export async function ensureSchema() {
-  if (!schemaReady) schemaReady = initSchema();
-  await schemaReady;
+    if (!schemaReady) schemaReady = initSchema();
+    await schemaReady;
 }
 
 export async function query<T = any>(text: string, params?: any[]): Promise<{ rows: T[] }> {
-  await ensureSchema();
-  return pool.query(text, params);
+    await ensureSchema();
+    return getPool().query(text, params);
 }
 
 export async function closePool() {
-  await pool.end();
+    await getPool().end();
 }
