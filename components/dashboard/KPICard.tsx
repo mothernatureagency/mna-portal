@@ -2,7 +2,14 @@
 import React from 'react';
 import { TrendingUp, TrendingDown } from 'lucide-react';
 import { useClient } from '@/context/ClientContext';
-
+type KPICardProps = {
+  label: string;
+  value: string;
+  change: number;
+  icon: React.ReactNode;
+  target: string;
+  gradient?: boolean;
+};
 export default function KPICard({ label, value, change, icon, target, gradient }) {
   const { activeClient } = useClient();
   const { gradientFrom, gradientTo } = activeClient.branding;
