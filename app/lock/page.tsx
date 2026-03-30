@@ -1,8 +1,8 @@
 'use client';
-import { useState, FormEvent } from 'react';
+import { useState, FormEvent, Suspense } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 
-export default function LockPage() {
+function LockInner() {
   const [password, setPassword] = useState('');
     const [error, setError] = useState('');
       const [loading, setLoading] = useState(false);
@@ -59,3 +59,12 @@ export default function LockPage() {
                                                                                                                                                                                                                                                                                                                                             </main>
                                                                                                                                                                                                                                                                                                                                               );
                                                                                                                                                                                                                                                                                                                                               }
+
+
+export default function LockPage() {
+  return (
+    <Suspense>
+      <LockInner />
+    </Suspense>
+  );
+}
