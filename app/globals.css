@@ -1,3 +1,96 @@
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
+
+@keyframes gradientShift {
+  0%   { background-position: 0% 50%; }
+  50%  { background-position: 100% 50%; }
+  100% { background-position: 0% 50%; }
+}
+
+@keyframes floatOrb {
+  0%, 100% { transform: translateY(0px) scale(1); }
+  50%       { transform: translateY(-20px) scale(1.05); }
+}
+
+@keyframes shimmer {
+  0%   { background-position: -200% 0; }
+  100% { background-position: 200% 0; }
+}
+
+.dashboard-bg {
+  background: linear-gradient(135deg,#eef6fb 0%,#f0f9f5 25%,#eaf4fb 50%,#f5f0fb 75%,#ebf7f5 100%);
+  background-size: 400% 400%;
+  animation: gradientShift 18s ease infinite;
+  position: relative;
+}
+
+.dashboard-bg::before {
+  content: '';
+  position: fixed;
+  top: -120px;
+  right: -80px;
+  width: 500px;
+  height: 500px;
+  border-radius: 50%;
+  background: radial-gradient(circle, rgba(12,180,200,0.08) 0%, transparent 70%);
+  animation: floatOrb 10s ease-in-out infinite;
+  pointer-events: none;
+  z-index: 0;
+}
+
+.dashboard-bg::after {
+  content: '';
+  position: fixed;
+  bottom: -100px;
+  left: 60px;
+  width: 400px;
+  height: 400px;
+  border-radius: 50%;
+  background: radial-gradient(circle, rgba(100,160,240,0.07) 0%, transparent 70%);
+  animation: floatOrb 14s ease-in-out infinite reverse;
+  pointer-events: none;
+  z-index: 0;
+}
+
+.glass-card {
+  background: rgba(255,255,255,0.72);
+  backdrop-filter: blur(20px) saturate(180%);
+  -webkit-backdrop-filter: blur(20px) saturate(180%);
+  border: 1px solid rgba(255,255,255,0.6);
+  border-radius: 20px;
+  box-shadow: 0 1px 1px rgba(0,0,0,0.03), 0 4px 12px rgba(0,0,0,0.04), 0 12px 32px rgba(12,109,164,0.06), inset 0 1px 0 rgba(255,255,255,0.8);
+  transition: all 0.25s cubic-bezier(0.4,0,0.2,1);
+}
+
+.glass-card:hover {
+  background: rgba(255,255,255,0.85);
+  box-shadow: 0 2px 4px rgba(0,0,0,0.04), 0 8px 24px rgba(0,0,0,0.07), 0 20px 48px rgba(12,109,164,0.09), inset 0 1px 0 rgba(255,255,255,0.9);
+  transform: translateY(-2px);
+}
+
+.glass-sidebar {
+  background: rgba(255,255,255,0.65);
+  backdrop-filter: blur(28px) saturate(200%);
+  -webkit-backdrop-filter: blur(28px) saturate(200%);
+  border-right: 1px solid rgba(255,255,255,0.5);
+  box-shadow: 4px 0 32px rgba(0,0,0,0.04);
+}
+
+.kpi-shimmer::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(105deg, transparent 40%, rgba(255,255,255,0.18) 50%, transparent 60%);
+  background-size: 200% 100%;
+  animation: shimmer 3.5s ease-in-out infinite;
+  border-radius: inherit;
+  pointer-events: none;
+}
+
+::-webkit-scrollbar { width: 5px; height: 5px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb { background: rgba(0,0,0,0.12); border-radius: 10px; }
+::-webkit-scrollbar-thumb:hover { background: rgba(0,0,0,0.2); }
+
+* { -webkit-font-smoothing: antialiased; -moz-osx-font-smoothing: grayscale; }
