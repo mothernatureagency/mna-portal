@@ -10,7 +10,7 @@ type KPICardProps = {
   target: string;
   gradient?: boolean;
 };
-export default function KPICard({ label, value, change, icon, target, gradient }) {
+export default function KPICard({ label, value, change, icon, target, gradient }: KPICardProps) {
   const { activeClient } = useClient();
   const { gradientFrom, gradientTo } = activeClient.branding;
   const positive = change >= 0;
