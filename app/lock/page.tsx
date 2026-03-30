@@ -19,7 +19,7 @@ function LockInner() {
                 body: JSON.stringify({ username, password }),
         });
         if (res.ok) {
-                const next = searchParams.get('next') ?? '/dashboard';
+                      const next = searchParams.get('next') ?? '/';
                 // Hard navigate so the cookie is sent and middleware re-evaluates
           window.location.href = next;
         } else {
@@ -37,10 +37,10 @@ function LockInner() {
                       >
                       <h1 className="text-white text-2xl font-semibold text-center">
                                 Mother Nature Agency
-                      </h1>h1>
+                      </h1>
                       <p className="text-neutral-400 text-sm text-center">
                                 Sign in to your portal.
-                      </p>p>
+                      </p>
                       <input
                                   type="text"
                                   value={username}
@@ -59,16 +59,16 @@ function LockInner() {
                                   autoComplete="current-password"
                                   className="rounded-lg px-4 py-3 bg-neutral-800 text-white border border-neutral-700 focus:outline-none focus:ring-2 focus:ring-green-500"
                                 />
-                {error && <p className="text-red-400 text-sm text-center">{error}</p>p>}
+                        {error && <p className="text-red-400 text-sm text-center">{error}</p>}
                       <button
                                   type="submit"
                                   disabled={loading}
                                   className="bg-green-600 hover:bg-green-500 text-white rounded-lg py-3 font-semibold transition disabled:opacity-50"
                                 >
                         {loading ? 'Signing in...' : 'Sign In'}
-                      </button>button>
-              </form>form>
-        </main>main>
+                                </button>
+                      </form>
+              </main>
       );
 }
 
