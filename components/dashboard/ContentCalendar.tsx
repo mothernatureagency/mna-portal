@@ -1,151 +1,78 @@
 'use client';
 import React from 'react';
-import { useClient } from '@/context/ClientContext';
 import Card from '@/components/ui/Card';
 
-type Post = { platform: string; type: string; color: string };
-type CalDay = { d: string; posts?: Post[] };
+const days = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
+const calendar = [
+  { day: 'Mon', date: 31, posts: [{ platform: 'IG', type: 'Reel', topic: 'Before/After', color: '#e879f9' }] },
+  { day: 'Tue', date: 1, posts: [{ platform: 'FB', type: 'Post', topic: 'Client Results', color: '#3b82f6' }, { platform: 'Blog', type: 'Article', topic: 'IV Therapy Guide', color: '#10b981' }] },
+  { day: 'Wed', date: 2, posts: [{ platform: 'IG', type: 'Story', topic: 'Day in the Life', color: '#e879f9' }] },
+  { day: 'Thu', date: 3, posts: [{ platform: 'Email', type: 'Newsletter', topic: 'April Promo', color: '#f59e0b' }] },
+  { day: 'Fri', date: 4, posts: [{ platform: 'IG', type: 'Carousel', topic: 'Top 5 Benefits', color: '#e879f9' }, { platform: 'TT', type: 'Video', topic: 'Trending Audio', color: '#111827' }] },
+  { day: 'Sat', date: 5, posts: [] },
+  { day: 'Sun', date: 6, posts: [{ platform: 'FB', type: 'Post', topic: 'Weekly Recap', color: '#3b82f6' }] },
+];
 
-const calDays: CalDay[] = [
-  { d: '31' },
-  { d: '1', posts: [{ platform: 'IG', type: 'Reel', color: '#ec4899' }] },
-  { d: '2', posts: [{ platform: 'FB', type: 'Post', color: '#3b82f6' }] },
-  { d: '3', posts: [{ platform: 'TT', type: 'Video', color: '#111827' }] },
-  { d: '4', posts: [{ platform: 'LI', type: 'Article', color: '#0a66c2' }] },
-  { d: '5' }, { d: '6' },
-  { d: '7', posts: [{ platform: 'IG', type: 'Reel', color: '#ec4899' }, { platform: 'TT', type: 'Video', color: '#111827' }] },
-  { d: '8', posts: [{ platform: 'FB', type: 'Post', color: '#3b82f6' }] },
-  { d: '9', posts: [{ platform: 'LI', type: 'Article', color: '#0a66c2' }] },
-  { d: '10', posts: [{ platform: 'IG', type: 'Story', color: '#ec4899' }] },
-  { d: '11', posts: [{ platform: 'TT', type: 'Video', color: '#111827' }, { platform: 'FB', type: 'Post', color: '#3b82f6' }] },
-  { d: '12' }, { d: '13' },
-  { d: '14', posts: [{ platform: 'IG', type: 'Reel', color: '#ec4899' }, { platform: 'LI', type: 'Article', color: '#0a66c2' }] },
-  { d: '15', posts: [{ platform: 'FB', type: 'Post', color: '#3b82f6' }] },
-  { d: '16', posts: [{ platform: 'TT', type: 'Video', color: '#111827' }] },
-  { d: '17', posts: [{ platform: 'IG', type: 'Story', color: '#ec4899' }] },
-  { d: '18', posts: [{ platform: 'LI', type: 'Article', color: '#0a66c2' }, { platform: 'TT', type: 'Video', color: '#111827' }] },
-  { d: '19' }, { d: '20' },
-  { d: '21', posts: [{ platform: 'IG', type: 'Reel', color: '#ec4899' }] },
-  ];
-
-const trendIdeas = [
-  { tag: '#TikTokHealth', trend: '↑ 340% this week', idea: 'Before & after transformation — client result with AI voiceover overlay', platform: 'TikTok', platformColor: '#111827', priority: 'Hot 🔥' },
-  { tag: '#WellnessWednesday', trend: '↑ 180% this week', idea: '5 signs your body needs IV therapy — carousel with stats', platform: 'Instagram', platformColor: '#ec4899', priority: 'Hot 🔥' },
-  { tag: '#MedSpaMarketing', trend: '↑ 95% this month', idea: 'Behind the scenes: how we built 3x ROI in 90 days for a client', platform: 'LinkedIn', platformColor: '#0a66c2', priority: 'Trending' },
-  { tag: '#HealthTech2026', trend: '↑ 220% this month', idea: 'AI in aesthetics — what clients actually want to know', platform: 'Facebook', platformColor: '#3b82f6', priority: 'Trending' },
-  { tag: '#SpringWellness', trend: '↑ 410% seasonal', idea: 'Spring refresh campaign — limited-time offer hook reel', platform: 'Instagram', platformColor: '#ec4899', priority: 'Seasonal 🌱' },
-  ];
-
-const weekDays = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
-const legend = [
-  { label: 'Instagram', color: '#ec4899' },
-  { label: 'Facebook', color: '#3b82f6' },
-  { label: 'TikTok', color: '#111827' },
-  { label: 'LinkedIn', color: '#0a66c2' },
-  ];
+const trends = [
+  { tag: '#WellnessTrends2026', volume: '2.4M', fit: 'High', idea: 'How IV therapy fits the 2026 wellness movement' },
+  { tag: '#NaturoPath', volume: '890K', fit: 'High', idea: 'What makes natural healing so effective — explainer reel' },
+  { tag: '#MomBossLife', volume: '1.1M', fit: 'Medium', idea: 'Running a wellness business as a mom — behind the scenes' },
+  { tag: '#AntiAgingSecrets', volume: '3.2M', fit: 'High', idea: 'The science behind IV anti-aging treatments' },
+];
 
 export default function ContentCalendar() {
-    const { activeClient } = useClient();
-    const { gradientFrom, gradientTo } = activeClient.branding;
-
   return (
-        <div className="grid gap-5" style={{ gridTemplateColumns: '1.5fr 1fr' }}>
-          {/* Calendar */}
-                <Card className="p-6">
-                        <div className="flex items-start justify-between mb-4">
-                                  <div>
-                                              <h3 className="text-[15px] font-bold text-gray-900 tracking-tight">📅 Content Calendar — April 2026</h3>h3>
-                                              <p className="text-[11px] text-gray-400 mt-0.5">Scheduled posts across all platforms</p>p>
-                                  </div>div>
-                                  <button
-                                                className="px-3 py-1.5 rounded-xl text-[11px] font-bold text-white"
-                                                style={{ background: `linear-gradient(135deg, ${gradientFrom}, ${gradientTo})` }}
-                                              >
-                                              + Add Post
-                                  </button>button>
-                        </div>div>
-                
-                  {/* Day headers */}
-                        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(7, 1fr)', gap: 4, marginBottom: 4 }}>
-                          {weekDays.map((d) => (
-                      <div key={d} style={{ textAlign: 'center', fontSize: 10, fontWeight: 700, color: '#9ca3af', padding: '4px 0' }}>{d}</div>div>
-                    ))}
-                        </div>div>
-                
-                  {/* Calendar grid */}
-                        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(7, 1fr)', gap: 4 }}>
-                          {calDays.map((day, i) => (
-                      <div
-                                      key={i}
-                                      style={{
-                                                        minHeight: 52,
-                                                        background: day.posts && day.posts.length > 0 ? '#f0f9ff' : '#fafafa',
-                                                        border: `1px solid ${day.posts && day.posts.length > 0 ? '#dbeafe' : '#f3f4f6'}`,
-                                                        borderRadius: 8,
-                                                        padding: 4,
-                                      }}
-                                    >
-                                    <div style={{ fontSize: 10, fontWeight: 600, color: '#374151', marginBottom: 2 }}>{day.d}</div>div>
-                                    <div style={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
-                                      {(day.posts || []).map((p, j) => (
-                                                        <div key={j} style={{ background: p.color, color: 'white', borderRadius: 4, padding: '1px 4px', fontSize: 8, fontWeight: 700, textAlign: 'center' }}>
-                                                          {p.platform} {p.type}
-                                                        </div>div>
-                                                      ))}
-                                    </div>div>
-                      </div>div>
-                    ))}
-                        </div>div>
-                
-                  {/* Legend */}
-                        <div style={{ display: 'flex', gap: 12, marginTop: 12, paddingTop: 10, borderTop: '1px solid #f3f4f6' }}>
-                          {legend.map((l) => (
-                      <div key={l.label} style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
-                                    <div style={{ width: 10, height: 10, borderRadius: 3, background: l.color, flexShrink: 0 }} />
-                                    <span style={{ fontSize: 10, color: '#6b7280' }}>{l.label}</span>span>
-                      </div>div>
-                    ))}
-                        </div>div>
-                </Card>Card>
-        
-          {/* AI Trend Ideas */}
-              <Card className="p-6">
-                      <div className="flex items-center justify-between mb-4">
-                                <div>
-                                            <h3 className="text-[15px] font-bold text-gray-900 tracking-tight">🤖 AI Trend Ideas</h3>h3>
-                                            <p className="text-[11px] text-gray-400 mt-0.5">Pulled from health &amp; wellness trends</p>p>
-                                </div>div>
-                                <div style={{ background: '#f5f3ff', padding: '4px 10px', borderRadius: 99, fontSize: 10, fontWeight: 700, color: '#7c3aed' }}>Live Trends</div>div>
-                      </div>div>
-              
-                      <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-                        {trendIdeas.map((item, i) => (
-                      <div key={i} style={{ padding: '10px 12px', background: '#fafafa', borderRadius: 12, border: '1px solid #f0f0f0' }}>
-                                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 4 }}>
-                                                    <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-                                                                      <span style={{ fontSize: 10, fontWeight: 700, color: '#7c3aed' }}>{item.tag}</span>span>
-                                                                      <span style={{ fontSize: 9, color: '#9ca3af' }}>{item.trend}</span>span>
-                                                    </div>div>
-                                                    <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
-                                                                      <div style={{ width: 6, height: 6, borderRadius: '50%', background: item.platformColor }} />
-                                                                      <span style={{ fontSize: 9, color: '#9ca3af' }}>{item.priority}</span>span>
-                                                    </div>div>
-                                    </div>div>
-                                    <p style={{ fontSize: 11, color: '#374151', margin: '0 0 6px 0', lineHeight: 1.4 }}>{item.idea}</p>p>
-                                    <button style={{ background: item.platformColor, color: 'white', border: 'none', borderRadius: 6, padding: '3px 10px', fontSize: 10, fontWeight: 600, cursor: 'pointer' }}>
-                                                    Add to {item.platform} Calendar +
-                                    </button>button>
-                      </div>div>
-                    ))}
-                      
-                                <button
-                                              className="w-full py-2.5 rounded-xl text-[12px] font-bold transition-all hover:opacity-90"
-                                              style={{ background: '#f5f3ff', color: '#7c3aed', border: '1px solid #ddd6fe' }}
-                                            >
-                                            ⚡ Generate Fresh Trend Ideas
-                                </button>button>
-                      </div>div>
-              </Card>Card>
-        </div>div>
-      );
-}</Card>
+    <div className="flex flex-col gap-5">
+      <Card className="p-6">
+        <div className="flex items-center justify-between mb-4">
+          <div>
+            <h3 className="text-[15px] font-bold text-gray-900 tracking-tight">Content Calendar</h3>
+            <p className="text-[11px] text-gray-400 mt-0.5">April 2026 · AI-planned schedule</p>
+          </div>
+          <button className="text-[12px] font-semibold px-3 py-1.5 rounded-xl bg-gray-100 text-gray-600">
+            + Add Post
+          </button>
+        </div>
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(7, 1fr)', gap: 8 }}>
+          {calendar.map((d) => (
+            <div key={d.day}>
+              <div className="text-center mb-2">
+                <div className="text-[9px] font-bold uppercase text-gray-400">{d.day}</div>
+                <div className="text-[13px] font-black text-gray-700">{d.date}</div>
+              </div>
+              <div className="flex flex-col gap-1.5" style={{ minHeight: 80 }}>
+                {d.posts.map((p, i) => (
+                  <div key={i} className="rounded-lg p-1.5" style={{ background: p.color + '15', borderLeft: `2px solid ${p.color}` }}>
+                    <div className="text-[8px] font-bold" style={{ color: p.color }}>{p.platform} · {p.type}</div>
+                    <div className="text-[9px] text-gray-600 mt-0.5 leading-tight">{p.topic}</div>
+                  </div>
+                ))}
+                {d.posts.length === 0 && (
+                  <div className="rounded-lg border border-dashed border-gray-200 flex items-center justify-center" style={{ minHeight: 48 }}>
+                    <span className="text-[9px] text-gray-300">empty</span>
+                  </div>
+                )}
+              </div>
+            </div>
+          ))}
+        </div>
+      </Card>
+      <Card className="p-6">
+        <h3 className="text-[15px] font-bold text-gray-900 tracking-tight mb-1">AI Trend Ideas</h3>
+        <p className="text-[11px] text-gray-400 mb-4">Trending topics matched to your brand</p>
+        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
+          {trends.map((t, i) => (
+            <div key={i} className="p-4 rounded-xl" style={{ background: '#f8fafc', border: '1px solid #e5e7eb' }}>
+              <div className="flex items-center justify-between mb-1">
+                <span className="text-[11px] font-black text-blue-500">{t.tag}</span>
+                <span className="text-[9px] font-bold px-2 py-0.5 rounded-full" style={{ background: t.fit === 'High' ? '#dcfce7' : '#fef9c3', color: t.fit === 'High' ? '#16a34a' : '#ca8a04' }}>{t.fit} Fit</span>
+              </div>
+              <div className="text-[10px] text-gray-400 mb-2">{t.volume} posts this week</div>
+              <div className="text-[11px] text-gray-700 font-medium">{t.idea}</div>
+            </div>
+          ))}
+        </div>
+      </Card>
+    </div>
+  );
+}
