@@ -1,0 +1,24 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(npm install:*)",
+      "Read(//usr/local/bin/**)",
+      "Read(//opt/homebrew/bin/**)",
+      "Read(//Users/alexuswilliams/**)",
+      "Bash(export PATH=$PATH:/usr/local/bin:/opt/homebrew/bin:/usr/bin)",
+      "Read(//Applications/**)",
+      "Bash(source ~/.zshrc)",
+      "Bash(source ~/.bashrc)",
+      "Bash(source ~/.bash_profile)",
+      "Bash(env)",
+      "Bash(brew list:*)",
+      "Bash(ls /usr/local/bin/node /opt/homebrew/bin/node ~/.nvm/versions/node/*/bin/node)",
+      "Bash(source ~/.zprofile)",
+      "mcp__Claude_Preview__preview_start",
+      "Bash(kill 12661)",
+      "Bash(xargs kill:*)",
+      "Bash(/opt/homebrew/bin/node --version)",
+      "Bash(python3 -c \":*)"
+    ]
+  }
+}

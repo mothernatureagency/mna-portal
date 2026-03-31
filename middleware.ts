@@ -1,11 +1,10 @@
-import type { NextRequest } from 'next/server';
-import { NextResponse } from 'next/server';
+import { createServerClient } from '@supabase/ssr';
+import { NextResponse, type NextRequest } from 'next/server';
 
-const COOKIE_NAME = 'mna_portal_auth';
-
-function isPublic(pathname: string) {
+// Routes that don't require authentication
+function isPublicRoute(pathname: string) {
   return (
-    pathname.startsWith('/lock') ||
+    pathname.startsWith('/login') ||
     pathname.startsWith('/api/lock') ||
     pathname.startsWith('/api/seed-users') ||
     pathname.startsWith('/_next') ||
@@ -13,27 +12,53 @@ function isPublic(pathname: string) {
   );
 }
 
-function isAuthenticated(req: NextRequest): boolean {
-  const raw = req.cookies.get(COOKIE_NAME)?.value;
-  if (!raw) return false;
-  try {
-    const parsed = JSON.parse(raw);
-    return typeof parsed.username === 'string' && parsed.username.length > 0;
-  } catch {
-    return false;
+export async function middleware(request: NextRequest) {
+  // Start with a passthrough response — we'll replace it if needed
+  let supabaseResponse = NextResponse.next({ request });
+
+  const supabase = createServerClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
+    {
+      cookies: {
+        getAll() {
+          return request.cookies.getAll();
+        },
+        setAll(cookiesToSet) {
+          // Write cookies onto the request object first
+          cookiesToSet.forEach(({ name, value }) =>
+            request.cookies.set(name, value)
+          );
+          // Then recreate the response so cookies are forwarded to the browser
+          supabaseResponse = NextResponse.next({ request });
+          cookiesToSet.forEach(({ name, value, options }) =>
+            supabaseResponse.cookies.set(name, value, options)
+          );
+        },
+      },
+    }
+  );
+
+  // Refresh the session — this must happen before any redirect logic
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+
+  const { pathname } = request.nextUrl;
+
+  // Let public routes through
+  if (isPublicRoute(pathname)) return supabaseResponse;
+
+  // No session → redirect to /login
+  if (!user) {
+    const url = request.nextUrl.clone();
+    url.pathname = '/login';
+    url.searchParams.set('next', pathname);
+    return NextResponse.redirect(url);
   }
-}
 
-export function middleware(req: NextRequest) {
-  const pathname = req.nextUrl.pathname;
-  if (isPublic(pathname)) return NextResponse.next();
-
-  if (isAuthenticated(req)) return NextResponse.next();
-
-  const redirectUrl = req.nextUrl.clone();
-  redirectUrl.pathname = '/lock';
-  redirectUrl.searchParams.set('next', req.nextUrl.pathname + req.nextUrl.search);
-  return NextResponse.redirect(redirectUrl);
+  // Authenticated → allow access
+  return supabaseResponse;
 }
 
 export const config = {

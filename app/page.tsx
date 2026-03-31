@@ -9,6 +9,7 @@ import AIInsightsPanel from '@/components/dashboard/AIInsightsPanel';
 import FinancialProjections from '@/components/dashboard/FinancialProjections';
 import LeadFollowUp from '@/components/dashboard/LeadFollowUp';
 import ContentCalendar from '@/components/dashboard/ContentCalendar';
+import UserBanner from '@/components/dashboard/UserBanner';
 import Card from '@/components/ui/Card';
 
 const kpiTop = [
@@ -42,6 +43,11 @@ export default function DashboardPage() {
   const { gradientFrom, gradientTo } = activeClient.branding;
   return (
     <div className="space-y-8 max-w-[1400px]">
+
+      {/* ── User Session Banner ──────────────────────────── */}
+      <UserBanner />
+
+      {/* ── Page Header ─────────────────────────────────── */}
       <div className="flex items-center justify-between pt-1">
         <div>
           <div className="flex items-center gap-2 mb-1">

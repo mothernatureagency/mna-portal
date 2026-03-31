@@ -1,7 +1,38 @@
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&display=swap');
+
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
 
+:root {
+  --brand-primary: #0c6da4;
+  --brand-mid: #2e8fc0;
+  --brand-aqua: #4ab8ce;
+  --brand-secondary: #86d6e1;
+  --brand-pale: #e8f7fa;
+  --sidebar-width: 256px;
+  --header-height: 64px;
+}
+
+/* ─── Base ─────────────────────────────────────────────── */
+*, *::before, *::after {
+  box-sizing: border-box;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+html {
+  text-rendering: optimizeLegibility;
+}
+
+body {
+  font-family: 'Inter', system-ui, -apple-system, sans-serif;
+  background-color: #f5f7fb;
+  color: #111827;
+  min-height: 100vh;
+}
+
+/* ─── Animated dashboard background ────────────────────── */
 @keyframes gradientShift {
   0%   { background-position: 0% 50%; }
   50%  { background-position: 100% 50%; }
@@ -28,10 +59,8 @@
 .dashboard-bg::before {
   content: '';
   position: fixed;
-  top: -120px;
-  right: -80px;
-  width: 500px;
-  height: 500px;
+  top: -120px; right: -80px;
+  width: 500px; height: 500px;
   border-radius: 50%;
   background: radial-gradient(circle, rgba(12,180,200,0.08) 0%, transparent 70%);
   animation: floatOrb 10s ease-in-out infinite;
@@ -42,10 +71,8 @@
 .dashboard-bg::after {
   content: '';
   position: fixed;
-  bottom: -100px;
-  left: 60px;
-  width: 400px;
-  height: 400px;
+  bottom: -100px; left: 60px;
+  width: 400px; height: 400px;
   border-radius: 50%;
   background: radial-gradient(circle, rgba(100,160,240,0.07) 0%, transparent 70%);
   animation: floatOrb 14s ease-in-out infinite reverse;
@@ -53,6 +80,7 @@
   z-index: 0;
 }
 
+/* ─── Glass components ──────────────────────────────────── */
 .glass-card {
   background: rgba(255,255,255,0.72);
   backdrop-filter: blur(20px) saturate(180%);
@@ -88,9 +116,76 @@
   pointer-events: none;
 }
 
+/* ─── Card base ─────────────────────────────────────────── */
+.card-base {
+  background: #ffffff;
+  border-radius: 20px;
+  border: 1px solid rgba(0,0,0,0.05);
+  box-shadow: 0 1px 2px rgba(0,0,0,0.04), 0 4px 12px rgba(0,0,0,0.04), 0 12px 32px rgba(12,109,164,0.05);
+}
+
+/* ─── Utility classes ───────────────────────────────────── */
+@layer utilities {
+  .gradient-text {
+    background-clip: text;
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    color: transparent;
+  }
+
+  .glass {
+    background: rgba(255,255,255,0.8);
+    backdrop-filter: blur(12px);
+    -webkit-backdrop-filter: blur(12px);
+  }
+
+  .glass-dark {
+    background: rgba(255,255,255,0.06);
+    backdrop-filter: blur(12px);
+    -webkit-backdrop-filter: blur(12px);
+  }
+
+  .animate-in {
+    animation: fadeIn 0.2s ease-out both;
+  }
+}
+
+/* ─── Scrollbar ─────────────────────────────────────────── */
 ::-webkit-scrollbar { width: 5px; height: 5px; }
 ::-webkit-scrollbar-track { background: transparent; }
 ::-webkit-scrollbar-thumb { background: rgba(0,0,0,0.12); border-radius: 10px; }
 ::-webkit-scrollbar-thumb:hover { background: rgba(0,0,0,0.2); }
 
-* { -webkit-font-smoothing: antialiased; -moz-osx-font-smoothing: grayscale; }
+/* ─── Animations ────────────────────────────────────────── */
+@keyframes fadeIn {
+  from { opacity: 0; transform: translateY(6px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
+@keyframes slideDown {
+  from { opacity: 0; transform: translateY(-8px) scale(0.98); }
+  to   { opacity: 1; transform: translateY(0) scale(1); }
+}
+
+@keyframes glowPulse {
+  0%, 100% { box-shadow: 0 0 16px rgba(74,184,206,0.2); }
+  50%       { box-shadow: 0 0 32px rgba(74,184,206,0.45); }
+}
+
+.nav-active-glow {
+  box-shadow: 0 4px 12px rgba(12,109,164,0.3), 0 2px 4px rgba(12,109,164,0.2);
+}
+
+.animate-glow-pulse { animation: glowPulse 3s ease-in-out infinite; }
+.animate-slide-down { animation: slideDown 0.18s cubic-bezier(0.16,1,0.3,1) both; }
+
+/* ─── Component overrides ───────────────────────────────── */
+input, select, textarea { font-family: inherit; }
+h1, h2, h3, h4, h5, h6 { letter-spacing: -0.01em; }
+
+/* ─── Focus ring ─────────────────────────────────────────── */
+:focus-visible {
+  outline: 2px solid var(--brand-aqua);
+  outline-offset: 2px;
+  border-radius: 8px;
+}
