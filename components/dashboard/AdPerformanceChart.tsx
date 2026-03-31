@@ -111,4 +111,4 @@ export default function AdPerformanceChart() {
                 </Card>
           </div>
         );
-}</div>
+}
