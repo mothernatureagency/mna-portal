@@ -20,14 +20,14 @@ export default function AdPerformanceChart() {
           if (!active || !payload?.length) return null;
           return (
                   <div className="rounded-2xl px-4 py-3" style={{ background: 'rgba(255,255,255,0.97)', border: '1px solid rgba(0,0,0,0.06)', boxShadow: '0 8px 32px rgba(0,0,0,0.12)' }}>
-                            <div className="font-semibold text-gray-800 mb-1.5 text-[12px]">{label}</div>div>
+                            <div className="font-semibold text-gray-800 mb-1.5 text-[12px]">{label}</div>
                     {payload.map((p, i) => (
                               <div key={i} className="text-[12px]">
-                                          <span className="text-gray-500">{p.name}: </span>span>
-                                          <span className="font-bold text-gray-900">${p.value?.toLocaleString()}</span>span>
-                              </div>div>
+                                          <span className="text-gray-500">{p.name}: </span>
+                                          <span className="font-bold text-gray-900">${p.value?.toLocaleString()}</span>
+                              </div>
                             ))}
-                  </div>div>
+                  </div>
                 );
     };
   
@@ -39,7 +39,7 @@ export default function AdPerformanceChart() {
           return (
                   <text x={x} y={y} fill="#374151" textAnchor={x > cx ? 'start' : 'end'} dominantBaseline="central" style={{ fontSize: 11, fontWeight: 700, fontFamily: 'Inter' }}>
                     {name} {value}%
-                  </text>text>
+                  </text>
                 );
     };
   
@@ -48,9 +48,9 @@ export default function AdPerformanceChart() {
             {/* Bar chart */}
                 <Card className="p-6">
                         <div className="mb-5">
-                                  <h3 className="text-[15px] font-bold text-gray-900 tracking-tight">Ad Spend by Platform</h3>h3>
-                                  <p className="text-[11px] text-gray-400 mt-0.5">Total spend this month</p>p>
-                        </div>div>
+                                  <h3 className="text-[15px] font-bold text-gray-900 tracking-tight">Ad Spend by Platform</h3>
+                                  <p className="text-[11px] text-gray-400 mt-0.5">Total spend this month</p>
+                        </div>
                         <ResponsiveContainer width="100%" height={220}>
                                   <BarChart data={adPerformanceData} margin={{ top: 4, right: 4, bottom: 0, left: -24 }} barSize={32}>
                                               <CartesianGrid strokeDasharray="3 3" stroke="rgba(0,0,0,0.04)" vertical={false} />
@@ -61,29 +61,29 @@ export default function AdPerformanceChart() {
                                                 {adPerformanceData.map((_, i) => (
                             <Cell key={i} fill={colors[i % colors.length]} />
                           ))}
-                                              </Bar>Bar>
-                                  </BarChart>BarChart>
-                        </ResponsiveContainer>ResponsiveContainer>
+                                              </Bar>
+                                  </BarChart>
+                        </ResponsiveContainer>
                 
                   {/* CPL row — horizontal grid UNDER the chart */}
                         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr 1fr', gap: 8, marginTop: 16, paddingTop: 14, borderTop: '1px solid #f3f4f6' }}>
                           {adPerformanceData.map((d, i) => (
                         <div key={i} style={{ background: colors[i % colors.length] + '10', border: '1px solid ' + colors[i % colors.length] + '25', borderRadius: 10, padding: '8px 4px', textAlign: 'center' }}>
-                                      <div style={{ fontSize: 10, fontWeight: 700, color: colors[i % colors.length], marginBottom: 3 }}>{d.platform}</div>div>
-                                      <div style={{ fontSize: 18, fontWeight: 900, color: '#111827', lineHeight: 1 }}>${d.cpl.toFixed(0)}</div>div>
-                                      <div style={{ fontSize: 9, fontWeight: 600, color: '#9ca3af', marginTop: 1 }}>CPL</div>div>
-                                      <div style={{ fontSize: 9, color: '#9ca3af', marginTop: 3 }}>${(d.spend / 1000).toFixed(1)}K spent</div>div>
-                        </div>div>
+                                      <div style={{ fontSize: 10, fontWeight: 700, color: colors[i % colors.length], marginBottom: 3 }}>{d.platform}</div>
+                                      <div style={{ fontSize: 18, fontWeight: 900, color: '#111827', lineHeight: 1 }}>${d.cpl.toFixed(0)}</div>
+                                      <div style={{ fontSize: 9, fontWeight: 600, color: '#9ca3af', marginTop: 1 }}>CPL</div>
+                                      <div style={{ fontSize: 9, color: '#9ca3af', marginTop: 3 }}>${(d.spend / 1000).toFixed(1)}K spent</div>
+                        </div>
                       ))}
-                        </div>div>
-                </Card>Card>
+                        </div>
+                </Card>
           
             {/* Pie chart */}
                 <Card className="p-6">
                         <div className="mb-3">
-                                  <h3 className="text-[15px] font-bold text-gray-900 tracking-tight">Lead Sources</h3>h3>
-                                  <p className="text-[11px] text-gray-400 mt-0.5">Distribution this month</p>p>
-                        </div>div>
+                                  <h3 className="text-[15px] font-bold text-gray-900 tracking-tight">Lead Sources</h3>
+                                  <p className="text-[11px] text-gray-400 mt-0.5">Distribution this month</p>
+                        </div>
                         <ResponsiveContainer width="100%" height={240}>
                                   <PieChart>
                                               <Pie
@@ -101,15 +101,15 @@ export default function AdPerformanceChart() {
                                                 {updatedPlatformData.map((entry, i) => (
                                                                               <Cell key={i} fill={entry.color} />
                                                                             ))}
-                                              </Pie>Pie>
+                                              </Pie>
                                               <Tooltip
                                                               contentStyle={{ borderRadius: '16px', border: 'none', boxShadow: '0 8px 32px rgba(0,0,0,0.12)', fontSize: '12px' }}
                                                               formatter={(v) => [v + '%', 'Share']}
                                                             />
-                                  </PieChart>PieChart>
-                        </ResponsiveContainer>ResponsiveContainer>
-                </Card>Card>
-          </div>div>
+                                  </PieChart>
+                        </ResponsiveContainer>
+                </Card>
+          </div>
         );
 }</div>
 export default function AdPerformanceChart() {
