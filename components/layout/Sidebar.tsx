@@ -2,117 +2,144 @@
 import React from 'react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
-import {
-  LayoutDashboard, Users, UserPlus, Megaphone, FileText,
-  Database, BarChart2, Zap, Settings,
-} from 'lucide-react';
-import Logo from '@/components/logo/Logo';
 import { useClient } from '@/context/ClientContext';
 import { clsx } from 'clsx';
+import Logo from '@/components/logo/Logo';
 
-const navItems = [
-  { label: 'Dashboard', href: '/', icon: LayoutDashboard },
-  { label: 'Clients', href: '/clients', icon: Users },
-  { label: 'Leads', href: '/leads', icon: UserPlus },
-  { label: 'Campaigns', href: '/campaigns', icon: Megaphone },
-  { label: 'Content', href: '/content', icon: FileText },
-  { label: 'CRM', href: '/crm', icon: Database },
-  { label: 'Reports', href: '/reports', icon: BarChart2 },
-  { label: 'Automations', href: '/automations', icon: Zap },
-];
-
-const bottomItems = [
-  { label: 'Settings', href: '/settings', icon: Settings },
-];
+// Nav sections matching the screenshot design
+const navSections = [
+  {
+        label: 'MAIN',
+        items: [
+          { label: 'Overview', href: '/', emoji: '📊' },
+          { label: 'Top Hooks', href: '/top-hooks', emoji: '🪝' },
+          { label: 'Content Tracker', href: '/content', emoji: '📋' },
+          { label: 'Ad Performance', href: '/campaigns', emoji: '💰' },
+              ],
+  },
+  {
+        label: 'CRM',
+        items: [
+          { label: 'Lead Tracking', href: '/leads', emoji: '🎯' },
+          { label: 'Campaigns', href: '/campaigns', emoji: '🚀' },
+          { label: 'Task Manager', href: '/crm', emoji: '✅' },
+              ],
+  },
+  {
+        label: 'INTELLIGENCE',
+        items: [
+          { label: 'AI Insights', href: '/reports', emoji: '🧠' },
+              ],
+  },
+  ];
 
 export default function Sidebar() {
-  const pathname = usePathname();
-  const { activeClient } = useClient();
-  const { gradientFrom, gradientTo } = activeClient.branding;
-
-  const NavLink = ({ label, href, icon: Icon }: typeof navItems[0]) => {
-    const isActive = pathname === href;
-    return (
-      <Link
-        href={href}
-        className={clsx(
-          'group flex items-center gap-3 px-3 py-[9px] rounded-xl text-[13px] font-medium transition-all duration-200 relative',
-          isActive ? 'text-white' : 'text-gray-500 hover:text-gray-800 hover:bg-white/60'
-        )}
-        style={isActive ? {
-          background: `linear-gradient(135deg, ${gradientFrom} 0%, ${gradientTo} 100%)`,
-          boxShadow: `0 4px 12px ${gradientFrom}40, 0 1px 3px rgba(0,0,0,0.1)`,
-        } : {}}
-      >
-        <Icon
-          size={15}
-          className={clsx(
-            'flex-shrink-0 transition-colors duration-200',
-            isActive ? 'text-white/90' : 'text-gray-400 group-hover:text-gray-600'
-          )}
-        />
-        <span className="flex-1 tracking-[-0.01em]">{label}</span>
-        {isActive && (
-          <span className="w-1.5 h-1.5 rounded-full bg-white/60 flex-shrink-0" />
-        )}
-      </Link>
-    );
-  };
+    const pathname = usePathname();
+    const { activeClient } = useClient();
 
   return (
-    <aside className="glass-sidebar w-64 min-h-screen flex flex-col flex-shrink-0 relative z-10">
-      {/* Logo */}
-      <div className="h-16 flex items-center px-5" style={{ borderBottom: '1px solid rgba(255,255,255,0.4)' }}>
-        <Logo variant="sidebar" />
-      </div>
-
-      {/* Nav label */}
-      <div className="px-5 pt-5 pb-2">
-        <span className="text-[10px] font-semibold tracking-[0.12em] text-gray-300 uppercase">
-          Navigation
-        </span>
-      </div>
-
-      {/* Main nav */}
-      <nav className="flex-1 px-3 space-y-0.5 overflow-y-auto pb-4">
-        {navItems.map((item) => (
-          <NavLink key={item.href} {...item} />
-        ))}
-      </nav>
-
-      {/* Divider */}
-      <div className="mx-5 h-px" style={{ background: 'rgba(0,0,0,0.06)' }} />
-
-      {/* Bottom nav */}
-      <div className="px-3 py-3">
-        {bottomItems.map((item) => (
-          <NavLink key={item.href} {...item} />
-        ))}
-      </div>
-
-      {/* Pro plan badge */}
-      <div className="px-4 pb-5">
-        <div
-          className="rounded-2xl p-4 relative overflow-hidden"
-          style={{
-            background: `linear-gradient(135deg, ${gradientFrom}14 0%, ${gradientTo}20 100%)`,
-            border: `1px solid ${gradientFrom}25`,
-            backdropFilter: 'blur(10px)',
-          }}
-        >
-          {/* Glowing dot */}
-          <div
-            className="absolute top-3 right-3 w-2 h-2 rounded-full"
-            style={{ background: gradientTo, boxShadow: `0 0 6px ${gradientTo}80` }}
-          />
-          <div className="text-[11px] font-bold mb-0.5" style={{ color: gradientFrom }}>
-            Pro Plan Active
-          </div>
-          <div className="text-[11px] text-gray-400 leading-relaxed">
-            All features enabled
-          </div>
-        </div>
-      </div>
-    </aside>
-  );
-}
+        <aside
+                style={{
+                          width: '240px',
+                          minWidth: '240px',
+                          height: '100vh',
+                          background: 'linear-gradient(180deg, #0f1f2e 0%, #0d1b2a 60%, #0a1628 100%)',
+                          display: 'flex',
+                          flexDirection: 'column',
+                          borderRight: '1px solid rgba(255,255,255,0.07)',
+                          position: 'relative',
+                          flexShrink: 0,
+                }}
+              >
+          {/* Logo */}
+              <div style={{ padding: '18px 20px 14px', display: 'flex', alignItems: 'center', gap: '10px', borderBottom: '1px solid rgba(255,255,255,0.07)' }}>
+                      <div style={{
+                          width: '36px', height: '36px', borderRadius: '10px',
+                          background: 'linear-gradient(135deg, #1a7a5e, #0fa86e)',
+                          display: 'flex', alignItems: 'center', justifyContent: 'center',
+                          flexShrink: 0,
+              }}>
+                                <Logo />
+                      </div>div>
+                      <div>
+                                <div style={{ color: '#fff', fontSize: '11px', fontWeight: 800, letterSpacing: '0.04em', lineHeight: 1.2 }}>MOTHER NATURE</div>div>
+                                <div style={{ color: 'rgba(255,255,255,0.5)', fontSize: '9px', fontWeight: 600, letterSpacing: '0.12em', textTransform: 'uppercase' }}>Agency</div>div>
+                      </div>div>
+              </div>div>
+        
+          {/* Active Client Block */}
+              <div style={{ margin: '14px 12px 8px', padding: '10px 14px', background: 'rgba(255,255,255,0.07)', borderRadius: '12px', border: '1px solid rgba(255,255,255,0.1)' }}>
+                      <div style={{ color: 'rgba(255,255,255,0.45)', fontSize: '9.5px', fontWeight: 600, letterSpacing: '0.12em', textTransform: 'uppercase', marginBottom: '3px' }}>Active Client</div>div>
+                      <div style={{ color: '#fff', fontSize: '13px', fontWeight: 700 }}>{activeClient?.name || 'Prime IV Niceville'}</div>div>
+              </div>div>
+        
+          {/* Nav Sections */}
+              <nav style={{ flex: 1, overflowY: 'auto', padding: '8px 10px 16px' }}>
+                {navSections.map((section) => (
+                          <div key={section.label} style={{ marginBottom: '6px' }}>
+                            {/* Section Label */}
+                                      <div style={{
+                                          color: 'rgba(255,255,255,0.35)',
+                                          fontSize: '9.5px',
+                                          fontWeight: 700,
+                                          letterSpacing: '0.14em',
+                                          textTransform: 'uppercase',
+                                          padding: '10px 10px 4px',
+                          }}>
+                                        {section.label}
+                                      </div>div>
+                            {/* Items */}
+                            {section.items.map((item) => {
+                                          const isActive = pathname === item.href || (item.href !== '/' && pathname?.startsWith(item.href));
+                                          return (
+                                                            <Link
+                                                                                key={item.href}
+                                                                                href={item.href}
+                                                                                style={{
+                                                                                                      display: 'flex',
+                                                                                                      alignItems: 'center',
+                                                                                                      gap: '10px',
+                                                                                                      padding: '8px 10px',
+                                                                                                      borderRadius: '10px',
+                                                                                                      fontSize: '13px',
+                                                                                                      fontWeight: isActive ? 600 : 400,
+                                                                                                      color: isActive ? '#fff' : 'rgba(255,255,255,0.6)',
+                                                                                                      background: isActive ? 'rgba(255,255,255,0.1)' : 'transparent',
+                                                                                                      textDecoration: 'none',
+                                                                                                      transition: 'all 0.15s ease',
+                                                                                                      marginBottom: '1px',
+                                                                                }}
+                                                                              >
+                                                                              <span style={{ fontSize: '15px', lineHeight: 1 }}>{item.emoji}</span>span>
+                                                                              <span>{item.label}</span>span>
+                                                              {isActive && (
+                                                                                                    <span style={{
+                                                                                                                            marginLeft: 'auto',
+                                                                                                                            width: '6px', height: '6px',
+                                                                                                                            borderRadius: '50%',
+                                                                                                                            background: '#4ade80',
+                                                                                                                            flexShrink: 0,
+                                                                                                      }} />
+                                                                                                  )}
+                                                            </Link>Link>
+                                                          );
+                          })}
+                          </div>div>
+                        ))}
+              </nav>nav>
+        
+          {/* Bottom active page highlight - Revenue Forecast style */}
+              <div style={{ padding: '10px', borderTop: '1px solid rgba(255,255,255,0.07)' }}>
+                      <div style={{
+                          display: 'flex', alignItems: 'center', gap: '10px',
+                          padding: '9px 12px', borderRadius: '10px',
+                          background: 'rgba(255,255,255,0.08)',
+                          border: '1px solid rgba(255,255,255,0.1)',
+              }}>
+                                <span style={{ fontSize: '15px' }}>📈</span>span>
+                                <span style={{ color: '#fff', fontSize: '13px', fontWeight: 600 }}>Revenue Forecast</span>span>
+                      </div>div>
+              </div>div>
+        </aside>aside>
+      );
+}</aside>
