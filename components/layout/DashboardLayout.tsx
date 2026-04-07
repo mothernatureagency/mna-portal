@@ -5,7 +5,8 @@ import Header from './Header';
 const darkBg = {
       display: 'flex',
       minHeight: '100vh',
-      background: 'linear-gradient(135deg,#0d1b2a 0%,#0f2236 40%,#0a1e35 70%,#0d2040 100%)',
+      background: 'linear-gradient(135deg,#0a1929 0%,#0d2b47 25%,#124b73 50%,#1e79a6 75%,#4ab8ce 100%)',
+      backgroundAttachment: 'fixed',
 } as React.CSSProperties;
 
 const innerWrap = {
