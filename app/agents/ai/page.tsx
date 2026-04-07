@@ -59,6 +59,9 @@ export default function AIAgentsPage() {
               <span className="w-2 h-2 rounded-full bg-emerald-400 shadow-[0_0_10px_#34d399] mt-2" />
             </div>
             <p className="text-white/70 text-sm leading-relaxed">{a.tagline}</p>
+            <div className="text-[10px] uppercase tracking-wider font-semibold text-white/50">
+              {a.model.includes('sonnet') ? 'Sonnet · Deep reasoning' : 'Haiku · Fast & cheap'}
+            </div>
             <div className="mt-auto pt-3 border-t border-white/10 text-sm font-semibold text-white/90 flex items-center gap-1">
               Open chat
               <span className="material-symbols-outlined" style={{ fontSize: 18 }}>arrow_forward</span>

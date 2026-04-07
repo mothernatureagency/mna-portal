@@ -32,7 +32,7 @@ export async function POST(req: NextRequest, { params }: { params: { id: string 
 
   try {
     const res = await client.messages.create({
-      model: 'claude-sonnet-4-5',
+      model: agent.model,
       max_tokens: 1024,
       system: agent.systemPrompt,
       messages: messages.map((m: any) => ({

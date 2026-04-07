@@ -16,7 +16,11 @@ export type AgentConfig = {
   description: string;
   systemPrompt: string;
   suggestions: string[];
+  model: string;
 };
+
+const SONNET = 'claude-sonnet-4-5';
+const HAIKU = 'claude-haiku-4-5';
 
 export const AGENTS: AgentConfig[] = [
   {
@@ -34,6 +38,7 @@ export const AGENTS: AgentConfig[] = [
       'Write an objection-handling script for "it\'s too expensive"',
       'What should I say to a lead who ghosted for 2 weeks?',
     ],
+    model: HAIKU,
   },
   {
     id: 'meta-ads',
@@ -50,6 +55,7 @@ export const AGENTS: AgentConfig[] = [
       'What CPL and ROAS should I target for a local wellness clinic?',
       'My ads are fatiguing at day 10 - what do I do?',
     ],
+    model: SONNET,
   },
   {
     id: 'tiktok-ads',
@@ -66,6 +72,7 @@ export const AGENTS: AgentConfig[] = [
       'Give me a UGC brief for a Myers Cocktail promo',
       'How do I structure a spark ad test with $300/day?',
     ],
+    model: HAIKU,
   },
   {
     id: 'content-calendar',
@@ -82,6 +89,7 @@ export const AGENTS: AgentConfig[] = [
       'Plan 4 weeks of content around a summer hydration promo',
       'What content should I post the week of a grand opening?',
     ],
+    model: HAIKU,
   },
   {
     id: 'social-media',
@@ -98,6 +106,7 @@ export const AGENTS: AgentConfig[] = [
       'Draft a DM response to "how much does this cost?"',
       'How should I reply to a negative comment on Instagram?',
     ],
+    model: HAIKU,
   },
   {
     id: 'project-manager',
@@ -114,6 +123,7 @@ export const AGENTS: AgentConfig[] = [
       'Build me a 2-week sprint plan for launching a TikTok account',
       'What should my daily standup agenda look like?',
     ],
+    model: SONNET,
   },
   {
     id: 'ceo',
@@ -130,6 +140,7 @@ export const AGENTS: AgentConfig[] = [
       'A client wants more leads but budget is flat - what do I do?',
       'Route this: "we need 20 new TikTok hooks for Prime IV"',
     ],
+    model: SONNET,
   },
 ];
 
