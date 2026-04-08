@@ -58,6 +58,10 @@ async function initSchema() {
                                                                         created_at timestamptz not null default now()
                                                                             )`,
                   `alter table content_calendar add column if not exists caption text`,
+                  `alter table content_calendar add column if not exists client_approval_status text not null default 'pending_review'`,
+                  `alter table content_calendar add column if not exists client_comments text`,
+                  `alter table content_calendar add column if not exists mna_comments text`,
+                  `alter table content_calendar add column if not exists approved_at timestamptz`,
                   `create table if not exists users (
                         id uuid primary key default uuid_generate_v4(),
                               username text not null unique,

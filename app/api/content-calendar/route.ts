@@ -23,17 +23,28 @@ function dayOffsetDate(startDate: string, day: number): string {
   return d.toISOString().slice(0, 10);
 }
 
-// PATCH — update a single content item (caption, status, etc.)
+// PATCH — update a single content item.
+// Supports caption, status, client_approval_status, client_comments, mna_comments.
+// When client_approval_status transitions to 'approved', approved_at is stamped.
 export async function PATCH(req: NextRequest) {
   await ensureSchema();
   let body: any;
   try { body = await req.json(); } catch { return NextResponse.json({ error: 'Invalid JSON' }, { status: 400 }); }
-  const { id, caption, status } = body || {};
+  const { id, caption, status, client_approval_status, client_comments, mna_comments } = body || {};
   if (!id) return NextResponse.json({ error: 'id required' }, { status: 400 });
   const fields: string[] = [];
   const values: any[] = [];
   if (caption !== undefined) { values.push(caption); fields.push(`caption = $${values.length}`); }
   if (status !== undefined) { values.push(status); fields.push(`status = $${values.length}`); }
+  if (client_approval_status !== undefined) {
+    values.push(client_approval_status);
+    fields.push(`client_approval_status = $${values.length}`);
+    if (client_approval_status === 'approved') {
+      fields.push(`approved_at = now()`);
+    }
+  }
+  if (client_comments !== undefined) { values.push(client_comments); fields.push(`client_comments = $${values.length}`); }
+  if (mna_comments !== undefined) { values.push(mna_comments); fields.push(`mna_comments = $${values.length}`); }
   if (fields.length === 0) return NextResponse.json({ error: 'nothing to update' }, { status: 400 });
   values.push(id);
   const { rows } = await query(
@@ -69,7 +80,16 @@ export async function POST(req: NextRequest) {
   const clientName: string = body?.clientName;
   if (!clientName) return NextResponse.json({ error: 'clientName required' }, { status: 400 });
 
-  let items: Array<{ post_date: string; platform: string; content_type?: string; title?: string; status?: string; assigned_role?: string }> = [];
+  type SeedItem = {
+    post_date: string;
+    platform: string;
+    content_type?: string;
+    title?: string;
+    status?: string;
+    assigned_role?: string;
+    caption?: string;
+  };
+  let items: SeedItem[] = [];
 
   if (body?.playbookId) {
     const pb = getPlaybook(body.playbookId);
@@ -82,6 +102,7 @@ export async function POST(req: NextRequest) {
       title: `[${it.phase}] ${it.title} — Hook: ${it.hook} | CTA: ${it.cta}`,
       status: 'Draft',
       assigned_role: 'Social Media Manager',
+      caption: it.caption, // pre written caption goes straight into content_calendar.caption
     }));
   } else if (Array.isArray(body?.items)) {
     items = body.items;
@@ -94,9 +115,20 @@ export async function POST(req: NextRequest) {
   for (const it of items) {
     if (!it.post_date || !it.platform) continue;
     const { rows } = await query(
-      `insert into content_calendar (project_id, post_date, platform, content_type, title, status, assigned_role)
-       values ($1,$2,$3,$4,$5,$6,$7) returning *`,
-      [projectId, it.post_date, it.platform, it.content_type || null, it.title || null, it.status || 'Draft', it.assigned_role || null]
+      `insert into content_calendar (project_id, post_date, platform, content_type, title, status, assigned_role, caption, client_approval_status)
+       values ($1,$2,$3,$4,$5,$6,$7,$8,$9) returning *`,
+      [
+        projectId,
+        it.post_date,
+        it.platform,
+        it.content_type || null,
+        it.title || null,
+        it.status || 'Draft',
+        it.assigned_role || null,
+        it.caption || null,
+        // If caption is pre written, it is ready for client review. Otherwise pending MNA draft.
+        it.caption ? 'pending_review' : 'drafting',
+      ]
     );
     inserted.push(rows[0]);
   }
