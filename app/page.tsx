@@ -12,23 +12,131 @@ import ContentCalendar from '@/components/dashboard/ContentCalendar';
 import UserBanner from '@/components/dashboard/UserBanner';
 import Card from '@/components/ui/Card';
 
-const kpiTop = [
-  { label: 'Total Leads', value: '468', change: 18, target: 500, current: 468, color: '#0ea5e9', featured: true },
-  { label: 'Cost Per Lead', value: '$42.40', change: -8, target: '$45.00', pct: 94, color: '#3b82f6', note: '-8% below target' },
-  { label: 'Conversion Rate', value: '13.2%', change: 4, target: '12%', pct: 110, color: '#8b5cf6', note: '+10% above target' },
-];
-const kpiBottom = [
-  { label: 'Ad Spend', value: '$20,300', change: 12, target: '$25,000', pct: 81, color: '#f59e0b' },
-  { label: 'Appointments', value: '57', change: 21, target: '60', pct: 95, color: '#ec4899' },
-  { label: 'Revenue', value: '$142K', change: 31, target: '$180K', pct: 79, color: '#06b6d4' },
-];
-const campaigns = [
-  { name: 'Spring Lead Gen', status: 'Active', leads: 198, spend: '$8,200', roas: '3.4x' },
-  { name: 'Retargeting Q1', status: 'Active', leads: 87, spend: '$3,100', roas: '4.1x' },
-  { name: 'Brand Awareness', status: 'Paused', leads: 43, spend: '$2,800', roas: '1.8x' },
-  { name: 'Email Re-engage', status: 'Active', leads: 140, spend: '$1,200', roas: '8.2x' },
-];
-const sparkline = [220, 245, 260, 280, 310, 340, 360, 380, 400, 420, 445, 468];
+// ─────────────────────────────────────────────────────────────────
+// Client-specific KPI data
+// Prime IV Niceville numbers mirror the live GHL dashboard
+// (app.gohighlevel.com/v2/location/X4La59xBeunP9oaXtJnj/dashboard,
+//  "Last 30 Days" snapshot) until the GHL API key is provisioned
+//  on portal.mothernatureagency.com and we can swap to live pulls.
+// ─────────────────────────────────────────────────────────────────
+type DashboardData = {
+  label: string;
+  subtitle: string;
+  totalLeads: number;
+  totalLeadsTarget: number;
+  totalLeadsChange: number | null;
+  cpl: string;
+  cplNote: string;
+  cplPct: number;
+  cplChange: number | null;
+  convRate: string;
+  convRateTarget: string;
+  convRateNote: string;
+  adSpend: string;
+  adSpendTarget: string;
+  adSpendPct: number;
+  adSpendChange: number | null;
+  appointments: string;
+  appointmentsTarget: string;
+  appointmentsPct: number;
+  appointmentsChange: number | null;
+  revenue: string;
+  revenueTarget: string;
+  revenuePct: number;
+  revenueChange: number | null;
+  sparkline: number[];
+  campaigns: { name: string; status: string; leads: number; spend: string; roas: string }[];
+};
+
+const defaultData: DashboardData = {
+  label: 'March 2026',
+  subtitle: 'Marketing intelligence',
+  totalLeads: 468,
+  totalLeadsTarget: 500,
+  totalLeadsChange: 18,
+  cpl: '$42.40',
+  cplNote: '-8% below target',
+  cplPct: 94,
+  cplChange: -8,
+  convRate: '13.2%',
+  convRateTarget: '12%',
+  convRateNote: '+10% above target · +4% vs last month',
+  adSpend: '$20,300',
+  adSpendTarget: '$25,000',
+  adSpendPct: 81,
+  adSpendChange: 12,
+  appointments: '57',
+  appointmentsTarget: '60',
+  appointmentsPct: 95,
+  appointmentsChange: 21,
+  revenue: '$142K',
+  revenueTarget: '$180K',
+  revenuePct: 79,
+  revenueChange: 31,
+  sparkline: [220, 245, 260, 280, 310, 340, 360, 380, 400, 420, 445, 468],
+  campaigns: [
+    { name: 'Spring Lead Gen', status: 'Active', leads: 198, spend: '$8,200', roas: '3.4x' },
+    { name: 'Retargeting Q1', status: 'Active', leads: 87, spend: '$3,100', roas: '4.1x' },
+    { name: 'Brand Awareness', status: 'Paused', leads: 43, spend: '$2,800', roas: '1.8x' },
+    { name: 'Email Re-engage', status: 'Active', leads: 140, spend: '$1,200', roas: '8.2x' },
+  ],
+};
+
+// Pulled manually from the GHL Prime IV Niceville dashboard on 2026-04-08
+// (app.gohighlevel.com/v2/location/X4La59xBeunP9oaXtJnj/dashboard, Last 30 Days view).
+// Only values that GHL actually exposed are filled in. Everything else shows "—"
+// or "No data yet" until the GHL API key is provisioned on portal.mothernatureagency.com.
+//
+// REAL numbers (confirmed in GHL UI):
+//   • Opportunities: 464 total — Open 346, Won 77, Lost 41
+//   • Conversion rate: 16.59%
+//   • Total pipeline value: $160.62K · Won revenue: $72.99K
+//   • Lead sources (page 1): "-" → 114 leads / $84,928 / 55.26% win,
+//                            "crm ui -" → 5 leads / $1,263.95
+const primeIvNicevilleData: DashboardData = {
+  label: 'Last 30 days · GHL (manual sync 2026-04-08)',
+  subtitle: 'Prime IV Niceville · Live data limited — full metrics pending GHL API key',
+  // Real
+  totalLeads: 464,
+  totalLeadsTarget: 280,
+  totalLeadsChange: null, // GHL UI does not expose prior-period comparison
+  // Unknown — no ad platform integration yet
+  cpl: '—',
+  cplNote: 'No data yet — awaiting ad platform connection',
+  cplPct: 0,
+  cplChange: null,
+  // Real
+  convRate: '16.59%',
+  convRateTarget: '14%',
+  convRateNote: 'Source: GHL Opportunities (Last 30 Days)',
+  // Unknown
+  adSpend: '—',
+  adSpendTarget: '$9,500',
+  adSpendPct: 0,
+  adSpendChange: null,
+  // Real (Won opportunities)
+  appointments: '77',
+  appointmentsTarget: '68',
+  appointmentsPct: 100,
+  appointmentsChange: null, // no prior-period comparison available
+  // Real (Won revenue)
+  revenue: '$72.99K',
+  revenueTarget: '$88K',
+  revenuePct: 83,
+  revenueChange: null, // no prior-period comparison available
+  // Empty — GHL UI does not expose a 12-bucket historical trend and we will not fabricate one
+  sparkline: [],
+  // Only lead sources GHL actually showed. No fabricated campaigns.
+  campaigns: [
+    { name: 'Lead Source: "-"', status: 'Active', leads: 114, spend: '—', roas: '—' },
+    { name: 'Lead Source: "crm ui -"', status: 'Active', leads: 5, spend: '—', roas: '—' },
+  ],
+};
+
+function getDashboardData(clientId: string): DashboardData {
+  if (clientId === 'prime-iv') return primeIvNicevilleData;
+  return defaultData;
+}
 
 function SectionLabel({ children }: { children: React.ReactNode }) {
   return (
@@ -41,6 +149,10 @@ function SectionLabel({ children }: { children: React.ReactNode }) {
 export default function DashboardPage() {
   const { activeClient } = useClient();
   const { gradientFrom, gradientTo } = activeClient.branding;
+  const data = getDashboardData(activeClient.id);
+  const leadsPct = Math.min(100, Math.round((data.totalLeads / data.totalLeadsTarget) * 1000) / 10);
+  const leadsMax = data.sparkline.length > 0 ? Math.max(...data.sparkline) : 1;
+  const campaigns = data.campaigns;
   return (
     <div className="space-y-8 max-w-[1400px]">
 
@@ -57,7 +169,7 @@ export default function DashboardPage() {
               {activeClient.name}
             </span>
           </div>
-          <p className="text-[12px] text-gray-400 pl-3.5">Marketing intelligence · March 2026</p>
+          <p className="text-[12px] text-gray-400 pl-3.5">{data.subtitle} · {data.label}</p>
         </div>
         <div className="flex items-center gap-2">
           <select className="text-[12px] font-medium border rounded-xl px-3 py-2 bg-white text-gray-600" style={{ border: '1px solid rgba(0,0,0,0.08)' }}>
@@ -77,47 +189,65 @@ export default function DashboardPage() {
             <div className="relative z-10">
               <div className="flex items-center justify-between mb-2">
                 <span className="text-[10px] font-bold uppercase opacity-85">Total Leads</span>
-                <span className="text-[10px] font-bold px-2 py-0.5 rounded-full" style={{ background: 'rgba(255,255,255,0.2)' }}>+18% ↑</span>
+                {data.totalLeadsChange !== null && data.totalLeadsChange > 0 && (
+                  <span className="text-[10px] font-bold px-2 py-0.5 rounded-full" style={{ background: 'rgba(255,255,255,0.2)' }}>+{data.totalLeadsChange}% ↑</span>
+                )}
+                {data.totalLeadsChange === null && (
+                  <span className="text-[10px] font-bold px-2 py-0.5 rounded-full" style={{ background: 'rgba(255,255,255,0.2)' }}>No trend data</span>
+                )}
+                {data.totalLeads > data.totalLeadsTarget && (
+                  <span className="text-[10px] font-bold px-2 py-0.5 rounded-full" style={{ background: 'rgba(255,255,255,0.2)' }}>Exceeded ✦</span>
+                )}
               </div>
-              <div className="text-[52px] font-black leading-none mb-1">468</div>
-              <div className="text-[12px] mb-4 opacity-70">Target: 500 leads</div>
+              <div className="text-[52px] font-black leading-none mb-1">{data.totalLeads}</div>
+              <div className="text-[12px] mb-4 opacity-70">Target: {data.totalLeadsTarget} leads</div>
               <div className="h-1.5 rounded-full mb-1.5" style={{ background: 'rgba(255,255,255,0.2)' }}>
-                <div className="h-full rounded-full bg-white" style={{ width: '93.6%' }} />
+                <div className="h-full rounded-full bg-white" style={{ width: `${leadsPct}%` }} />
               </div>
               <div className="flex justify-between text-[10px] mb-3 opacity-70">
                 <span>Progress to target</span>
-                <span className="font-bold">93.6%</span>
+                <span className="font-bold">{leadsPct}%</span>
               </div>
               <div className="flex items-end gap-0.5 h-7">
-                {sparkline.map((v, i) => (
-                  <div key={i} className="flex-1 rounded-sm" style={{ height: Math.round((v / 468) * 28), background: `rgba(255,255,255,${0.3 + (v / 468) * 0.5})` }} />
-                ))}
+                {data.sparkline.length > 0 ? (
+                  data.sparkline.map((v, i) => (
+                    <div key={i} className="flex-1 rounded-sm" style={{ height: Math.round((v / leadsMax) * 28), background: `rgba(255,255,255,${0.3 + (v / leadsMax) * 0.5})` }} />
+                  ))
+                ) : (
+                  <div className="text-[10px] opacity-60 italic">Historical trend unavailable — awaiting API</div>
+                )}
               </div>
             </div>
           </div>
           <div className="glass-card p-5 relative overflow-hidden">
             <div className="absolute top-0 left-0 right-0 h-1 rounded-t-[20px]" style={{ background: 'linear-gradient(90deg,#3b82f6,#6366f1)' }} />
             <span className="text-[10px] font-bold uppercase text-gray-400">Cost Per Lead</span>
-            <div className="text-[34px] font-black text-gray-900 leading-none my-2">$42.40</div>
+            <div className="text-[34px] font-black text-gray-900 leading-none my-2">{data.cpl}</div>
             <div className="text-[11px] text-gray-400 mb-3">Target: ≤$45.00</div>
             <div className="h-1.5 rounded-full overflow-hidden mb-3" style={{ background: '#eff6ff' }}>
-              <div className="h-full rounded-full" style={{ width: '94%', background: 'linear-gradient(90deg,#3b82f6,#6366f1)' }} />
+              <div className="h-full rounded-full" style={{ width: `${data.cplPct}%`, background: 'linear-gradient(90deg,#3b82f6,#6366f1)' }} />
             </div>
-            <div className="text-[11px] font-bold" style={{ color: '#059669' }}>✅ -8% below target</div>
+            <div className="text-[11px] font-bold" style={{ color: '#059669' }}>{data.cplNote}</div>
           </div>
           <div className="glass-card p-5 relative overflow-hidden">
             <div className="absolute top-0 left-0 right-0 h-1 rounded-t-[20px]" style={{ background: 'linear-gradient(90deg,#8b5cf6,#a78bfa)' }} />
             <span className="text-[10px] font-bold uppercase text-gray-400">Conversion Rate</span>
-            <div className="text-[34px] font-black text-gray-900 leading-none my-2">13.2%</div>
+            <div className="text-[34px] font-black text-gray-900 leading-none my-2">{data.convRate}</div>
             <div className="text-[11px] mb-3">
-              <span className="text-gray-400">Target: 12% </span>
-              <span className="font-bold" style={{ color: '#7c3aed' }}>Exceeded ✦</span>
+              <span className="text-gray-400">Target: {data.convRateTarget} </span>
+              {parseFloat(data.convRate) > parseFloat(data.convRateTarget) && (
+                <span className="font-bold" style={{ color: '#7c3aed' }}>Exceeded ✦</span>
+              )}
             </div>
-            <div className="text-[11px] font-bold" style={{ color: '#7c3aed' }}>+10% above target · +4% vs last month</div>
+            <div className="text-[11px] font-bold" style={{ color: '#7c3aed' }}>{data.convRateNote}</div>
           </div>
         </div>
         <div className="grid grid-cols-3 gap-4">
-          {kpiBottom.map((k) => (
+          {[
+            { label: 'Ad Spend', value: data.adSpend, target: data.adSpendTarget, pct: data.adSpendPct, change: data.adSpendChange, color: '#f59e0b' },
+            { label: 'Appointments', value: data.appointments, target: data.appointmentsTarget, pct: data.appointmentsPct, change: data.appointmentsChange, color: '#ec4899' },
+            { label: 'Revenue', value: data.revenue, target: data.revenueTarget, pct: data.revenuePct, change: data.revenueChange, color: '#06b6d4' },
+          ].map((k) => (
             <div key={k.label} className="glass-card p-5 relative overflow-hidden">
               <div className="absolute top-0 left-0 right-0 h-1 rounded-t-[20px]" style={{ background: k.color }} />
               <span className="text-[10px] font-bold uppercase text-gray-400">{k.label}</span>
@@ -126,7 +256,9 @@ export default function DashboardPage() {
               <div className="h-1.5 rounded-full overflow-hidden mb-3" style={{ background: k.color + '18' }}>
                 <div className="h-full rounded-full" style={{ width: k.pct + '%', background: k.color }} />
               </div>
-              <div className="text-[11px] font-bold" style={{ color: k.color }}>+{k.change}% vs last month</div>
+              <div className="text-[11px] font-bold" style={{ color: k.color }}>
+                {k.change === null ? 'No data yet' : k.change > 0 ? `+${k.change}% vs last month` : '— vs last month'}
+              </div>
             </div>
           ))}
         </div>
