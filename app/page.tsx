@@ -182,6 +182,77 @@ export default function DashboardPage() {
           </button>
         </div>
       </div>
+      {/* ── Meta Ads Account (when present on the active client) ── */}
+      {activeClient.metaAds && (
+        <div>
+          <SectionLabel>Meta Ads Account</SectionLabel>
+          <div className="glass-card p-5 grid gap-3" style={{ gridTemplateColumns: '1.4fr 1fr 1fr', borderLeft: `3px solid ${gradientFrom}` }}>
+            <div>
+              <div className="text-[10px] font-bold uppercase tracking-wider text-gray-400 mb-1">Business Portfolio</div>
+              <div className="text-[14px] font-bold text-gray-900">{activeClient.metaAds.businessPortfolioName}</div>
+              <div className="text-[11px] text-gray-500 font-mono">{activeClient.metaAds.businessPortfolioId}</div>
+              <div className="flex items-center gap-2 mt-2">
+                {activeClient.metaAds.verificationStatus && (
+                  <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${
+                    activeClient.metaAds.verificationStatus === 'Verified'
+                      ? 'bg-emerald-100 text-emerald-700'
+                      : 'bg-amber-100 text-amber-700'
+                  }`}>
+                    {activeClient.metaAds.verificationStatus}
+                  </span>
+                )}
+                {activeClient.metaAds.createdDate && (
+                  <span className="text-[10px] text-gray-400">Created {activeClient.metaAds.createdDate}</span>
+                )}
+              </div>
+            </div>
+            <div>
+              <div className="text-[10px] font-bold uppercase tracking-wider text-gray-400 mb-1">Ad Account</div>
+              <div className="text-[13px] font-bold text-gray-900 font-mono">{activeClient.metaAds.adAccountId}</div>
+              {activeClient.metaAds.partnerName && (
+                <div className="text-[11px] text-gray-500 mt-1">
+                  Partner: <span className="font-semibold text-gray-700">{activeClient.metaAds.partnerName}</span>
+                  {activeClient.metaAds.partnerAccessLevel && (
+                    <span className="ml-1 text-[10px] px-1.5 py-0.5 rounded bg-gray-100 text-gray-600">{activeClient.metaAds.partnerAccessLevel}</span>
+                  )}
+                </div>
+              )}
+              {activeClient.metaAds.admin && (
+                <div className="text-[11px] text-gray-500 mt-1">
+                  Admin: <span className="text-gray-700">{activeClient.metaAds.admin.name}</span>
+                </div>
+              )}
+            </div>
+            <div>
+              <div className="text-[10px] font-bold uppercase tracking-wider text-gray-400 mb-1">Pixel / Dataset</div>
+              {activeClient.metaAds.datasetPixel ? (
+                <>
+                  <div className="text-[13px] font-bold text-gray-900">{activeClient.metaAds.datasetPixel.name}</div>
+                  <div className="text-[11px] text-gray-500 font-mono">{activeClient.metaAds.datasetPixel.id}</div>
+                  <div className="flex items-center gap-1.5 mt-1">
+                    {activeClient.metaAds.datasetPixel.status && (
+                      <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-700">
+                        ✓ {activeClient.metaAds.datasetPixel.status}
+                      </span>
+                    )}
+                  </div>
+                  {activeClient.metaAds.datasetPixel.sources && (
+                    <div className="text-[10px] text-gray-400 mt-1">{activeClient.metaAds.datasetPixel.sources.join(' · ')}</div>
+                  )}
+                </>
+              ) : (
+                <div className="text-[11px] text-gray-400 italic">Not connected</div>
+              )}
+            </div>
+            {activeClient.metaAds.notes && (
+              <div className="col-span-3 mt-2 pt-3 border-t border-gray-200/60 text-[11px] text-gray-500 leading-relaxed">
+                {activeClient.metaAds.notes}
+              </div>
+            )}
+          </div>
+        </div>
+      )}
+
       <div>
         <SectionLabel>Key Metrics</SectionLabel>
         <div className="grid gap-4 mb-4" style={{ gridTemplateColumns: '1.6fr 1fr 1fr' }}>
