@@ -116,4 +116,69 @@ export const clients: Client[] = [
     notes: 'Reopening location — Prime IV Pinecrest, FL. Co-owned by Alexus Williams and partner. Grand reopening launch focus: brand awareness, lead generation, memberships, and appointment bookings.',
     integrations: ['Google Ads', 'Meta Ads', 'Jane App', 'Mailchimp'],
   },
+  {
+    id: 'serenity-bayfront',
+    name: 'Serenity — Bayfront Freeport',
+    shortName: 'Serenity STR',
+    industry: 'Short-Term Rental / Vacation Home',
+    location: 'Freeport, FL',
+    branding: {
+      // Coastal bayfront palette: deep sea blue + soft sand + sunset accent
+      primaryColor: '#0f4c5c',
+      secondaryColor: '#9fd8cb',
+      gradientFrom: '#0f4c5c',
+      gradientTo: '#4fa3a0',
+      accentColor: '#e8b96c',
+      mode: 'light',
+      logoText: 'Serenity',
+    },
+    // Vacation rental KPIs think in nights booked + ADR + occupancy,
+    // not leads + appointments. The dashboard still reads the same field
+    // names, so we map them: "leads" = inquiries, "appointments" = bookings,
+    // "revenue" = gross rental revenue, "conversionRate" = inquiry→book %.
+    kpiTargets: {
+      leads: 120,          // monthly inquiries across Airbnb / VRBO / direct
+      costPerLead: 18,     // blended ad CPL across Meta + Google
+      conversionRate: 22,  // inquiry to confirmed booking %
+      adSpend: 1800,       // monthly brand + retargeting spend
+      appointments: 22,    // confirmed bookings per month
+      revenue: 14500,      // gross rental revenue per month target
+    },
+    notes:
+      'Bayfront vacation rental on the Freeport, FL waterfront. Focus: Airbnb/VRBO/direct-booking funnel, 5-star review velocity, Instagrammable content from on-property shoots, off-season demand generation, and repeat-guest email list growth. Secondary goal: drive direct bookings to cut OTA fees.',
+    integrations: ['Airbnb', 'VRBO', 'Meta Ads', 'Google Ads', 'Mailchimp', 'Hospitable'],
+  },
+  {
+    id: 'mna-realty',
+    name: 'MNA Realty — Agent Growth',
+    shortName: 'MNA Realty',
+    industry: 'Real Estate — Agents & Websites',
+    location: 'Niceville / Emerald Coast, FL',
+    branding: {
+      // Warm realty palette: deep navy + gold accent, feels upscale/trustworthy
+      primaryColor: '#1a2a4a',
+      secondaryColor: '#c9a25c',
+      gradientFrom: '#1a2a4a',
+      gradientTo: '#3b4f7f',
+      accentColor: '#c9a25c',
+      mode: 'light',
+      logoText: 'MNA Realty',
+    },
+    // Realty KPIs map slightly differently:
+    //  • "leads" = buyer + seller lead form fills + IDX registrations
+    //  • "appointments" = listing appointments + buyer consults booked
+    //  • "revenue" = GCI (gross commission income) from closed deals
+    //  • "conversionRate" = lead to appointment %
+    kpiTargets: {
+      leads: 180,          // IDX regs + form fills + open house sign-ins
+      costPerLead: 12,     // paid lead gen CPL target (Meta + Google)
+      conversionRate: 8,   // lead → appointment
+      adSpend: 2200,       // agent + website dev lead gen spend
+      appointments: 14,    // listing appointments + buyer consults
+      revenue: 48000,      // projected GCI from the pipeline
+    },
+    notes:
+      'Alexus Williams is a licensed real estate agent on the Emerald Coast AND builds websites for other agents. This account serves dual-purpose: (1) grow her own buyer/seller pipeline (listings, open houses, market updates, neighborhood spotlights, video tours) and (2) act as the showcase/portfolio for the website-building service she sells to other agents — templates, IDX setups, lead capture flows, CRM wiring, SEO for local search. Content should rotate between personal agent brand posts, listing content, and "I build websites for agents" educational/lead-gen content.',
+    integrations: ['IDX Broker', 'Follow Up Boss', 'Meta Ads', 'Google Ads', 'YouTube', 'Mailchimp', 'Cal.com'],
+  },
 ];
