@@ -23,6 +23,26 @@ function dayOffsetDate(startDate: string, day: number): string {
   return d.toISOString().slice(0, 10);
 }
 
+// PATCH — update a single content item (caption, status, etc.)
+export async function PATCH(req: NextRequest) {
+  await ensureSchema();
+  let body: any;
+  try { body = await req.json(); } catch { return NextResponse.json({ error: 'Invalid JSON' }, { status: 400 }); }
+  const { id, caption, status } = body || {};
+  if (!id) return NextResponse.json({ error: 'id required' }, { status: 400 });
+  const fields: string[] = [];
+  const values: any[] = [];
+  if (caption !== undefined) { values.push(caption); fields.push(`caption = $${values.length}`); }
+  if (status !== undefined) { values.push(status); fields.push(`status = $${values.length}`); }
+  if (fields.length === 0) return NextResponse.json({ error: 'nothing to update' }, { status: 400 });
+  values.push(id);
+  const { rows } = await query(
+    `update content_calendar set ${fields.join(', ')} where id = $${values.length} returning *`,
+    values
+  );
+  return NextResponse.json({ item: rows[0] });
+}
+
 // GET — list content for a client
 export async function GET(req: NextRequest) {
   await ensureSchema();

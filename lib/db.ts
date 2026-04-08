@@ -57,6 +57,7 @@ async function initSchema() {
                                                                   assigned_role text,
                                                                         created_at timestamptz not null default now()
                                                                             )`,
+                  `alter table content_calendar add column if not exists caption text`,
                   `create table if not exists users (
                         id uuid primary key default uuid_generate_v4(),
                               username text not null unique,

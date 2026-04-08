@@ -10,6 +10,7 @@ type ContentItem = {
   title: string | null;
   status: string;
   assigned_role: string | null;
+  caption: string | null;
 };
 
 function parseTitle(raw: string | null) {
@@ -46,6 +47,30 @@ export default function ContentPage() {
   const [items, setItems] = useState<ContentItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [filter, setFilter] = useState<string>('all');
+  const [writingId, setWritingId] = useState<string | null>(null);
+  const [expanded, setExpanded] = useState<Record<string, boolean>>({});
+
+  async function writeCopy(id: string) {
+    setWritingId(id);
+    try {
+      const res = await fetch(`/api/content-calendar/${id}/write-copy`, { method: 'POST' });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || 'Failed');
+      setItems((prev) => prev.map((it) => (it.id === id ? data.item : it)));
+      setExpanded((e) => ({ ...e, [id]: true }));
+    } catch (e: any) {
+      alert(e.message);
+    } finally {
+      setWritingId(null);
+    }
+  }
+
+  async function writeAll() {
+    for (const it of items) {
+      if (it.caption) continue;
+      await writeCopy(it.id);
+    }
+  }
 
   useEffect(() => {
     if (!activeClient?.name) return;
@@ -70,6 +95,23 @@ export default function ContentPage() {
           {activeClient?.name || 'No client selected'} · {items.length} posts
         </p>
       </div>
+
+      {items.length > 0 && items.some((i) => !i.caption) && (
+        <div className="glass-card p-4 flex items-center justify-between gap-4">
+          <div>
+            <div className="text-white font-semibold text-sm">Bulk generate captions</div>
+            <div className="text-white/60 text-xs">Uses the Social Media Manager agent to write 3 caption variants for every post missing copy.</div>
+          </div>
+          <button
+            onClick={writeAll}
+            disabled={!!writingId}
+            className="rounded-xl px-4 py-2 text-sm font-semibold text-white disabled:opacity-50"
+            style={{ background: 'linear-gradient(135deg,#0c6da4,#4ab8ce)' }}
+          >
+            {writingId ? 'Writing…' : 'Write all captions'}
+          </button>
+        </div>
+      )}
 
       {/* Filters */}
       <div className="flex gap-2 flex-wrap">
@@ -128,11 +170,37 @@ export default function ContentPage() {
                     <div className="text-white/85 text-sm">{parsed.cta}</div>
                   </div>
                 )}
-                {it.assigned_role && (
-                  <div className="pt-2 border-t border-white/10 text-xs text-white/50">
-                    Owner: {it.assigned_role}
+                {it.caption && (
+                  <div className="pt-2 border-t border-white/10">
+                    <button
+                      onClick={() => setExpanded((e) => ({ ...e, [it.id]: !e[it.id] }))}
+                      className="text-xs text-white/70 font-semibold mb-2 flex items-center gap-1"
+                    >
+                      <span className="material-symbols-outlined" style={{ fontSize: 14 }}>
+                        {expanded[it.id] ? 'expand_less' : 'expand_more'}
+                      </span>
+                      Caption copy
+                    </button>
+                    {expanded[it.id] && (
+                      <div className="text-white/85 text-xs whitespace-pre-wrap leading-relaxed bg-white/5 rounded-lg p-3 border border-white/10">
+                        {it.caption}
+                      </div>
+                    )}
                   </div>
                 )}
+                <div className="pt-2 border-t border-white/10 flex items-center justify-between text-xs">
+                  <span className="text-white/50">{it.assigned_role || ''}</span>
+                  {!it.caption && (
+                    <button
+                      onClick={() => writeCopy(it.id)}
+                      disabled={writingId === it.id}
+                      className="rounded-lg px-3 py-1.5 font-semibold text-white disabled:opacity-50"
+                      style={{ background: 'linear-gradient(135deg,#0c6da4,#4ab8ce)' }}
+                    >
+                      {writingId === it.id ? 'Writing…' : 'Write copy'}
+                    </button>
+                  )}
+                </div>
               </div>
             );
           })}
