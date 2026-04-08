@@ -10,6 +10,20 @@ export type ClientBranding = {
   iconUrl?: string;
 };
 
+export type MetaAdsAccount = {
+  businessPortfolioId: string;
+  businessPortfolioName: string;
+  adAccountId: string;
+  partnerName?: string;
+  partnerBusinessId?: string;
+  partnerAccessLevel?: 'Full control' | 'Standard' | 'Limited';
+  admin?: { name: string; email?: string };
+  datasetPixel?: { name: string; id: string; sources?: string[]; status?: string };
+  verificationStatus?: 'Verified' | 'Unverified' | 'Pending';
+  createdDate?: string;
+  notes?: string;
+};
+
 export type Client = {
   id: string;
   name: string;
@@ -27,6 +41,7 @@ export type Client = {
   };
   notes: string;
   integrations: string[];
+  metaAds?: MetaAdsAccount;
 };
 
 export const clients: Client[] = [
@@ -87,6 +102,25 @@ export const clients: Client[] = [
     },
     notes: 'Premium IV therapy & wellness clinic in Niceville, FL. High-value clientele, focus on luxury health positioning and appointment-driven conversions.',
     integrations: ['Google Ads', 'Meta Ads', 'Jane App', 'Mailchimp'],
+    metaAds: {
+      businessPortfolioId: '1612011663383887',
+      businessPortfolioName: 'Prime IV Niceville',
+      adAccountId: '1975481426317109',
+      partnerName: 'Mother Nature Agency',
+      partnerBusinessId: '211318884636384',
+      partnerAccessLevel: 'Full control',
+      admin: { name: 'Jennifer Burlison', email: 'niceville@primeivhydration.com' },
+      datasetPixel: {
+        name: 'PIV Niceville',
+        id: '766587706175457',
+        sources: ['Meta Pixel', 'Conversions API'],
+        status: 'Receiving events',
+      },
+      verificationStatus: 'Unverified',
+      createdDate: '2026-03-03',
+      notes:
+        'Portfolio created 2026-03-03, still unverified. No primary page set; legal name, address, phone, and website not filled in. Outstanding balance $54.86. Payment: AmEx ···3019. Next payment due at $58.00 threshold or 2026-04-21. Daily spending limit $111.04. Opportunity score 63/100. 9 total campaigns, 1 active (Lead generation). Last 7 day spend $142.79.',
+    },
   },
   {
     id: 'prime-iv-pinecrest',
