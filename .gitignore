@@ -145,3 +145,4 @@ node_modules/
 dist/
 .DS_Store
 >>>>>>> 1732e32 (Initial commit)
+.vercel

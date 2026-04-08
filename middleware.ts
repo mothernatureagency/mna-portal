@@ -57,6 +57,19 @@ export async function middleware(request: NextRequest) {
     return NextResponse.redirect(url);
   }
 
+  // Role-based routing.
+  // A user with user_metadata.role === 'client' is a client portal user and can
+  // only see /client/*. If they hit anything else, bounce them to their portal.
+  // Conversely, staff (anything other than 'client') should not linger on /client
+  // unless they explicitly opt in (we allow it so you can QA the client view).
+  const role = (user.user_metadata as Record<string, unknown> | null)?.role as string | undefined;
+  if (role === 'client' && !pathname.startsWith('/client')) {
+    const url = request.nextUrl.clone();
+    url.pathname = '/client';
+    url.search = '';
+    return NextResponse.redirect(url);
+  }
+
   // Authenticated → allow access
   return supabaseResponse;
 }

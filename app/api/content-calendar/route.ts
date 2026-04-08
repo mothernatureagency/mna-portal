@@ -30,7 +30,7 @@ export async function PATCH(req: NextRequest) {
   await ensureSchema();
   let body: any;
   try { body = await req.json(); } catch { return NextResponse.json({ error: 'Invalid JSON' }, { status: 400 }); }
-  const { id, caption, status, client_approval_status, client_comments, mna_comments } = body || {};
+  const { id, caption, status, client_approval_status, client_comments, mna_comments, photo_drive_url } = body || {};
   if (!id) return NextResponse.json({ error: 'id required' }, { status: 400 });
   const fields: string[] = [];
   const values: any[] = [];
@@ -45,6 +45,7 @@ export async function PATCH(req: NextRequest) {
   }
   if (client_comments !== undefined) { values.push(client_comments); fields.push(`client_comments = $${values.length}`); }
   if (mna_comments !== undefined) { values.push(mna_comments); fields.push(`mna_comments = $${values.length}`); }
+  if (photo_drive_url !== undefined) { values.push(photo_drive_url); fields.push(`photo_drive_url = $${values.length}`); }
   if (fields.length === 0) return NextResponse.json({ error: 'nothing to update' }, { status: 400 });
   values.push(id);
   const { rows } = await query(

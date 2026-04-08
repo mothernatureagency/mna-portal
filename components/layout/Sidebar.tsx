@@ -9,6 +9,7 @@ const NAV = [
     { label: 'Overview', href: '/', e: 'bar_chart' },
     { label: 'Top Hooks', href: '/top-hooks', e: 'bolt' },
     { label: 'Content Tracker', href: '/content', e: 'grid_view' },
+    { label: 'Client Tasks', href: '/client-tasks', e: 'checklist' },
     { label: 'Ad Performance', href: '/campaigns', e: 'paid' },
   ]},
   { sec: 'CRM', items: [

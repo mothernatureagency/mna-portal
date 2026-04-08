@@ -1,6 +1,7 @@
 'use client';
 import React, { useEffect, useState } from 'react';
 import { useClient } from '@/context/ClientContext';
+import { driveThumbnailUrl, driveViewUrl } from '@/lib/drive';
 
 type ApprovalStatus = 'drafting' | 'pending_review' | 'approved' | 'changes_requested' | 'scheduled';
 
@@ -17,6 +18,7 @@ type ContentItem = {
   client_comments: string | null;
   mna_comments: string | null;
   approved_at: string | null;
+  photo_drive_url: string | null;
 };
 
 const APPROVAL_STYLES: Record<ApprovalStatus, { label: string; bg: string; text: string; strike?: boolean }> = {
@@ -65,6 +67,16 @@ export default function ContentPage() {
   const [expanded, setExpanded] = useState<Record<string, boolean>>({});
   const [commentDraft, setCommentDraft] = useState<Record<string, string>>({});
   const [approvalFilter, setApprovalFilter] = useState<'all' | ApprovalStatus>('all');
+  const [photoDraft, setPhotoDraft] = useState<Record<string, string>>({});
+  const [editingPhoto, setEditingPhoto] = useState<Record<string, boolean>>({});
+
+  async function savePhoto(id: string) {
+    const url = photoDraft[id]?.trim() || '';
+    try {
+      await patchItem(id, { photo_drive_url: url || null });
+      setEditingPhoto((e) => ({ ...e, [id]: false }));
+    } catch (e: any) { alert(e.message); }
+  }
 
   async function patchItem(id: string, payload: Record<string, unknown>) {
     const res = await fetch('/api/content-calendar', {
@@ -266,6 +278,57 @@ export default function ContentPage() {
                   <span className={`text-xs px-2 py-0.5 rounded-md ${style.bg} ${style.text}`}>{style.label}</span>
                 </div>
                 <div className={`text-white font-bold text-base leading-tight ${style.strike ? 'line-through opacity-60' : ''}`}>{parsed.title || 'Untitled'}</div>
+
+                {/* Photo / Drive link */}
+                {(() => {
+                  const thumb = driveThumbnailUrl(it.photo_drive_url, 600);
+                  const view = driveViewUrl(it.photo_drive_url);
+                  const isEditing = editingPhoto[it.id];
+                  return (
+                    <div className="space-y-2">
+                      {thumb && !isEditing && (
+                        <a href={view!} target="_blank" rel="noreferrer" className="block rounded-lg overflow-hidden border border-white/10">
+                          <img src={thumb} alt="" className="w-full h-32 object-cover" />
+                        </a>
+                      )}
+                      {isEditing ? (
+                        <div className="flex gap-2">
+                          <input
+                            value={photoDraft[it.id] ?? it.photo_drive_url ?? ''}
+                            onChange={(e) => setPhotoDraft((d) => ({ ...d, [it.id]: e.target.value }))}
+                            placeholder="Paste Google Drive share link"
+                            className="flex-1 text-[11px] rounded-lg bg-white/5 border border-white/10 p-2 text-white placeholder:text-white/30"
+                          />
+                          <button
+                            onClick={() => savePhoto(it.id)}
+                            className="rounded-lg px-3 py-1 text-[11px] font-semibold bg-emerald-500/80 text-white"
+                          >
+                            Save
+                          </button>
+                          <button
+                            onClick={() => setEditingPhoto((e) => ({ ...e, [it.id]: false }))}
+                            className="rounded-lg px-3 py-1 text-[11px] font-semibold bg-white/10 text-white/80"
+                          >
+                            Cancel
+                          </button>
+                        </div>
+                      ) : (
+                        <button
+                          onClick={() => {
+                            setPhotoDraft((d) => ({ ...d, [it.id]: it.photo_drive_url || '' }));
+                            setEditingPhoto((e) => ({ ...e, [it.id]: true }));
+                          }}
+                          className="text-[10px] font-semibold text-white/60 hover:text-white inline-flex items-center gap-1"
+                        >
+                          <span className="material-symbols-outlined" style={{ fontSize: 14 }}>
+                            {thumb ? 'edit' : 'add_photo_alternate'}
+                          </span>
+                          {thumb ? 'Edit Drive link' : 'Add Drive link'}
+                        </button>
+                      )}
+                    </div>
+                  );
+                })()}
                 {parsed.hook && (
                   <div>
                     <div className="text-[10px] uppercase tracking-wider text-white/50 font-semibold mb-0.5">Hook</div>
