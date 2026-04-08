@@ -3,16 +3,72 @@ import React, { useState, useRef, useEffect } from 'react';
 import Link from 'next/link';
 import { notFound, useParams } from 'next/navigation';
 import { getAgent } from '@/lib/agents/config';
+import { useClient } from '@/context/ClientContext';
 
 type Msg = { role: 'user' | 'assistant'; content: string };
+
+function extractJsonArray(text: string): any[] | null {
+  const match = text.match(/```json\s*([\s\S]*?)\s*```/i);
+  const raw = match ? match[1] : null;
+  if (!raw) return null;
+  try {
+    const parsed = JSON.parse(raw);
+    return Array.isArray(parsed) ? parsed : null;
+  } catch {
+    return null;
+  }
+}
 
 export default function AgentChatPage() {
   const params = useParams<{ id: string }>();
   const agent = getAgent(params.id);
+  const ctx = useClient() as any;
+  const activeClient = ctx?.activeClient;
   const [messages, setMessages] = useState<Msg[]>([]);
   const [input, setInput] = useState('');
   const [loading, setLoading] = useState(false);
+  const [saveStatus, setSaveStatus] = useState<string>('');
   const scrollRef = useRef<HTMLDivElement>(null);
+
+  async function savePlanToTracker(items: any[]) {
+    if (!activeClient?.name) {
+      setSaveStatus('⚠️ No active client selected — pick one first.');
+      return;
+    }
+    setSaveStatus('Saving to Content Tracker…');
+    try {
+      const res = await fetch('/api/content-calendar', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ clientName: activeClient.name, items }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || 'Save failed');
+      setSaveStatus(`✓ Saved ${data.count} items to ${activeClient.name}`);
+    } catch (e: any) {
+      setSaveStatus(`⚠️ ${e.message}`);
+    }
+  }
+
+  async function applyPinecrestPlaybook() {
+    setSaveStatus('Applying Pinecrest playbook…');
+    try {
+      const res = await fetch('/api/content-calendar', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          clientName: 'Prime IV — Pinecrest',
+          playbookId: 'pinecrest-reopening',
+          startDate: new Date().toISOString().slice(0, 10),
+        }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || 'Playbook failed');
+      setSaveStatus(`✓ Loaded ${data.count} playbook posts into Prime IV — Pinecrest`);
+    } catch (e: any) {
+      setSaveStatus(`⚠️ ${e.message}`);
+    }
+  }
 
   useEffect(() => {
     scrollRef.current?.scrollTo({ top: scrollRef.current.scrollHeight, behavior: 'smooth' });
@@ -52,6 +108,26 @@ export default function AgentChatPage() {
         <div className="flex-1" />
       </div>
 
+      {saveStatus && (
+        <div className="glass-card p-3 text-sm text-white/90">{saveStatus}</div>
+      )}
+
+      {agent.id === 'content-calendar' && (
+        <div className="glass-card p-4 flex items-center justify-between gap-4">
+          <div>
+            <div className="text-white font-semibold text-sm">Pinecrest Grand Reopening Playbook</div>
+            <div className="text-white/60 text-xs">30-day launch plan: teaser → buildout → menu → soft open → grand opening</div>
+          </div>
+          <button
+            onClick={applyPinecrestPlaybook}
+            className="rounded-xl px-4 py-2 text-sm font-semibold text-white"
+            style={{ background: 'linear-gradient(135deg,#0c6da4,#4ab8ce)' }}
+          >
+            Load into Pinecrest
+          </button>
+        </div>
+      )}
+
       <div className="glass-card p-5 flex items-center gap-4">
         <div
           className="w-14 h-14 rounded-2xl flex items-center justify-center"
@@ -85,19 +161,32 @@ export default function AgentChatPage() {
               ))}
             </div>
           )}
-          {messages.map((m, i) => (
-            <div
-              key={i}
-              className={`rounded-2xl px-4 py-3 max-w-[85%] text-sm whitespace-pre-wrap leading-relaxed ${
-                m.role === 'user'
-                  ? 'self-end text-white'
-                  : 'self-start text-white/90 bg-white/10 border border-white/15'
-              }`}
-              style={m.role === 'user' ? { background: 'linear-gradient(135deg,#0c6da4,#4ab8ce)' } : undefined}
-            >
-              {m.content}
-            </div>
-          ))}
+          {messages.map((m, i) => {
+            const plan = m.role === 'assistant' ? extractJsonArray(m.content) : null;
+            return (
+              <div
+                key={i}
+                className={`rounded-2xl px-4 py-3 max-w-[85%] text-sm whitespace-pre-wrap leading-relaxed ${
+                  m.role === 'user'
+                    ? 'self-end text-white'
+                    : 'self-start text-white/90 bg-white/10 border border-white/15'
+                }`}
+                style={m.role === 'user' ? { background: 'linear-gradient(135deg,#0c6da4,#4ab8ce)' } : undefined}
+              >
+                <div>{m.content}</div>
+                {plan && (
+                  <button
+                    onClick={() => savePlanToTracker(plan)}
+                    className="mt-3 inline-flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-xs font-semibold text-white"
+                    style={{ background: 'linear-gradient(135deg,#0c6da4,#4ab8ce)' }}
+                  >
+                    <span className="material-symbols-outlined" style={{ fontSize: 14 }}>save</span>
+                    Save {plan.length} posts to Content Tracker
+                  </button>
+                )}
+              </div>
+            );
+          })}
           {loading && (
             <div className="self-start text-white/60 text-sm flex items-center gap-2">
               <span className="w-2 h-2 rounded-full bg-white/60 animate-pulse" />

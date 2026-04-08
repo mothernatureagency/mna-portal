@@ -51,9 +51,9 @@ export default function Sidebar() {
           React.createElement('div', { style: { color: 'rgba(255,255,255,.35)', fontSize: 9.5, fontWeight: 700, letterSpacing: '.14em', textTransform: 'uppercase', padding: '10px 10px 4px' } }, section.sec),
           ...section.items.map(function(item) {
             var on = active(item.href);
-            return React.createElement(Link, { key: item.href, href: item.href, style: { display: 'flex', alignItems: 'center', gap: 10, padding: '8px 10px', borderRadius: 10, fontSize: 13, fontWeight: on ? 600 : 400, color: on ? '#fff' : 'rgba(255,255,255,.6)', background: on ? 'rgba(255,255,255,.1)' : 'transparent', textDecoration: 'none', marginBottom: 1 } },
-              React.createElement('span', { className: 'material-symbols-outlined', style: { fontSize: 16 } }, item.e),
-              React.createElement('span', null, item.label)
+            return React.createElement(Link, { key: item.href, href: item.href, style: { display: 'flex', alignItems: 'center', gap: 10, padding: '8px 10px', borderRadius: 10, fontSize: 13, fontWeight: on ? 600 : 400, color: on ? '#fff' : 'rgba(255,255,255,.6)', background: on ? 'rgba(255,255,255,.1)' : 'transparent', textDecoration: 'none', marginBottom: 1, overflow: 'hidden' } },
+              React.createElement('span', { className: 'material-symbols-outlined', style: { fontSize: 18, width: 18, height: 18, flexShrink: 0, display: 'inline-flex', alignItems: 'center', justifyContent: 'center', overflow: 'hidden' } }, item.e),
+              React.createElement('span', { style: { whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' } }, item.label)
             );
           })
         );
