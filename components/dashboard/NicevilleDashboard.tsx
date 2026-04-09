@@ -104,12 +104,12 @@ export default function NicevilleDashboard({ client }: { client: Client }) {
         <div>
           <div className="flex items-center gap-2 mb-1">
             <div className="w-1.5 h-6 rounded-full" style={{ background: `linear-gradient(180deg, ${gradientFrom}, ${gradientTo})` }} />
-            <h1 className="text-[22px] font-extrabold text-gray-900 tracking-tight">Overview</h1>
+            <h1 className="text-[22px] font-extrabold text-white tracking-tight">Overview</h1>
             <span className="text-[15px] font-medium ml-1" style={{ background: `linear-gradient(135deg, ${gradientFrom}, ${gradientTo})`, WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent' }}>
               {client.name}
             </span>
           </div>
-          <p className="text-[12px] text-gray-400 pl-3.5">
+          <p className="text-[12px] text-white/60 pl-3.5">
             Revenue actuals through March 2026 · Ad data verified with PDM split · GHL metrics manual pull
           </p>
         </div>
@@ -121,22 +121,22 @@ export default function NicevilleDashboard({ client }: { client: Client }) {
           <SectionLabel>Meta Ads Account</SectionLabel>
           <div className="glass-card p-5 grid gap-3" style={{ gridTemplateColumns: '1.4fr 1fr 1fr', borderLeft: `3px solid ${gradientFrom}` }}>
             <div>
-              <div className="text-[10px] font-bold uppercase tracking-wider text-gray-400 mb-1">Business Portfolio</div>
-              <div className="text-[14px] font-bold text-gray-900">{client.metaAds.businessPortfolioName}</div>
-              <div className="text-[11px] text-gray-500 font-mono">{client.metaAds.businessPortfolioId}</div>
+              <div className="text-[10px] font-bold uppercase tracking-wider text-white/60 mb-1">Business Portfolio</div>
+              <div className="text-[14px] font-bold text-white">{client.metaAds.businessPortfolioName}</div>
+              <div className="text-[11px] text-white/70 font-mono">{client.metaAds.businessPortfolioId}</div>
             </div>
             <div>
-              <div className="text-[10px] font-bold uppercase tracking-wider text-gray-400 mb-1">Ad Account</div>
-              <div className="text-[13px] font-bold text-gray-900 font-mono">{client.metaAds.adAccountId}</div>
+              <div className="text-[10px] font-bold uppercase tracking-wider text-white/60 mb-1">Ad Account</div>
+              <div className="text-[13px] font-bold text-white font-mono">{client.metaAds.adAccountId}</div>
               {client.metaAds.partnerName && (
-                <div className="text-[11px] text-gray-500 mt-1">Partner: <span className="font-semibold text-gray-700">{client.metaAds.partnerName}</span></div>
+                <div className="text-[11px] text-white/70 mt-1">Partner: <span className="font-semibold text-white/85">{client.metaAds.partnerName}</span></div>
               )}
             </div>
             <div>
-              <div className="text-[10px] font-bold uppercase tracking-wider text-gray-400 mb-1">Pixel</div>
+              <div className="text-[10px] font-bold uppercase tracking-wider text-white/60 mb-1">Pixel</div>
               {client.metaAds.datasetPixel && (
                 <>
-                  <div className="text-[13px] font-bold text-gray-900">{client.metaAds.datasetPixel.name}</div>
+                  <div className="text-[13px] font-bold text-white">{client.metaAds.datasetPixel.name}</div>
                   <span className="mt-1 inline-block text-[10px] font-bold px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-700">
                     ✓ {client.metaAds.datasetPixel.status}
                   </span>
@@ -159,26 +159,26 @@ export default function NicevilleDashboard({ client }: { client: Client }) {
         <div className="grid grid-cols-4 gap-4">
           <div className="glass-card p-5 relative overflow-hidden">
             <div className="absolute top-0 left-0 right-0 h-1 rounded-t-[20px]" style={{ background: '#0ea5e9' }} />
-            <span className="text-[10px] font-bold uppercase text-gray-400">Total Leads</span>
-            <div className="text-[30px] font-black text-gray-900 leading-none my-2">{GHL_SNAPSHOT.totalOpportunities}</div>
-            <div className="text-[11px] text-gray-500">Open {GHL_SNAPSHOT.openOpportunities} · Won {GHL_SNAPSHOT.wonOpportunities} · Lost {GHL_SNAPSHOT.lostOpportunities}</div>
+            <span className="text-[10px] font-bold uppercase text-white/60">Total Leads</span>
+            <div className="text-[30px] font-black text-white leading-none my-2">{GHL_SNAPSHOT.totalOpportunities}</div>
+            <div className="text-[11px] text-white/70">Open {GHL_SNAPSHOT.openOpportunities} · Won {GHL_SNAPSHOT.wonOpportunities} · Lost {GHL_SNAPSHOT.lostOpportunities}</div>
           </div>
           <div className="glass-card p-5 relative overflow-hidden">
             <div className="absolute top-0 left-0 right-0 h-1 rounded-t-[20px]" style={{ background: '#8b5cf6' }} />
-            <span className="text-[10px] font-bold uppercase text-gray-400">Conversion Rate</span>
-            <div className="text-[30px] font-black text-gray-900 leading-none my-2">{GHL_SNAPSHOT.conversionRate}%</div>
+            <span className="text-[10px] font-bold uppercase text-white/60">Conversion Rate</span>
+            <div className="text-[30px] font-black text-white leading-none my-2">{GHL_SNAPSHOT.conversionRate}%</div>
             <div className="text-[11px] font-bold" style={{ color: '#7c3aed' }}>Target 14% · Exceeded ✦</div>
           </div>
           <div className="glass-card p-5 relative overflow-hidden">
             <div className="absolute top-0 left-0 right-0 h-1 rounded-t-[20px]" style={{ background: '#ec4899' }} />
-            <span className="text-[10px] font-bold uppercase text-gray-400">Booked Appts</span>
-            <div className="text-[30px] font-black text-gray-900 leading-none my-2">{GHL_SNAPSHOT.wonOpportunities}</div>
-            <div className="text-[11px] text-gray-500">Won opportunities</div>
+            <span className="text-[10px] font-bold uppercase text-white/60">Booked Appts</span>
+            <div className="text-[30px] font-black text-white leading-none my-2">{GHL_SNAPSHOT.wonOpportunities}</div>
+            <div className="text-[11px] text-white/70">Won opportunities</div>
           </div>
           <div className="glass-card p-5 relative overflow-hidden">
             <div className="absolute top-0 left-0 right-0 h-1 rounded-t-[20px]" style={{ background: '#06b6d4' }} />
-            <span className="text-[10px] font-bold uppercase text-gray-400">March Revenue</span>
-            <div className="text-[30px] font-black text-gray-900 leading-none my-2">{fmtUSD(REVENUE_HISTORY[2].value)}</div>
+            <span className="text-[10px] font-bold uppercase text-white/60">March Revenue</span>
+            <div className="text-[30px] font-black text-white leading-none my-2">{fmtUSD(REVENUE_HISTORY[2].value)}</div>
             <div className="text-[11px] font-bold" style={{ color: '#059669' }}>+{Math.round((REVENUE_HISTORY[2].value / REVENUE_HISTORY[1].value - 1) * 100)}% vs Feb</div>
           </div>
         </div>
@@ -187,21 +187,21 @@ export default function NicevilleDashboard({ client }: { client: Client }) {
         <div className="mt-4 grid grid-cols-3 gap-4">
           <div className="glass-card p-5 relative overflow-hidden opacity-60">
             <div className="absolute top-0 left-0 right-0 h-1 rounded-t-[20px]" style={{ background: '#94a3b8' }} />
-            <span className="text-[10px] font-bold uppercase text-gray-400">Cost Per Lead</span>
-            <div className="text-[28px] font-black text-gray-500 leading-none my-2">—</div>
-            <div className="text-[11px] text-gray-500">Blocked until we know paid vs walk-in split (Revive API)</div>
+            <span className="text-[10px] font-bold uppercase text-white/60">Cost Per Lead</span>
+            <div className="text-[28px] font-black text-white/70 leading-none my-2">—</div>
+            <div className="text-[11px] text-white/70">Blocked until we know paid vs walk-in split (Revive API)</div>
           </div>
           <div className="glass-card p-5 relative overflow-hidden opacity-60">
             <div className="absolute top-0 left-0 right-0 h-1 rounded-t-[20px]" style={{ background: '#94a3b8' }} />
-            <span className="text-[10px] font-bold uppercase text-gray-400">Pipeline Value</span>
-            <div className="text-[28px] font-black text-gray-500 leading-none my-2">{fmtUSD(GHL_SNAPSHOT.pipelineValue)}</div>
-            <div className="text-[11px] text-gray-500">GHL snapshot only · live API pending</div>
+            <span className="text-[10px] font-bold uppercase text-white/60">Pipeline Value</span>
+            <div className="text-[28px] font-black text-white/70 leading-none my-2">{fmtUSD(GHL_SNAPSHOT.pipelineValue)}</div>
+            <div className="text-[11px] text-white/70">GHL snapshot only · live API pending</div>
           </div>
           <div className="glass-card p-5 relative overflow-hidden opacity-60">
             <div className="absolute top-0 left-0 right-0 h-1 rounded-t-[20px]" style={{ background: '#94a3b8' }} />
-            <span className="text-[10px] font-bold uppercase text-gray-400">Today's Appointments</span>
-            <div className="text-[28px] font-black text-gray-500 leading-none my-2">—</div>
-            <div className="text-[11px] text-gray-500">Awaiting scheduling API</div>
+            <span className="text-[10px] font-bold uppercase text-white/60">Today's Appointments</span>
+            <div className="text-[28px] font-black text-white/70 leading-none my-2">—</div>
+            <div className="text-[11px] text-white/70">Awaiting scheduling API</div>
           </div>
         </div>
       </div>
@@ -212,20 +212,20 @@ export default function NicevilleDashboard({ client }: { client: Client }) {
         <div className="glass-card p-6">
           <div className="flex items-center justify-between mb-4">
             <div>
-              <div className="text-[15px] font-bold text-gray-900">Monthly revenue</div>
-              <div className="text-[11px] text-gray-500">
+              <div className="text-[15px] font-bold text-white">Monthly revenue</div>
+              <div className="text-[11px] text-white/70">
                 3 real months from client · Q2 projected at {fmtPct(avgGrowth)} MoM (average of actuals)
               </div>
             </div>
             <div className="text-right">
-              <div className="text-[10px] font-bold uppercase tracking-wider text-gray-400">Projected Q2 total</div>
-              <div className="text-[22px] font-black text-gray-900">{fmtUSD(q2Total)}</div>
+              <div className="text-[10px] font-bold uppercase tracking-wider text-white/60">Projected Q2 total</div>
+              <div className="text-[22px] font-black text-white">{fmtUSD(q2Total)}</div>
             </div>
           </div>
           <div className="flex items-end gap-3 h-40 mb-4">
             {[...REVENUE_HISTORY, ...projections.map((p) => ({ ...p, real: false }))].map((m, i) => (
               <div key={i} className="flex-1 flex flex-col items-center gap-1.5">
-                <div className="text-[11px] font-bold text-gray-700">{fmtUSD(m.value)}</div>
+                <div className="text-[11px] font-bold text-white/85">{fmtUSD(m.value)}</div>
                 <div
                   className="w-full rounded-t-lg"
                   style={{
@@ -236,13 +236,13 @@ export default function NicevilleDashboard({ client }: { client: Client }) {
                     border: m.real ? 'none' : `1px dashed ${gradientFrom}66`,
                   }}
                 />
-                <div className={`text-[10px] font-semibold ${m.real ? 'text-gray-600' : 'text-gray-400 italic'}`}>
+                <div className={`text-[10px] font-semibold ${m.real ? 'text-white/80' : 'text-white/60 italic'}`}>
                   {m.month}
                 </div>
               </div>
             ))}
           </div>
-          <div className="flex items-center gap-5 text-[10px] text-gray-500 pt-3 border-t border-gray-200/60">
+          <div className="flex items-center gap-5 text-[10px] text-white/70 pt-3 border-t border-white/10">
             <div className="flex items-center gap-1.5">
               <div className="w-3 h-3 rounded" style={{ background: `linear-gradient(180deg, ${gradientFrom}, ${gradientTo})` }} />
               Actual (client confirmed)
@@ -266,15 +266,15 @@ export default function NicevilleDashboard({ client }: { client: Client }) {
                 <div key={row.agency}>
                   <div className="flex items-center justify-between mb-1.5">
                     <div>
-                      <span className="text-[13px] font-bold text-gray-900">{row.agency}</span>
-                      <span className="text-[11px] text-gray-500 ml-2">· {row.channel}</span>
+                      <span className="text-[13px] font-bold text-white">{row.agency}</span>
+                      <span className="text-[11px] text-white/70 ml-2">· {row.channel}</span>
                     </div>
                     <div className="text-right">
-                      <div className="text-[14px] font-bold text-gray-900">{fmtUSD(row.monthly)}/mo</div>
-                      <div className="text-[10px] text-gray-500">{row.note}</div>
+                      <div className="text-[14px] font-bold text-white">{fmtUSD(row.monthly)}/mo</div>
+                      <div className="text-[10px] text-white/70">{row.note}</div>
                     </div>
                   </div>
-                  <div className="h-2 rounded-full overflow-hidden bg-gray-100">
+                  <div className="h-2 rounded-full overflow-hidden bg-white/10">
                     <div
                       className="h-full rounded-full"
                       style={{ width: `${pct}%`, background: `linear-gradient(90deg, ${gradientFrom}, ${gradientTo})` }}
@@ -284,7 +284,7 @@ export default function NicevilleDashboard({ client }: { client: Client }) {
               );
             })}
           </div>
-          <div className="mt-5 pt-4 border-t border-gray-200/60 text-[11px] text-gray-500 leading-relaxed">
+          <div className="mt-5 pt-4 border-t border-white/10 text-[11px] text-white/70 leading-relaxed">
             💡 All Niceville ad spend is currently on <strong>Meta</strong>. No Google Ads running today. When the Revive / HighLevel lead source API lands, this panel will split Meta spend between MNA and PDM automatically by UTM + ad account ID.
           </div>
         </div>
@@ -335,8 +335,8 @@ function InsightRow({ color, title, body }: { color: string; title: string; body
     <div className="flex gap-3">
       <div className="w-1 rounded-full shrink-0" style={{ background: color }} />
       <div>
-        <div className="text-[13px] font-bold text-gray-900">{title}</div>
-        <div className="text-[12px] text-gray-600 leading-relaxed mt-1">{body}</div>
+        <div className="text-[13px] font-bold text-white">{title}</div>
+        <div className="text-[12px] text-white/80 leading-relaxed mt-1">{body}</div>
       </div>
     </div>
   );

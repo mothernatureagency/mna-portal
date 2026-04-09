@@ -99,8 +99,8 @@ export default function LeadSourceSplitEditor({
     <div className="glass-card p-6">
       <div className="flex items-start justify-between mb-4">
         <div>
-          <div className="text-[15px] font-bold text-gray-900">Lead source split</div>
-          <div className="text-[11px] text-gray-500 mt-0.5">
+          <div className="text-[15px] font-bold text-white">Lead source split</div>
+          <div className="text-[11px] text-white/70 mt-0.5">
             {split
               ? `Manual estimate · updated ${new Date(split.updatedAt || '').toLocaleDateString()}`
               : 'No manual estimate set yet'}
@@ -109,14 +109,14 @@ export default function LeadSourceSplitEditor({
         {!editing && (
           <button
             onClick={() => setEditing(true)}
-            className="text-[11px] font-semibold px-3 py-1.5 rounded-lg bg-gray-100 text-gray-700 hover:bg-gray-200"
+            className="text-[11px] font-semibold px-3 py-1.5 rounded-lg bg-white/10 text-white hover:bg-white/20"
           >
             {split ? 'Edit' : 'Set split'}
           </button>
         )}
       </div>
 
-      {loading && <div className="text-gray-400 text-sm py-4">Loading…</div>}
+      {loading && <div className="text-white/50 text-sm py-4">Loading…</div>}
 
       {/* View mode */}
       {!loading && !editing && (
@@ -129,12 +129,12 @@ export default function LeadSourceSplitEditor({
                   <div key={c.key}>
                     <div className="flex items-center justify-between mb-1.5">
                       <div>
-                        <span className="text-[13px] font-bold text-gray-900">{c.label}</span>
-                        <span className="text-[10px] text-gray-500 ml-2">· {c.sub}</span>
+                        <span className="text-[13px] font-bold text-white">{c.label}</span>
+                        <span className="text-[10px] text-white/70 ml-2">· {c.sub}</span>
                       </div>
-                      <div className="text-[14px] font-bold text-gray-900 tabular-nums">{pct}%</div>
+                      <div className="text-[14px] font-bold text-white tabular-nums">{pct}%</div>
                     </div>
-                    <div className="h-2 rounded-full overflow-hidden bg-gray-100">
+                    <div className="h-2 rounded-full overflow-hidden bg-white/10">
                       <div
                         className="h-full rounded-full"
                         style={{ width: `${pct}%`, background: `linear-gradient(90deg, ${gradientFrom}, ${gradientTo})` }}
@@ -144,7 +144,7 @@ export default function LeadSourceSplitEditor({
                 );
               })}
               {split.notes && (
-                <div className="pt-3 border-t border-gray-200/60 text-[11px] text-gray-500 italic leading-relaxed">
+                <div className="pt-3 border-t border-white/10 text-[11px] text-white/70 italic leading-relaxed">
                   {split.notes}
                 </div>
               )}
@@ -152,10 +152,10 @@ export default function LeadSourceSplitEditor({
           ) : (
             <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
               {CATEGORIES.map((c) => (
-                <div key={c.key} className="rounded-xl border border-gray-200 bg-white p-3">
-                  <div className="text-[13px] font-bold text-gray-900">{c.label}</div>
-                  <div className="text-[10px] text-gray-500 mt-0.5">{c.sub}</div>
-                  <div className="text-[11px] font-mono text-gray-400 mt-2">—</div>
+                <div key={c.key} className="rounded-xl border border-white/10 bg-white/5 p-3">
+                  <div className="text-[13px] font-bold text-white">{c.label}</div>
+                  <div className="text-[10px] text-white/70 mt-0.5">{c.sub}</div>
+                  <div className="text-[11px] font-mono text-white/50 mt-2">—</div>
                 </div>
               ))}
             </div>
@@ -168,9 +168,9 @@ export default function LeadSourceSplitEditor({
         <div className="space-y-4">
           <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
             {CATEGORIES.map((c) => (
-              <div key={c.key} className="rounded-xl border border-gray-200 bg-white p-3">
-                <div className="text-[12px] font-bold text-gray-900">{c.label}</div>
-                <div className="text-[9px] text-gray-500 mb-2">{c.sub}</div>
+              <div key={c.key} className="rounded-xl border border-white/10 bg-white/5 p-3">
+                <div className="text-[12px] font-bold text-white">{c.label}</div>
+                <div className="text-[9px] text-white/70 mb-2">{c.sub}</div>
                 <div className="flex items-center gap-1">
                   <input
                     type="number"
@@ -178,31 +178,31 @@ export default function LeadSourceSplitEditor({
                     max={100}
                     value={draft[c.key]}
                     onChange={(e) => setDraft((d) => ({ ...d, [c.key]: Math.max(0, Math.min(100, Number(e.target.value) || 0)) }))}
-                    className="w-16 rounded-md border border-gray-300 px-2 py-1 text-sm font-mono text-right"
+                    className="w-16 rounded-md border border-white/20 bg-white/10 text-white px-2 py-1 text-sm font-mono text-right"
                   />
-                  <span className="text-[12px] text-gray-500">%</span>
+                  <span className="text-[12px] text-white/70">%</span>
                 </div>
               </div>
             ))}
           </div>
           <div>
-            <label className="text-[10px] font-bold uppercase tracking-wider text-gray-500">Notes</label>
+            <label className="text-[10px] font-bold uppercase tracking-wider text-white/70">Notes</label>
             <textarea
               value={draft.notes || ''}
               onChange={(e) => setDraft((d) => ({ ...d, notes: e.target.value }))}
               rows={2}
               placeholder="Context for this estimate, e.g. 'Based on first week of April DMs and walk-in log'"
-              className="w-full mt-1 rounded-lg border border-gray-200 p-2 text-[12px]"
+              className="w-full mt-1 rounded-lg border border-white/20 bg-white/10 text-white placeholder:text-white/40 p-2 text-[12px]"
             />
           </div>
-          <div className="flex items-center justify-between pt-2 border-t border-gray-200/60">
+          <div className="flex items-center justify-between pt-2 border-t border-white/10">
             <div className={`text-[11px] font-semibold ${canSave ? 'text-emerald-600' : 'text-rose-600'}`}>
               Total: {draftTotal}% {canSave ? '✓' : '(must equal 100)'}
             </div>
             <div className="flex gap-2">
               <button
                 onClick={() => { setEditing(false); setError(null); if (split) setDraft({ ...split }); }}
-                className="text-[11px] font-semibold px-3 py-1.5 rounded-lg bg-gray-100 text-gray-700"
+                className="text-[11px] font-semibold px-3 py-1.5 rounded-lg bg-white/10 text-white hover:bg-white/20"
               >
                 Cancel
               </button>
@@ -220,7 +220,7 @@ export default function LeadSourceSplitEditor({
         </div>
       )}
 
-      <div className="mt-4 pt-3 border-t border-gray-200/60 text-[10px] text-gray-400 leading-relaxed">
+      <div className="mt-4 pt-3 border-t border-white/10 text-[10px] text-white/50 leading-relaxed">
         Saved splits display on the client portal dashboard too. Will auto-populate from Revive / HighLevel once the lead source API is wired.
       </div>
     </div>

@@ -106,27 +106,27 @@ export default function NicevilleContentPreview({ clientName }: { clientName: st
     <div className="glass-card p-6">
       <div className="flex items-start justify-between mb-5">
         <div>
-          <h3 className="text-[16px] font-bold text-gray-900">Content Calendar · next 3 weeks</h3>
-          <p className="text-[11px] text-gray-500 mt-0.5">
+          <h3 className="text-[16px] font-bold text-white">Content Calendar · next 3 weeks</h3>
+          <p className="text-[11px] text-white/70 mt-0.5">
             Pulled live from the Content Tracker. Click through to approve or edit.
           </p>
         </div>
         <Link
           href="/content"
-          className="text-[11px] font-semibold px-3 py-1.5 rounded-lg bg-gray-100 text-gray-700 hover:bg-gray-200"
+          className="text-[11px] font-semibold px-3 py-1.5 rounded-lg bg-white/10 text-white hover:bg-white/20"
         >
           Open Content Tracker →
         </Link>
       </div>
 
       {loading && (
-        <div className="text-center text-gray-400 py-10 text-sm">Loading calendar…</div>
+        <div className="text-center text-white/50 py-10 text-sm">Loading calendar…</div>
       )}
 
       {!loading && items.length === 0 && (
-        <div className="rounded-xl border border-dashed border-gray-200 p-6 text-center">
-          <div className="text-[13px] font-semibold text-gray-700">No content loaded yet</div>
-          <div className="text-[11px] text-gray-500 mt-1 mb-3">
+        <div className="rounded-xl border border-dashed border-white/20 p-6 text-center">
+          <div className="text-[13px] font-semibold text-white/85">No content loaded yet</div>
+          <div className="text-[11px] text-white/70 mt-1 mb-3">
             Head to the Content Tracker and click "Load Spring Reset" to seed the 45 day plan.
           </div>
           <Link
@@ -142,7 +142,7 @@ export default function NicevilleContentPreview({ clientName }: { clientName: st
       {!loading && items.length > 0 && (
         <>
           {/* Status legend */}
-          <div className="flex items-center gap-4 mb-3 flex-wrap text-[10px] text-gray-500">
+          <div className="flex items-center gap-4 mb-3 flex-wrap text-[10px] text-white/70">
             {(
               [
                 ['approved', 'Approved'],
@@ -162,7 +162,7 @@ export default function NicevilleContentPreview({ clientName }: { clientName: st
           {/* Calendar grid */}
           <div className="grid grid-cols-7 gap-1.5">
             {['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'].map((d) => (
-              <div key={d} className="text-[9px] font-bold uppercase tracking-wider text-gray-400 text-center pb-1">{d}</div>
+              <div key={d} className="text-[9px] font-bold uppercase tracking-wider text-white/50 text-center pb-1">{d}</div>
             ))}
             {weeks.flat().map((day) => {
               const iso = day.toISOString().slice(0, 10);
@@ -171,20 +171,20 @@ export default function NicevilleContentPreview({ clientName }: { clientName: st
               return (
                 <div
                   key={iso}
-                  className={`min-h-[72px] rounded-lg border p-1.5 flex flex-col gap-1 ${isToday ? 'border-gray-900 bg-gray-50' : 'border-gray-200 bg-white'}`}
+                  className={`min-h-[72px] rounded-lg border p-1.5 flex flex-col gap-1 ${isToday ? 'border-white bg-white/15' : 'border-white/10 bg-white/5'}`}
                 >
-                  <div className="text-[9px] font-bold text-gray-400">{day.getDate()}</div>
+                  <div className="text-[9px] font-bold text-white/50">{day.getDate()}</div>
                   {posts.slice(0, 3).map((p) => {
                     const status = (p.client_approval_status || 'pending_review') as ApprovalStatus;
                     return (
                       <div key={p.id} className="flex items-start gap-1">
                         <span className="w-1.5 h-1.5 rounded-full mt-0.5 shrink-0" style={{ background: STATUS_DOT[status] }} />
-                        <span className="text-[9px] leading-tight text-gray-700 line-clamp-2">{parseTitle(p.title)}</span>
+                        <span className="text-[9px] leading-tight text-white/85 line-clamp-2">{parseTitle(p.title)}</span>
                       </div>
                     );
                   })}
                   {posts.length > 3 && (
-                    <div className="text-[9px] text-gray-400">+{posts.length - 3} more</div>
+                    <div className="text-[9px] text-white/50">+{posts.length - 3} more</div>
                   )}
                 </div>
               );
