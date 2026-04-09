@@ -7,15 +7,18 @@ import { useClient } from '@/context/ClientContext';
 const NAV = [
   { sec: 'MAIN', items: [
     { label: 'Overview', href: '/', e: 'bar_chart' },
-    { label: 'Top Hooks', href: '/top-hooks', e: 'bolt' },
+  ]},
+  { sec: 'SOCIAL & CONTENT', items: [
     { label: 'Content Tracker', href: '/content', e: 'grid_view' },
+    { label: 'Content Planner', href: '/planner', e: 'edit_calendar' },
     { label: 'Client Tasks', href: '/client-tasks', e: 'checklist' },
-    { label: 'Ad Performance', href: '/campaigns', e: 'paid' },
+  ]},
+  { sec: 'ADVERTISING', items: [
     { label: 'Meta Ads (Live)', href: '/meta-ads', e: 'ads_click' },
+    { label: 'Campaigns', href: '/campaigns', e: 'rocket_launch' },
   ]},
   { sec: 'CRM', items: [
     { label: 'Lead Tracking', href: '/leads', e: 'track_changes' },
-    { label: 'Campaigns', href: '/campaigns', e: 'rocket_launch' },
     { label: 'Task Manager', href: '/crm', e: 'task_alt' },
   ]},
   { sec: 'INTELLIGENCE', items: [
