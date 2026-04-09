@@ -21,8 +21,8 @@ function primeIvNicevilleKPIs(): KPI[] {
   return [
     { label: 'Total Leads (30d)',    value: '464',     sub: 'GHL pipeline',           color: '#0ea5e9' },
     { label: 'Conversion Rate',      value: '16.59%',  sub: 'Above 14% target',       color: '#8b5cf6' },
-    { label: 'Appointments Booked',  value: '77',      sub: 'Won opportunities',      color: '#ec4899' },
-    { label: 'Revenue (Won)',        value: '$72.99K', sub: 'Pipeline $160.62K',      color: '#06b6d4' },
+    { label: 'Booked Appointments',  value: '77',      sub: 'Won opportunities',      color: '#ec4899' },
+    { label: 'March Revenue',        value: '$54.5K',  sub: '+3.8% vs February',      color: '#06b6d4' },
   ];
 }
 
@@ -32,15 +32,13 @@ function defaultKPIs(): KPI[] {
   ];
 }
 
-// Lead trend — same safe 6-month mock used on staff dashboard for now.
-// Once live data lands, swap this for a real pull.
-const TREND_NICEVILLE = [
-  { month: 'Nov', leads: 380 },
-  { month: 'Dec', leads: 405 },
-  { month: 'Jan', leads: 428 },
-  { month: 'Feb', leads: 441 },
-  { month: 'Mar', leads: 454 },
-  { month: 'Apr', leads: 464 },
+// Real monthly revenue from the client (Jan/Feb/Mar 2026). Shown as a
+// revenue trajectory, not leads, since revenue is the number Jennifer
+// actually cares about and we have it confirmed.
+const REVENUE_HISTORY_NICEVILLE = [
+  { month: 'Jan', value: 49400 },
+  { month: 'Feb', value: 52500 },
+  { month: 'Mar', value: 54500 },
 ];
 
 const TOP_POSTS = [
@@ -59,8 +57,8 @@ export default async function ClientOverviewPage() {
 
   const isNiceville = client.id === 'prime-iv';
   const kpis = isNiceville ? primeIvNicevilleKPIs() : defaultKPIs();
-  const trend = isNiceville ? TREND_NICEVILLE : [];
-  const trendMax = trend.length > 0 ? Math.max(...trend.map((t) => t.leads)) : 1;
+  const history = isNiceville ? REVENUE_HISTORY_NICEVILLE : [];
+  const historyMax = history.length > 0 ? Math.max(...history.map((t) => t.value)) : 1;
   const { gradientFrom, gradientTo } = client.branding;
 
   return (
@@ -84,30 +82,32 @@ export default async function ClientOverviewPage() {
         ))}
       </div>
 
-      {/* Lead trend */}
-      {trend.length > 0 && (
+      {/* Revenue trajectory (real numbers) */}
+      {history.length > 0 && (
         <div className="bg-white rounded-2xl p-6 shadow-sm border border-black/5">
           <div className="flex items-center justify-between mb-4">
             <div>
-              <div className="text-[15px] font-bold text-neutral-900">Lead trend — last 6 months</div>
-              <div className="text-[11px] text-neutral-500">Steady growth into Spring Reset launch</div>
+              <div className="text-[15px] font-bold text-neutral-900">Revenue · last 3 months</div>
+              <div className="text-[11px] text-neutral-500">Actuals confirmed with the team</div>
             </div>
             <span className="text-[11px] font-bold px-2 py-1 rounded-full bg-emerald-100 text-emerald-700">
-              +{Math.round(((trend[trend.length - 1].leads / trend[0].leads) - 1) * 100)}% vs start
+              +{Math.round(((history[history.length - 1].value / history[0].value) - 1) * 100)}% vs Jan
             </span>
           </div>
-          <div className="flex items-end gap-3 h-36">
-            {trend.map((t) => (
+          <div className="flex items-end gap-4 h-36">
+            {history.map((t) => (
               <div key={t.month} className="flex-1 flex flex-col items-center gap-2">
+                <div className="text-[11px] font-bold text-neutral-800">
+                  {new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD', maximumFractionDigits: 0 }).format(t.value)}
+                </div>
                 <div
                   className="w-full rounded-t-lg"
                   style={{
-                    height: `${(t.leads / trendMax) * 100}%`,
+                    height: `${(t.value / historyMax) * 100}%`,
                     background: `linear-gradient(180deg, ${gradientFrom}, ${gradientTo})`,
                   }}
                 />
-                <div className="text-[10px] font-semibold text-neutral-500">{t.month}</div>
-                <div className="text-[11px] font-bold text-neutral-800">{t.leads}</div>
+                <div className="text-[10px] font-semibold text-neutral-500">{t.month} 2026</div>
               </div>
             ))}
           </div>

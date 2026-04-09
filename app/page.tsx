@@ -1,6 +1,7 @@
 'use client';
 import React from 'react';
 import { useClient } from '@/context/ClientContext';
+import NicevilleDashboard from '@/components/dashboard/NicevilleDashboard';
 import LeadTrendsChart from '@/components/dashboard/LeadTrendsChart';
 import AdPerformanceChart from '@/components/dashboard/AdPerformanceChart';
 import CRMSnapshot from '@/components/dashboard/CRMSnapshot';
@@ -148,6 +149,14 @@ function SectionLabel({ children }: { children: React.ReactNode }) {
 
 export default function DashboardPage() {
   const { activeClient } = useClient();
+
+  // Prime IV Niceville gets its own completely custom layout built on real
+  // numbers from the client. Every other client falls through to the default
+  // dashboard below.
+  if (activeClient.id === 'prime-iv') {
+    return <NicevilleDashboard client={activeClient} />;
+  }
+
   const { gradientFrom, gradientTo } = activeClient.branding;
   const data = getDashboardData(activeClient.id);
   const leadsPct = Math.min(100, Math.round((data.totalLeads / data.totalLeadsTarget) * 1000) / 10);
