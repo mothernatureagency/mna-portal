@@ -20,6 +20,7 @@ import React from 'react';
 import type { Client } from '@/lib/clients';
 import UserBanner from './UserBanner';
 import NicevilleContentPreview from './NicevilleContentPreview';
+import LeadSourceSplitEditor from './LeadSourceSplitEditor';
 
 // ─── REAL DATA ────────────────────────────────────────────────────────────
 // Source: client provided directly on 2026-04-08
@@ -58,14 +59,6 @@ function computeProjections(history: { month: string; value: number }[]) {
 const AD_SPEND_BREAKDOWN = [
   { agency: 'Mother Nature Agency', channel: 'Meta', monthly: 600, note: '$20/day daily budget' },
   { agency: 'PDM', channel: 'Meta', monthly: 1_290, note: 'Managed separately' },
-];
-
-// Categories only. Real split pending Revive/HighLevel lead source API.
-const LEAD_SOURCE_CATEGORIES = [
-  { label: 'Facebook / Instagram', note: 'Paid · MNA + PDM' },
-  { label: 'Google',               note: 'Organic only (no paid)' },
-  { label: 'Walk-in',              note: 'In-person traffic' },
-  { label: 'Referral',             note: 'Word of mouth + member referral' },
 ];
 
 // GHL Last 30 Days snapshot (manual pull 2026-04-08)
@@ -297,23 +290,14 @@ export default function NicevilleDashboard({ client }: { client: Client }) {
         </div>
       </div>
 
-      {/* ── LEAD SOURCE CATEGORIES (no fabricated splits) ── */}
+      {/* ── LEAD SOURCE SPLIT (manual, editable by staff) ── */}
       <div>
         <SectionLabel>Lead Sources</SectionLabel>
-        <div className="glass-card p-6">
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-            {LEAD_SOURCE_CATEGORIES.map((c) => (
-              <div key={c.label} className="rounded-xl border border-gray-200 bg-white p-3">
-                <div className="text-[13px] font-bold text-gray-900">{c.label}</div>
-                <div className="text-[10px] text-gray-500 mt-0.5">{c.note}</div>
-                <div className="text-[11px] font-mono text-gray-400 mt-2">—</div>
-              </div>
-            ))}
-          </div>
-          <div className="mt-4 text-[11px] text-gray-500">
-            Percentages will populate once the Revive / HighLevel lead source API is wired. GHL currently groups most leads under "—" which is not useful for attribution.
-          </div>
-        </div>
+        <LeadSourceSplitEditor
+          clientId={client.id}
+          gradientFrom={gradientFrom}
+          gradientTo={gradientTo}
+        />
       </div>
 
       {/* ── INTELLIGENCE (Niceville specific, real signals) ── */}

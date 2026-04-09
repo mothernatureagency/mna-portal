@@ -74,6 +74,16 @@ async function initSchema() {
                         created_at timestamptz not null default now(),
                         completed_at timestamptz
                   )`,
+                  // Per-client key/value blobs for things that don't justify their own
+                  // schema: manual lead source splits, QA notes, override targets, etc.
+                  // client_id = lib/clients.ts id, key = semantic name, value = jsonb.
+                  `create table if not exists client_kv (
+                        client_id text not null,
+                        key text not null,
+                        value jsonb not null,
+                        updated_at timestamptz not null default now(),
+                        primary key (client_id, key)
+                  )`,
                   `create table if not exists users (
                         id uuid primary key default uuid_generate_v4(),
                               username text not null unique,
