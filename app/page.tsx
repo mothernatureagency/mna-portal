@@ -2,6 +2,7 @@
 import React from 'react';
 import { useClient } from '@/context/ClientContext';
 import NicevilleDashboard from '@/components/dashboard/NicevilleDashboard';
+import SerenityDashboard from '@/components/dashboard/SerenityDashboard';
 import LeadTrendsChart from '@/components/dashboard/LeadTrendsChart';
 import AdPerformanceChart from '@/components/dashboard/AdPerformanceChart';
 import CRMSnapshot from '@/components/dashboard/CRMSnapshot';
@@ -155,6 +156,10 @@ export default function DashboardPage() {
   // dashboard below.
   if (activeClient.id === 'prime-iv') {
     return <NicevilleDashboard client={activeClient} />;
+  }
+
+  if (activeClient.id === 'serenity-bayfront') {
+    return <SerenityDashboard client={activeClient} />;
   }
 
   const { gradientFrom, gradientTo } = activeClient.branding;
