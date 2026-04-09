@@ -137,9 +137,12 @@ export default async function PlannerPage() {
 
   return (
     <div className="max-w-6xl mx-auto px-4 py-10">
+      {/* Light panel so the legacy light-themed form elements are readable
+          on the dark DashboardLayout background */}
+      <div className="bg-white rounded-2xl p-6 shadow-lg text-neutral-900">
       <div className="flex items-end justify-between gap-4 mb-6">
         <div>
-          <h1 className="text-3xl font-semibold">Marketing Planner</h1>
+          <h1 className="text-3xl font-semibold text-neutral-900">Marketing Planner</h1>
           <p className="text-sm text-muted-foreground">
             Create projects, assign checklists by role, and plan content by platform.
           </p>
@@ -348,6 +351,7 @@ export default async function PlannerPage() {
           </div>
         </div>
       </div>
+      </div>{/* close white panel */}
     </div>
   );
 }
