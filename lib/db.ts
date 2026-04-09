@@ -84,6 +84,50 @@ async function initSchema() {
                         updated_at timestamptz not null default now(),
                         primary key (client_id, key)
                   )`,
+                  // STR (short-term rental) reservations synced from Hospitable via Make
+                  `create table if not exists str_reservations (
+                        id uuid primary key default uuid_generate_v4(),
+                        client_id text not null,
+                        platform text not null,
+                        reservation_id text not null,
+                        guest_name text,
+                        check_in date not null,
+                        check_out date not null,
+                        nights integer not null,
+                        nightly_rate numeric(10,2),
+                        total_payout numeric(10,2),
+                        status text not null default 'confirmed',
+                        booked_at timestamptz,
+                        synced_at timestamptz not null default now(),
+                        unique (client_id, platform, reservation_id)
+                  )`,
+                  // STR daily metrics: occupancy, ADR, revenue rolled up daily
+                  // Upserted by the Make webhook on each sync
+                  `create table if not exists str_daily_metrics (
+                        client_id text not null,
+                        metric_date date not null,
+                        occupancy_pct numeric(5,2),
+                        adr numeric(10,2),
+                        revpar numeric(10,2),
+                        revenue numeric(10,2),
+                        bookings_count integer default 0,
+                        inquiries_count integer default 0,
+                        synced_at timestamptz not null default now(),
+                        primary key (client_id, metric_date)
+                  )`,
+                  // STR reviews synced from platforms
+                  `create table if not exists str_reviews (
+                        id uuid primary key default uuid_generate_v4(),
+                        client_id text not null,
+                        platform text not null,
+                        review_id text,
+                        guest_name text,
+                        rating integer not null,
+                        review_text text,
+                        review_date date,
+                        synced_at timestamptz not null default now(),
+                        unique (client_id, platform, review_id)
+                  )`,
                   `create table if not exists users (
                         id uuid primary key default uuid_generate_v4(),
                               username text not null unique,

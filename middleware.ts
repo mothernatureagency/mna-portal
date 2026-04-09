@@ -7,6 +7,7 @@ function isPublicRoute(pathname: string) {
     pathname.startsWith('/login') ||
     pathname.startsWith('/api/lock') ||
     pathname.startsWith('/api/seed-users') ||
+    pathname.startsWith('/api/hospitable-sync') ||
     pathname.startsWith('/_next') ||
     pathname === '/favicon.ico'
   );

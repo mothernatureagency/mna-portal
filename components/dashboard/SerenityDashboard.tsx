@@ -6,13 +6,38 @@
  * Designed for vacation rental KPIs: occupancy, ADR, RevPAR, booking pace,
  * revenue by channel, seasonal demand, and review velocity.
  *
- * No fabricated metrics. All sections use honest empty states until
- * real data is piped in from Airbnb/VRBO/Hospitable APIs.
+ * Data flows: Hospitable → Make.com → /api/hospitable-sync → Postgres → this dashboard
+ * Falls back to honest empty states when no data has synced yet.
  */
 
-import React from 'react';
+import React, { useEffect, useState } from 'react';
 import type { Client } from '@/lib/clients';
 import UserBanner from './UserBanner';
+
+// ─── TYPES ──────────────────────────────────────────────────────────
+
+type STRSummary = {
+  currentMonth: {
+    avg_occupancy: number;
+    avg_adr: number;
+    avg_revpar: number;
+    total_revenue: number;
+    total_bookings: number;
+    total_inquiries: number;
+  } | null;
+  channelRevenue: { platform: string; booking_count: number; total_revenue: number; avg_nightly_rate: number }[];
+  upcoming: { platform: string; check_in: string; check_out: string; nights: number; total_payout: number; guest_name: string }[];
+  reviewStats: { total_reviews: number; avg_rating: number; five_star_count: number } | null;
+  monthlyTrend: { month: string; revenue: number; avg_occupancy: number }[];
+};
+
+type LaunchTask = {
+  id: string;
+  title: string;
+  status: string;
+};
+
+// ─── HELPERS ────────────────────────────────────────────────────────
 
 function fmtUSD(n: number) {
   return new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD', maximumFractionDigits: 0 }).format(n);
@@ -27,7 +52,6 @@ function SectionLabel({ children }: { children: React.ReactNode }) {
 }
 
 // ─── SEASONAL DEMAND MODEL ─────────────────────────────────────────
-// Based on Emerald Coast / Freeport FL rental comps
 const SEASONAL_DEMAND = [
   { month: 'Jan', season: 'low',      demandPct: 35, label: 'Low' },
   { month: 'Feb', season: 'low',      demandPct: 40, label: 'Low' },
@@ -49,8 +73,39 @@ const SEASON_COLORS: Record<string, string> = {
   low: '#94a3b8',
 };
 
+// ─── COMPONENT ──────────────────────────────────────────────────────
+
 export default function SerenityDashboard({ client }: { client: Client }) {
   const { gradientFrom, gradientTo, accentColor } = client.branding;
+
+  // Fetch STR summary from Hospitable sync
+  const [summary, setSummary] = useState<STRSummary | null>(null);
+  const [tasks, setTasks] = useState<LaunchTask[]>([]);
+
+  useEffect(() => {
+    fetch(`/api/hospitable-sync?clientId=${client.id}&type=summary`)
+      .then((r) => r.json())
+      .then(setSummary)
+      .catch(() => {});
+    fetch(`/api/client-requests?clientId=${client.id}`)
+      .then((r) => r.json())
+      .then((d) => setTasks(d.items || []))
+      .catch(() => {});
+  }, [client.id]);
+
+  const cm = summary?.currentMonth;
+  const hasData = cm && (cm.total_revenue > 0 || cm.total_bookings > 0);
+  const rs = summary?.reviewStats;
+  const hasReviews = rs && rs.total_reviews > 0;
+
+  // Channel revenue
+  const channelData = summary?.channelRevenue || [];
+  const totalChannelRevenue = channelData.reduce((s, c) => s + Number(c.total_revenue), 0);
+
+  // Launch progress
+  const doneTasks = tasks.filter((t) => t.status === 'done').length;
+  const totalTasks = tasks.length;
+  const progressPct = totalTasks > 0 ? Math.round((doneTasks / totalTasks) * 100) : 0;
 
   return (
     <div className="space-y-8 max-w-[1400px]">
@@ -67,10 +122,57 @@ export default function SerenityDashboard({ client }: { client: Client }) {
             </span>
           </div>
           <p className="text-[12px] text-white/60 pl-3.5">
-            Vacation rental dashboard · Airbnb live, VRBO launching · Data pending API connections
+            Vacation rental dashboard · Hospitable → Make → Dashboard sync
+            {hasData ? '' : ' · Awaiting first data sync'}
           </p>
         </div>
       </div>
+
+      {/* ── VRBO LAUNCH PROGRESS ── */}
+      {totalTasks > 0 && (
+        <div>
+          <SectionLabel>VRBO Launch Progress</SectionLabel>
+          <div className="glass-card p-6" style={{ borderLeft: `3px solid ${accentColor}` }}>
+            <div className="flex items-center justify-between mb-4">
+              <div>
+                <div className="text-[15px] font-bold text-white">Launch Checklist</div>
+                <div className="text-[11px] text-white/70">{doneTasks} of {totalTasks} tasks complete</div>
+              </div>
+              <div className="text-right">
+                <div className="text-[28px] font-black text-white">{progressPct}%</div>
+              </div>
+            </div>
+            <div className="h-3 rounded-full overflow-hidden bg-white/10 mb-4">
+              <div
+                className="h-full rounded-full transition-all duration-700"
+                style={{
+                  width: `${Math.max(progressPct, 2)}%`,
+                  background: `linear-gradient(90deg, ${accentColor}, ${gradientTo})`,
+                }}
+              />
+            </div>
+            <div className="space-y-2">
+              {tasks.map((task) => (
+                <div key={task.id} className="flex items-center gap-2.5">
+                  <div
+                    className="w-4 h-4 rounded-full flex items-center justify-center text-[9px] shrink-0"
+                    style={{
+                      background: task.status === 'done' ? '#059669' : 'rgba(255,255,255,0.1)',
+                      border: task.status === 'done' ? 'none' : '1px solid rgba(255,255,255,0.2)',
+                      color: 'white',
+                    }}
+                  >
+                    {task.status === 'done' ? '✓' : ''}
+                  </div>
+                  <span className={`text-[12px] ${task.status === 'done' ? 'text-white/50 line-through' : 'text-white/90'}`}>
+                    {task.title}
+                  </span>
+                </div>
+              ))}
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* ── PROPERTY SNAPSHOT ── */}
       <div>
@@ -81,6 +183,7 @@ export default function SerenityDashboard({ client }: { client: Client }) {
               <div className="text-[10px] font-bold uppercase tracking-wider text-white/60 mb-1">Property</div>
               <div className="text-[14px] font-bold text-white">Serenity on the Bay</div>
               <div className="text-[11px] text-white/70">Bayfront waterfront home · Freeport, FL</div>
+              <div className="text-[11px] text-white/50 mt-1">4 BR · 2.5 BA · 10 guests · 1.5 acres</div>
             </div>
             <div>
               <div className="text-[10px] font-bold uppercase tracking-wider text-white/60 mb-1">Active Channels</div>
@@ -101,23 +204,43 @@ export default function SerenityDashboard({ client }: { client: Client }) {
               </div>
             </div>
             <div>
-              <div className="text-[10px] font-bold uppercase tracking-wider text-white/60 mb-1">Sync Platform</div>
-              <div className="text-[13px] font-bold text-white">Hospitable</div>
-              <div className="text-[11px] text-white/70">Cross-platform calendar sync + messaging</div>
+              <div className="text-[10px] font-bold uppercase tracking-wider text-white/60 mb-1">Data Pipeline</div>
+              <div className="text-[13px] font-bold text-white">Hospitable → Make → Dashboard</div>
+              <div className="text-[11px] text-white/70">Automated sync via Make.com webhook</div>
             </div>
           </div>
         </div>
       </div>
 
-      {/* ── KEY STR METRICS (empty states) ── */}
+      {/* ── KEY STR METRICS ── */}
       <div>
         <SectionLabel>Key Metrics · Short-Term Rental</SectionLabel>
         <div className="grid grid-cols-4 gap-4">
           {[
-            { label: 'Occupancy Rate', value: '—', note: 'Awaiting Hospitable API', color: '#0f4c5c', icon: '🏠' },
-            { label: 'ADR (Avg Daily Rate)', value: '—', note: 'Awaiting pricing data', color: '#4fa3a0', icon: '💰' },
-            { label: 'RevPAR', value: '—', note: 'Occupancy × ADR', color: '#059669', icon: '📊' },
-            { label: 'Booking Pace', value: '—', note: 'Bookings this month vs target', color: accentColor, icon: '📈' },
+            {
+              label: 'Occupancy Rate',
+              value: hasData ? `${Number(cm!.avg_occupancy).toFixed(1)}%` : '—',
+              note: hasData ? 'Current month average' : 'Awaiting first sync from Hospitable',
+              color: '#0f4c5c', icon: '🏠',
+            },
+            {
+              label: 'ADR (Avg Daily Rate)',
+              value: hasData ? fmtUSD(Number(cm!.avg_adr)) : '—',
+              note: hasData ? 'Current month average' : 'Awaiting pricing data',
+              color: '#4fa3a0', icon: '💰',
+            },
+            {
+              label: 'RevPAR',
+              value: hasData ? fmtUSD(Number(cm!.avg_revpar)) : '—',
+              note: hasData ? 'Occupancy x ADR' : 'Occupancy x ADR',
+              color: '#059669', icon: '📊',
+            },
+            {
+              label: 'Booking Pace',
+              value: hasData ? `${cm!.total_bookings}` : '—',
+              note: hasData ? `vs ${client.kpiTargets.appointments}/mo target` : 'Bookings this month vs target',
+              color: accentColor, icon: '📈',
+            },
           ].map((kpi) => (
             <div key={kpi.label} className="glass-card p-5 relative overflow-hidden">
               <div className="absolute top-0 left-0 right-0 h-1 rounded-t-[20px]" style={{ background: kpi.color }} />
@@ -125,7 +248,7 @@ export default function SerenityDashboard({ client }: { client: Client }) {
                 <span className="text-[12px]">{kpi.icon}</span>
                 <span className="text-[10px] font-bold uppercase text-white/60">{kpi.label}</span>
               </div>
-              <div className="text-[30px] font-black text-white/70 leading-none my-2">{kpi.value}</div>
+              <div className={`text-[30px] font-black leading-none my-2 ${kpi.value === '—' ? 'text-white/70' : 'text-white'}`}>{kpi.value}</div>
               <div className="text-[11px] text-white/70">{kpi.note}</div>
             </div>
           ))}
@@ -136,19 +259,25 @@ export default function SerenityDashboard({ client }: { client: Client }) {
           <div className="glass-card p-5 relative overflow-hidden">
             <div className="absolute top-0 left-0 right-0 h-1 rounded-t-[20px]" style={{ background: gradientFrom }} />
             <span className="text-[10px] font-bold uppercase text-white/60">Monthly Inquiries</span>
-            <div className="text-[28px] font-black text-white/70 leading-none my-2">—</div>
+            <div className={`text-[28px] font-black leading-none my-2 ${hasData && cm!.total_inquiries > 0 ? 'text-white' : 'text-white/70'}`}>
+              {hasData && cm!.total_inquiries > 0 ? cm!.total_inquiries : '—'}
+            </div>
             <div className="text-[11px] text-white/70">Target: {client.kpiTargets.leads} across all channels</div>
           </div>
           <div className="glass-card p-5 relative overflow-hidden">
             <div className="absolute top-0 left-0 right-0 h-1 rounded-t-[20px]" style={{ background: '#ec4899' }} />
             <span className="text-[10px] font-bold uppercase text-white/60">Confirmed Bookings</span>
-            <div className="text-[28px] font-black text-white/70 leading-none my-2">—</div>
+            <div className={`text-[28px] font-black leading-none my-2 ${hasData && cm!.total_bookings > 0 ? 'text-white' : 'text-white/70'}`}>
+              {hasData && cm!.total_bookings > 0 ? cm!.total_bookings : '—'}
+            </div>
             <div className="text-[11px] text-white/70">Target: {client.kpiTargets.appointments}/mo</div>
           </div>
           <div className="glass-card p-5 relative overflow-hidden">
             <div className="absolute top-0 left-0 right-0 h-1 rounded-t-[20px]" style={{ background: '#06b6d4' }} />
             <span className="text-[10px] font-bold uppercase text-white/60">Gross Rental Revenue</span>
-            <div className="text-[28px] font-black text-white/70 leading-none my-2">—</div>
+            <div className={`text-[28px] font-black leading-none my-2 ${hasData && cm!.total_revenue > 0 ? 'text-white' : 'text-white/70'}`}>
+              {hasData && cm!.total_revenue > 0 ? fmtUSD(cm!.total_revenue) : '—'}
+            </div>
             <div className="text-[11px] text-white/70">Target: {fmtUSD(client.kpiTargets.revenue)}/mo</div>
           </div>
         </div>
@@ -163,46 +292,92 @@ export default function SerenityDashboard({ client }: { client: Client }) {
               <div className="text-[15px] font-bold text-white">Channel Breakdown</div>
               <div className="text-[11px] text-white/70">Revenue split across listing platforms</div>
             </div>
+            {totalChannelRevenue > 0 && (
+              <div className="text-right">
+                <div className="text-[10px] font-bold uppercase tracking-wider text-white/60">Total</div>
+                <div className="text-[18px] font-black text-white">{fmtUSD(totalChannelRevenue)}</div>
+              </div>
+            )}
           </div>
           <div className="space-y-4">
-            {[
-              { channel: 'Airbnb', pct: 0, revenue: '—', status: 'Live', statusColor: '#059669' },
-              { channel: 'VRBO', pct: 0, revenue: '—', status: 'Launching', statusColor: accentColor },
-              { channel: 'Direct Booking', pct: 0, revenue: '—', status: 'Planned', statusColor: '#94a3b8' },
-            ].map((ch) => (
-              <div key={ch.channel}>
-                <div className="flex items-center justify-between mb-1.5">
-                  <div className="flex items-center gap-2">
-                    <span className="text-[13px] font-bold text-white">{ch.channel}</span>
-                    <span
-                      className="text-[9px] font-bold px-2 py-0.5 rounded-full"
-                      style={{ background: ch.statusColor + '22', color: ch.statusColor }}
-                    >
-                      {ch.status}
-                    </span>
+            {(() => {
+              // Merge API data with known channels
+              const channels = ['Airbnb', 'VRBO', 'Direct'];
+              const statusMap: Record<string, { status: string; statusColor: string }> = {
+                Airbnb: { status: 'Live', statusColor: '#059669' },
+                VRBO: { status: 'Launching', statusColor: accentColor },
+                Direct: { status: 'Planned', statusColor: '#94a3b8' },
+              };
+              return channels.map((ch) => {
+                const apiRow = channelData.find((c) => c.platform.toLowerCase() === ch.toLowerCase());
+                const rev = apiRow ? Number(apiRow.total_revenue) : 0;
+                const pct = totalChannelRevenue > 0 ? (rev / totalChannelRevenue) * 100 : 0;
+                const { status, statusColor } = statusMap[ch] || { status: '', statusColor: '#94a3b8' };
+                return (
+                  <div key={ch}>
+                    <div className="flex items-center justify-between mb-1.5">
+                      <div className="flex items-center gap-2">
+                        <span className="text-[13px] font-bold text-white">{ch}</span>
+                        <span className="text-[9px] font-bold px-2 py-0.5 rounded-full" style={{ background: statusColor + '22', color: statusColor }}>
+                          {status}
+                        </span>
+                        {apiRow && <span className="text-[10px] text-white/50">{apiRow.booking_count} bookings</span>}
+                      </div>
+                      <span className="text-[13px] font-bold text-white/70">{rev > 0 ? fmtUSD(rev) : '—'}</span>
+                    </div>
+                    <div className="h-2 rounded-full overflow-hidden bg-white/10">
+                      <div
+                        className="h-full rounded-full transition-all duration-500"
+                        style={{
+                          width: pct > 0 ? `${pct}%` : '2%',
+                          background: `linear-gradient(90deg, ${gradientFrom}, ${gradientTo})`,
+                          opacity: pct > 0 ? 1 : 0.3,
+                        }}
+                      />
+                    </div>
                   </div>
-                  <div className="text-right">
-                    <span className="text-[13px] font-bold text-white/70">{ch.revenue}</span>
-                  </div>
-                </div>
-                <div className="h-2 rounded-full overflow-hidden bg-white/10">
-                  <div
-                    className="h-full rounded-full transition-all duration-500"
-                    style={{
-                      width: ch.pct > 0 ? `${ch.pct}%` : '2%',
-                      background: `linear-gradient(90deg, ${gradientFrom}, ${gradientTo})`,
-                      opacity: ch.pct > 0 ? 1 : 0.3,
-                    }}
-                  />
-                </div>
-              </div>
-            ))}
+                );
+              });
+            })()}
           </div>
           <div className="mt-5 pt-4 border-t border-white/10 text-[11px] text-white/70 leading-relaxed">
-            Revenue data will populate once Hospitable API is connected and pulling nightly rate data from each channel. Goal: shift 20%+ of bookings to direct to reduce OTA commission fees.
+            {totalChannelRevenue > 0
+              ? 'Revenue data synced via Hospitable → Make. Goal: shift 20%+ of bookings to direct to reduce OTA commission fees.'
+              : 'Revenue data will populate once Hospitable syncs through Make. Goal: shift 20%+ of bookings to direct to reduce OTA commission fees.'}
           </div>
         </div>
       </div>
+
+      {/* ── UPCOMING BOOKINGS ── */}
+      {(summary?.upcoming || []).length > 0 && (
+        <div>
+          <SectionLabel>Upcoming Bookings · Next 90 Days</SectionLabel>
+          <div className="glass-card p-6">
+            <div className="space-y-3">
+              {summary!.upcoming.map((b, i) => (
+                <div key={i} className="flex items-center justify-between py-2 border-b border-white/5 last:border-0">
+                  <div className="flex items-center gap-3">
+                    <span
+                      className="text-[9px] font-bold px-2 py-0.5 rounded-full"
+                      style={{
+                        background: b.platform === 'Airbnb' ? '#FF585D22' : b.platform === 'VRBO' ? `${accentColor}22` : 'rgba(255,255,255,0.1)',
+                        color: b.platform === 'Airbnb' ? '#FF585D' : b.platform === 'VRBO' ? accentColor : 'white',
+                      }}
+                    >
+                      {b.platform}
+                    </span>
+                    <div>
+                      <div className="text-[12px] font-bold text-white">{b.guest_name || 'Guest'}</div>
+                      <div className="text-[11px] text-white/60">{b.check_in} → {b.check_out} · {b.nights} nights</div>
+                    </div>
+                  </div>
+                  <div className="text-[13px] font-bold text-white">{b.total_payout ? fmtUSD(b.total_payout) : '—'}</div>
+                </div>
+              ))}
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* ── SEASONAL DEMAND CHART ── */}
       <div>
@@ -253,22 +428,30 @@ export default function SerenityDashboard({ client }: { client: Client }) {
           <div className="grid grid-cols-3 gap-6">
             <div>
               <div className="text-[10px] font-bold uppercase tracking-wider text-white/60 mb-1">Average Rating</div>
-              <div className="text-[36px] font-black text-white leading-none my-2">—</div>
+              <div className={`text-[36px] font-black leading-none my-2 ${hasReviews ? 'text-white' : 'text-white/70'}`}>
+                {hasReviews ? Number(rs!.avg_rating).toFixed(1) : '—'}
+              </div>
               <div className="text-[11px] text-white/70">Target: 4.8+ stars</div>
             </div>
             <div>
               <div className="text-[10px] font-bold uppercase tracking-wider text-white/60 mb-1">Total Reviews</div>
-              <div className="text-[36px] font-black text-white leading-none my-2">—</div>
+              <div className={`text-[36px] font-black leading-none my-2 ${hasReviews ? 'text-white' : 'text-white/70'}`}>
+                {hasReviews ? rs!.total_reviews : '—'}
+              </div>
               <div className="text-[11px] text-white/70">Airbnb + VRBO combined</div>
             </div>
             <div>
               <div className="text-[10px] font-bold uppercase tracking-wider text-white/60 mb-1">5-Star Rate</div>
-              <div className="text-[36px] font-black text-white leading-none my-2">—</div>
+              <div className={`text-[36px] font-black leading-none my-2 ${hasReviews ? 'text-white' : 'text-white/70'}`}>
+                {hasReviews ? `${Math.round((rs!.five_star_count / rs!.total_reviews) * 100)}%` : '—'}
+              </div>
               <div className="text-[11px] text-white/70">% of reviews at 5 stars</div>
             </div>
           </div>
           <div className="mt-5 pt-4 border-t border-white/10 text-[11px] text-white/70 leading-relaxed">
-            Review data will pull from Airbnb and VRBO once listing APIs are connected. Strategy: automated post-checkout message via Hospitable asking for reviews, personalized thank-you note in welcome guide, and 5-star guarantee follow-up.
+            {hasReviews
+              ? 'Review data synced from Hospitable. Strategy: automated post-checkout message, welcome guide thank-you, 5-star guarantee follow-up.'
+              : 'Review data will sync from Hospitable via Make once connected. Strategy: automated post-checkout message, welcome guide thank-you, 5-star guarantee follow-up.'}
           </div>
         </div>
       </div>
