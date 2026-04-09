@@ -11,6 +11,7 @@ const NAV = [
     { label: 'Content Tracker', href: '/content', e: 'grid_view' },
     { label: 'Client Tasks', href: '/client-tasks', e: 'checklist' },
     { label: 'Ad Performance', href: '/campaigns', e: 'paid' },
+    { label: 'Meta Ads (Live)', href: '/meta-ads', e: 'ads_click' },
   ]},
   { sec: 'CRM', items: [
     { label: 'Lead Tracking', href: '/leads', e: 'track_changes' },
