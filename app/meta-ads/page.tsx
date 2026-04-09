@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useState } from 'react';
+import { useClient } from '@/context/ClientContext';
 
 type InsightsResponse = {
   adAccountId: string;
@@ -57,11 +58,33 @@ function formatPct(n: number) {
 }
 
 export default function MetaAdsDashboardPage() {
+  const { activeClient } = useClient();
   const [datePreset, setDatePreset] = useState('last_30d');
   const [insights, setInsights] = useState<InsightsResponse | null>(null);
   const [campaigns, setCampaigns] = useState<CampaignsResponse | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+
+  // Resolve which ad account to pull from:
+  //  1. If the active client has metaAds.adAccountId saved → use that
+  //  2. Otherwise fall back to undefined, which makes the API use the
+  //     server-side META_AD_ACCOUNT_ID default (the MNA house account).
+  //
+  // Graph requires the "act_" prefix. We save IDs without it on some clients
+  // so we normalize here.
+  const rawId = activeClient.metaAds?.adAccountId;
+  const clientAdAccountId = rawId
+    ? rawId.startsWith('act_') ? rawId : `act_${rawId}`
+    : undefined;
+
+  const accountQuery = clientAdAccountId
+    ? `&adAccountId=${encodeURIComponent(clientAdAccountId)}`
+    : '';
+
+  const hasClientAccount = !!clientAdAccountId;
+  const accountLabel = hasClientAccount
+    ? `${activeClient.shortName} · ${clientAdAccountId}`
+    : `MNA house account · ${activeClient.shortName} has no Meta account on file`;
 
   useEffect(() => {
     let cancelled = false;
@@ -70,8 +93,8 @@ export default function MetaAdsDashboardPage() {
       setError(null);
       try {
         const [insRes, campRes] = await Promise.all([
-          fetch(`/api/meta/insights?datePreset=${datePreset}`).then((r) => r.json()),
-          fetch('/api/meta/campaigns').then((r) => r.json()),
+          fetch(`/api/meta/insights?datePreset=${datePreset}${accountQuery}`).then((r) => r.json()),
+          fetch(`/api/meta/campaigns?${accountQuery.replace(/^&/, '')}`).then((r) => r.json()),
         ]);
         if (cancelled) return;
         if (insRes.error) throw new Error(insRes.error);
@@ -86,7 +109,7 @@ export default function MetaAdsDashboardPage() {
       }
     })();
     return () => { cancelled = true; };
-  }, [datePreset]);
+  }, [datePreset, accountQuery]);
 
   const kpis = insights ? [
     { label: 'Total Spend',       value: formatUSD(insights.totals.totalSpend),       color: '#f59e0b' },
@@ -106,9 +129,13 @@ export default function MetaAdsDashboardPage() {
             <h1 className="text-3xl font-bold text-white tracking-tight">Meta Ads Dashboard</h1>
           </div>
           <p className="text-white/60 mt-1 text-sm">
-            {insights?.adAccountId || campaigns?.adAccountId || 'Loading ad account…'} ·
-            Live Graph API pull
+            {accountLabel} · Live Graph API pull
           </p>
+          {!hasClientAccount && activeClient.id !== 'mna' && (
+            <p className="text-amber-300/80 mt-1 text-xs">
+              ⚠ No Meta ad account configured for {activeClient.name}. Showing the MNA house account instead. Add metaAds.adAccountId in lib/clients.ts to fix.
+            </p>
+          )}
         </div>
         <select
           value={datePreset}
