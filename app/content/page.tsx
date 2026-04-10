@@ -82,6 +82,8 @@ export default function ContentPage() {
   const [isStaff, setIsStaff] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editDraft, setEditDraft] = useState<{ post_date: string; platform: string; content_type: string; title: string }>({ post_date: '', platform: '', content_type: '', title: '' });
+  const [editingCaption, setEditingCaption] = useState<Record<string, boolean>>({});
+  const [captionDraft, setCaptionDraft] = useState<Record<string, string>>({});
   const [showAddForm, setShowAddForm] = useState(false);
   const [newPost, setNewPost] = useState({ post_date: '', platform: 'Instagram', content_type: 'Post', title: '', caption: '' });
 
@@ -536,11 +538,48 @@ export default function ContentPage() {
                         {expanded[it.id] ? 'expand_less' : 'expand_more'}
                       </span>
                       Caption copy
+                      {isStaff && expanded[it.id] && !editingCaption[it.id] && (
+                        <span
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            setCaptionDraft((d) => ({ ...d, [it.id]: it.caption || '' }));
+                            setEditingCaption((ec) => ({ ...ec, [it.id]: true }));
+                          }}
+                          className="material-symbols-outlined ml-1 text-white/40 hover:text-white cursor-pointer"
+                          style={{ fontSize: 13 }}
+                        >edit</span>
+                      )}
                     </button>
                     {expanded[it.id] && (
-                      <div className="text-white/85 text-xs whitespace-pre-wrap leading-relaxed bg-white/5 rounded-lg p-3 border border-white/10">
-                        {it.caption}
-                      </div>
+                      isStaff && editingCaption[it.id] ? (
+                        <div className="flex flex-col gap-2">
+                          <textarea
+                            value={captionDraft[it.id] ?? it.caption ?? ''}
+                            onChange={(e) => setCaptionDraft((d) => ({ ...d, [it.id]: e.target.value }))}
+                            rows={8}
+                            className="w-full text-xs rounded-lg bg-white/5 border border-white/10 p-3 text-white placeholder:text-white/30 outline-none leading-relaxed"
+                          />
+                          <div className="flex gap-2">
+                            <button
+                              onClick={async () => {
+                                try {
+                                  await patchItem(it.id, { caption: captionDraft[it.id] });
+                                  setEditingCaption((ec) => ({ ...ec, [it.id]: false }));
+                                } catch (e: any) { alert(e.message); }
+                              }}
+                              className="text-[11px] font-bold px-3 py-1.5 rounded-lg bg-emerald-500/80 text-white"
+                            >Save Caption</button>
+                            <button
+                              onClick={() => setEditingCaption((ec) => ({ ...ec, [it.id]: false }))}
+                              className="text-[11px] font-bold px-3 py-1.5 rounded-lg bg-white/10 text-white/80"
+                            >Cancel</button>
+                          </div>
+                        </div>
+                      ) : (
+                        <div className="text-white/85 text-xs whitespace-pre-wrap leading-relaxed bg-white/5 rounded-lg p-3 border border-white/10">
+                          {it.caption}
+                        </div>
+                      )
                     )}
                   </div>
                 )}
