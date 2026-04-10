@@ -4,6 +4,7 @@ import { useClient } from '@/context/ClientContext';
 import NicevilleDashboard from '@/components/dashboard/NicevilleDashboard';
 import SerenityDashboard from '@/components/dashboard/SerenityDashboard';
 import AgencyOverview from '@/components/dashboard/AgencyOverview';
+import MNADashboard from '@/components/dashboard/MNADashboard';
 import LeadTrendsChart from '@/components/dashboard/LeadTrendsChart';
 import AdPerformanceChart from '@/components/dashboard/AdPerformanceChart';
 import CRMSnapshot from '@/components/dashboard/CRMSnapshot';
@@ -157,7 +158,7 @@ export default function DashboardPage() {
   // dashboard below.
   // Custom dashboards per client
   if (activeClient.id === 'mna') {
-    return <AgencyOverview />;
+    return <MNADashboard />;
   }
 
   if (activeClient.id === 'prime-iv') {
