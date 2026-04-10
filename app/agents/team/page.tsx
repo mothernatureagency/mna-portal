@@ -12,9 +12,9 @@ type TeamMember = {
 };
 
 const TEAM: TeamMember[] = [
-  { id: '1', name: 'Alexus Williams', role: 'Owner', initials: 'AW', clients: 5, tasks: 12, status: 'online' },
-  { id: '2', name: 'Sable', role: 'Social Media', initials: 'SB', clients: 4, tasks: 8, status: 'online' },
-  { id: '3', name: 'Vanessa', role: 'Manager', initials: 'VN', clients: 3, tasks: 6, status: 'online' },
+  { id: '1', name: 'Alexus Williams', role: 'Owner', initials: 'AW', clients: 2, tasks: 12, status: 'online' },
+  { id: '2', name: 'Sable', role: 'Social Media', initials: 'SB', clients: 2, tasks: 8, status: 'online' },
+  { id: '3', name: 'Vanessa', role: 'Manager', initials: 'VN', clients: 2, tasks: 6, status: 'online' },
 ];
 
 const statusColor = { online: '#26a96c', away: '#f5a623', offline: '#6b7280' } as const;
