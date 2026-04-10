@@ -1,0 +1,160 @@
+{
+  "name": "Serenity STR — Airbnb/VRBO Booking Sync to Portal",
+  "flow": [
+    {
+      "id": 1,
+      "module": "google-email:WatchEmails",
+      "version": 2,
+      "parameters": {
+        "account": "mn@mothernatureagency.com",
+        "folder": "INBOX",
+        "filter": "from:(automated@airbnb.com OR noreply@vrbo.com OR noreply@homeaway.com) subject:(reservation OR booking)"
+      },
+      "metadata": {
+        "description": "Watch MNA inbox for Airbnb and VRBO booking confirmation emails"
+      },
+      "scheduler": {
+        "type": "interval",
+        "interval": 15
+      }
+    },
+    {
+      "id": 2,
+      "module": "builtin:Router",
+      "routes": [
+        {
+          "label": "Airbnb Booking",
+          "filter": {
+            "condition": "{{1.from}} contains airbnb.com"
+          }
+        },
+        {
+          "label": "VRBO Booking",
+          "filter": {
+            "condition": "{{1.from}} contains vrbo.com OR {{1.from}} contains homeaway.com"
+          }
+        }
+      ],
+      "metadata": {
+        "description": "Route to Airbnb or VRBO parser based on sender"
+      }
+    },
+    {
+      "id": 3,
+      "module": "builtin:TextParser",
+      "route": "Airbnb Booking",
+      "parameters": {
+        "patterns": {
+          "guest_name": "(?:Reservation confirmed|You have a new reservation).*?from\\s+([A-Za-z\\s]+?)(?:\\n|\\.|,)",
+          "check_in": "Check-in[:\\s]+([A-Za-z]+\\s+\\d{1,2},?\\s+\\d{4})",
+          "check_out": "Checkout[:\\s]+([A-Za-z]+\\s+\\d{1,2},?\\s+\\d{4})",
+          "total_payout": "(?:Total payout|You earn|Your payout)[:\\s]*\\$([\\d,]+\\.?\\d*)",
+          "nightly_rate": "(?:per night|nightly rate|x \\d+ nights)[:\\s]*\\$([\\d,]+\\.?\\d*)",
+          "confirmation_code": "(?:Confirmation code|Reservation code)[:\\s]*([A-Z0-9]+)"
+        }
+      },
+      "metadata": {
+        "description": "Parse Airbnb booking email for guest name, dates, and payout"
+      }
+    },
+    {
+      "id": 4,
+      "module": "builtin:TextParser",
+      "route": "VRBO Booking",
+      "parameters": {
+        "patterns": {
+          "guest_name": "(?:Reservation|Booking).*?(?:from|by)\\s+([A-Za-z\\s]+?)(?:\\n|\\.|,)",
+          "check_in": "(?:Check-in|Arrival)[:\\s]+([A-Za-z]+\\s+\\d{1,2},?\\s+\\d{4})",
+          "check_out": "(?:Check-out|Departure)[:\\s]+([A-Za-z]+\\s+\\d{1,2},?\\s+\\d{4})",
+          "total_payout": "(?:Total payout|Owner payout|You earn)[:\\s]*\\$([\\d,]+\\.?\\d*)",
+          "nightly_rate": "(?:per night|nightly)[:\\s]*\\$([\\d,]+\\.?\\d*)",
+          "reservation_id": "(?:Reservation|Booking)\\s*(?:ID|#|number)[:\\s]*([A-Z0-9-]+)"
+        }
+      },
+      "metadata": {
+        "description": "Parse VRBO booking email for guest name, dates, and payout"
+      }
+    },
+    {
+      "id": 5,
+      "module": "http:ActionSendData",
+      "route": "Airbnb Booking",
+      "parameters": {
+        "url": "https://portal.mothernatureagency.com/api/hospitable-sync",
+        "method": "POST",
+        "headers": [
+          { "name": "Content-Type", "value": "application/json" },
+          { "name": "X-Sync-Key", "value": "{{env.SYNC_KEY}}" }
+        ],
+        "body": {
+          "type": "reservations",
+          "clientId": "serenity-bayfront",
+          "data": [
+            {
+              "platform": "Airbnb",
+              "reservation_id": "{{3.confirmation_code}}",
+              "guest_name": "{{3.guest_name}}",
+              "check_in": "{{formatDate(3.check_in, 'YYYY-MM-DD')}}",
+              "check_out": "{{formatDate(3.check_out, 'YYYY-MM-DD')}}",
+              "nightly_rate": "{{3.nightly_rate}}",
+              "total_payout": "{{3.total_payout}}",
+              "status": "confirmed",
+              "booked_at": "{{1.date}}"
+            }
+          ]
+        }
+      },
+      "metadata": {
+        "description": "POST Airbnb reservation to portal dashboard API"
+      }
+    },
+    {
+      "id": 6,
+      "module": "http:ActionSendData",
+      "route": "VRBO Booking",
+      "parameters": {
+        "url": "https://portal.mothernatureagency.com/api/hospitable-sync",
+        "method": "POST",
+        "headers": [
+          { "name": "Content-Type", "value": "application/json" },
+          { "name": "X-Sync-Key", "value": "{{env.SYNC_KEY}}" }
+        ],
+        "body": {
+          "type": "reservations",
+          "clientId": "serenity-bayfront",
+          "data": [
+            {
+              "platform": "VRBO",
+              "reservation_id": "{{4.reservation_id}}",
+              "guest_name": "{{4.guest_name}}",
+              "check_in": "{{formatDate(4.check_in, 'YYYY-MM-DD')}}",
+              "check_out": "{{formatDate(4.check_out, 'YYYY-MM-DD')}}",
+              "nightly_rate": "{{4.nightly_rate}}",
+              "total_payout": "{{4.total_payout}}",
+              "status": "confirmed",
+              "booked_at": "{{1.date}}"
+            }
+          ]
+        }
+      },
+      "metadata": {
+        "description": "POST VRBO reservation to portal dashboard API"
+      }
+    }
+  ],
+  "notes": {
+    "setup": [
+      "1. Import this blueprint into Make.com",
+      "2. Connect your mn@mothernatureagency.com Gmail account",
+      "3. Set the SYNC_KEY environment variable (or remove the header if not using auth)",
+      "4. Set scheduling to every 15 minutes",
+      "5. Run once to test with a real booking email",
+      "6. Activate the scenario"
+    ],
+    "regex_tuning": [
+      "The text parser regex patterns may need tuning based on actual email formats.",
+      "Run the scenario once with a real email, check the parsed output,",
+      "and adjust the regex patterns to match the exact Airbnb/VRBO email templates."
+    ]
+  }
+}
