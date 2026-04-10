@@ -355,11 +355,16 @@ export default function ClientOverviewPage() {
 
   return (
     <div className="space-y-8">
-      <div>
-        <h1 className="text-[26px] font-extrabold text-neutral-900">
-          Hi {client.shortName}, here&apos;s the latest
-        </h1>
-        <p className="text-[13px] text-neutral-500 mt-1">
+      {/* Header */}
+      <div className="pt-1">
+        <div className="flex items-center gap-2 mb-1">
+          <div className="w-1.5 h-6 rounded-full" style={{ background: `linear-gradient(180deg, ${gradientFrom}, ${gradientTo})` }} />
+          <h1 className="text-[22px] font-extrabold text-white tracking-tight">Overview</h1>
+          <span className="text-[15px] font-medium ml-1" style={{ background: `linear-gradient(135deg, ${gradientFrom}, ${gradientTo})`, WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent' }}>
+            {client.name}
+          </span>
+        </div>
+        <p className="text-[12px] text-white/60 pl-3.5">
           Your top-line results, projections, and content performance.
         </p>
       </div>
@@ -367,39 +372,39 @@ export default function ClientOverviewPage() {
       {/* KPIs */}
       <div className="grid gap-4" style={{ gridTemplateColumns: `repeat(${kpis.length}, 1fr)` }}>
         {kpis.map((k) => (
-          <div key={k.label} className="bg-white rounded-2xl p-5 shadow-sm border border-black/5 relative overflow-hidden">
-            <div className="absolute top-0 left-0 right-0 h-1" style={{ background: k.color }} />
-            <div className="text-[10px] font-bold uppercase tracking-wider text-neutral-400">{k.label}</div>
-            <div className="text-[34px] font-black text-neutral-900 leading-none my-2">{k.value}</div>
-            {k.sub && <div className="text-[11px] text-neutral-500">{k.sub}</div>}
+          <div key={k.label} className="glass-card p-5 relative overflow-hidden">
+            <div className="absolute top-0 left-0 right-0 h-1 rounded-t-[22px]" style={{ background: k.color }} />
+            <div className="text-[10px] font-bold uppercase tracking-wider text-white/60">{k.label}</div>
+            <div className="text-[34px] font-black text-white leading-none my-2">{k.value}</div>
+            {k.sub && <div className="text-[11px] text-white/70">{k.sub}</div>}
           </div>
         ))}
       </div>
 
       {/* Revenue Projections — Monthly */}
-      <div className="bg-white rounded-2xl p-6 shadow-sm border border-black/5">
+      <div className="glass-card p-6">
         <div className="flex items-center justify-between mb-4">
           <div>
             <div className="flex items-center gap-2">
-              <div className="text-[15px] font-bold text-neutral-900">Revenue Projections · {CURRENT_YEAR}</div>
+              <div className="text-[15px] font-bold text-white">Revenue Projections · {CURRENT_YEAR}</div>
               {avgGrowthPct > 0 && (
-                <span className="text-[11px] font-bold px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-700">
+                <span className="text-[11px] font-bold px-2 py-0.5 rounded-full bg-emerald-500/20 text-emerald-400">
                   +{avgGrowthPct.toFixed(1)}% avg MoM growth
                 </span>
               )}
             </div>
-            <div className="text-[11px] text-neutral-500">
-              Click any month to update actuals or projections · Next 3 months auto-projected from growth trend
-              {saving && <span className="ml-2 text-amber-600">Saving...</span>}
+            <div className="text-[11px] text-white/50">
+              Click any month to update actuals or projections
+              {saving && <span className="ml-2 text-amber-400">Saving...</span>}
             </div>
           </div>
           <div className="flex gap-3">
-            <div className="flex items-center gap-1.5 text-[11px] text-neutral-500">
+            <div className="flex items-center gap-1.5 text-[11px] text-white/70">
               <div className="w-3 h-3 rounded" style={{ background: `linear-gradient(135deg, ${gradientFrom}, ${gradientTo})` }} />
               Actual
             </div>
-            <div className="flex items-center gap-1.5 text-[11px] text-neutral-500">
-              <div className="w-3 h-3 rounded bg-neutral-200 border border-neutral-300" />
+            <div className="flex items-center gap-1.5 text-[11px] text-white/70">
+              <div className="w-3 h-3 rounded" style={{ background: 'rgba(255,255,255,0.15)', border: '1px solid rgba(255,255,255,0.3)' }} />
               Projected
             </div>
           </div>
@@ -412,18 +417,15 @@ export default function ClientOverviewPage() {
             const isEditing = editingMonth === m.monthKey;
             return (
               <div key={m.monthKey} className="flex-1 flex flex-col items-center gap-1">
-                {/* Values */}
-                <div className="text-[10px] font-bold text-neutral-700">
+                <div className="text-[10px] font-bold text-white/85">
                   {m.actual > 0 ? `$${(m.actual / 1000).toFixed(1)}K` : isPast ? '—' : ''}
                 </div>
-                {/* Bars */}
                 <div className="w-full flex gap-0.5 items-end" style={{ height: '100%' }}>
-                  {/* Actual bar */}
                   <div
                     className="flex-1 rounded-t-md transition-all cursor-pointer hover:opacity-80"
                     style={{
                       height: m.actual > 0 ? `${(m.actual / chartMax) * 100}%` : '2px',
-                      background: m.actual > 0 ? `linear-gradient(180deg, ${gradientFrom}, ${gradientTo})` : '#e5e7eb',
+                      background: m.actual > 0 ? `linear-gradient(180deg, ${gradientFrom}, ${gradientTo})` : 'rgba(255,255,255,0.1)',
                       minHeight: 2,
                     }}
                     onClick={() => {
@@ -431,13 +433,12 @@ export default function ClientOverviewPage() {
                       setEditValues({ actual: String(m.actual || ''), projected: String(m.projected || '') });
                     }}
                   />
-                  {/* Projected bar */}
                   <div
                     className="flex-1 rounded-t-md cursor-pointer hover:opacity-80"
                     style={{
                       height: `${(m.projected / chartMax) * 100}%`,
-                      background: '#e5e7eb',
-                      border: '1px solid #d1d5db',
+                      background: 'rgba(255,255,255,0.1)',
+                      border: '1px solid rgba(255,255,255,0.2)',
                       minHeight: 2,
                     }}
                     onClick={() => {
@@ -446,35 +447,34 @@ export default function ClientOverviewPage() {
                     }}
                   />
                 </div>
-                <div className={`text-[10px] font-semibold ${i === currentMonthIdx ? 'text-neutral-900' : 'text-neutral-400'}`}>
+                <div className={`text-[10px] font-semibold ${i === currentMonthIdx ? 'text-white' : 'text-white/40'}`}>
                   {m.month}
                 </div>
 
-                {/* Inline edit popover */}
                 {isEditing && (
-                  <div className="absolute mt-2 bg-white rounded-xl shadow-xl border border-neutral-200 p-4 z-10 w-56"
-                    style={{ transform: 'translateY(100%)' }}
+                  <div className="absolute mt-2 rounded-xl shadow-xl p-4 z-10 w-56"
+                    style={{ transform: 'translateY(100%)', background: 'rgba(15,31,46,0.95)', border: '1px solid rgba(255,255,255,0.15)', backdropFilter: 'blur(24px)' }}
                   >
-                    <div className="text-[11px] font-bold text-neutral-700 mb-2">{m.month} {CURRENT_YEAR}</div>
+                    <div className="text-[11px] font-bold text-white mb-2">{m.month} {CURRENT_YEAR}</div>
                     <div className="space-y-2">
                       <div>
-                        <label className="text-[10px] font-bold uppercase tracking-wider text-neutral-400">Actual Revenue</label>
+                        <label className="text-[10px] font-bold uppercase tracking-wider text-white/50">Actual Revenue</label>
                         <input
                           type="number"
                           value={editValues.actual}
                           onChange={(e) => setEditValues({ ...editValues, actual: e.target.value })}
                           placeholder="0"
-                          className="w-full mt-1 text-[13px] px-3 py-2 rounded-lg border border-neutral-200 outline-none focus:border-neutral-400"
+                          className="w-full mt-1 text-[13px] px-3 py-2 rounded-lg bg-white/10 border border-white/10 text-white outline-none focus:border-white/30 placeholder:text-white/30"
                         />
                       </div>
                       <div>
-                        <label className="text-[10px] font-bold uppercase tracking-wider text-neutral-400">Projected Revenue</label>
+                        <label className="text-[10px] font-bold uppercase tracking-wider text-white/50">Projected Revenue</label>
                         <input
                           type="number"
                           value={editValues.projected}
                           onChange={(e) => setEditValues({ ...editValues, projected: e.target.value })}
                           placeholder="0"
-                          className="w-full mt-1 text-[13px] px-3 py-2 rounded-lg border border-neutral-200 outline-none focus:border-neutral-400"
+                          className="w-full mt-1 text-[13px] px-3 py-2 rounded-lg bg-white/10 border border-white/10 text-white outline-none focus:border-white/30 placeholder:text-white/30"
                         />
                       </div>
                       <div className="flex gap-2 pt-1">
@@ -487,7 +487,7 @@ export default function ClientOverviewPage() {
                         </button>
                         <button
                           onClick={() => setEditingMonth(null)}
-                          className="flex-1 text-[12px] font-semibold px-3 py-2 rounded-lg bg-neutral-100 text-neutral-600"
+                          className="flex-1 text-[12px] font-semibold px-3 py-2 rounded-lg bg-white/10 text-white/70"
                         >
                           Cancel
                         </button>
@@ -501,12 +501,12 @@ export default function ClientOverviewPage() {
         </div>
 
         {/* Summary row */}
-        <div className="pt-4 border-t border-neutral-100">
+        <div className="pt-4 border-t border-white/10">
           <div>
-            <div className="text-[10px] font-bold uppercase tracking-wider text-neutral-400">YTD Actual</div>
-            <div className="text-[22px] font-black text-neutral-900">${(ytdActual / 1000).toFixed(1)}K</div>
+            <div className="text-[10px] font-bold uppercase tracking-wider text-white/50">YTD Actual</div>
+            <div className="text-[22px] font-black text-white">${(ytdActual / 1000).toFixed(1)}K</div>
             {ytdProjected > 0 && (
-              <div className={`text-[11px] font-semibold ${ytdActual >= ytdProjected ? 'text-emerald-600' : 'text-amber-600'}`}>
+              <div className={`text-[11px] font-semibold ${ytdActual >= ytdProjected ? 'text-emerald-400' : 'text-amber-400'}`}>
                 {ytdActual >= ytdProjected ? 'On track' : `${Math.round((ytdActual / ytdProjected) * 100)}% of projection`}
               </div>
             )}
@@ -519,37 +519,36 @@ export default function ClientOverviewPage() {
         {quarters.map((q) => (
           <div
             key={q.label}
-            className={`bg-white rounded-2xl p-5 shadow-sm border relative overflow-hidden ${
-              q.isCurrent ? 'border-neutral-300 ring-1 ring-neutral-200' : 'border-black/5'
+            className={`glass-card p-5 relative overflow-hidden ${
+              q.isCurrent ? 'ring-1 ring-white/20' : ''
             }`}
           >
-            {/* Status badge */}
             <div className="flex items-center justify-between mb-2">
-              <div className="text-[10px] font-bold uppercase tracking-wider text-neutral-400">{q.label} {CURRENT_YEAR}</div>
+              <div className="text-[10px] font-bold uppercase tracking-wider text-white/50">{q.label} {CURRENT_YEAR}</div>
               {q.isComplete && (
-                <span className="text-[9px] font-bold px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-700">Complete</span>
+                <span className="text-[9px] font-bold px-2 py-0.5 rounded-full bg-emerald-500/20 text-emerald-400">Complete</span>
               )}
               {q.isCurrent && (
-                <span className="text-[9px] font-bold px-2 py-0.5 rounded-full bg-blue-100 text-blue-700">Current</span>
+                <span className="text-[9px] font-bold px-2 py-0.5 rounded-full bg-blue-500/20 text-blue-400">Current</span>
               )}
               {!q.isComplete && !q.isCurrent && (
-                <span className="text-[9px] font-bold px-2 py-0.5 rounded-full bg-neutral-100 text-neutral-400">Upcoming</span>
+                <span className="text-[9px] font-bold px-2 py-0.5 rounded-full bg-white/10 text-white/40">Upcoming</span>
               )}
             </div>
             <div className="space-y-2">
               <div>
-                <div className="text-[10px] text-neutral-400">{q.isComplete ? 'Final' : 'Actual'}</div>
-                <div className="text-[20px] font-black text-neutral-900">
+                <div className="text-[10px] text-white/50">{q.isComplete ? 'Final' : 'Actual'}</div>
+                <div className="text-[20px] font-black text-white">
                   {q.actual > 0 ? `$${(q.actual / 1000).toFixed(1)}K` : '—'}
                 </div>
               </div>
               <div>
-                <div className="text-[10px] text-neutral-400">{q.isComplete ? 'Was projected' : 'Projected'}</div>
-                <div className="text-[18px] font-bold text-neutral-500">${(q.projected / 1000).toFixed(1)}K</div>
+                <div className="text-[10px] text-white/50">{q.isComplete ? 'Was projected' : 'Projected'}</div>
+                <div className="text-[18px] font-bold text-white/60">${(q.projected / 1000).toFixed(1)}K</div>
               </div>
               {q.actual > 0 && q.projected > 0 && (
                 <>
-                  <div className="h-1.5 rounded-full bg-neutral-100 overflow-hidden">
+                  <div className="h-1.5 rounded-full bg-white/10 overflow-hidden">
                     <div
                       className="h-full rounded-full"
                       style={{
@@ -560,7 +559,7 @@ export default function ClientOverviewPage() {
                       }}
                     />
                   </div>
-                  <div className={`text-[10px] font-semibold ${q.actual >= q.projected ? 'text-emerald-600' : 'text-amber-600'}`}>
+                  <div className={`text-[10px] font-semibold ${q.actual >= q.projected ? 'text-emerald-400' : 'text-amber-400'}`}>
                     {Math.round((q.actual / q.projected) * 100)}% of projection
                   </div>
                 </>
@@ -571,94 +570,110 @@ export default function ClientOverviewPage() {
       </div>
 
       {/* Monthly Content Calendar Preview */}
-      <div className="bg-white rounded-2xl p-6 shadow-sm border border-black/5">
+      <div className="glass-card p-6">
         <div className="flex items-center justify-between mb-4">
           <div className="flex items-center gap-3">
-            <button onClick={() => setMonthOffset((o) => o - 1)} className="w-7 h-7 rounded-lg bg-neutral-100 hover:bg-neutral-200 flex items-center justify-center transition-colors">
+            <button onClick={() => setMonthOffset((o) => o - 1)} className="w-8 h-8 rounded-lg bg-white/10 hover:bg-white/20 flex items-center justify-center text-white/70 hover:text-white transition-colors">
               <span className="material-symbols-outlined" style={{ fontSize: 16 }}>chevron_left</span>
             </button>
-            <div className="text-[15px] font-bold text-neutral-900">{calLabel}</div>
-            <button onClick={() => setMonthOffset((o) => o + 1)} className="w-7 h-7 rounded-lg bg-neutral-100 hover:bg-neutral-200 flex items-center justify-center transition-colors">
+            <div className="text-[15px] font-bold text-white">{calLabel}</div>
+            <button onClick={() => setMonthOffset((o) => o + 1)} className="w-8 h-8 rounded-lg bg-white/10 hover:bg-white/20 flex items-center justify-center text-white/70 hover:text-white transition-colors">
               <span className="material-symbols-outlined" style={{ fontSize: 16 }}>chevron_right</span>
             </button>
             {monthOffset !== 0 && (
-              <button onClick={() => setMonthOffset(0)} className="text-[11px] font-semibold text-neutral-400 hover:text-neutral-600">Today</button>
+              <button onClick={() => setMonthOffset(0)} className="text-[10px] font-semibold text-white/50 hover:text-white/80 ml-1">Today</button>
             )}
           </div>
-          <Link href="/client/calendar" className="text-[12px] font-semibold flex items-center gap-1 hover:underline" style={{ color: gradientFrom }}>
-            Open Content Calendar
-            <span className="material-symbols-outlined" style={{ fontSize: 14 }}>arrow_forward</span>
+          <Link href="/client/calendar" className="text-[11px] font-semibold px-3 py-1.5 rounded-lg bg-white/10 text-white hover:bg-white/20">
+            Open Content Calendar →
           </Link>
         </div>
 
         {/* Day headers */}
         <div className="grid grid-cols-7 mb-1">
           {['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'].map((d) => (
-            <div key={d} className="text-[10px] font-bold uppercase tracking-wider text-neutral-400 text-center py-1">{d}</div>
+            <div key={d} className="text-[9px] font-bold uppercase tracking-wider text-white/50 text-center pb-1">{d}</div>
           ))}
         </div>
 
         {/* Calendar grid */}
-        <div className="border border-neutral-200 rounded-xl overflow-hidden">
-          {calWeeks.map((week, wi) => (
-            <div key={wi} className={`grid grid-cols-7 ${wi > 0 ? 'border-t border-neutral-100' : ''}`}>
-              {week.map((day) => {
-                const iso = day.toISOString().slice(0, 10);
-                const inMonth = day.getMonth() === calMonth;
-                const isToday = iso === calTodayStr;
-                const dayItems = calByDay[iso] || [];
-                return (
-                  <div key={iso} className={`min-h-[72px] p-1.5 border-r border-neutral-100 last:border-r-0 ${!inMonth ? 'bg-neutral-50/50' : ''} ${isToday ? 'bg-blue-50/50' : ''}`}>
-                    <div className={`text-[11px] font-semibold mb-1 ${isToday ? 'text-white w-5 h-5 rounded-full flex items-center justify-center' : inMonth ? 'text-neutral-700' : 'text-neutral-300'}`}
-                      style={isToday ? { background: gradientFrom } : undefined}
-                    >
-                      {day.getDate()}
-                    </div>
-                    {dayItems.slice(0, 3).map((it) => (
-                      <div key={it.id} className="flex items-center gap-0.5 mb-0.5">
-                        <div className="w-1.5 h-1.5 rounded-full shrink-0" style={{ background: STATUS_DOT[(it.client_approval_status || 'pending_review') as CalendarApprovalStatus] || '#9ca3af' }} />
-                        <span className="text-[9px] truncate text-neutral-600">{PLATFORM_EMOJI[it.platform] || ''} {parseCalTitle(it.title) || it.platform}</span>
-                      </div>
-                    ))}
-                    {dayItems.length > 3 && <div className="text-[8px] text-neutral-400">+{dayItems.length - 3} more</div>}
+        <div className="grid grid-cols-7 gap-1.5">
+          {calWeeks.flat().map((day) => {
+            const iso = day.toISOString().slice(0, 10);
+            const inMonth = day.getMonth() === calMonth;
+            const isToday = iso === calTodayStr;
+            const dayItems = calByDay[iso] || [];
+            return (
+              <div
+                key={iso}
+                className={`min-h-[72px] rounded-lg border p-1.5 flex flex-col gap-1 transition-colors ${
+                  isToday
+                    ? 'border-white bg-white/15'
+                    : inMonth
+                    ? 'border-white/10 bg-white/5'
+                    : 'border-white/5 bg-white/[0.02]'
+                }`}
+              >
+                <div className={`text-[9px] font-bold ${inMonth ? 'text-white/50' : 'text-white/25'}`}>
+                  {day.getDate()}
+                </div>
+                {dayItems.slice(0, 3).map((it) => (
+                  <div key={it.id} className="flex items-start gap-1">
+                    <span className="w-1.5 h-1.5 rounded-full mt-0.5 shrink-0" style={{ background: STATUS_DOT[(it.client_approval_status || 'pending_review') as CalendarApprovalStatus] || '#9ca3af' }} />
+                    <span className="text-[8px] leading-tight text-white/80 line-clamp-2">
+                      {PLATFORM_EMOJI[it.platform] || ''} {parseCalTitle(it.title) || it.platform}
+                    </span>
                   </div>
-                );
-              })}
-            </div>
-          ))}
+                ))}
+                {dayItems.length > 3 && <div className="text-[8px] text-white/40">+{dayItems.length - 3} more</div>}
+              </div>
+            );
+          })}
         </div>
 
         {/* Legend */}
-        <div className="flex gap-4 mt-3 flex-wrap">
+        <div className="flex items-center gap-4 mt-3 flex-wrap text-[10px] text-white/70">
           {Object.entries(STATUS_DOT).map(([key, color]) => (
-            <div key={key} className="flex items-center gap-1.5 text-[10px] text-neutral-500">
-              <div className="w-2 h-2 rounded-full" style={{ background: color }} />
+            <div key={key} className="flex items-center gap-1.5">
+              <span className="w-2 h-2 rounded-full" style={{ background: color }} />
               {key === 'pending_review' ? 'Pending review' : key === 'changes_requested' ? 'Changes requested' : key.charAt(0).toUpperCase() + key.slice(1)}
             </div>
           ))}
         </div>
-        <div className="text-[11px] text-neutral-400 mt-2">{calMonthItems.length} posts this month</div>
+        <div className="text-[11px] text-white/50 mt-2">{calMonthItems.length} posts this month</div>
       </div>
 
       {/* Ad Spend Breakdown */}
       {(AD_SPEND_BY_CLIENT[client.id] || []).length > 0 && (
-        <div className="bg-white rounded-2xl p-6 shadow-sm border border-black/5">
-          <div className="text-[15px] font-bold text-neutral-900 mb-4">Ad Spend Breakdown</div>
-          <div className="grid gap-3">
-            {(AD_SPEND_BY_CLIENT[client.id] || []).map((item, i) => (
-              <div key={i} className="flex items-center justify-between p-4 rounded-xl bg-neutral-50 border border-black/5">
-                <div>
-                  <div className="text-[13px] font-semibold text-neutral-900">{item.agency}</div>
-                  <div className="text-[11px] text-neutral-500">{item.channel} · {item.note}</div>
+        <div className="glass-card p-6">
+          <div className="text-[15px] font-bold text-white mb-4">Ad Spend Breakdown</div>
+          <div className="space-y-3">
+            {(AD_SPEND_BY_CLIENT[client.id] || []).map((item, i) => {
+              const total = (AD_SPEND_BY_CLIENT[client.id] || []).reduce((s, x) => s + x.monthly, 0);
+              const pct = (item.monthly / total) * 100;
+              return (
+                <div key={i}>
+                  <div className="flex items-center justify-between mb-1.5">
+                    <div>
+                      <span className="text-[13px] font-bold text-white">{item.agency}</span>
+                      <span className="text-[11px] text-white/70 ml-2">· {item.channel}</span>
+                    </div>
+                    <div className="text-right">
+                      <div className="text-[14px] font-bold text-white">{fmtUSD(item.monthly)}/mo</div>
+                      <div className="text-[10px] text-white/70">{item.note}</div>
+                    </div>
+                  </div>
+                  <div className="h-2 rounded-full overflow-hidden bg-white/10">
+                    <div className="h-full rounded-full" style={{ width: `${pct}%`, background: `linear-gradient(90deg, ${gradientFrom}, ${gradientTo})` }} />
+                  </div>
                 </div>
-                <div className="text-[20px] font-black text-neutral-900">{fmtUSD(item.monthly)}<span className="text-[11px] font-semibold text-neutral-400">/mo</span></div>
-              </div>
-            ))}
-            <div className="flex items-center justify-between pt-3 border-t border-neutral-100 px-1">
-              <div className="text-[12px] font-bold text-neutral-500 uppercase tracking-wider">Total monthly ad spend</div>
-              <div className="text-[20px] font-black text-neutral-900">
-                {fmtUSD((AD_SPEND_BY_CLIENT[client.id] || []).reduce((s, i) => s + i.monthly, 0))}
-              </div>
+              );
+            })}
+          </div>
+          <div className="mt-4 pt-3 border-t border-white/10 flex items-center justify-between">
+            <div className="text-[12px] font-bold text-white/50 uppercase tracking-wider">Total monthly ad spend</div>
+            <div className="text-[20px] font-black text-white">
+              {fmtUSD((AD_SPEND_BY_CLIENT[client.id] || []).reduce((s, i) => s + i.monthly, 0))}
             </div>
           </div>
         </div>
@@ -666,8 +681,8 @@ export default function ClientOverviewPage() {
 
       {/* Lead Sources */}
       {leadSplit && (
-        <div className="bg-white rounded-2xl p-6 shadow-sm border border-black/5">
-          <div className="text-[15px] font-bold text-neutral-900 mb-4">Lead Sources</div>
+        <div className="glass-card p-6">
+          <div className="text-[15px] font-bold text-white mb-4">Lead Sources</div>
           <div className="grid gap-3">
             {LEAD_CATEGORIES.map((cat) => {
               const pct = leadSplit[cat.key] || 0;
@@ -675,12 +690,12 @@ export default function ClientOverviewPage() {
                 <div key={cat.key}>
                   <div className="flex items-center justify-between mb-1">
                     <div>
-                      <span className="text-[13px] font-semibold text-neutral-900">{cat.label}</span>
-                      <span className="text-[11px] text-neutral-400 ml-2">{cat.sub}</span>
+                      <span className="text-[13px] font-semibold text-white">{cat.label}</span>
+                      <span className="text-[11px] text-white/50 ml-2">{cat.sub}</span>
                     </div>
-                    <span className="text-[14px] font-black text-neutral-900">{pct}%</span>
+                    <span className="text-[14px] font-black text-white">{pct}%</span>
                   </div>
-                  <div className="h-2 rounded-full bg-neutral-100 overflow-hidden">
+                  <div className="h-2 rounded-full bg-white/10 overflow-hidden">
                     <div
                       className="h-full rounded-full transition-all"
                       style={{ width: `${pct}%`, background: `linear-gradient(90deg, ${gradientFrom}, ${gradientTo})` }}
@@ -695,14 +710,14 @@ export default function ClientOverviewPage() {
 
       {/* Content performance */}
       {topPosts.length > 0 && (
-        <div className="bg-white rounded-2xl p-6 shadow-sm border border-black/5">
+        <div className="glass-card p-6">
           <div className="flex items-center justify-between mb-4">
-            <div className="text-[15px] font-bold text-neutral-900">Top performing content</div>
-            <span className="text-[11px] text-neutral-400">Last 30 days</span>
+            <div className="text-[15px] font-bold text-white">Top performing content</div>
+            <span className="text-[11px] text-white/50">Last 30 days</span>
           </div>
           <div className="grid gap-3">
             {topPosts.map((p, i) => (
-              <div key={i} className="flex items-center justify-between p-3 rounded-xl bg-neutral-50 border border-black/5">
+              <div key={i} className="flex items-center justify-between p-3 rounded-xl bg-white/5 border border-white/10">
                 <div className="flex items-center gap-3">
                   <div
                     className="w-9 h-9 rounded-lg flex items-center justify-center text-white text-[11px] font-bold"
@@ -711,18 +726,18 @@ export default function ClientOverviewPage() {
                     {p.platform.charAt(0)}
                   </div>
                   <div>
-                    <div className="text-[13px] font-semibold text-neutral-900">{p.title}</div>
-                    <div className="text-[10px] text-neutral-400">{p.platform} · {p.type}</div>
+                    <div className="text-[13px] font-semibold text-white">{p.title}</div>
+                    <div className="text-[10px] text-white/50">{p.platform} · {p.type}</div>
                   </div>
                 </div>
                 <div className="flex items-center gap-5 text-right">
                   <div>
-                    <div className="text-[10px] text-neutral-400">Engagement</div>
-                    <div className="text-[13px] font-bold text-neutral-800">{p.engagement.toLocaleString()}</div>
+                    <div className="text-[10px] text-white/50">Engagement</div>
+                    <div className="text-[13px] font-bold text-white">{p.engagement.toLocaleString()}</div>
                   </div>
                   <div>
-                    <div className="text-[10px] text-neutral-400">Reach</div>
-                    <div className="text-[13px] font-bold text-neutral-800">{p.reach.toLocaleString()}</div>
+                    <div className="text-[10px] text-white/50">Reach</div>
+                    <div className="text-[13px] font-bold text-white">{p.reach.toLocaleString()}</div>
                   </div>
                 </div>
               </div>
@@ -732,49 +747,49 @@ export default function ClientOverviewPage() {
       )}
 
       {topPosts.length === 0 && (
-        <div className="bg-white rounded-2xl p-6 shadow-sm border border-black/5 text-center text-neutral-500">
-          <div className="text-[14px] font-semibold">Content performance</div>
-          <div className="text-[12px] mt-1">We&apos;ll show your top posts here once we have engagement data.</div>
+        <div className="glass-card p-6 text-center">
+          <div className="text-[14px] font-semibold text-white/60">Content performance</div>
+          <div className="text-[12px] text-white/40 mt-1">We&apos;ll show your top posts here once we have engagement data.</div>
         </div>
       )}
 
       {/* Meta Ads Account card */}
       {client.metaAds && (
-        <div className="bg-white rounded-2xl p-6 shadow-sm border border-black/5">
-          <div className="text-[15px] font-bold text-neutral-900 mb-4">Meta Ads Account</div>
+        <div className="glass-card p-6">
+          <div className="text-[15px] font-bold text-white mb-4">Meta Ads Account</div>
           <div className="grid gap-4" style={{ gridTemplateColumns: '1.2fr 1fr 1fr' }}>
             <div>
-              <div className="text-[10px] font-bold uppercase tracking-wider text-neutral-400">Business Portfolio</div>
-              <div className="text-[13px] font-bold text-neutral-900 mt-1">{client.metaAds.businessPortfolioName}</div>
-              <div className="text-[10px] text-neutral-500 font-mono">{client.metaAds.businessPortfolioId}</div>
+              <div className="text-[10px] font-bold uppercase tracking-wider text-white/60">Business Portfolio</div>
+              <div className="text-[13px] font-bold text-white mt-1">{client.metaAds.businessPortfolioName}</div>
+              <div className="text-[10px] text-white/70 font-mono">{client.metaAds.businessPortfolioId}</div>
               {client.metaAds.verificationStatus && (
                 <span className={`mt-2 inline-block text-[10px] font-bold px-2 py-0.5 rounded-full ${
                   client.metaAds.verificationStatus === 'Verified'
-                    ? 'bg-emerald-100 text-emerald-700'
-                    : 'bg-amber-100 text-amber-700'
+                    ? 'bg-emerald-500/20 text-emerald-400'
+                    : 'bg-amber-500/20 text-amber-400'
                 }`}>
                   {client.metaAds.verificationStatus}
                 </span>
               )}
             </div>
             <div>
-              <div className="text-[10px] font-bold uppercase tracking-wider text-neutral-400">Ad Account</div>
-              <div className="text-[13px] font-bold text-neutral-900 mt-1 font-mono">{client.metaAds.adAccountId}</div>
+              <div className="text-[10px] font-bold uppercase tracking-wider text-white/60">Ad Account</div>
+              <div className="text-[13px] font-bold text-white mt-1 font-mono">{client.metaAds.adAccountId}</div>
               {client.metaAds.partnerName && (
-                <div className="text-[10px] text-neutral-500 mt-1">Managed by {client.metaAds.partnerName}</div>
+                <div className="text-[10px] text-white/70 mt-1">Managed by {client.metaAds.partnerName}</div>
               )}
             </div>
             <div>
-              <div className="text-[10px] font-bold uppercase tracking-wider text-neutral-400">Pixel</div>
+              <div className="text-[10px] font-bold uppercase tracking-wider text-white/60">Pixel</div>
               {client.metaAds.datasetPixel ? (
                 <>
-                  <div className="text-[13px] font-bold text-neutral-900 mt-1">{client.metaAds.datasetPixel.name}</div>
-                  <span className="mt-1 inline-block text-[10px] font-bold px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-700">
+                  <div className="text-[13px] font-bold text-white mt-1">{client.metaAds.datasetPixel.name}</div>
+                  <span className="mt-1 inline-block text-[10px] font-bold px-2 py-0.5 rounded-full bg-emerald-500/20 text-emerald-400">
                     {client.metaAds.datasetPixel.status || 'Active'}
                   </span>
                 </>
               ) : (
-                <div className="text-[11px] text-neutral-400 italic">Not connected</div>
+                <div className="text-[11px] text-white/40 italic">Not connected</div>
               )}
             </div>
           </div>

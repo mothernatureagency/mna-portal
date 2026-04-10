@@ -48,45 +48,45 @@ export default function ClientTasksPage() {
   return (
     <div className="space-y-6">
       <div>
-        <h1 className="text-[26px] font-extrabold text-neutral-900">Tasks from Mother Nature Agency</h1>
-        <p className="text-[13px] text-neutral-700 mt-1">
+        <h1 className="text-[26px] font-extrabold text-white">Tasks from Mother Nature Agency</h1>
+        <p className="text-[13px] text-white/50 mt-1">
           Things we need from you to keep your content engine humming. Check them off when you're done and we'll get notified.
         </p>
       </div>
 
       {loading && (
-        <div className="bg-white rounded-2xl p-8 text-center text-neutral-700 shadow-sm border border-neutral-200">
+        <div className="glass-card p-8 text-center text-white/50">
           Loading your list…
         </div>
       )}
 
       {!loading && items.length === 0 && (
-        <div className="bg-white rounded-2xl p-8 text-center text-neutral-700 shadow-sm border border-neutral-200">
-          <div className="text-[14px] font-semibold">You're all caught up 🎉</div>
+        <div className="glass-card p-8 text-center text-white/50">
+          <div className="text-[14px] font-semibold text-white/70">You're all caught up</div>
           <div className="text-[12px] mt-1">We'll post new requests here when we need anything.</div>
         </div>
       )}
 
       {!loading && open.length > 0 && (
         <div className="space-y-3">
-          <div className="text-[11px] font-bold uppercase tracking-wider text-neutral-700">
+          <div className="text-[11px] font-bold uppercase tracking-wider text-white/40">
             Open ({open.length})
           </div>
           {open.map((r) => (
-            <div key={r.id} className="bg-white rounded-2xl p-4 shadow-sm border border-neutral-200 flex items-start gap-3">
+            <div key={r.id} className="glass-card p-4 flex items-start gap-3">
               <button
                 onClick={() => toggle(r.id, 'done')}
-                className="mt-0.5 w-6 h-6 rounded-md border-2 border-neutral-300 hover:border-emerald-500 flex items-center justify-center shrink-0"
+                className="mt-0.5 w-6 h-6 rounded-md border-2 border-white/30 hover:border-emerald-400 flex items-center justify-center shrink-0 transition-colors"
                 aria-label="Mark done"
               />
               <div className="flex-1">
-                <div className="text-[14px] font-semibold text-neutral-900">{r.title}</div>
+                <div className="text-[14px] font-semibold text-white">{r.title}</div>
                 {r.description && (
-                  <div className="text-[12px] text-neutral-600 mt-1 whitespace-pre-wrap leading-relaxed">
+                  <div className="text-[12px] text-white/50 mt-1 whitespace-pre-wrap leading-relaxed">
                     {r.description}
                   </div>
                 )}
-                <div className="text-[10px] text-neutral-500 mt-2">
+                <div className="text-[10px] text-white/30 mt-2">
                   Added {new Date(r.created_at).toLocaleDateString()}
                 </div>
               </div>
@@ -97,11 +97,11 @@ export default function ClientTasksPage() {
 
       {!loading && done.length > 0 && (
         <div className="space-y-3">
-          <div className="text-[11px] font-bold uppercase tracking-wider text-neutral-700">
+          <div className="text-[11px] font-bold uppercase tracking-wider text-white/40">
             Completed ({done.length})
           </div>
           {done.map((r) => (
-            <div key={r.id} className="bg-neutral-50 rounded-2xl p-4 border border-neutral-200 flex items-start gap-3 opacity-80">
+            <div key={r.id} className="glass-card p-4 flex items-start gap-3 opacity-60">
               <button
                 onClick={() => toggle(r.id, 'open')}
                 className="mt-0.5 w-6 h-6 rounded-md border-2 border-emerald-500 bg-emerald-500 flex items-center justify-center shrink-0 text-white"
@@ -110,12 +110,12 @@ export default function ClientTasksPage() {
                 ✓
               </button>
               <div className="flex-1">
-                <div className="text-[14px] font-semibold text-neutral-700 line-through">{r.title}</div>
+                <div className="text-[14px] font-semibold text-white/60 line-through">{r.title}</div>
                 {r.description && (
-                  <div className="text-[12px] text-neutral-700 mt-1 line-through">{r.description}</div>
+                  <div className="text-[12px] text-white/40 mt-1 line-through">{r.description}</div>
                 )}
                 {r.completed_at && (
-                  <div className="text-[10px] text-neutral-500 mt-2">
+                  <div className="text-[10px] text-white/30 mt-2">
                     Completed {new Date(r.completed_at).toLocaleDateString()}
                   </div>
                 )}
