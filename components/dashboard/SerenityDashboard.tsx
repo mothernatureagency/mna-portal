@@ -13,6 +13,7 @@
 import React, { useEffect, useState } from 'react';
 import type { Client } from '@/lib/clients';
 import UserBanner from './UserBanner';
+import MonthlyContentCalendar from './MonthlyContentCalendar';
 
 // ─── TYPES ──────────────────────────────────────────────────────────
 
@@ -178,12 +179,12 @@ export default function SerenityDashboard({ client }: { client: Client }) {
       <div>
         <SectionLabel>Property Snapshot</SectionLabel>
         <div className="glass-card p-6" style={{ borderLeft: `3px solid ${gradientFrom}` }}>
-          <div className="grid grid-cols-3 gap-6">
+          <div className="grid grid-cols-3 gap-6 mb-4">
             <div>
               <div className="text-[10px] font-bold uppercase tracking-wider text-white/60 mb-1">Property</div>
               <div className="text-[14px] font-bold text-white">Serenity on the Bay</div>
-              <div className="text-[11px] text-white/70">Bayfront waterfront home · Freeport, FL</div>
-              <div className="text-[11px] text-white/50 mt-1">4 BR · 2.5 BA · 10 guests · 1.5 acres</div>
+              <div className="text-[11px] text-white/70">1.5 acre bayfront retreat · Freeport, FL</div>
+              <div className="text-[11px] text-white/50 mt-1">4 BR · 2.5 BA · 6 beds · 10 guests</div>
             </div>
             <div>
               <div className="text-[10px] font-bold uppercase tracking-wider text-white/60 mb-1">Active Channels</div>
@@ -193,21 +194,90 @@ export default function SerenityDashboard({ client }: { client: Client }) {
                     key={ch}
                     className="text-[10px] font-bold px-2 py-0.5 rounded-full"
                     style={{
-                      background: ch === 'VRBO' ? 'rgba(232,185,108,0.2)' : 'rgba(255,255,255,0.12)',
-                      color: ch === 'VRBO' ? accentColor : 'rgba(255,255,255,0.85)',
-                      border: ch === 'VRBO' ? `1px solid ${accentColor}55` : '1px solid rgba(255,255,255,0.15)',
+                      background: ch === 'VRBO' ? 'rgba(232,185,108,0.2)' : ch === 'Airbnb' ? 'rgba(5,150,105,0.15)' : 'rgba(255,255,255,0.08)',
+                      color: ch === 'VRBO' ? accentColor : ch === 'Airbnb' ? '#059669' : 'rgba(255,255,255,0.6)',
+                      border: ch === 'VRBO' ? `1px solid ${accentColor}55` : ch === 'Airbnb' ? '1px solid rgba(5,150,105,0.3)' : '1px solid rgba(255,255,255,0.1)',
                     }}
                   >
-                    {ch === 'VRBO' ? '🚀 VRBO (Launching)' : ch === 'Airbnb' ? '✓ Airbnb' : '◦ Direct (Planned)'}
+                    {ch === 'VRBO' ? '✓ VRBO (Live)' : ch === 'Airbnb' ? '✓ Airbnb' : '◦ Direct (Planned)'}
                   </span>
                 ))}
               </div>
             </div>
             <div>
               <div className="text-[10px] font-bold uppercase tracking-wider text-white/60 mb-1">Data Pipeline</div>
-              <div className="text-[13px] font-bold text-white">Hospitable → Make → Dashboard</div>
-              <div className="text-[11px] text-white/70">Automated sync via Make.com webhook</div>
+              <div className="text-[13px] font-bold text-white">Airbnb Email → Make → Dashboard</div>
+              <div className="text-[11px] text-white/70">Auto-sync via booking email parsing</div>
             </div>
+          </div>
+          {/* Property highlights */}
+          <div className="pt-3 border-t border-white/10">
+            <div className="flex flex-wrap gap-2">
+              {['Private Dock', 'Bayfront', 'Fire Pit', 'Cathedral Ceilings', 'Spa Bathroom', 'Smart Appliances', 'Cargo Elevator', 'Pet Friendly', 'Self Check-in', 'Free Parking'].map((feat) => (
+                <span key={feat} className="text-[9px] font-semibold px-2 py-0.5 rounded-full" style={{ background: 'rgba(255,255,255,0.06)', color: 'rgba(255,255,255,0.55)', border: '1px solid rgba(255,255,255,0.08)' }}>
+                  {feat}
+                </span>
+              ))}
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {/* ── CONTENT CALENDAR ── */}
+      <div>
+        <SectionLabel>Content Calendar</SectionLabel>
+        <MonthlyContentCalendar
+          clientName={client.name}
+          gradientFrom={gradientFrom}
+          gradientTo={gradientTo}
+        />
+      </div>
+
+      {/* ── SHOT LIST / ASSET NEEDS ── */}
+      <div>
+        <SectionLabel>Shot List · Media Needed for Content Calendar</SectionLabel>
+        <div className="glass-card p-6" style={{ borderLeft: `3px solid ${accentColor}` }}>
+          <div className="flex items-center justify-between mb-4">
+            <div>
+              <div className="text-[15px] font-bold text-white">Asset Needs</div>
+              <div className="text-[11px] text-white/50">Photos and video required for the VRBO Launch playbook</div>
+            </div>
+          </div>
+          <div className="space-y-3">
+            {[
+              { priority: 'high', type: '📸 Photo', title: 'Hero exterior from the water', desc: 'Bayfront + dock visible, golden hour. Drone aerial if possible. Used for VRBO hero, Airbnb cover, and social launch posts.', days: '1, 6' },
+              { priority: 'high', type: '🎬 Video', title: 'Full property walkthrough reel', desc: 'Walk-in tour from front door through living room, kitchen, bedrooms, spa bathroom, out to dock. 30-60 seconds. Smooth gimbal.', days: '1, 2' },
+              { priority: 'high', type: '📸 Photo', title: 'Room-by-room carousel set', desc: 'Individual shots: living room (bay view), primary suite, kitchen, each bedroom, bunk room, outdoor deck, dock. Min 10 photos.', days: '3, 18' },
+              { priority: 'high', type: '🎬 Video', title: 'Sunset timelapse from dock', desc: 'Tripod on dock, 30-min timelapse compressed to 15 seconds. Golden hour through sunset. No audio needed.', days: '5' },
+              { priority: 'medium', type: '📸 Photo', title: 'Coffee on the dock lifestyle shot', desc: 'Styled: coffee mug, book, dock railing, bay in background. Morning light. Used for "morning routine" reel.', days: '15' },
+              { priority: 'medium', type: '🎬 Video', title: 'POV arrival + first impressions', desc: 'Phone POV: pull into driveway, walk to door, open door, first view of bay. Casual feel, not overly produced.', days: '2, 22' },
+              { priority: 'medium', type: '📸 Photo', title: 'Fire pit evening setup', desc: 'Fire pit lit, chairs arranged, string lights if available. Dusk/blue hour. S\'mores props optional.', days: '6' },
+              { priority: 'medium', type: '📸 Photo', title: 'Spa bathroom detail shots', desc: 'LED mirror lit, fluted tub filled, walk-in shower close-up. Clean and styled. Candle prop.', days: '3, 18' },
+              { priority: 'low', type: '📸 Photo', title: 'Local area photos', desc: 'Crab Island, Destin Harbor, Henderson Beach. For "things to do near Serenity" carousel.', days: '16' },
+              { priority: 'low', type: '🎬 Video', title: 'Dolphin sighting clip', desc: 'Any dolphin footage from the dock or nearby. Even phone quality works. For social proof content.', days: '26' },
+            ].map((shot, i) => (
+              <div key={i} className="flex gap-3 py-2 border-b border-white/5 last:border-0">
+                <div className="shrink-0 mt-0.5">
+                  <span
+                    className="text-[8px] font-bold px-1.5 py-0.5 rounded uppercase"
+                    style={{
+                      background: shot.priority === 'high' ? 'rgba(239,68,68,0.15)' : shot.priority === 'medium' ? 'rgba(245,158,11,0.15)' : 'rgba(148,163,184,0.15)',
+                      color: shot.priority === 'high' ? '#ef4444' : shot.priority === 'medium' ? '#f59e0b' : '#94a3b8',
+                    }}
+                  >
+                    {shot.priority}
+                  </span>
+                </div>
+                <div className="flex-1">
+                  <div className="flex items-center gap-2">
+                    <span className="text-[10px] text-white/50">{shot.type}</span>
+                    <span className="text-[12px] font-bold text-white/90">{shot.title}</span>
+                  </div>
+                  <div className="text-[10px] text-white/55 mt-0.5 leading-relaxed">{shot.desc}</div>
+                  <div className="text-[9px] text-white/40 mt-1">Used in playbook days: {shot.days}</div>
+                </div>
+              </div>
+            ))}
           </div>
         </div>
       </div>
