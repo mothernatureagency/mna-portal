@@ -18,7 +18,6 @@ const NAV = [
     { label: 'Campaigns', href: '/campaigns', e: 'rocket_launch' },
   ]},
   { sec: 'CRM', items: [
-    { label: 'Lead Tracking', href: '/leads', e: 'track_changes' },
     { label: 'Task Manager', href: '/crm', e: 'task_alt' },
   ]},
   { sec: 'INTELLIGENCE', items: [
