@@ -157,7 +157,7 @@ export default function ClientCalendarPage() {
       {!loading && items.length === 0 && (
         <div className="bg-white rounded-2xl p-8 text-center text-neutral-500 shadow-sm border border-black/5">
           <div className="text-[14px] font-semibold">No posts in your calendar yet</div>
-          <div className="text-[12px] mt-1">Mother Nature Agency will load your Spring Reset plan shortly.</div>
+          <div className="text-[12px] mt-1">Your agency will share content here for your review.</div>
         </div>
       )}
 

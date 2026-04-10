@@ -1,6 +1,7 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
+import Link from 'next/link';
 import { clients, Client } from '@/lib/clients';
 import { createClient } from '@/lib/supabase/client';
 
@@ -89,6 +90,57 @@ const KNOWN_KPIS: Record<string, KPI[]> = {
   ],
 };
 
+// Ad spend data per client
+const AD_SPEND_BY_CLIENT: Record<string, { agency: string; channel: string; monthly: number; note: string }[]> = {
+  'prime-iv': [
+    { agency: 'Mother Nature Agency', channel: 'Meta', monthly: 600, note: '$20/day daily budget' },
+    { agency: 'PDM', channel: 'Meta', monthly: 1290, note: 'Managed separately' },
+  ],
+};
+
+// Lead source category definitions
+const LEAD_CATEGORIES = [
+  { key: 'fb', label: 'Facebook / Instagram', sub: 'Paid ads' },
+  { key: 'google', label: 'Google', sub: 'Organic + paid' },
+  { key: 'walkin', label: 'Walk-in', sub: 'In-person' },
+  { key: 'referral', label: 'Referral', sub: 'Word of mouth' },
+] as const;
+
+// Calendar types for the overview preview
+type CalendarApprovalStatus = 'drafting' | 'pending_review' | 'approved' | 'changes_requested' | 'scheduled';
+type CalendarItem = {
+  id: string;
+  post_date: string;
+  platform: string;
+  content_type: string | null;
+  title: string | null;
+  client_approval_status: CalendarApprovalStatus | null;
+};
+
+const STATUS_DOT: Record<CalendarApprovalStatus, string> = {
+  drafting: '#9ca3af',
+  pending_review: '#f59e0b',
+  approved: '#10b981',
+  changes_requested: '#f43f5e',
+  scheduled: '#0ea5e9',
+};
+
+const PLATFORM_EMOJI: Record<string, string> = {
+  Instagram: '📸', Facebook: '📘', TikTok: '🎵', LinkedIn: '💼', YouTube: '🎬',
+};
+
+function parseCalTitle(raw: string | null) {
+  if (!raw) return '';
+  const phaseMatch = raw.match(/^\[([^\]]+)\]\s*/);
+  let rest = phaseMatch ? raw.slice(phaseMatch[0].length) : raw;
+  const hookIdx = rest.indexOf(' — Hook:');
+  return hookIdx >= 0 ? rest.slice(0, hookIdx) : rest;
+}
+
+function fmtUSD(n: number) {
+  return new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD', maximumFractionDigits: 0 }).format(n);
+}
+
 const TOP_POSTS_BY_CLIENT: Record<string, { platform: string; title: string; engagement: number; reach: number; type: string }[]> = {
   'prime-iv': [
     { platform: 'Instagram', title: 'Spa walkthrough reel', engagement: 4820, reach: 28400, type: 'Reel' },
@@ -105,6 +157,9 @@ export default function ClientOverviewPage() {
   const [editingMonth, setEditingMonth] = useState<string | null>(null);
   const [editValues, setEditValues] = useState({ actual: '', projected: '' });
   const [saving, setSaving] = useState(false);
+  const [calItems, setCalItems] = useState<CalendarItem[]>([]);
+  const [leadSplit, setLeadSplit] = useState<Record<string, number> | null>(null);
+  const [monthOffset, setMonthOffset] = useState(0);
 
   // Resolve client from auth
   useEffect(() => {
@@ -146,6 +201,70 @@ export default function ClientOverviewPage() {
       })
       .catch(() => setProjections(applyGrowthProjections(defaults)));
   }, [client]);
+
+  // Load content calendar items
+  useEffect(() => {
+    if (!client?.name) return;
+    fetch(`/api/content-calendar?client=${encodeURIComponent(client.name)}`)
+      .then((r) => r.json())
+      .then((d) => setCalItems(d.items || []))
+      .catch(() => {});
+  }, [client?.name]);
+
+  // Load lead source split
+  useEffect(() => {
+    if (!client?.id) return;
+    fetch(`/api/client-kv?clientId=${client.id}&key=lead_source_split`)
+      .then((r) => r.json())
+      .then((d) => { if (d.value) setLeadSplit(d.value); })
+      .catch(() => {});
+  }, [client?.id]);
+
+  // Calendar grid computation
+  const calDisplay = useMemo(() => {
+    const d = new Date();
+    d.setDate(1);
+    d.setMonth(d.getMonth() + monthOffset);
+    return d;
+  }, [monthOffset]);
+
+  const calYear = calDisplay.getFullYear();
+  const calMonth = calDisplay.getMonth();
+  const calLabel = calDisplay.toLocaleDateString('en-US', { month: 'long', year: 'numeric' });
+
+  const { calWeeks, calByDay, calMonthItems } = useMemo(() => {
+    const firstDay = new Date(calYear, calMonth, 1);
+    const lastDay = new Date(calYear, calMonth + 1, 0);
+    const startDow = firstDay.getDay();
+    const daysInMo = lastDay.getDate();
+
+    const gridStart = new Date(firstDay);
+    gridStart.setDate(gridStart.getDate() - startDow);
+    const totalCells = Math.ceil((startDow + daysInMo) / 7) * 7;
+    const days: Date[] = [];
+    for (let i = 0; i < totalCells; i++) {
+      const dd = new Date(gridStart);
+      dd.setDate(gridStart.getDate() + i);
+      days.push(dd);
+    }
+    const weeks: Date[][] = [];
+    for (let i = 0; i < days.length; i += 7) weeks.push(days.slice(i, i + 7));
+
+    const byDay: Record<string, CalendarItem[]> = {};
+    for (const it of calItems) {
+      const key = it.post_date.slice(0, 10);
+      if (!byDay[key]) byDay[key] = [];
+      byDay[key].push(it);
+    }
+
+    const monthStart = `${calYear}-${String(calMonth + 1).padStart(2, '0')}-01`;
+    const monthEnd = `${calYear}-${String(calMonth + 1).padStart(2, '0')}-${String(daysInMo).padStart(2, '0')}`;
+    const monthItemsOut = calItems.filter((i) => i.post_date >= monthStart && i.post_date <= monthEnd);
+
+    return { calWeeks: weeks, calByDay: byDay, calMonthItems: monthItemsOut };
+  }, [calItems, calYear, calMonth]);
+
+  const calTodayStr = new Date().toISOString().slice(0, 10);
 
   async function saveProjection(monthKey: string) {
     const actual = parseFloat(editValues.actual) || 0;
@@ -444,6 +563,129 @@ export default function ClientOverviewPage() {
           </div>
         ))}
       </div>
+
+      {/* Monthly Content Calendar Preview */}
+      <div className="bg-white rounded-2xl p-6 shadow-sm border border-black/5">
+        <div className="flex items-center justify-between mb-4">
+          <div className="flex items-center gap-3">
+            <button onClick={() => setMonthOffset((o) => o - 1)} className="w-7 h-7 rounded-lg bg-neutral-100 hover:bg-neutral-200 flex items-center justify-center transition-colors">
+              <span className="material-symbols-outlined" style={{ fontSize: 16 }}>chevron_left</span>
+            </button>
+            <div className="text-[15px] font-bold text-neutral-900">{calLabel}</div>
+            <button onClick={() => setMonthOffset((o) => o + 1)} className="w-7 h-7 rounded-lg bg-neutral-100 hover:bg-neutral-200 flex items-center justify-center transition-colors">
+              <span className="material-symbols-outlined" style={{ fontSize: 16 }}>chevron_right</span>
+            </button>
+            {monthOffset !== 0 && (
+              <button onClick={() => setMonthOffset(0)} className="text-[11px] font-semibold text-neutral-400 hover:text-neutral-600">Today</button>
+            )}
+          </div>
+          <Link href="/client/calendar" className="text-[12px] font-semibold flex items-center gap-1 hover:underline" style={{ color: gradientFrom }}>
+            Open Content Calendar
+            <span className="material-symbols-outlined" style={{ fontSize: 14 }}>arrow_forward</span>
+          </Link>
+        </div>
+
+        {/* Day headers */}
+        <div className="grid grid-cols-7 mb-1">
+          {['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'].map((d) => (
+            <div key={d} className="text-[10px] font-bold uppercase tracking-wider text-neutral-400 text-center py-1">{d}</div>
+          ))}
+        </div>
+
+        {/* Calendar grid */}
+        <div className="border border-neutral-200 rounded-xl overflow-hidden">
+          {calWeeks.map((week, wi) => (
+            <div key={wi} className={`grid grid-cols-7 ${wi > 0 ? 'border-t border-neutral-100' : ''}`}>
+              {week.map((day) => {
+                const iso = day.toISOString().slice(0, 10);
+                const inMonth = day.getMonth() === calMonth;
+                const isToday = iso === calTodayStr;
+                const dayItems = calByDay[iso] || [];
+                return (
+                  <div key={iso} className={`min-h-[72px] p-1.5 border-r border-neutral-100 last:border-r-0 ${!inMonth ? 'bg-neutral-50/50' : ''} ${isToday ? 'bg-blue-50/50' : ''}`}>
+                    <div className={`text-[11px] font-semibold mb-1 ${isToday ? 'text-white w-5 h-5 rounded-full flex items-center justify-center' : inMonth ? 'text-neutral-700' : 'text-neutral-300'}`}
+                      style={isToday ? { background: gradientFrom } : undefined}
+                    >
+                      {day.getDate()}
+                    </div>
+                    {dayItems.slice(0, 3).map((it) => (
+                      <div key={it.id} className="flex items-center gap-0.5 mb-0.5">
+                        <div className="w-1.5 h-1.5 rounded-full shrink-0" style={{ background: STATUS_DOT[(it.client_approval_status || 'pending_review') as CalendarApprovalStatus] || '#9ca3af' }} />
+                        <span className="text-[9px] truncate text-neutral-600">{PLATFORM_EMOJI[it.platform] || ''} {parseCalTitle(it.title) || it.platform}</span>
+                      </div>
+                    ))}
+                    {dayItems.length > 3 && <div className="text-[8px] text-neutral-400">+{dayItems.length - 3} more</div>}
+                  </div>
+                );
+              })}
+            </div>
+          ))}
+        </div>
+
+        {/* Legend */}
+        <div className="flex gap-4 mt-3 flex-wrap">
+          {Object.entries(STATUS_DOT).map(([key, color]) => (
+            <div key={key} className="flex items-center gap-1.5 text-[10px] text-neutral-500">
+              <div className="w-2 h-2 rounded-full" style={{ background: color }} />
+              {key === 'pending_review' ? 'Pending review' : key === 'changes_requested' ? 'Changes requested' : key.charAt(0).toUpperCase() + key.slice(1)}
+            </div>
+          ))}
+        </div>
+        <div className="text-[11px] text-neutral-400 mt-2">{calMonthItems.length} posts this month</div>
+      </div>
+
+      {/* Ad Spend Breakdown */}
+      {(AD_SPEND_BY_CLIENT[client.id] || []).length > 0 && (
+        <div className="bg-white rounded-2xl p-6 shadow-sm border border-black/5">
+          <div className="text-[15px] font-bold text-neutral-900 mb-4">Ad Spend Breakdown</div>
+          <div className="grid gap-3">
+            {(AD_SPEND_BY_CLIENT[client.id] || []).map((item, i) => (
+              <div key={i} className="flex items-center justify-between p-4 rounded-xl bg-neutral-50 border border-black/5">
+                <div>
+                  <div className="text-[13px] font-semibold text-neutral-900">{item.agency}</div>
+                  <div className="text-[11px] text-neutral-500">{item.channel} · {item.note}</div>
+                </div>
+                <div className="text-[20px] font-black text-neutral-900">{fmtUSD(item.monthly)}<span className="text-[11px] font-semibold text-neutral-400">/mo</span></div>
+              </div>
+            ))}
+            <div className="flex items-center justify-between pt-3 border-t border-neutral-100 px-1">
+              <div className="text-[12px] font-bold text-neutral-500 uppercase tracking-wider">Total monthly ad spend</div>
+              <div className="text-[20px] font-black text-neutral-900">
+                {fmtUSD((AD_SPEND_BY_CLIENT[client.id] || []).reduce((s, i) => s + i.monthly, 0))}
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Lead Sources */}
+      {leadSplit && (
+        <div className="bg-white rounded-2xl p-6 shadow-sm border border-black/5">
+          <div className="text-[15px] font-bold text-neutral-900 mb-4">Lead Sources</div>
+          <div className="grid gap-3">
+            {LEAD_CATEGORIES.map((cat) => {
+              const pct = leadSplit[cat.key] || 0;
+              return (
+                <div key={cat.key}>
+                  <div className="flex items-center justify-between mb-1">
+                    <div>
+                      <span className="text-[13px] font-semibold text-neutral-900">{cat.label}</span>
+                      <span className="text-[11px] text-neutral-400 ml-2">{cat.sub}</span>
+                    </div>
+                    <span className="text-[14px] font-black text-neutral-900">{pct}%</span>
+                  </div>
+                  <div className="h-2 rounded-full bg-neutral-100 overflow-hidden">
+                    <div
+                      className="h-full rounded-full transition-all"
+                      style={{ width: `${pct}%`, background: `linear-gradient(90deg, ${gradientFrom}, ${gradientTo})` }}
+                    />
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      )}
 
       {/* Content performance */}
       {topPosts.length > 0 && (
