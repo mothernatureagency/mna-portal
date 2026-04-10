@@ -35,6 +35,42 @@ function defaultProjections(client: Client): MonthData[] {
   }));
 }
 
+// Auto-project the next 3 months based on recent growth rate from actuals.
+// Looks at the last 2+ months with actual data, calculates average MoM growth,
+// and applies that rate forward for 3 months. Recalculates whenever actuals change.
+function applyGrowthProjections(data: MonthData[]): MonthData[] {
+  // Find months with actual revenue > 0
+  const withActuals = data.filter((m) => m.actual > 0);
+  if (withActuals.length < 2) return data; // need at least 2 months to calc growth
+
+  // Calculate month-over-month growth rates
+  const rates: number[] = [];
+  for (let i = 1; i < withActuals.length; i++) {
+    const prev = withActuals[i - 1].actual;
+    const curr = withActuals[i].actual;
+    if (prev > 0) rates.push(curr / prev);
+  }
+  if (rates.length === 0) return data;
+
+  // Average growth rate
+  const avgRate = rates.reduce((s, r) => s + r, 0) / rates.length;
+
+  // Find the last month with actuals
+  const lastActualIdx = data.findIndex((m) => m.monthKey === withActuals[withActuals.length - 1].monthKey);
+  const lastActualValue = withActuals[withActuals.length - 1].actual;
+
+  // Project forward 3 months from the last actual
+  const result = [...data];
+  for (let offset = 1; offset <= 3; offset++) {
+    const targetIdx = lastActualIdx + offset;
+    if (targetIdx >= result.length) break;
+    // Only auto-project if no manual override was saved (projected still equals the default)
+    const projected = Math.round(lastActualValue * Math.pow(avgRate, offset));
+    result[targetIdx] = { ...result[targetIdx], projected };
+  }
+  return result;
+}
+
 // Hardcoded actuals for Prime IV Niceville (known data)
 const KNOWN_ACTUALS: Record<string, Record<string, number>> = {
   'prime-iv': {
@@ -106,9 +142,9 @@ export default function ClientOverviewPage() {
             }
           });
         }
-        setProjections(defaults);
+        setProjections(applyGrowthProjections(defaults));
       })
-      .catch(() => setProjections(defaults));
+      .catch(() => setProjections(applyGrowthProjections(defaults)));
   }, [client]);
 
   async function saveProjection(monthKey: string) {
@@ -146,18 +182,36 @@ export default function ClientOverviewPage() {
   ];
   const topPosts = TOP_POSTS_BY_CLIENT[client.id] || [];
 
+  // Calculate growth rate from actuals for display
+  const withActuals = projections.filter((m) => m.actual > 0);
+  let avgGrowthPct = 0;
+  if (withActuals.length >= 2) {
+    const rates: number[] = [];
+    for (let i = 1; i < withActuals.length; i++) {
+      if (withActuals[i - 1].actual > 0) {
+        rates.push((withActuals[i].actual / withActuals[i - 1].actual - 1) * 100);
+      }
+    }
+    avgGrowthPct = rates.length > 0 ? rates.reduce((s, r) => s + r, 0) / rates.length : 0;
+  }
+
+  // Current month index (0-based) — April = 3
+  const currentMonthIdx = new Date().getMonth();
+  const currentQuarter = getQuarter(currentMonthIdx);
+
   // Quarterly rollups
   const quarters = [1, 2, 3, 4].map((q) => {
     const qMonths = projections.filter((_, i) => getQuarter(i) === q);
+    const isComplete = q < currentQuarter;
+    const isCurrent = q === currentQuarter;
     return {
       label: `Q${q}`,
       actual: qMonths.reduce((sum, m) => sum + m.actual, 0),
       projected: qMonths.reduce((sum, m) => sum + m.projected, 0),
+      isComplete,
+      isCurrent,
     };
   });
-
-  // Current month index (0-based)
-  const currentMonthIdx = new Date().getMonth();
   const ytdActual = projections.slice(0, currentMonthIdx + 1).reduce((s, m) => s + m.actual, 0);
   const ytdProjected = projections.slice(0, currentMonthIdx + 1).reduce((s, m) => s + m.projected, 0);
   const annualProjected = projections.reduce((s, m) => s + m.projected, 0);
@@ -193,9 +247,16 @@ export default function ClientOverviewPage() {
       <div className="bg-white rounded-2xl p-6 shadow-sm border border-black/5">
         <div className="flex items-center justify-between mb-4">
           <div>
-            <div className="text-[15px] font-bold text-neutral-900">Revenue Projections · {CURRENT_YEAR}</div>
+            <div className="flex items-center gap-2">
+              <div className="text-[15px] font-bold text-neutral-900">Revenue Projections · {CURRENT_YEAR}</div>
+              {avgGrowthPct > 0 && (
+                <span className="text-[11px] font-bold px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-700">
+                  +{avgGrowthPct.toFixed(1)}% avg MoM growth
+                </span>
+              )}
+            </div>
             <div className="text-[11px] text-neutral-500">
-              Click any month to update actuals or projections
+              Click any month to update actuals or projections · Next 3 months auto-projected from growth trend
               {saving && <span className="ml-2 text-amber-600">Saving...</span>}
             </div>
           </div>
@@ -331,29 +392,53 @@ export default function ClientOverviewPage() {
       {/* Quarterly Breakdown */}
       <div className="grid grid-cols-4 gap-4">
         {quarters.map((q) => (
-          <div key={q.label} className="bg-white rounded-2xl p-5 shadow-sm border border-black/5">
-            <div className="text-[10px] font-bold uppercase tracking-wider text-neutral-400 mb-2">{q.label} {CURRENT_YEAR}</div>
+          <div
+            key={q.label}
+            className={`bg-white rounded-2xl p-5 shadow-sm border relative overflow-hidden ${
+              q.isCurrent ? 'border-neutral-300 ring-1 ring-neutral-200' : 'border-black/5'
+            }`}
+          >
+            {/* Status badge */}
+            <div className="flex items-center justify-between mb-2">
+              <div className="text-[10px] font-bold uppercase tracking-wider text-neutral-400">{q.label} {CURRENT_YEAR}</div>
+              {q.isComplete && (
+                <span className="text-[9px] font-bold px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-700">Complete</span>
+              )}
+              {q.isCurrent && (
+                <span className="text-[9px] font-bold px-2 py-0.5 rounded-full bg-blue-100 text-blue-700">Current</span>
+              )}
+              {!q.isComplete && !q.isCurrent && (
+                <span className="text-[9px] font-bold px-2 py-0.5 rounded-full bg-neutral-100 text-neutral-400">Upcoming</span>
+              )}
+            </div>
             <div className="space-y-2">
               <div>
-                <div className="text-[10px] text-neutral-400">Actual</div>
+                <div className="text-[10px] text-neutral-400">{q.isComplete ? 'Final' : 'Actual'}</div>
                 <div className="text-[20px] font-black text-neutral-900">
                   {q.actual > 0 ? `$${(q.actual / 1000).toFixed(1)}K` : '—'}
                 </div>
               </div>
               <div>
-                <div className="text-[10px] text-neutral-400">Projected</div>
+                <div className="text-[10px] text-neutral-400">{q.isComplete ? 'Was projected' : 'Projected'}</div>
                 <div className="text-[18px] font-bold text-neutral-500">${(q.projected / 1000).toFixed(1)}K</div>
               </div>
               {q.actual > 0 && q.projected > 0 && (
-                <div className="h-1.5 rounded-full bg-neutral-100 overflow-hidden">
-                  <div
-                    className="h-full rounded-full"
-                    style={{
-                      width: `${Math.min((q.actual / q.projected) * 100, 100)}%`,
-                      background: `linear-gradient(90deg, ${gradientFrom}, ${gradientTo})`,
-                    }}
-                  />
-                </div>
+                <>
+                  <div className="h-1.5 rounded-full bg-neutral-100 overflow-hidden">
+                    <div
+                      className="h-full rounded-full"
+                      style={{
+                        width: `${Math.min((q.actual / q.projected) * 100, 100)}%`,
+                        background: q.actual >= q.projected
+                          ? `linear-gradient(90deg, #10b981, #34d399)`
+                          : `linear-gradient(90deg, ${gradientFrom}, ${gradientTo})`,
+                      }}
+                    />
+                  </div>
+                  <div className={`text-[10px] font-semibold ${q.actual >= q.projected ? 'text-emerald-600' : 'text-amber-600'}`}>
+                    {Math.round((q.actual / q.projected) * 100)}% of projection
+                  </div>
+                </>
               )}
             </div>
           </div>
