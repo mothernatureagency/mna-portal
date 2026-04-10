@@ -81,6 +81,15 @@ const KNOWN_ACTUALS: Record<string, Record<string, number>> = {
   },
 };
 
+// Known projected totals per quarter (overrides default per-month projections)
+const KNOWN_Q_PROJECTIONS: Record<string, Record<string, number>> = {
+  'prime-iv': {
+    '2026-01': 50000,
+    '2026-02': 52000,
+    '2026-03': 53000,  // Q1 total = $155K
+  },
+};
+
 const KNOWN_KPIS: Record<string, KPI[]> = {
   'prime-iv': [
     { label: 'Total Leads (30d)', value: '464', sub: 'GHL pipeline', color: '#0ea5e9' },
@@ -145,7 +154,6 @@ const TOP_POSTS_BY_CLIENT: Record<string, { platform: string; title: string; eng
   'prime-iv': [
     { platform: 'Instagram', title: 'Spa walkthrough reel', engagement: 4820, reach: 28400, type: 'Reel' },
     { platform: 'Instagram', title: 'After Hours giveaway', engagement: 3210, reach: 18600, type: 'Post' },
-    { platform: 'Facebook', title: 'Spring Reset Bundle launch', engagement: 1840, reach: 12200, type: 'Post' },
     { platform: 'Instagram', title: 'Real client review', engagement: 2670, reach: 14100, type: 'Reel' },
   ],
 };
@@ -182,6 +190,12 @@ export default function ClientOverviewPage() {
     const knownActuals = KNOWN_ACTUALS[client.id] || {};
     defaults.forEach((m) => {
       if (knownActuals[m.monthKey]) m.actual = knownActuals[m.monthKey];
+    });
+
+    // Merge known quarterly projections
+    const knownProj = KNOWN_Q_PROJECTIONS[client.id] || {};
+    defaults.forEach((m) => {
+      if (knownProj[m.monthKey]) m.projected = knownProj[m.monthKey];
     });
 
     // Load saved projections from KV
@@ -335,8 +349,8 @@ export default function ClientOverviewPage() {
   const ytdProjected = projections.slice(0, currentMonthIdx + 1).reduce((s, m) => s + m.projected, 0);
   const annualProjected = projections.reduce((s, m) => s + m.projected, 0);
 
-  // For bar chart: show months with data or projections
-  const chartMonths = projections.filter((m, i) => i <= currentMonthIdx + 5); // show through ~6 months ahead
+  // For bar chart: show months with data through current quarter + next month
+  const chartMonths = projections.filter((m, i) => i <= currentMonthIdx + 2);
   const chartMax = Math.max(...chartMonths.map((m) => Math.max(m.actual, m.projected)), 1);
 
   return (
@@ -487,7 +501,7 @@ export default function ClientOverviewPage() {
         </div>
 
         {/* Summary row */}
-        <div className="grid grid-cols-3 gap-4 pt-4 border-t border-neutral-100">
+        <div className="pt-4 border-t border-neutral-100">
           <div>
             <div className="text-[10px] font-bold uppercase tracking-wider text-neutral-400">YTD Actual</div>
             <div className="text-[22px] font-black text-neutral-900">${(ytdActual / 1000).toFixed(1)}K</div>
@@ -496,14 +510,6 @@ export default function ClientOverviewPage() {
                 {ytdActual >= ytdProjected ? 'On track' : `${Math.round((ytdActual / ytdProjected) * 100)}% of projection`}
               </div>
             )}
-          </div>
-          <div>
-            <div className="text-[10px] font-bold uppercase tracking-wider text-neutral-400">YTD Projected</div>
-            <div className="text-[22px] font-black text-neutral-900">${(ytdProjected / 1000).toFixed(1)}K</div>
-          </div>
-          <div>
-            <div className="text-[10px] font-bold uppercase tracking-wider text-neutral-400">Annual Projection</div>
-            <div className="text-[22px] font-black text-neutral-900">${(annualProjected / 1000).toFixed(1)}K</div>
           </div>
         </div>
       </div>

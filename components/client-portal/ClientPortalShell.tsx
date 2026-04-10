@@ -29,9 +29,8 @@ export default function ClientPortalShell({
 
   const nav = [
     { href: '/client', label: 'Overview', icon: 'dashboard' },
-    { href: '/client/calendar', label: 'Content Calendar', icon: 'calendar_month' },
-    { href: '/client/tracker', label: 'Content Tracker', icon: 'grid_view' },
     { href: '/client/agenda', label: 'Agenda', icon: 'event_note' },
+    { href: '/client/calendar', label: 'Content Calendar', icon: 'calendar_month' },
     { href: '/client/tasks', label: 'Tasks from MNA', icon: 'checklist' },
   ];
 
