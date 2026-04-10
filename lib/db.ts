@@ -74,6 +74,7 @@ async function initSchema() {
                         created_at timestamptz not null default now(),
                         completed_at timestamptz
                   )`,
+                  `alter table client_requests add column if not exists assigned_to text`,
                   // Per-client key/value blobs for things that don't justify their own
                   // schema: manual lead source splits, QA notes, override targets, etc.
                   // client_id = lib/clients.ts id, key = semantic name, value = jsonb.

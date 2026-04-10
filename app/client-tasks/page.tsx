@@ -1,183 +1,298 @@
 'use client';
 
-/**
- * MNA STAFF page for managing "Tasks from MNA → Client".
- *
- * This is the admin side of /client/tasks. Staff picks a client, adds request
- * items, sees status, and can delete completed ones. Clients never see this
- * page (middleware bounces them to /client).
- */
+import React, { useEffect, useState } from 'react';
+import { clients } from '@/lib/clients';
+import { createClient } from '@/lib/supabase/client';
 
-import { useEffect, useState } from 'react';
-import { useClient } from '@/context/ClientContext';
-
-type Request = {
+type Task = {
   id: string;
   client_id: string;
   title: string;
   description: string | null;
-  status: 'open' | 'done';
+  status: string;
+  assigned_to: string | null;
   created_at: string;
   completed_at: string | null;
 };
 
-export default function StaffClientTasksPage() {
-  const { activeClient } = useClient();
-  const [items, setItems] = useState<Request[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [title, setTitle] = useState('');
-  const [description, setDescription] = useState('');
-  const [submitting, setSubmitting] = useState(false);
+const TEAM = [
+  { email: 'mn@mothernatureagency.com', name: 'Alexus', short: 'AW', color: '#7c3aed' },
+  { email: 'admin@mothernatureagency.com', name: 'Vanessa', short: 'VN', color: '#f59e0b' },
+  { email: 'info@mothernatureagency.com', name: 'Sable', short: 'SB', color: '#0ea5e9' },
+];
 
-  async function load() {
-    setLoading(true);
-    const res = await fetch(`/api/client-requests?clientId=${encodeURIComponent(activeClient.id)}`);
+function getTeamMember(email: string | null) {
+  return TEAM.find((t) => t.email === email) || null;
+}
+
+function getClientName(clientId: string) {
+  const c = clients.find((cl) => cl.id === clientId);
+  return c?.shortName || clientId;
+}
+
+function getClientColor(clientId: string) {
+  const c = clients.find((cl) => cl.id === clientId);
+  return c?.branding.gradientFrom || '#0c6da4';
+}
+
+const FILTERS = ['All', 'My Tasks', 'Alexus', 'Vanessa', 'Sable', 'Unassigned'] as const;
+
+export default function TaskManagerPage() {
+  const [tasks, setTasks] = useState<Task[]>([]);
+  const [activeFilter, setActiveFilter] = useState<string>('All');
+  const [userEmail, setUserEmail] = useState('');
+  const [showForm, setShowForm] = useState(false);
+  const [newTask, setNewTask] = useState({ clientId: '', title: '', description: '', assignedTo: '' });
+
+  useEffect(() => {
+    createClient().auth.getUser().then(({ data: { user } }) => {
+      const email = user?.email || '';
+      setUserEmail(email);
+      if (email !== 'mn@mothernatureagency.com') {
+        setActiveFilter('My Tasks');
+      }
+    });
+    loadTasks();
+  }, []);
+
+  async function loadTasks() {
+    const res = await fetch('/api/client-requests');
     const data = await res.json();
-    setItems(data.items || []);
-    setLoading(false);
+    setTasks(data.items || []);
   }
 
-  useEffect(() => { load(); }, [activeClient.id]);
-
-  async function addTask(e: React.FormEvent) {
-    e.preventDefault();
-    if (!title.trim()) return;
-    setSubmitting(true);
-    try {
-      const res = await fetch('/api/client-requests', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          clientId: activeClient.id,
-          title: title.trim(),
-          description: description.trim() || null,
-        }),
-      });
-      const data = await res.json();
-      if (!res.ok) throw new Error(data.error || 'Failed');
-      setItems((prev) => [data.item, ...prev]);
-      setTitle('');
-      setDescription('');
-    } catch (e: any) {
-      alert(e.message);
-    } finally {
-      setSubmitting(false);
-    }
+  async function createTask() {
+    if (!newTask.clientId || !newTask.title) return;
+    await fetch('/api/client-requests', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        clientId: newTask.clientId,
+        title: newTask.title,
+        description: newTask.description || null,
+        assignedTo: newTask.assignedTo || null,
+      }),
+    });
+    setNewTask({ clientId: '', title: '', description: '', assignedTo: '' });
+    setShowForm(false);
+    loadTasks();
   }
 
-  async function remove(id: string) {
-    if (!confirm('Delete this task?')) return;
-    const res = await fetch(`/api/client-requests?id=${id}`, { method: 'DELETE' });
-    if (res.ok) setItems((prev) => prev.filter((r) => r.id !== id));
-  }
-
-  async function toggle(id: string, next: 'open' | 'done') {
-    setItems((prev) => prev.map((r) => r.id === id ? { ...r, status: next } : r));
+  async function toggleStatus(id: string, currentStatus: string) {
     await fetch('/api/client-requests', {
       method: 'PATCH',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ id, status: next }),
+      body: JSON.stringify({ id, status: currentStatus === 'done' ? 'open' : 'done' }),
     });
+    loadTasks();
   }
 
-  const open = items.filter((i) => i.status === 'open');
-  const done = items.filter((i) => i.status === 'done');
+  async function updateAssignee(id: string, assignedTo: string) {
+    await fetch('/api/client-requests', {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ id, assignedTo: assignedTo || null }),
+    });
+    loadTasks();
+  }
+
+  async function deleteTask(id: string) {
+    await fetch(`/api/client-requests?id=${id}`, { method: 'DELETE' });
+    loadTasks();
+  }
+
+  // Filter
+  const filtered = tasks.filter((t) => {
+    if (activeFilter === 'All') return true;
+    if (activeFilter === 'My Tasks') return t.assigned_to === userEmail;
+    if (activeFilter === 'Unassigned') return !t.assigned_to;
+    const member = TEAM.find((m) => m.name === activeFilter);
+    return member ? t.assigned_to === member.email : true;
+  });
+
+  const openTasks = filtered.filter((t) => t.status !== 'done');
+  const doneTasks = filtered.filter((t) => t.status === 'done');
+
+  // Group open tasks by client
+  const byClient = new Map<string, Task[]>();
+  openTasks.forEach((t) => {
+    const existing = byClient.get(t.client_id) || [];
+    existing.push(t);
+    byClient.set(t.client_id, existing);
+  });
 
   return (
-    <div className="flex flex-col gap-6">
-      <div>
-        <div className="flex items-center gap-3">
-          <span className="material-symbols-outlined text-white/80" style={{ fontSize: 28 }}>
-            checklist
-          </span>
-          <h1 className="text-3xl font-bold text-white tracking-tight">Tasks for {activeClient.shortName}</h1>
-        </div>
-        <p className="text-white/60 mt-1">
-          Things we're asking {activeClient.name} for. They see these on their client portal.
-        </p>
-      </div>
-
-      <form onSubmit={addTask} className="glass-card p-5 space-y-3">
+    <div className="flex flex-col gap-6 max-w-[1200px]">
+      <div className="flex items-center justify-between">
         <div>
-          <label className="text-[10px] font-bold uppercase tracking-wider text-white/60">Task title</label>
-          <input
-            value={title}
-            onChange={(e) => setTitle(e.target.value)}
-            placeholder="e.g. Send us 5 testimonials for Q2 campaign"
-            className="w-full mt-1 rounded-lg bg-white/5 border border-white/10 p-2.5 text-white text-sm placeholder:text-white/30"
-          />
-        </div>
-        <div>
-          <label className="text-[10px] font-bold uppercase tracking-wider text-white/60">Details (optional)</label>
-          <textarea
-            value={description}
-            onChange={(e) => setDescription(e.target.value)}
-            rows={2}
-            placeholder="Context, format, deadline, etc."
-            className="w-full mt-1 rounded-lg bg-white/5 border border-white/10 p-2.5 text-white text-sm placeholder:text-white/30"
-          />
+          <div className="flex items-center gap-3">
+            <span className="material-symbols-outlined text-white/80" style={{ fontSize: 28 }}>checklist</span>
+            <h1 className="text-3xl font-bold text-white tracking-tight">Task Manager</h1>
+          </div>
+          <p className="text-white/60 mt-1">All tasks across all clients. Assign, track, and complete.</p>
         </div>
         <button
-          type="submit"
-          disabled={submitting || !title.trim()}
-          className="rounded-xl px-4 py-2 text-sm font-semibold text-white disabled:opacity-50"
-          style={{ background: 'linear-gradient(135deg,#0c6da4,#4ab8ce)' }}
+          onClick={() => setShowForm(!showForm)}
+          className="text-[12px] font-bold px-4 py-2 rounded-xl text-white"
+          style={{ background: 'linear-gradient(135deg, #0c6da4, #4ab8ce)' }}
         >
-          {submitting ? 'Adding…' : 'Add task'}
+          {showForm ? 'Cancel' : '+ New Task'}
         </button>
-      </form>
+      </div>
 
-      {loading && <div className="glass-card p-6 text-white/70">Loading…</div>}
-
-      {!loading && open.length > 0 && (
-        <div className="space-y-2">
-          <div className="text-[10px] font-bold uppercase tracking-wider text-white/60">Open ({open.length})</div>
-          {open.map((r) => (
-            <div key={r.id} className="glass-card p-4 flex items-start gap-3">
-              <button
-                onClick={() => toggle(r.id, 'done')}
-                className="mt-0.5 w-5 h-5 rounded border-2 border-white/40 hover:border-emerald-400 shrink-0"
-                aria-label="Mark done"
-              />
-              <div className="flex-1">
-                <div className="text-white font-semibold text-sm">{r.title}</div>
-                {r.description && <div className="text-white/60 text-xs mt-1">{r.description}</div>}
-                <div className="text-white/40 text-[10px] mt-1">Added {new Date(r.created_at).toLocaleDateString()}</div>
-              </div>
-              <button onClick={() => remove(r.id)} className="text-white/30 hover:text-rose-400">
-                <span className="material-symbols-outlined" style={{ fontSize: 18 }}>delete</span>
-              </button>
-            </div>
-          ))}
+      {showForm && (
+        <div className="glass-card p-5">
+          <div className="grid grid-cols-2 gap-3 mb-3">
+            <select
+              value={newTask.clientId}
+              onChange={(e) => setNewTask({ ...newTask, clientId: e.target.value })}
+              className="text-[12px] px-3 py-2 rounded-xl bg-white/5 border border-white/15 text-white outline-none"
+            >
+              <option value="">Select client...</option>
+              {clients.map((c) => (
+                <option key={c.id} value={c.id}>{c.shortName}</option>
+              ))}
+            </select>
+            <select
+              value={newTask.assignedTo}
+              onChange={(e) => setNewTask({ ...newTask, assignedTo: e.target.value })}
+              className="text-[12px] px-3 py-2 rounded-xl bg-white/5 border border-white/15 text-white outline-none"
+            >
+              <option value="">Assign to...</option>
+              {TEAM.map((m) => (
+                <option key={m.email} value={m.email}>{m.name}</option>
+              ))}
+            </select>
+          </div>
+          <input
+            type="text"
+            placeholder="Task title..."
+            value={newTask.title}
+            onChange={(e) => setNewTask({ ...newTask, title: e.target.value })}
+            className="w-full text-[13px] px-3 py-2 rounded-xl bg-white/5 border border-white/15 text-white outline-none placeholder:text-white/30 mb-2"
+          />
+          <input
+            type="text"
+            placeholder="Description (optional)..."
+            value={newTask.description}
+            onChange={(e) => setNewTask({ ...newTask, description: e.target.value })}
+            className="w-full text-[12px] px-3 py-2 rounded-xl bg-white/5 border border-white/15 text-white outline-none placeholder:text-white/30 mb-3"
+          />
+          <button
+            onClick={createTask}
+            className="text-[12px] font-bold px-5 py-2 rounded-xl text-white"
+            style={{ background: 'linear-gradient(135deg, #0c6da4, #4ab8ce)' }}
+          >
+            Create Task
+          </button>
         </div>
       )}
 
-      {!loading && done.length > 0 && (
-        <div className="space-y-2">
-          <div className="text-[10px] font-bold uppercase tracking-wider text-white/60">Completed ({done.length})</div>
-          {done.map((r) => (
-            <div key={r.id} className="glass-card p-4 flex items-start gap-3 opacity-60">
-              <button
-                onClick={() => toggle(r.id, 'open')}
-                className="mt-0.5 w-5 h-5 rounded bg-emerald-500 border-2 border-emerald-500 text-white flex items-center justify-center text-[10px] shrink-0"
-              >
-                ✓
-              </button>
-              <div className="flex-1">
-                <div className="text-white font-semibold text-sm line-through">{r.title}</div>
-                {r.description && <div className="text-white/60 text-xs mt-1 line-through">{r.description}</div>}
-              </div>
-              <button onClick={() => remove(r.id)} className="text-white/30 hover:text-rose-400">
-                <span className="material-symbols-outlined" style={{ fontSize: 18 }}>delete</span>
-              </button>
-            </div>
-          ))}
+      {/* Filter tabs */}
+      <div className="flex gap-1.5 flex-wrap">
+        {FILTERS.map((f) => {
+          const isActive = activeFilter === f;
+          const member = TEAM.find((m) => m.name === f);
+          return (
+            <button
+              key={f}
+              onClick={() => setActiveFilter(f)}
+              className="text-[11px] font-semibold px-3 py-1.5 rounded-lg transition-colors"
+              style={{
+                background: isActive ? (member?.color || 'rgba(255,255,255,0.15)') : 'rgba(255,255,255,0.06)',
+                color: isActive ? '#fff' : 'rgba(255,255,255,0.6)',
+                border: `1px solid ${isActive ? 'transparent' : 'rgba(255,255,255,0.1)'}`,
+              }}
+            >
+              {f} {f === 'All' ? `(${tasks.filter((t) => t.status !== 'done').length})` : ''}
+            </button>
+          );
+        })}
+      </div>
+
+      {/* Tasks grouped by client */}
+      {Array.from(byClient.entries()).map(([clientId, clientTasks]) => (
+        <div key={clientId}>
+          <div className="flex items-center gap-2 mb-2">
+            <div className="w-1 h-4 rounded-full" style={{ background: getClientColor(clientId) }} />
+            <span className="text-[11px] font-bold uppercase tracking-wider text-white/50">{getClientName(clientId)}</span>
+            <span className="text-[10px] text-white/30">{clientTasks.length} open</span>
+          </div>
+          <div className="glass-card p-4 space-y-1">
+            {clientTasks.map((task) => {
+              const member = getTeamMember(task.assigned_to);
+              return (
+                <div key={task.id} className="flex items-center gap-3 py-2 border-b border-white/5 last:border-0 group">
+                  <button
+                    onClick={() => toggleStatus(task.id, task.status)}
+                    className="w-5 h-5 rounded border border-white/30 shrink-0 hover:border-white/60 transition-colors flex items-center justify-center"
+                  >
+                    {task.status === 'done' && <span className="text-[10px] text-emerald-400">✓</span>}
+                  </button>
+                  <div className="flex-1 min-w-0">
+                    <div className="text-[12px] font-semibold text-white/90 truncate">{task.title}</div>
+                    {task.description && (
+                      <div className="text-[10px] text-white/45 truncate">{task.description}</div>
+                    )}
+                  </div>
+                  <select
+                    value={task.assigned_to || ''}
+                    onChange={(e) => updateAssignee(task.id, e.target.value)}
+                    className="text-[10px] font-semibold px-2 py-1 rounded-lg bg-transparent border border-white/10 outline-none cursor-pointer"
+                    style={{
+                      color: member?.color || 'rgba(255,255,255,0.4)',
+                      background: member ? member.color + '15' : 'transparent',
+                    }}
+                  >
+                    <option value="">Unassigned</option>
+                    {TEAM.map((m) => (
+                      <option key={m.email} value={m.email}>{m.name}</option>
+                    ))}
+                  </select>
+                  <button
+                    onClick={() => deleteTask(task.id)}
+                    className="text-[10px] text-white/20 hover:text-red-400 transition-colors opacity-0 group-hover:opacity-100"
+                  >
+                    ✕
+                  </button>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      ))}
+
+      {openTasks.length === 0 && (
+        <div className="glass-card p-8 text-center">
+          <div className="text-[14px] font-semibold text-white/70">
+            {activeFilter === 'All' ? 'No open tasks' : `No tasks for ${activeFilter}`}
+          </div>
+          <div className="text-[11px] text-white/40 mt-1">Click "+ New Task" to create one.</div>
         </div>
       )}
 
-      {!loading && items.length === 0 && (
-        <div className="glass-card p-8 text-center text-white/60">
-          No tasks yet. Add one above to ask {activeClient.shortName} for something.
+      {doneTasks.length > 0 && (
+        <div>
+          <div className="text-[10px] font-bold uppercase tracking-wider text-white/30 mb-2">
+            Completed ({doneTasks.length})
+          </div>
+          <div className="glass-card p-4 opacity-60">
+            {doneTasks.slice(0, 10).map((task) => (
+              <div key={task.id} className="flex items-center gap-3 py-1.5">
+                <button
+                  onClick={() => toggleStatus(task.id, task.status)}
+                  className="w-4 h-4 rounded bg-emerald-600/30 flex items-center justify-center text-[9px] text-white shrink-0"
+                >
+                  ✓
+                </button>
+                <span className="text-[11px] text-white/40 line-through truncate">{task.title}</span>
+                <span className="text-[9px] text-white/25 shrink-0">{getClientName(task.client_id)}</span>
+              </div>
+            ))}
+            {doneTasks.length > 10 && (
+              <div className="text-[10px] text-white/30 mt-2">+{doneTasks.length - 10} more completed</div>
+            )}
+          </div>
         </div>
       )}
     </div>

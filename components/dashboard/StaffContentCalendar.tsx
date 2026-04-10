@@ -75,8 +75,8 @@ export default function StaffContentCalendar() {
       setAllContent(merged);
     });
 
-    // Fetch MNA tasks
-    fetch('/api/client-requests?clientId=mna')
+    // Fetch tasks assigned to Sable across all clients
+    fetch('/api/client-requests?assignedTo=info@mothernatureagency.com')
       .then((r) => r.json())
       .then((d) => setTasks(d.items || []))
       .catch(() => {});

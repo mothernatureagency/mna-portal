@@ -25,8 +25,8 @@ export default function StaffChecklist() {
   const [showAddForm, setShowAddForm] = useState(false);
 
   useEffect(() => {
-    // Fetch MNA-level tasks
-    fetch('/api/client-requests?clientId=mna')
+    // Fetch tasks assigned to Vanessa across all clients
+    fetch('/api/client-requests?assignedTo=admin@mothernatureagency.com')
       .then((r) => r.json())
       .then((d) => setTasks(d.items || []))
       .catch(() => {});
