@@ -3,6 +3,7 @@ import React from 'react';
 import { useClient } from '@/context/ClientContext';
 import NicevilleDashboard from '@/components/dashboard/NicevilleDashboard';
 import SerenityDashboard from '@/components/dashboard/SerenityDashboard';
+import AgencyOverview from '@/components/dashboard/AgencyOverview';
 import LeadTrendsChart from '@/components/dashboard/LeadTrendsChart';
 import AdPerformanceChart from '@/components/dashboard/AdPerformanceChart';
 import CRMSnapshot from '@/components/dashboard/CRMSnapshot';
@@ -154,6 +155,11 @@ export default function DashboardPage() {
   // Prime IV Niceville gets its own completely custom layout built on real
   // numbers from the client. Every other client falls through to the default
   // dashboard below.
+  // Custom dashboards per client
+  if (activeClient.id === 'mna') {
+    return <AgencyOverview />;
+  }
+
   if (activeClient.id === 'prime-iv') {
     return <NicevilleDashboard client={activeClient} />;
   }
