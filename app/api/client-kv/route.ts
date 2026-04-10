@@ -49,16 +49,26 @@ export async function PUT(req: NextRequest) {
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) return NextResponse.json({ error: 'Not authenticated' }, { status: 401 });
 
-  const role = ((user.user_metadata as Record<string, unknown> | null)?.role as string) || 'staff';
-  if (role === 'client') {
-    return NextResponse.json({ error: 'Only staff can write client settings' }, { status: 403 });
-  }
+  const meta = (user.user_metadata as Record<string, unknown> | null) || {};
+  const role = (meta.role as string) || 'staff';
+  const userClientId = (meta.client_id as string) || '';
 
   let body: any;
   try { body = await req.json(); } catch { return NextResponse.json({ error: 'Invalid JSON' }, { status: 400 }); }
   const { clientId, key, value } = body || {};
   if (!clientId || !key || value === undefined) {
     return NextResponse.json({ error: 'clientId, key, and value required' }, { status: 400 });
+  }
+
+  // Clients can only write to their own client_id and only specific keys
+  const CLIENT_WRITABLE_KEYS = ['revenue_projections'];
+  if (role === 'client') {
+    if (clientId !== userClientId) {
+      return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
+    }
+    if (!CLIENT_WRITABLE_KEYS.includes(key)) {
+      return NextResponse.json({ error: 'Only staff can write this setting' }, { status: 403 });
+    }
   }
 
   const { rows } = await query(

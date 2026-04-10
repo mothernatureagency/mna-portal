@@ -1,7 +1,8 @@
 'use client';
 
 import { useEffect, useMemo, useState } from 'react';
-import { clients } from '@/lib/clients';
+import { clients, Client } from '@/lib/clients';
+import { createClient } from '@/lib/supabase/client';
 import { driveThumbnailUrl, driveViewUrl } from '@/lib/drive';
 
 type ApprovalStatus =
@@ -62,13 +63,22 @@ function firstWeekday(key: string) {
 }
 
 export default function ClientCalendarPage() {
-  // Hardcoded to Niceville for MVP. Layout also defaults there.
-  const client = clients.find((c) => c.id === 'prime-iv')!;
+  const [client, setClient] = useState<Client>(clients.find((c) => c.id === 'prime-iv')!);
   const [items, setItems] = useState<ContentItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [view, setView] = useState<'grid' | 'list'>('grid');
   const [commentDraft, setCommentDraft] = useState<Record<string, string>>({});
   const [activeId, setActiveId] = useState<string | null>(null);
+
+  // Resolve the client from auth
+  useEffect(() => {
+    createClient().auth.getUser().then(({ data: { user } }) => {
+      const meta = (user?.user_metadata || {}) as Record<string, unknown>;
+      const clientId = (meta.client_id as string) || 'prime-iv';
+      const found = clients.find((c) => c.id === clientId);
+      if (found) setClient(found);
+    });
+  }, []);
 
   useEffect(() => {
     setLoading(true);
