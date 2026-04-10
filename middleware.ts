@@ -8,6 +8,8 @@ function isPublicRoute(pathname: string) {
     pathname.startsWith('/api/lock') ||
     pathname.startsWith('/api/seed-users') ||
     pathname.startsWith('/api/hospitable-sync') ||
+    pathname.startsWith('/api/meeting-notes') ||
+    pathname.startsWith('/api/weekly-summary') ||
     pathname.startsWith('/_next') ||
     pathname === '/favicon.ico'
   );

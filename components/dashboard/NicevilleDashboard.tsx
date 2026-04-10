@@ -19,7 +19,7 @@
 import React from 'react';
 import type { Client } from '@/lib/clients';
 import UserBanner from './UserBanner';
-import NicevilleContentPreview from './NicevilleContentPreview';
+import MonthlyContentCalendar from './MonthlyContentCalendar';
 import LeadSourceSplitEditor from './LeadSourceSplitEditor';
 
 // ─── REAL DATA ────────────────────────────────────────────────────────────
@@ -150,7 +150,7 @@ export default function NicevilleDashboard({ client }: { client: Client }) {
       {/* ── CONTENT CALENDAR (moved to top per client request) ── */}
       <div>
         <SectionLabel>Content Calendar</SectionLabel>
-        <NicevilleContentPreview clientName={client.name} />
+        <MonthlyContentCalendar clientName={client.name} gradientFrom={gradientFrom} gradientTo={gradientTo} />
       </div>
 
       {/* ── KEY METRICS (honest — only values we actually have) ── */}
