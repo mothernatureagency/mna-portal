@@ -11,6 +11,7 @@ const NAV = [
   { sec: 'SOCIAL & CONTENT', items: [
     { label: 'Content Tracker', href: '/content', e: 'grid_view' },
     { label: 'Content Planner', href: '/planner', e: 'edit_calendar' },
+    { label: 'Agenda', href: '/agenda', e: 'event_note' },
     { label: 'Task Manager', href: '/client-tasks', e: 'checklist' },
     { label: 'Email Drafts', href: '/email-preview', e: 'mail' },
   ]},

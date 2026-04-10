@@ -21,8 +21,16 @@ const TEAM = [
   { email: 'info@mothernatureagency.com', name: 'Sable', short: 'SB', color: '#0ea5e9' },
 ];
 
+// Client assignees — tasks can also be assigned to the client themselves
+const CLIENT_ASSIGNEES = clients.map((c) => ({
+  email: `client:${c.id}`,
+  name: c.shortName,
+  short: c.shortName.slice(0, 2).toUpperCase(),
+  color: c.branding.gradientFrom,
+}));
+
 function getTeamMember(email: string | null) {
-  return TEAM.find((t) => t.email === email) || null;
+  return TEAM.find((t) => t.email === email) || CLIENT_ASSIGNEES.find((c) => c.email === email) || null;
 }
 
 function getClientName(clientId: string) {
@@ -159,9 +167,16 @@ export default function TaskManagerPage() {
               className="text-[12px] px-3 py-2 rounded-xl bg-white/5 border border-white/15 text-white outline-none"
             >
               <option value="">Assign to...</option>
-              {TEAM.map((m) => (
-                <option key={m.email} value={m.email}>{m.name}</option>
-              ))}
+              <optgroup label="Team">
+                {TEAM.map((m) => (
+                  <option key={m.email} value={m.email}>{m.name}</option>
+                ))}
+              </optgroup>
+              <optgroup label="Client">
+                {CLIENT_ASSIGNEES.map((c) => (
+                  <option key={c.email} value={c.email}>{c.name}</option>
+                ))}
+              </optgroup>
             </select>
           </div>
           <input
@@ -245,9 +260,16 @@ export default function TaskManagerPage() {
                     }}
                   >
                     <option value="">Unassigned</option>
-                    {TEAM.map((m) => (
-                      <option key={m.email} value={m.email}>{m.name}</option>
-                    ))}
+                    <optgroup label="Team">
+                      {TEAM.map((m) => (
+                        <option key={m.email} value={m.email}>{m.name}</option>
+                      ))}
+                    </optgroup>
+                    <optgroup label="Client">
+                      {CLIENT_ASSIGNEES.map((c) => (
+                        <option key={c.email} value={c.email}>{c.name}</option>
+                      ))}
+                    </optgroup>
                   </select>
                   <button
                     onClick={() => deleteTask(task.id)}

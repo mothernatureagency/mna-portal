@@ -24,16 +24,21 @@ function dayOffsetDate(startDate: string, day: number): string {
 }
 
 // PATCH — update a single content item.
-// Supports caption, status, client_approval_status, client_comments, mna_comments.
+// Supports post_date, platform, content_type, title, caption, status,
+// client_approval_status, client_comments, mna_comments, photo_drive_url.
 // When client_approval_status transitions to 'approved', approved_at is stamped.
 export async function PATCH(req: NextRequest) {
   await ensureSchema();
   let body: any;
   try { body = await req.json(); } catch { return NextResponse.json({ error: 'Invalid JSON' }, { status: 400 }); }
-  const { id, caption, status, client_approval_status, client_comments, mna_comments, photo_drive_url } = body || {};
+  const { id, post_date, platform, content_type, title, caption, status, client_approval_status, client_comments, mna_comments, photo_drive_url } = body || {};
   if (!id) return NextResponse.json({ error: 'id required' }, { status: 400 });
   const fields: string[] = [];
   const values: any[] = [];
+  if (post_date !== undefined) { values.push(post_date); fields.push(`post_date = $${values.length}`); }
+  if (platform !== undefined) { values.push(platform); fields.push(`platform = $${values.length}`); }
+  if (content_type !== undefined) { values.push(content_type); fields.push(`content_type = $${values.length}`); }
+  if (title !== undefined) { values.push(title); fields.push(`title = $${values.length}`); }
   if (caption !== undefined) { values.push(caption); fields.push(`caption = $${values.length}`); }
   if (status !== undefined) { values.push(status); fields.push(`status = $${values.length}`); }
   if (client_approval_status !== undefined) {
@@ -134,4 +139,13 @@ export async function POST(req: NextRequest) {
     inserted.push(rows[0]);
   }
   return NextResponse.json({ inserted, count: inserted.length });
+}
+
+// DELETE — remove a content item (staff only)
+export async function DELETE(req: NextRequest) {
+  await ensureSchema();
+  const id = req.nextUrl.searchParams.get('id');
+  if (!id) return NextResponse.json({ error: 'id required' }, { status: 400 });
+  await query('delete from content_calendar where id = $1', [id]);
+  return NextResponse.json({ ok: true });
 }
