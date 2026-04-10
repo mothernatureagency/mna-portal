@@ -3,7 +3,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import Link from 'next/link';
 import { clients, Client } from '@/lib/clients';
-import { createClient } from '@/lib/supabase/client';
+import { useClientPortal } from '@/components/client-portal/ClientPortalContext';
 
 type KPI = { label: string; value: string; sub?: string; color: string };
 
@@ -159,8 +159,7 @@ const TOP_POSTS_BY_CLIENT: Record<string, { platform: string; title: string; eng
 };
 
 export default function ClientOverviewPage() {
-  const [client, setClient] = useState<Client>(clients.find((c) => c.id === 'prime-iv')!);
-  const [isStaff, setIsStaff] = useState(false);
+  const { client, isStaffPreview } = useClientPortal();
   const [projections, setProjections] = useState<MonthData[]>([]);
   const [editingMonth, setEditingMonth] = useState<string | null>(null);
   const [editValues, setEditValues] = useState({ actual: '', projected: '' });
@@ -168,18 +167,6 @@ export default function ClientOverviewPage() {
   const [calItems, setCalItems] = useState<CalendarItem[]>([]);
   const [leadSplit, setLeadSplit] = useState<Record<string, number> | null>(null);
   const [monthOffset, setMonthOffset] = useState(0);
-
-  // Resolve client from auth
-  useEffect(() => {
-    createClient().auth.getUser().then(({ data: { user } }) => {
-      const meta = (user?.user_metadata || {}) as Record<string, unknown>;
-      const role = (meta.role as string) || 'staff';
-      const clientId = (meta.client_id as string) || 'prime-iv';
-      const found = clients.find((c) => c.id === clientId);
-      if (found) setClient(found);
-      setIsStaff(role === 'staff');
-    });
-  }, []);
 
   // Load projections from client_kv
   useEffect(() => {
@@ -367,6 +354,80 @@ export default function ClientOverviewPage() {
         <p className="text-[12px] text-white/60 pl-3.5">
           Your top-line results, projections, and content performance.
         </p>
+      </div>
+
+      {/* Monthly Content Calendar Preview */}
+      <div className="glass-card p-6">
+        <div className="flex items-center justify-between mb-4">
+          <div className="flex items-center gap-3">
+            <button onClick={() => setMonthOffset((o) => o - 1)} className="w-8 h-8 rounded-lg bg-white/10 hover:bg-white/20 flex items-center justify-center text-white/70 hover:text-white transition-colors">
+              <span className="material-symbols-outlined" style={{ fontSize: 16 }}>chevron_left</span>
+            </button>
+            <div className="text-[15px] font-bold text-white">{calLabel}</div>
+            <button onClick={() => setMonthOffset((o) => o + 1)} className="w-8 h-8 rounded-lg bg-white/10 hover:bg-white/20 flex items-center justify-center text-white/70 hover:text-white transition-colors">
+              <span className="material-symbols-outlined" style={{ fontSize: 16 }}>chevron_right</span>
+            </button>
+            {monthOffset !== 0 && (
+              <button onClick={() => setMonthOffset(0)} className="text-[10px] font-semibold text-white/50 hover:text-white/80 ml-1">Today</button>
+            )}
+          </div>
+          <Link href="/client/calendar" className="text-[11px] font-semibold px-3 py-1.5 rounded-lg bg-white/10 text-white hover:bg-white/20">
+            Open Content Calendar →
+          </Link>
+        </div>
+
+        {/* Day headers */}
+        <div className="grid grid-cols-7 mb-1">
+          {['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'].map((d) => (
+            <div key={d} className="text-[9px] font-bold uppercase tracking-wider text-white/50 text-center pb-1">{d}</div>
+          ))}
+        </div>
+
+        {/* Calendar grid */}
+        <div className="grid grid-cols-7 gap-1.5">
+          {calWeeks.flat().map((day) => {
+            const iso = day.toISOString().slice(0, 10);
+            const inMonth = day.getMonth() === calMonth;
+            const isToday = iso === calTodayStr;
+            const dayItems = calByDay[iso] || [];
+            return (
+              <div
+                key={iso}
+                className={`min-h-[72px] rounded-lg border p-1.5 flex flex-col gap-1 transition-colors ${
+                  isToday
+                    ? 'border-white bg-white/15'
+                    : inMonth
+                    ? 'border-white/10 bg-white/5'
+                    : 'border-white/5 bg-white/[0.02]'
+                }`}
+              >
+                <div className={`text-[9px] font-bold ${inMonth ? 'text-white/50' : 'text-white/25'}`}>
+                  {day.getDate()}
+                </div>
+                {dayItems.slice(0, 3).map((it) => (
+                  <div key={it.id} className="flex items-start gap-1">
+                    <span className="w-1.5 h-1.5 rounded-full mt-0.5 shrink-0" style={{ background: STATUS_DOT[(it.client_approval_status || 'pending_review') as CalendarApprovalStatus] || '#9ca3af' }} />
+                    <span className="text-[8px] leading-tight text-white/80 line-clamp-2">
+                      {PLATFORM_EMOJI[it.platform] || ''} {parseCalTitle(it.title) || it.platform}
+                    </span>
+                  </div>
+                ))}
+                {dayItems.length > 3 && <div className="text-[8px] text-white/40">+{dayItems.length - 3} more</div>}
+              </div>
+            );
+          })}
+        </div>
+
+        {/* Legend */}
+        <div className="flex items-center gap-4 mt-3 flex-wrap text-[10px] text-white/70">
+          {Object.entries(STATUS_DOT).map(([key, color]) => (
+            <div key={key} className="flex items-center gap-1.5">
+              <span className="w-2 h-2 rounded-full" style={{ background: color }} />
+              {key === 'pending_review' ? 'Pending review' : key === 'changes_requested' ? 'Changes requested' : key.charAt(0).toUpperCase() + key.slice(1)}
+            </div>
+          ))}
+        </div>
+        <div className="text-[11px] text-white/50 mt-2">{calMonthItems.length} posts this month</div>
       </div>
 
       {/* KPIs */}
@@ -567,80 +628,6 @@ export default function ClientOverviewPage() {
             </div>
           </div>
         ))}
-      </div>
-
-      {/* Monthly Content Calendar Preview */}
-      <div className="glass-card p-6">
-        <div className="flex items-center justify-between mb-4">
-          <div className="flex items-center gap-3">
-            <button onClick={() => setMonthOffset((o) => o - 1)} className="w-8 h-8 rounded-lg bg-white/10 hover:bg-white/20 flex items-center justify-center text-white/70 hover:text-white transition-colors">
-              <span className="material-symbols-outlined" style={{ fontSize: 16 }}>chevron_left</span>
-            </button>
-            <div className="text-[15px] font-bold text-white">{calLabel}</div>
-            <button onClick={() => setMonthOffset((o) => o + 1)} className="w-8 h-8 rounded-lg bg-white/10 hover:bg-white/20 flex items-center justify-center text-white/70 hover:text-white transition-colors">
-              <span className="material-symbols-outlined" style={{ fontSize: 16 }}>chevron_right</span>
-            </button>
-            {monthOffset !== 0 && (
-              <button onClick={() => setMonthOffset(0)} className="text-[10px] font-semibold text-white/50 hover:text-white/80 ml-1">Today</button>
-            )}
-          </div>
-          <Link href="/client/calendar" className="text-[11px] font-semibold px-3 py-1.5 rounded-lg bg-white/10 text-white hover:bg-white/20">
-            Open Content Calendar →
-          </Link>
-        </div>
-
-        {/* Day headers */}
-        <div className="grid grid-cols-7 mb-1">
-          {['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'].map((d) => (
-            <div key={d} className="text-[9px] font-bold uppercase tracking-wider text-white/50 text-center pb-1">{d}</div>
-          ))}
-        </div>
-
-        {/* Calendar grid */}
-        <div className="grid grid-cols-7 gap-1.5">
-          {calWeeks.flat().map((day) => {
-            const iso = day.toISOString().slice(0, 10);
-            const inMonth = day.getMonth() === calMonth;
-            const isToday = iso === calTodayStr;
-            const dayItems = calByDay[iso] || [];
-            return (
-              <div
-                key={iso}
-                className={`min-h-[72px] rounded-lg border p-1.5 flex flex-col gap-1 transition-colors ${
-                  isToday
-                    ? 'border-white bg-white/15'
-                    : inMonth
-                    ? 'border-white/10 bg-white/5'
-                    : 'border-white/5 bg-white/[0.02]'
-                }`}
-              >
-                <div className={`text-[9px] font-bold ${inMonth ? 'text-white/50' : 'text-white/25'}`}>
-                  {day.getDate()}
-                </div>
-                {dayItems.slice(0, 3).map((it) => (
-                  <div key={it.id} className="flex items-start gap-1">
-                    <span className="w-1.5 h-1.5 rounded-full mt-0.5 shrink-0" style={{ background: STATUS_DOT[(it.client_approval_status || 'pending_review') as CalendarApprovalStatus] || '#9ca3af' }} />
-                    <span className="text-[8px] leading-tight text-white/80 line-clamp-2">
-                      {PLATFORM_EMOJI[it.platform] || ''} {parseCalTitle(it.title) || it.platform}
-                    </span>
-                  </div>
-                ))}
-                {dayItems.length > 3 && <div className="text-[8px] text-white/40">+{dayItems.length - 3} more</div>}
-              </div>
-            );
-          })}
-        </div>
-
-        {/* Legend */}
-        <div className="flex items-center gap-4 mt-3 flex-wrap text-[10px] text-white/70">
-          {Object.entries(STATUS_DOT).map(([key, color]) => (
-            <div key={key} className="flex items-center gap-1.5">
-              <span className="w-2 h-2 rounded-full" style={{ background: color }} />
-              {key === 'pending_review' ? 'Pending review' : key === 'changes_requested' ? 'Changes requested' : key.charAt(0).toUpperCase() + key.slice(1)}
-            </div>
-          ))}
-        </div>
-        <div className="text-[11px] text-white/50 mt-2">{calMonthItems.length} posts this month</div>
       </div>
 
       {/* Ad Spend Breakdown */}

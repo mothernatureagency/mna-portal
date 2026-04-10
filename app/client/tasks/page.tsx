@@ -48,7 +48,7 @@ export default function ClientTasksPage() {
   return (
     <div className="space-y-6">
       <div>
-        <h1 className="text-[26px] font-extrabold text-white">Tasks from Mother Nature Agency</h1>
+        <h1 className="text-[26px] font-extrabold text-white">Tasks</h1>
         <p className="text-[13px] text-white/50 mt-1">
           Things we need from you to keep your content engine humming. Check them off when you're done and we'll get notified.
         </p>

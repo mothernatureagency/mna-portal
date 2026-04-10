@@ -4,6 +4,7 @@ import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
 import { createClient } from '@/lib/supabase/client';
 import type { Client } from '@/lib/clients';
+import { ClientPortalProvider } from './ClientPortalContext';
 
 /**
  * Client-facing shell — dark glass theme matching the staff dashboard.
@@ -30,7 +31,7 @@ export default function ClientPortalShell({
     { href: '/client', label: 'Overview', icon: 'dashboard' },
     { href: '/client/agenda', label: 'Agenda', icon: 'event_note' },
     { href: '/client/calendar', label: 'Content Calendar', icon: 'calendar_month' },
-    { href: '/client/tasks', label: 'Tasks from MNA', icon: 'checklist' },
+    { href: '/client/tasks', label: 'Tasks', icon: 'checklist' },
   ];
 
   const active = (href: string) =>
@@ -137,7 +138,9 @@ export default function ClientPortalShell({
 
       {/* ── Main content ── */}
       <main className="flex-1 min-w-0 overflow-y-auto">
-        <div className="max-w-[1400px] mx-auto px-8 py-8">{children}</div>
+        <ClientPortalProvider client={client} userEmail={userEmail} isStaffPreview={isStaffPreview}>
+          <div className="max-w-[1400px] mx-auto px-8 py-8">{children}</div>
+        </ClientPortalProvider>
       </main>
     </div>
   );

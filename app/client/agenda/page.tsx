@@ -1,8 +1,7 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import { clients, Client } from '@/lib/clients';
-import { createClient } from '@/lib/supabase/client';
+import { useClientPortal } from '@/components/client-portal/ClientPortalContext';
 
 type Task = {
   id: string;
@@ -47,19 +46,10 @@ function fmtTime(t: string) {
 }
 
 export default function ClientAgendaPage() {
-  const [client, setClient] = useState<Client>(clients.find((c) => c.id === 'prime-iv')!);
+  const { client } = useClientPortal();
   const [tasks, setTasks] = useState<Task[]>([]);
   const [manualItems, setManualItems] = useState<AgendaItem[]>([]);
   const [loading, setLoading] = useState(true);
-
-  useEffect(() => {
-    createClient().auth.getUser().then(({ data: { user } }) => {
-      const meta = (user?.user_metadata || {}) as Record<string, unknown>;
-      const clientId = (meta.client_id as string) || 'prime-iv';
-      const found = clients.find((c) => c.id === clientId);
-      if (found) setClient(found);
-    });
-  }, []);
 
   // Load tasks for this client
   useEffect(() => {
