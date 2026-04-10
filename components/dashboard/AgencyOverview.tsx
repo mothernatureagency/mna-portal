@@ -11,7 +11,10 @@
 import React, { useEffect, useState } from 'react';
 import { clients, Client } from '@/lib/clients';
 import { useClient } from '@/context/ClientContext';
+import { createClient as createSupabaseClient } from '@/lib/supabase/client';
 import UserBanner from './UserBanner';
+import StaffChecklist from './StaffChecklist';
+import StaffContentCalendar from './StaffContentCalendar';
 
 // ─── REAL DATA (Niceville) ──────────────────────────────────────────
 // Source: GHL manual pull 2026-04-08
@@ -119,6 +122,17 @@ function ClientCard({
 export default function AgencyOverview() {
   const { setActiveClientId } = useClient();
 
+  // Detect logged-in user email for role-based top sections
+  const [userEmail, setUserEmail] = useState('');
+  useEffect(() => {
+    createSupabaseClient().auth.getUser().then(({ data: { user } }) => {
+      setUserEmail(user?.email || '');
+    });
+  }, []);
+
+  const isAdmin = userEmail === 'admin@mothernatureagency.com';
+  const isSocial = userEmail === 'info@mothernatureagency.com';
+
   // Fetch Serenity live data
   const [serenityData, setSerenityData] = useState<any>(null);
   useEffect(() => {
@@ -152,6 +166,10 @@ export default function AgencyOverview() {
           All clients at a glance · Click any card to view their full dashboard
         </p>
       </div>
+
+      {/* ── ROLE-SPECIFIC TOP SECTIONS ── */}
+      {isAdmin && <StaffChecklist />}
+      {isSocial && <StaffContentCalendar />}
 
       {/* ── HEALTH & WELLNESS ── */}
       <div>
