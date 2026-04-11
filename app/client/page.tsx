@@ -4,6 +4,10 @@ import { useEffect, useMemo, useState } from 'react';
 import Link from 'next/link';
 import { clients, Client } from '@/lib/clients';
 import { useClientPortal } from '@/components/client-portal/ClientPortalContext';
+import { getAttributionForClient } from '@/lib/data/attribution';
+import AttributionOverview from '@/components/client-portal/AttributionOverview';
+import { getPerformanceForClient } from '@/lib/data/performance';
+import PerformanceOverview from '@/components/client-portal/PerformanceOverview';
 
 type KPI = { label: string; value: string; sub?: string; color: string };
 
@@ -629,6 +633,22 @@ export default function ClientOverviewPage() {
           </div>
         ))}
       </div>
+
+      {/* Performance Overview (Q1 vs April) */}
+      {(() => {
+        const perfData = getPerformanceForClient(client.id);
+        return perfData ? (
+          <PerformanceOverview data={perfData} gradientFrom={gradientFrom} gradientTo={gradientTo} />
+        ) : null;
+      })()}
+
+      {/* Attribution Overview */}
+      {(() => {
+        const attrData = getAttributionForClient(client.id);
+        return attrData ? (
+          <AttributionOverview data={attrData} gradientFrom={gradientFrom} gradientTo={gradientTo} />
+        ) : null;
+      })()}
 
       {/* Ad Spend Breakdown */}
       {(AD_SPEND_BY_CLIENT[client.id] || []).length > 0 && (
