@@ -62,10 +62,23 @@ function parseTitle(raw: string | null) {
   return { phase, title, hook, cta };
 }
 
+/** Normalize a date string (possibly ISO with time) to YYYY-MM-DD. */
+function toDateOnly(s: string): string {
+  if (!s) return s;
+  // If already YYYY-MM-DD, return as-is
+  if (s.length === 10) return s;
+  // For ISO strings like "2026-04-15T00:00:00.000Z", extract the date part
+  // but use UTC values to avoid timezone shift
+  try {
+    const d = new Date(s);
+    return `${d.getUTCFullYear()}-${String(d.getUTCMonth() + 1).padStart(2, '0')}-${String(d.getUTCDate()).padStart(2, '0')}`;
+  } catch { return s.slice(0, 10); }
+}
+
 function fmtDate(iso: string) {
   try {
-    // Append T12:00:00 to avoid UTC midnight → previous-day-in-local-tz shift
-    const d = new Date(iso.length === 10 ? `${iso}T12:00:00` : iso);
+    const clean = toDateOnly(iso);
+    const d = new Date(`${clean}T12:00:00`);
     return d.toLocaleDateString(undefined, { weekday: 'short', month: 'short', day: 'numeric' });
   } catch { return iso; }
 }
@@ -73,7 +86,14 @@ function fmtDate(iso: string) {
 export default function ContentPage() {
   const ctx = useClient() as any;
   const activeClient = ctx?.activeClient;
-  const [items, setItems] = useState<ContentItem[]>([]);
+  const [items, _setItems] = useState<ContentItem[]>([]);
+  // Normalize post_date to YYYY-MM-DD on every update to avoid timezone issues
+  function setItems(updater: ContentItem[] | ((prev: ContentItem[]) => ContentItem[])) {
+    _setItems((prev) => {
+      const next = typeof updater === 'function' ? updater(prev) : updater;
+      return next.map((it) => ({ ...it, post_date: toDateOnly(it.post_date) }));
+    });
+  }
   const [loading, setLoading] = useState(true);
   const [filter, setFilter] = useState<string>('all');
   const [writingId, setWritingId] = useState<string | null>(null);

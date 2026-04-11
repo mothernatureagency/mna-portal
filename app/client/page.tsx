@@ -168,7 +168,18 @@ export default function ClientOverviewPage() {
   const [editingMonth, setEditingMonth] = useState<string | null>(null);
   const [editValues, setEditValues] = useState({ actual: '', projected: '' });
   const [saving, setSaving] = useState(false);
-  const [calItems, setCalItems] = useState<CalendarItem[]>([]);
+  const [calItems, _setCalItems] = useState<CalendarItem[]>([]);
+  function setCalItems(updater: CalendarItem[] | ((prev: CalendarItem[]) => CalendarItem[])) {
+    _setCalItems((prev) => {
+      const next = typeof updater === 'function' ? updater(prev) : updater;
+      return next.map((it) => ({
+        ...it,
+        post_date: it.post_date.length > 10
+          ? (() => { const d = new Date(it.post_date); return `${d.getUTCFullYear()}-${String(d.getUTCMonth()+1).padStart(2,'0')}-${String(d.getUTCDate()).padStart(2,'0')}`; })()
+          : it.post_date,
+      }));
+    });
+  }
   const [leadSplit, setLeadSplit] = useState<Record<string, number> | null>(null);
   const [monthOffset, setMonthOffset] = useState(0);
 

@@ -23,7 +23,24 @@ export async function POST(_req: NextRequest, { params }: { params: { id: string
   if (!agent) return NextResponse.json({ error: 'Agent missing' }, { status: 500 });
 
   const client = new Anthropic({ apiKey });
-  const userPrompt = `Write Instagram/TikTok caption copy for this post for ${item.client_name}.\n\nPlatform: ${item.platform}\nFormat: ${item.content_type || 'post'}\nTitle/Context: ${item.title}\n\nGive me THREE caption variants labeled "SHORT:", "MEDIUM:", and "LONG:". Each should include 3-6 relevant hashtags at the end. Keep brand voice warm, wellness-focused, and conversion-oriented.`;
+  const userPrompt = `Write social media caption copy for this post for ${item.client_name}.
+
+Platform: ${item.platform}
+Format: ${item.content_type || 'post'}
+Title/Context: ${item.title}
+
+Give me TWO caption options:
+
+OPTION A: (primary — your best version)
+OPTION B: (backup — different angle or tone)
+
+Rules:
+- Write like a real person, not AI. Sound natural, conversational, and human.
+- Do NOT overuse hyphens or em dashes. Use them sparingly (max once per caption if at all).
+- No generic filler phrases like "Ready to transform your wellness journey?" or "Here's the thing —"
+- Keep brand voice warm, genuine, and relatable. Write the way the business owner would actually talk.
+- Include 3-5 relevant hashtags at the end of each option.
+- Each option should be a complete, ready-to-post caption.`;
 
   try {
     const res = await client.messages.create({

@@ -4,6 +4,15 @@ import { useEffect, useMemo, useState } from 'react';
 import { driveThumbnailUrl, driveViewUrl } from '@/lib/drive';
 import { useClientPortal } from '@/components/client-portal/ClientPortalContext';
 
+function toDateOnly(s: string): string {
+  if (!s) return s;
+  if (s.length === 10) return s;
+  try {
+    const d = new Date(s);
+    return `${d.getUTCFullYear()}-${String(d.getUTCMonth() + 1).padStart(2, '0')}-${String(d.getUTCDate()).padStart(2, '0')}`;
+  } catch { return s.slice(0, 10); }
+}
+
 type ApprovalStatus =
   | 'drafting'
   | 'pending_review'
@@ -63,7 +72,13 @@ function firstWeekday(key: string) {
 
 export default function ClientCalendarPage() {
   const { client } = useClientPortal();
-  const [items, setItems] = useState<ContentItem[]>([]);
+  const [items, _setItems] = useState<ContentItem[]>([]);
+  function setItems(updater: ContentItem[] | ((prev: ContentItem[]) => ContentItem[])) {
+    _setItems((prev) => {
+      const next = typeof updater === 'function' ? updater(prev) : updater;
+      return next.map((it) => ({ ...it, post_date: toDateOnly(it.post_date) }));
+    });
+  }
   const [loading, setLoading] = useState(true);
   const [view, setView] = useState<'grid' | 'list'>('grid');
   const [commentDraft, setCommentDraft] = useState<Record<string, string>>({});
