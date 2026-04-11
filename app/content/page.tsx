@@ -107,6 +107,8 @@ export default function ContentPage() {
   const [editDraft, setEditDraft] = useState<{ post_date: string; platform: string; content_type: string; title: string }>({ post_date: '', platform: '', content_type: '', title: '' });
   const [editingCaption, setEditingCaption] = useState<Record<string, boolean>>({});
   const [captionDraft, setCaptionDraft] = useState<Record<string, string>>({});
+  const [editingNotes, setEditingNotes] = useState<Record<string, boolean>>({});
+  const [notesDraft, setNotesDraft] = useState<Record<string, string>>({});
   const [showAddForm, setShowAddForm] = useState(false);
   const [newPost, setNewPost] = useState({ post_date: '', platform: 'Instagram', content_type: 'Post', title: '', caption: '' });
 
@@ -662,18 +664,72 @@ export default function ContentPage() {
                   </div>
                 )}
 
+                {/* Staff notes */}
+                {isStaff && (
+                  <div className="pt-2 border-t border-white/10">
+                    {editingNotes[it.id] ? (
+                      <div className="flex flex-col gap-2">
+                        <textarea
+                          value={notesDraft[it.id] ?? it.mna_comments ?? ''}
+                          onChange={(e) => setNotesDraft((d) => ({ ...d, [it.id]: e.target.value }))}
+                          rows={3}
+                          placeholder="Internal notes (not visible to client)"
+                          className="w-full text-xs rounded-lg bg-white/5 border border-white/10 p-2 text-white placeholder:text-white/30 outline-none"
+                        />
+                        <div className="flex gap-2">
+                          <button
+                            onClick={async () => {
+                              try {
+                                await patchItem(it.id, { mna_comments: notesDraft[it.id] || null });
+                                setEditingNotes((e) => ({ ...e, [it.id]: false }));
+                              } catch (e: any) { alert(e.message); }
+                            }}
+                            className="text-[11px] font-bold px-3 py-1.5 rounded-lg bg-emerald-500/80 text-white"
+                          >Save Note</button>
+                          <button
+                            onClick={() => setEditingNotes((e) => ({ ...e, [it.id]: false }))}
+                            className="text-[11px] font-bold px-3 py-1.5 rounded-lg bg-white/10 text-white/80"
+                          >Cancel</button>
+                        </div>
+                      </div>
+                    ) : (
+                      <button
+                        onClick={() => {
+                          setNotesDraft((d) => ({ ...d, [it.id]: it.mna_comments || '' }));
+                          setEditingNotes((e) => ({ ...e, [it.id]: true }));
+                        }}
+                        className="text-[10px] font-semibold text-white/50 hover:text-white inline-flex items-center gap-1"
+                      >
+                        <span className="material-symbols-outlined" style={{ fontSize: 13 }}>note_add</span>
+                        {it.mna_comments ? 'Edit note' : 'Add note'}
+                      </button>
+                    )}
+                  </div>
+                )}
+
                 <div className="pt-2 border-t border-white/10 flex items-center justify-between text-xs">
                   <span className="text-white/50">{it.assigned_role || ''}</span>
-                  {isStaff && !it.caption && (
-                    <button
-                      onClick={() => writeCopy(it.id)}
-                      disabled={writingId === it.id}
-                      className="rounded-lg px-3 py-1.5 font-semibold text-white disabled:opacity-50"
-                      style={{ background: 'linear-gradient(135deg,#0c6da4,#4ab8ce)' }}
-                    >
-                      {writingId === it.id ? 'Writing...' : 'Write copy'}
-                    </button>
-                  )}
+                  <div className="flex gap-2">
+                    {isStaff && it.caption && (
+                      <button
+                        onClick={() => writeCopy(it.id)}
+                        disabled={writingId === it.id}
+                        className="rounded-lg px-3 py-1.5 font-semibold text-white/70 hover:text-white border border-white/15 bg-white/5 hover:bg-white/10 disabled:opacity-50 transition-colors"
+                      >
+                        {writingId === it.id ? 'Rewriting...' : 'Redo copy'}
+                      </button>
+                    )}
+                    {isStaff && !it.caption && (
+                      <button
+                        onClick={() => writeCopy(it.id)}
+                        disabled={writingId === it.id}
+                        className="rounded-lg px-3 py-1.5 font-semibold text-white disabled:opacity-50"
+                        style={{ background: 'linear-gradient(135deg,#0c6da4,#4ab8ce)' }}
+                      >
+                        {writingId === it.id ? 'Writing...' : 'Write copy'}
+                      </button>
+                    )}
+                  </div>
                 </div>
               </div>
             );
