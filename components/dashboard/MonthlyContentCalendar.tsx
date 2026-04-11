@@ -125,7 +125,7 @@ export default function MonthlyContentCalendar({
     return { weeks: weeksOut, byDay: byDayOut, monthItems: monthItemsOut };
   }, [items, year, month]);
 
-  const todayStr = new Date().toISOString().slice(0, 10);
+  const todayStr = (() => { const d = new Date(); return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`; })();
 
   const countByStatus = monthItems.reduce<Record<string, number>>((acc, it) => {
     const s = it.client_approval_status || 'pending_review';
@@ -217,7 +217,7 @@ export default function MonthlyContentCalendar({
               <div key={d} className="text-[9px] font-bold uppercase tracking-wider text-white/50 text-center pb-1">{d}</div>
             ))}
             {weeks.flat().map((day) => {
-              const iso = day.toISOString().slice(0, 10);
+              const iso = `${day.getFullYear()}-${String(day.getMonth()+1).padStart(2,'0')}-${String(day.getDate()).padStart(2,'0')}`;
               const posts = byDay[iso] || [];
               const isToday = iso === todayStr;
               const isCurrentMonth = day.getMonth() === month;

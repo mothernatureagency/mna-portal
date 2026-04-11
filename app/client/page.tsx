@@ -139,7 +139,7 @@ const STATUS_DOT: Record<CalendarApprovalStatus, string> = {
 };
 
 const PLATFORM_EMOJI: Record<string, string> = {
-  Instagram: '📸', Facebook: '📘', TikTok: '🎵', LinkedIn: '💼', YouTube: '🎬',
+  Instagram: '📸', Facebook: '📘', Meta: '🔷', TikTok: '🎵', LinkedIn: '💼', YouTube: '🎬',
 };
 
 function parseCalTitle(raw: string | null) {
@@ -269,7 +269,11 @@ export default function ClientOverviewPage() {
     return { calWeeks: weeks, calByDay: byDay, calMonthItems: monthItemsOut };
   }, [calItems, calYear, calMonth]);
 
-  const calTodayStr = new Date().toISOString().slice(0, 10);
+  // Use local date parts to avoid UTC shift
+  function localDateStr(d: Date) {
+    return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+  }
+  const calTodayStr = localDateStr(new Date());
 
   async function saveProjection(monthKey: string) {
     const actual = parseFloat(editValues.actual) || 0;
@@ -390,7 +394,7 @@ export default function ClientOverviewPage() {
         {/* Calendar grid */}
         <div className="grid grid-cols-7 gap-1.5">
           {calWeeks.flat().map((day) => {
-            const iso = day.toISOString().slice(0, 10);
+            const iso = localDateStr(day);
             const inMonth = day.getMonth() === calMonth;
             const isToday = iso === calTodayStr;
             const dayItems = calByDay[iso] || [];

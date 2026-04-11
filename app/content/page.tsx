@@ -29,7 +29,7 @@ const MNA_EMAILS = [
   'info@mothernatureagency.com',
 ];
 
-const PLATFORMS = ['Instagram', 'Facebook', 'TikTok', 'LinkedIn', 'YouTube', 'Pinterest', 'X/Twitter'];
+const PLATFORMS = ['Instagram', 'Facebook', 'Meta', 'TikTok', 'LinkedIn', 'YouTube', 'Pinterest', 'X/Twitter'];
 const CONTENT_TYPES = ['Reel', 'Carousel', 'Post', 'Story', 'Live', 'Short', 'Video', 'Pin'];
 
 const APPROVAL_STYLES: Record<ApprovalStatus, { label: string; bg: string; text: string; strike?: boolean }> = {
@@ -64,7 +64,9 @@ function parseTitle(raw: string | null) {
 
 function fmtDate(iso: string) {
   try {
-    return new Date(iso).toLocaleDateString(undefined, { weekday: 'short', month: 'short', day: 'numeric' });
+    // Append T12:00:00 to avoid UTC midnight → previous-day-in-local-tz shift
+    const d = new Date(iso.length === 10 ? `${iso}T12:00:00` : iso);
+    return d.toLocaleDateString(undefined, { weekday: 'short', month: 'short', day: 'numeric' });
   } catch { return iso; }
 }
 

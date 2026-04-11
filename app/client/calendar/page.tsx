@@ -243,7 +243,7 @@ export default function ClientCalendarPage() {
                 )}
                 <div className="p-5 flex flex-col gap-3 flex-1">
                   <div className="flex items-center justify-between text-[10px] font-bold uppercase tracking-wider text-white/40">
-                    <span>{new Date(it.post_date).toLocaleDateString(undefined, { weekday: 'short', month: 'short', day: 'numeric' })}</span>
+                    <span>{new Date(`${it.post_date.slice(0,10)}T12:00:00`).toLocaleDateString(undefined, { weekday: 'short', month: 'short', day: 'numeric' })}</span>
                     <span>{it.platform} · {it.content_type || 'Post'}</span>
                   </div>
                   <div className="text-[15px] font-bold text-white leading-tight">{parsed.title}</div>
@@ -330,7 +330,7 @@ export default function ClientCalendarPage() {
                   <div className="p-6 space-y-4">
                     <div className="flex items-center justify-between">
                       <div className="text-[11px] font-bold uppercase tracking-wider text-white/40">
-                        {new Date(activeItem.post_date).toLocaleDateString(undefined, { weekday: 'long', month: 'long', day: 'numeric' })} · {activeItem.platform} · {activeItem.content_type || 'Post'}
+                        {new Date(`${activeItem.post_date.slice(0,10)}T12:00:00`).toLocaleDateString(undefined, { weekday: 'long', month: 'long', day: 'numeric' })} · {activeItem.platform} · {activeItem.content_type || 'Post'}
                       </div>
                       <button onClick={() => setActiveId(null)} className="text-white/40 hover:text-white">
                         <span className="material-symbols-outlined">close</span>

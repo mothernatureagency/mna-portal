@@ -165,9 +165,10 @@ export default function NicevilleContentPreview({ clientName }: { clientName: st
               <div key={d} className="text-[9px] font-bold uppercase tracking-wider text-white/50 text-center pb-1">{d}</div>
             ))}
             {weeks.flat().map((day) => {
-              const iso = day.toISOString().slice(0, 10);
+              const iso = `${day.getFullYear()}-${String(day.getMonth()+1).padStart(2,'0')}-${String(day.getDate()).padStart(2,'0')}`;
               const posts = byDay[iso] || [];
-              const isToday = iso === new Date().toISOString().slice(0, 10);
+              const _now = new Date();
+              const isToday = iso === `${_now.getFullYear()}-${String(_now.getMonth()+1).padStart(2,'0')}-${String(_now.getDate()).padStart(2,'0')}`;
               return (
                 <div
                   key={iso}

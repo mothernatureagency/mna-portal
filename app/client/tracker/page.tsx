@@ -42,7 +42,8 @@ function parseTitle(raw: string | null) {
 
 function fmtDate(iso: string) {
   try {
-    return new Date(iso).toLocaleDateString(undefined, { weekday: 'short', month: 'short', day: 'numeric' });
+    const d = new Date(iso.length === 10 ? `${iso}T12:00:00` : iso);
+    return d.toLocaleDateString(undefined, { weekday: 'short', month: 'short', day: 'numeric' });
   } catch { return iso; }
 }
 
