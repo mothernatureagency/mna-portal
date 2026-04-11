@@ -21,6 +21,7 @@ type ContentItem = {
   mna_comments: string | null;
   approved_at: string | null;
   photo_drive_url: string | null;
+  client_visible: boolean;
 };
 
 const MNA_EMAILS = [
@@ -109,7 +110,10 @@ export default function ContentPage() {
   const [captionDraft, setCaptionDraft] = useState<Record<string, string>>({});
   const [editingNotes, setEditingNotes] = useState<Record<string, boolean>>({});
   const [notesDraft, setNotesDraft] = useState<Record<string, string>>({});
+  const [showRedoInput, setShowRedoInput] = useState<Record<string, boolean>>({});
+  const [redoGuidance, setRedoGuidance] = useState<Record<string, string>>({});
   const [showAddForm, setShowAddForm] = useState(false);
+  const [sortAsc, setSortAsc] = useState(true); // sort by date ascending by default
   const [newPost, setNewPost] = useState({ post_date: '', platform: 'Instagram', content_type: 'Post', title: '', caption: '' });
 
   // Detect user role
@@ -156,14 +160,20 @@ export default function ContentPage() {
     catch (e: any) { alert(e.message); }
   }
 
-  async function writeCopy(id: string) {
+  async function writeCopy(id: string, guidance?: string) {
     setWritingId(id);
     try {
-      const res = await fetch(`/api/content-calendar/${id}/write-copy`, { method: 'POST' });
+      const res = await fetch(`/api/content-calendar/${id}/write-copy`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ guidance: guidance || undefined }),
+      });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || 'Failed');
       setItems((prev) => prev.map((it) => (it.id === id ? data.item : it)));
       setExpanded((e) => ({ ...e, [id]: true }));
+      setRedoGuidance((g) => ({ ...g, [id]: '' }));
+      setShowRedoInput((s) => ({ ...s, [id]: false }));
     } catch (e: any) {
       alert(e.message);
     } finally {
@@ -253,9 +263,13 @@ export default function ContentPage() {
     if (byApproval[s] !== undefined) byApproval[s]++;
   });
   const platformFiltered = filter === 'all' ? items : items.filter((i) => i.platform === filter);
-  const shown = approvalFilter === 'all'
+  const filtered = approvalFilter === 'all'
     ? platformFiltered
     : platformFiltered.filter((i) => (i.client_approval_status || 'pending_review') === approvalFilter);
+  const shown = [...filtered].sort((a, b) => {
+    const cmp = a.post_date.localeCompare(b.post_date);
+    return sortAsc ? cmp : -cmp;
+  });
 
   return (
     <div className="flex flex-col gap-6">
@@ -369,7 +383,7 @@ export default function ContentPage() {
         <div className="glass-card p-4 flex items-center justify-between gap-4">
           <div>
             <div className="text-white font-semibold text-sm">Bulk generate captions</div>
-            <div className="text-white/60 text-xs">Uses the Social Media Manager agent to write 3 caption variants for every post missing copy.</div>
+            <div className="text-white/60 text-xs">Uses the Social Media Manager agent to write 2 caption options for every post missing copy.</div>
           </div>
           <button
             onClick={writeAll}
@@ -382,8 +396,46 @@ export default function ContentPage() {
         </div>
       )}
 
-      {/* Platform filters */}
-      <div className="flex gap-2 flex-wrap">
+      {/* Push to client controls */}
+      {isStaff && items.length > 0 && (
+        <div className="glass-card p-4 flex items-center justify-between gap-4">
+          <div>
+            <div className="text-white font-semibold text-sm flex items-center gap-2">
+              <span className="material-symbols-outlined" style={{ fontSize: 18 }}>send</span>
+              Push to Client Portal
+            </div>
+            <div className="text-white/60 text-xs">
+              {items.filter((i) => i.client_visible).length} of {items.length} posts visible to client.
+              {items.some((i) => !i.client_visible) && ' Hidden posts won\u2019t appear on the client\u2019s calendar.'}
+            </div>
+          </div>
+          <div className="flex gap-2">
+            {items.some((i) => !i.client_visible) && (
+              <button
+                onClick={async () => {
+                  const hidden = items.filter((i) => !i.client_visible);
+                  for (const it of hidden) {
+                    await patchItem(it.id, { client_visible: true });
+                  }
+                }}
+                className="rounded-xl px-4 py-2 text-sm font-semibold text-white shrink-0"
+                style={{ background: 'linear-gradient(135deg,#059669,#34d399)' }}
+              >
+                Push all to client
+              </button>
+            )}
+            {items.every((i) => i.client_visible) && (
+              <span className="text-[11px] font-semibold text-emerald-300 flex items-center gap-1">
+                <span className="material-symbols-outlined" style={{ fontSize: 14 }}>check_circle</span>
+                All posts are live
+              </span>
+            )}
+          </div>
+        </div>
+      )}
+
+      {/* Platform filters + sort toggle */}
+      <div className="flex gap-2 flex-wrap items-center">
         <button
           onClick={() => setFilter('all')}
           className={`px-4 py-2 rounded-xl text-sm font-semibold border ${filter === 'all' ? 'bg-white/15 text-white border-white/30' : 'bg-white/5 text-white/60 border-white/10'}`}
@@ -399,6 +451,15 @@ export default function ContentPage() {
             {p} ({items.filter((i) => i.platform === p).length})
           </button>
         ))}
+        <div className="ml-auto">
+          <button
+            onClick={() => setSortAsc((v) => !v)}
+            className="flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs font-semibold border bg-white/5 text-white/60 border-white/10 hover:bg-white/10 transition"
+          >
+            <span className="material-symbols-outlined" style={{ fontSize: 16 }}>sort</span>
+            Date {sortAsc ? '↑ Oldest first' : '↓ Newest first'}
+          </button>
+        </div>
       </div>
 
       {/* Approval status filters */}
@@ -501,6 +562,19 @@ export default function ContentPage() {
                       <span className="text-xs px-2 py-0.5 rounded-md bg-white/10 text-white/80">{it.platform}</span>
                       {it.content_type && <span className="text-xs px-2 py-0.5 rounded-md bg-white/10 text-white/80">{it.content_type}</span>}
                       <span className={`text-xs px-2 py-0.5 rounded-md ${style.bg} ${style.text}`}>{style.label}</span>
+                      {isStaff && (
+                        it.client_visible ? (
+                          <span className="text-[10px] px-2 py-0.5 rounded-md bg-emerald-500/15 text-emerald-300 font-semibold flex items-center gap-1">
+                            <span className="material-symbols-outlined" style={{ fontSize: 12 }}>visibility</span>
+                            Live to client
+                          </span>
+                        ) : (
+                          <span className="text-[10px] px-2 py-0.5 rounded-md bg-white/5 text-white/40 font-semibold flex items-center gap-1">
+                            <span className="material-symbols-outlined" style={{ fontSize: 12 }}>visibility_off</span>
+                            Hidden from client
+                          </span>
+                        )
+                      )}
                     </div>
                     <div className={`text-white font-bold text-base leading-tight ${style.strike ? 'line-through opacity-60' : ''}`}>{parsed.title || 'Untitled'}</div>
                   </>
@@ -710,9 +784,27 @@ export default function ContentPage() {
                 <div className="pt-2 border-t border-white/10 flex items-center justify-between text-xs">
                   <span className="text-white/50">{it.assigned_role || ''}</span>
                   <div className="flex gap-2">
-                    {isStaff && it.caption && (
+                    {isStaff && (
                       <button
-                        onClick={() => writeCopy(it.id)}
+                        onClick={async () => {
+                          try { await patchItem(it.id, { client_visible: !it.client_visible }); }
+                          catch (e: any) { alert(e.message); }
+                        }}
+                        className={`rounded-lg px-3 py-1.5 font-semibold flex items-center gap-1 transition-colors ${
+                          it.client_visible
+                            ? 'bg-emerald-500/20 text-emerald-300 hover:bg-emerald-500/30'
+                            : 'bg-white/5 text-white/60 border border-white/15 hover:bg-white/10'
+                        }`}
+                      >
+                        <span className="material-symbols-outlined" style={{ fontSize: 14 }}>
+                          {it.client_visible ? 'visibility' : 'visibility_off'}
+                        </span>
+                        {it.client_visible ? 'Live' : 'Push to client'}
+                      </button>
+                    )}
+                    {isStaff && it.caption && !showRedoInput[it.id] && (
+                      <button
+                        onClick={() => setShowRedoInput((s) => ({ ...s, [it.id]: true }))}
                         disabled={writingId === it.id}
                         className="rounded-lg px-3 py-1.5 font-semibold text-white/70 hover:text-white border border-white/15 bg-white/5 hover:bg-white/10 disabled:opacity-50 transition-colors"
                       >
@@ -731,6 +823,34 @@ export default function ContentPage() {
                     )}
                   </div>
                 </div>
+                {isStaff && showRedoInput[it.id] && (
+                  <div className="pt-2 border-t border-white/10 flex flex-col gap-2">
+                    <div className="text-[10px] uppercase tracking-wider text-white/50 font-semibold">What should change?</div>
+                    <textarea
+                      value={redoGuidance[it.id] || ''}
+                      onChange={(e) => setRedoGuidance((g) => ({ ...g, [it.id]: e.target.value }))}
+                      placeholder="e.g. make it more casual, shorter, focus on the promo, less salesy..."
+                      rows={2}
+                      className="w-full text-xs rounded-lg bg-white/5 border border-white/10 p-2 text-white placeholder:text-white/30 outline-none"
+                    />
+                    <div className="flex gap-2">
+                      <button
+                        onClick={() => writeCopy(it.id, redoGuidance[it.id])}
+                        disabled={writingId === it.id}
+                        className="text-[11px] font-bold px-3 py-1.5 rounded-lg text-white disabled:opacity-50"
+                        style={{ background: 'linear-gradient(135deg,#0c6da4,#4ab8ce)' }}
+                      >
+                        {writingId === it.id ? 'Rewriting...' : 'Regenerate'}
+                      </button>
+                      <button
+                        onClick={() => { setShowRedoInput((s) => ({ ...s, [it.id]: false })); setRedoGuidance((g) => ({ ...g, [it.id]: '' })); }}
+                        className="text-[11px] font-bold px-3 py-1.5 rounded-lg bg-white/10 text-white/80"
+                      >
+                        Cancel
+                      </button>
+                    </div>
+                  </div>
+                )}
               </div>
             );
           })}

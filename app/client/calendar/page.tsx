@@ -86,7 +86,7 @@ export default function ClientCalendarPage() {
 
   useEffect(() => {
     setLoading(true);
-    fetch(`/api/content-calendar?client=${encodeURIComponent(client.name)}`)
+    fetch(`/api/content-calendar?client=${encodeURIComponent(client.name)}&visible=1`)
       .then((r) => r.json())
       .then((d) => setItems(d.items || []))
       .finally(() => setLoading(false));

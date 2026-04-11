@@ -5,10 +5,19 @@ import { getAgent } from '@/lib/agents/config';
 
 export const runtime = 'nodejs';
 
-export async function POST(_req: NextRequest, { params }: { params: { id: string } }) {
+export async function POST(req: NextRequest, { params }: { params: { id: string } }) {
   await ensureSchema();
   const apiKey = process.env.ANTHROPIC_API_KEY;
   if (!apiKey) return NextResponse.json({ error: 'ANTHROPIC_API_KEY not set' }, { status: 500 });
+
+  // Parse optional guidance from request body (used when redoing copy)
+  let guidance = '';
+  try {
+    const body = await req.json();
+    if (body?.guidance) guidance = body.guidance;
+  } catch {
+    // No body or invalid JSON — that's fine, guidance stays empty
+  }
 
   const { rows } = await query<any>(
     `select cc.*, p.client_name from content_calendar cc
@@ -23,6 +32,11 @@ export async function POST(_req: NextRequest, { params }: { params: { id: string
   if (!agent) return NextResponse.json({ error: 'Agent missing' }, { status: 500 });
 
   const client = new Anthropic({ apiKey });
+
+  const guidanceBlock = guidance
+    ? `\n\nIMPORTANT — the team is redoing this copy. Here are their notes on what to change:\n"${guidance}"\nPlease follow these notes closely while still keeping the caption polished and ready to post.`
+    : '';
+
   const userPrompt = `Write social media caption copy for this post for ${item.client_name}.
 
 Platform: ${item.platform}
@@ -40,7 +54,7 @@ Rules:
 - No generic filler phrases like "Ready to transform your wellness journey?" or "Here's the thing —"
 - Keep brand voice warm, genuine, and relatable. Write the way the business owner would actually talk.
 - Include 3-5 relevant hashtags at the end of each option.
-- Each option should be a complete, ready-to-post caption.`;
+- Each option should be a complete, ready-to-post caption.${guidanceBlock}`;
 
   try {
     const res = await client.messages.create({

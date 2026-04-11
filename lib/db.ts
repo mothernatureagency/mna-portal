@@ -74,6 +74,8 @@ async function initSchema() {
                   `alter table content_calendar add column if not exists approved_at timestamptz`,
                   // Google Drive link to the photo/video for this post. Rendered as preview + click through.
                   `alter table content_calendar add column if not exists photo_drive_url text`,
+                  // Staff can control when content becomes visible to clients.
+                  `alter table content_calendar add column if not exists client_visible boolean not null default false`,
                   // Client tasks: MNA asks the client for things. client_id is the lib/clients.ts id (text, not FK to projects).
                   `create table if not exists client_requests (
                         id uuid primary key default uuid_generate_v4(),

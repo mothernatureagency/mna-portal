@@ -51,7 +51,7 @@ function todayStr() {
 
 function fmtDate(iso: string) {
   try {
-    const d = new Date(iso + 'T00:00:00');
+    const d = new Date(iso + 'T12:00:00');
     return d.toLocaleDateString(undefined, { weekday: 'short', month: 'short', day: 'numeric' });
   } catch { return iso; }
 }

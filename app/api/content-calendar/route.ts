@@ -18,9 +18,10 @@ async function getOrCreateProject(clientName: string): Promise<string> {
 }
 
 function dayOffsetDate(startDate: string, day: number): string {
-  const d = new Date(startDate);
+  // Parse as local noon to avoid UTC midnight timezone shift
+  const d = new Date(`${startDate}T12:00:00`);
   d.setDate(d.getDate() + (day - 1));
-  return d.toISOString().slice(0, 10);
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
 }
 
 // PATCH — update a single content item.
@@ -51,6 +52,8 @@ export async function PATCH(req: NextRequest) {
   if (client_comments !== undefined) { values.push(client_comments); fields.push(`client_comments = $${values.length}`); }
   if (mna_comments !== undefined) { values.push(mna_comments); fields.push(`mna_comments = $${values.length}`); }
   if (photo_drive_url !== undefined) { values.push(photo_drive_url); fields.push(`photo_drive_url = $${values.length}`); }
+  const client_visible = body?.client_visible;
+  if (client_visible !== undefined) { values.push(client_visible); fields.push(`client_visible = $${values.length}`); }
   if (fields.length === 0) return NextResponse.json({ error: 'nothing to update' }, { status: 400 });
   values.push(id);
   const { rows } = await query(
@@ -61,14 +64,18 @@ export async function PATCH(req: NextRequest) {
 }
 
 // GET — list content for a client
+// ?client=Name          — returns all items (staff view)
+// ?client=Name&visible=1 — returns only client_visible=true items (client portal)
 export async function GET(req: NextRequest) {
   await ensureSchema();
   const clientName = req.nextUrl.searchParams.get('client');
   if (!clientName) return NextResponse.json({ items: [] });
+  const onlyVisible = req.nextUrl.searchParams.get('visible') === '1';
+  const visibleClause = onlyVisible ? ' and cc.client_visible = true' : '';
   const { rows } = await query(
     `select cc.* from content_calendar cc
        join projects p on p.id = cc.project_id
-      where p.client_name = $1
+      where p.client_name = $1${visibleClause}
       order by cc.post_date asc, cc.created_at asc`,
     [clientName]
   );

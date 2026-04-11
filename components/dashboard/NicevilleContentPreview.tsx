@@ -93,7 +93,8 @@ export default function NicevilleContentPreview({ clientName }: { clientName: st
   const windowStart = weeks[0][0];
   const windowEnd = weeks[2][6];
   const windowItems = items.filter((i) => {
-    const d = new Date(i.post_date);
+    // Use T12:00:00 to avoid UTC midnight timezone shift
+    const d = new Date(`${i.post_date.slice(0, 10)}T12:00:00`);
     return d >= windowStart && d <= windowEnd;
   });
   const countByStatus = windowItems.reduce<Record<string, number>>((acc, it) => {

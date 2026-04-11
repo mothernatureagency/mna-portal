@@ -221,7 +221,7 @@ export default function ClientOverviewPage() {
   // Load content calendar items
   useEffect(() => {
     if (!client?.name) return;
-    fetch(`/api/content-calendar?client=${encodeURIComponent(client.name)}`)
+    fetch(`/api/content-calendar?client=${encodeURIComponent(client.name)}&visible=1`)
       .then((r) => r.json())
       .then((d) => setCalItems(d.items || []))
       .catch(() => {});
@@ -653,7 +653,7 @@ export default function ClientOverviewPage() {
       {(() => {
         const perfData = getPerformanceForClient(client.id);
         return perfData ? (
-          <PerformanceOverview data={perfData} gradientFrom={gradientFrom} gradientTo={gradientTo} />
+          <PerformanceOverview data={perfData} gradientFrom={gradientFrom} gradientTo={gradientTo} isStaff={isStaffPreview} />
         ) : null;
       })()}
 

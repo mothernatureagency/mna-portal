@@ -138,10 +138,12 @@ function PeriodCard({
   period,
   baseline,
   accentColor,
+  isStaff = false,
 }: {
   period: PeriodMetrics;
   baseline?: PeriodMetrics;
   accentColor: string;
+  isStaff?: boolean;
 }) {
   const metrics = [
     { label: 'Total Leads',     value: period.totalLeads.toLocaleString(),       raw: period.totalLeads,     baseRaw: baseline?.totalLeads },
@@ -156,7 +158,7 @@ function PeriodCard({
       <div className="absolute top-0 left-0 right-0 h-1 rounded-t-[22px]" style={{ background: accentColor }} />
       <div className="flex items-center gap-2 mb-4">
         <div className="text-[14px] font-bold text-white">{period.label}</div>
-        {baseline && period.conversionRate < baseline.conversionRate * 0.7 && (
+        {isStaff && baseline && period.conversionRate < baseline.conversionRate * 0.7 && (
           <span className="text-[8px] font-bold uppercase tracking-wider px-1.5 py-0.5 rounded-full bg-rose-500/20 text-rose-400">
             Performance Drop
           </span>
@@ -167,13 +169,15 @@ function PeriodCard({
           const delta = baseline && m.baseRaw !== undefined
             ? pctChange(m.raw, m.baseRaw)
             : null;
+          // On client-facing view, hide negative change badges
+          const showDelta = delta !== null && (isStaff || delta >= 0);
           return (
             <div key={m.label}>
               <div className="text-[9px] font-bold uppercase tracking-wider text-white/40">{m.label}</div>
               <div className="text-[20px] font-black text-white leading-none mt-1">{m.value}</div>
-              {delta !== null && (
+              {showDelta && (
                 <div className="mt-1">
-                  <ChangeBadge value={delta} suffix="%" />
+                  <ChangeBadge value={delta!} suffix="%" />
                 </div>
               )}
             </div>
@@ -189,20 +193,27 @@ export default function PerformanceOverview({
   data,
   gradientFrom,
   gradientTo,
+  isStaff = false,
 }: {
   data: PerformanceData;
   gradientFrom: string;
   gradientTo: string;
+  /** When false (client-facing), hides red warnings, drop badges, and negative insights */
+  isStaff?: boolean;
 }) {
   const [activeTab, setActiveTab] = useState<'compare' | string>('compare');
   const periods = data.periods;
   const baseline = periods[0];
   const current = periods.length > 1 ? periods[periods.length - 1] : null;
 
-  const insights = useMemo(
+  const allInsights = useMemo(
     () => current ? generatePerformanceInsights(baseline, current) : [],
     [baseline, current],
   );
+  // On client-facing view, only show success/info insights — no warnings
+  const insights = isStaff
+    ? allInsights
+    : allInsights.filter((ins) => ins.tone !== 'warning');
 
   // Comparison bar chart data
   const comparisonMetrics = useMemo(() => {
@@ -256,9 +267,9 @@ export default function PerformanceOverview({
         <>
           {/* Side-by-side period cards */}
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-            <PeriodCard period={baseline} accentColor={PERIOD_COLORS[0]} />
+            <PeriodCard period={baseline} accentColor={PERIOD_COLORS[0]} isStaff={isStaff} />
             {current && (
-              <PeriodCard period={current} baseline={baseline} accentColor={PERIOD_COLORS[1]} />
+              <PeriodCard period={current} baseline={baseline} accentColor={PERIOD_COLORS[1]} isStaff={isStaff} />
             )}
           </div>
 
@@ -353,6 +364,7 @@ export default function PerformanceOverview({
             period={period}
             baseline={prev}
             accentColor={PERIOD_COLORS[colorIdx % PERIOD_COLORS.length]}
+            isStaff={isStaff}
           />
         );
       })()}
