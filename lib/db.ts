@@ -1,4 +1,14 @@
-import { Pool } from 'pg';
+import { Pool, types } from 'pg';
+
+// Override the pg driver's default date parser.
+// By default, pg converts `date` columns to JavaScript Date objects using
+// the server's local timezone, which causes off-by-one day shifts when
+// the server or client is in a non-UTC timezone.
+// This override returns the raw YYYY-MM-DD string instead.
+const DATE_OID = 1082;     // PostgreSQL 'date' type OID
+const TIMESTAMP_OID = 1114; // PostgreSQL 'timestamp' type OID
+types.setTypeParser(DATE_OID, (val: string) => val);   // return "2026-04-15" as-is
+types.setTypeParser(TIMESTAMP_OID, (val: string) => val); // keep as string too
 
 let _pool: Pool | null = null;
 
