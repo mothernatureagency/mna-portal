@@ -1,8 +1,9 @@
 'use client';
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import { useClient } from '@/context/ClientContext';
 import { createClient } from '@/lib/supabase/client';
 import { driveThumbnailUrl, driveViewUrl } from '@/lib/drive';
+import { getPlaybooksForClient } from '@/lib/agents/playbooks';
 
 type ApprovalStatus = 'drafting' | 'pending_review' | 'approved' | 'changes_requested' | 'scheduled';
 
@@ -305,36 +306,40 @@ export default function ContentPage() {
         </div>
       )}
 
-      {isStaff && activeClient?.id === 'prime-iv' && items.length === 0 && !loading && (
-        <div className="glass-card p-5 flex items-center justify-between gap-4">
-          <div>
-            <div className="text-white font-semibold text-sm">Load Spring Reset 45 day plan</div>
-            <div className="text-white/60 text-xs">Seeds 22 pre written posts in Prime IV Niceville's approved voice. Starts today, ready for client approval.</div>
+      {isStaff && activeClient && items.length === 0 && !loading && (() => {
+        const playbooks = getPlaybooksForClient(activeClient.id);
+        if (playbooks.length === 0) return null;
+        return playbooks.map((pb) => (
+          <div key={pb.id} className="glass-card p-5 flex items-center justify-between gap-4">
+            <div>
+              <div className="text-white font-semibold text-sm">{pb.name}</div>
+              <div className="text-white/60 text-xs">{pb.description}</div>
+            </div>
+            <button
+              onClick={async () => {
+                const res = await fetch('/api/content-calendar', {
+                  method: 'POST',
+                  headers: { 'Content-Type': 'application/json' },
+                  body: JSON.stringify({
+                    clientName: activeClient.name,
+                    playbookId: pb.id,
+                    startDate: new Date().toISOString().slice(0, 10),
+                  }),
+                });
+                const data = await res.json();
+                if (!res.ok) { alert(data.error || 'Seed failed'); return; }
+                const listRes = await fetch(`/api/content-calendar?client=${encodeURIComponent(activeClient.name)}`);
+                const listData = await listRes.json();
+                setItems(listData.items || []);
+              }}
+              className="rounded-xl px-4 py-2 text-sm font-semibold text-white shrink-0"
+              style={{ background: 'linear-gradient(135deg,#1c3d6e,#3a7ab5)' }}
+            >
+              Load Playbook
+            </button>
           </div>
-          <button
-            onClick={async () => {
-              const res = await fetch('/api/content-calendar', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({
-                  clientName: activeClient.name,
-                  playbookId: 'niceville-spring-reset',
-                  startDate: new Date().toISOString().slice(0, 10),
-                }),
-              });
-              const data = await res.json();
-              if (!res.ok) { alert(data.error || 'Seed failed'); return; }
-              const listRes = await fetch(`/api/content-calendar?client=${encodeURIComponent(activeClient.name)}`);
-              const listData = await listRes.json();
-              setItems(listData.items || []);
-            }}
-            className="rounded-xl px-4 py-2 text-sm font-semibold text-white"
-            style={{ background: 'linear-gradient(135deg,#1c3d6e,#3a7ab5)' }}
-          >
-            Load Spring Reset
-          </button>
-        </div>
-      )}
+        ));
+      })()}
 
       {isStaff && items.length > 0 && items.some((i) => !i.caption) && (
         <div className="glass-card p-4 flex items-center justify-between gap-4">

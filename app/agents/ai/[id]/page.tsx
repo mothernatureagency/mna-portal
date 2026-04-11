@@ -1,9 +1,10 @@
 'use client';
-import React, { useState, useRef, useEffect } from 'react';
+import React, { useState, useRef, useEffect, useMemo } from 'react';
 import Link from 'next/link';
 import { notFound, useParams } from 'next/navigation';
 import { getAgent } from '@/lib/agents/config';
 import { useClient } from '@/context/ClientContext';
+import { getPlaybooksForClient } from '@/lib/agents/playbooks';
 
 type Msg = { role: 'user' | 'assistant'; content: string };
 
@@ -30,12 +31,19 @@ export default function AgentChatPage() {
   const [saveStatus, setSaveStatus] = useState<string>('');
   const scrollRef = useRef<HTMLDivElement>(null);
 
+  // Get playbooks available for the active client
+  const clientPlaybooks = useMemo(
+    () => (activeClient?.id ? getPlaybooksForClient(activeClient.id) : []),
+    [activeClient?.id],
+  );
+
+  // ── Save AI-generated calendar to content tracker + client calendar ──
   async function savePlanToTracker(items: any[]) {
     if (!activeClient?.name) {
-      setSaveStatus('⚠️ No active client selected — pick one first.');
+      setSaveStatus('No active client selected — pick one from the sidebar first.');
       return;
     }
-    setSaveStatus('Saving to Content Tracker…');
+    setSaveStatus(`Saving ${items.length} posts to ${activeClient.name}…`);
     try {
       const res = await fetch('/api/content-calendar', {
         method: 'POST',
@@ -44,29 +52,40 @@ export default function AgentChatPage() {
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || 'Save failed');
-      setSaveStatus(`✓ Saved ${data.count} items to ${activeClient.name}`);
+      setSaveStatus(
+        `Saved ${data.count} posts to ${activeClient.name}. ` +
+        `They are now in the Content Tracker and the client's calendar for approval.`
+      );
     } catch (e: any) {
-      setSaveStatus(`⚠️ ${e.message}`);
+      setSaveStatus(`Error: ${e.message}`);
     }
   }
 
-  async function applyPinecrestPlaybook() {
-    setSaveStatus('Applying Pinecrest playbook…');
+  // ── Apply a playbook for the active client ──────────────────────────
+  async function applyPlaybook(playbookId: string, playbookName: string) {
+    if (!activeClient?.name) {
+      setSaveStatus('No active client selected — pick one from the sidebar first.');
+      return;
+    }
+    setSaveStatus(`Loading "${playbookName}" for ${activeClient.name}…`);
     try {
       const res = await fetch('/api/content-calendar', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          clientName: 'Prime IV — Pinecrest',
-          playbookId: 'pinecrest-reopening',
+          clientName: activeClient.name,
+          playbookId,
           startDate: new Date().toISOString().slice(0, 10),
         }),
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || 'Playbook failed');
-      setSaveStatus(`✓ Loaded ${data.count} playbook posts into Prime IV — Pinecrest`);
+      setSaveStatus(
+        `Loaded ${data.count} posts from "${playbookName}" into ${activeClient.name}. ` +
+        `Posts with captions are ready for client review; others are in drafting.`
+      );
     } catch (e: any) {
-      setSaveStatus(`⚠️ ${e.message}`);
+      setSaveStatus(`Error: ${e.message}`);
     }
   }
 
@@ -92,7 +111,7 @@ export default function AgentChatPage() {
       if (!res.ok) throw new Error(data.error || 'Request failed');
       setMessages((m) => [...m, { role: 'assistant', content: data.reply }]);
     } catch (e: any) {
-      setMessages((m) => [...m, { role: 'assistant', content: `⚠️ ${e.message}` }]);
+      setMessages((m) => [...m, { role: 'assistant', content: `Error: ${e.message}` }]);
     } finally {
       setLoading(false);
     }
@@ -106,25 +125,50 @@ export default function AgentChatPage() {
           <span className="material-symbols-outlined" style={{ fontSize: 18 }}>arrow_back</span> Agents
         </Link>
         <div className="flex-1" />
+        {activeClient && (
+          <div className="flex items-center gap-2 text-[11px] text-white/50">
+            <span className="material-symbols-outlined" style={{ fontSize: 14 }}>business</span>
+            Working on: <span className="font-semibold text-white/80">{activeClient.name}</span>
+          </div>
+        )}
       </div>
 
       {saveStatus && (
-        <div className="glass-card p-3 text-sm text-white/90">{saveStatus}</div>
+        <div className={`glass-card p-3 text-sm ${
+          saveStatus.startsWith('Error') ? 'text-rose-300' : 'text-white/90'
+        }`}>
+          {saveStatus}
+        </div>
       )}
 
-      {agent.id === 'content-calendar' && (
-        <div className="glass-card p-4 flex items-center justify-between gap-4">
-          <div>
-            <div className="text-white font-semibold text-sm">Pinecrest Grand Reopening Playbook</div>
-            <div className="text-white/60 text-xs">30-day launch plan: teaser → buildout → menu → soft open → grand opening</div>
+      {/* Playbook cards — dynamic per active client */}
+      {agent.id === 'content-calendar' && clientPlaybooks.length > 0 && (
+        <div className="space-y-2">
+          {clientPlaybooks.map((pb) => (
+            <div key={pb.id} className="glass-card p-4 flex items-center justify-between gap-4">
+              <div>
+                <div className="text-white font-semibold text-sm">{pb.name}</div>
+                <div className="text-white/60 text-xs">{pb.description}</div>
+              </div>
+              <button
+                onClick={() => applyPlaybook(pb.id, pb.name)}
+                className="rounded-xl px-4 py-2 text-sm font-semibold text-white shrink-0"
+                style={{ background: 'linear-gradient(135deg,#0c6da4,#4ab8ce)' }}
+              >
+                Load into {activeClient?.shortName || activeClient?.name || 'Client'}
+              </button>
+            </div>
+          ))}
+        </div>
+      )}
+
+      {/* No client selected warning */}
+      {agent.id === 'content-calendar' && !activeClient && (
+        <div className="glass-card p-4 flex items-center gap-3 border-amber-400/30">
+          <span className="material-symbols-outlined text-amber-400" style={{ fontSize: 20 }}>warning</span>
+          <div className="text-[12px] text-white/70">
+            Select a client from the sidebar to load playbooks or save content calendars.
           </div>
-          <button
-            onClick={applyPinecrestPlaybook}
-            className="rounded-xl px-4 py-2 text-sm font-semibold text-white"
-            style={{ background: 'linear-gradient(135deg,#0c6da4,#4ab8ce)' }}
-          >
-            Load into Pinecrest
-          </button>
         </div>
       )}
 
@@ -174,15 +218,20 @@ export default function AgentChatPage() {
                 style={m.role === 'user' ? { background: 'linear-gradient(135deg,#0c6da4,#4ab8ce)' } : undefined}
               >
                 <div>{m.content}</div>
-                {plan && (
+                {plan && activeClient && (
                   <button
                     onClick={() => savePlanToTracker(plan)}
                     className="mt-3 inline-flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-xs font-semibold text-white"
                     style={{ background: 'linear-gradient(135deg,#0c6da4,#4ab8ce)' }}
                   >
                     <span className="material-symbols-outlined" style={{ fontSize: 14 }}>save</span>
-                    Save {plan.length} posts to Content Tracker
+                    Save {plan.length} posts to {activeClient.shortName || activeClient.name}
                   </button>
+                )}
+                {plan && !activeClient && (
+                  <div className="mt-3 text-[11px] text-amber-300">
+                    Select a client from the sidebar to save these posts.
+                  </div>
                 )}
               </div>
             );

@@ -942,3 +942,19 @@ export const PLAYBOOKS: Playbook[] = [PINECREST_REOPENING, NICEVILLE_SPRING_RESE
 export function getPlaybook(id: string): Playbook | undefined {
   return PLAYBOOKS.find((p) => p.id === id);
 }
+
+/**
+ * Map client IDs to their available playbooks.
+ * When a client has playbooks, they show in the Content Calendar Agent
+ * as one-click load buttons.
+ */
+export const CLIENT_PLAYBOOKS: Record<string, string[]> = {
+  'prime-iv':           ['niceville-spring-reset'],
+  'prime-iv-pinecrest': ['pinecrest-reopening'],
+  'serenity-bayfront':  ['serenity-vrbo-launch'],
+};
+
+export function getPlaybooksForClient(clientId: string): Playbook[] {
+  const ids = CLIENT_PLAYBOOKS[clientId] || [];
+  return ids.map((id) => PLAYBOOKS.find((p) => p.id === id)).filter(Boolean) as Playbook[];
+}
