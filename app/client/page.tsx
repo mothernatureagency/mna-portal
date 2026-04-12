@@ -406,54 +406,85 @@ export default function ClientOverviewPage() {
           </Link>
         </div>
 
-        {/* Day headers */}
-        <div className="grid grid-cols-7 mb-1">
-          {['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'].map((d) => (
-            <div key={d} className="text-[9px] font-bold uppercase tracking-wider text-white/50 text-center pb-1">{d}</div>
-          ))}
+        {/* Desktop: Calendar grid with photo previews */}
+        <div className="hidden md:block">
+          <div className="grid grid-cols-7 mb-1">
+            {['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'].map((d) => (
+              <div key={d} className="text-[9px] font-bold uppercase tracking-wider text-white/50 text-center pb-1">{d}</div>
+            ))}
+          </div>
+          <div className="grid grid-cols-7 gap-1.5">
+            {calWeeks.flat().map((day) => {
+              const iso = localDateStr(day);
+              const inMonth = day.getMonth() === calMonth;
+              const isToday = iso === calTodayStr;
+              const dayItems = calByDay[iso] || [];
+              return (
+                <div
+                  key={iso}
+                  className={`min-h-[90px] rounded-lg border p-1.5 flex flex-col gap-1 transition-colors ${
+                    isToday
+                      ? 'border-white bg-white/15'
+                      : inMonth
+                      ? 'border-white/10 bg-white/5'
+                      : 'border-white/5 bg-white/[0.02]'
+                  }`}
+                >
+                  <div className={`text-[9px] font-bold ${inMonth ? 'text-white/50' : 'text-white/25'}`}>
+                    {day.getDate()}
+                  </div>
+                  {dayItems.slice(0, 2).map((it) => {
+                    const driveLink = driveViewUrl(it.photo_drive_url);
+                    const status = (it.client_approval_status || 'pending_review') as CalendarApprovalStatus;
+                    return (
+                      <div key={it.id} className="rounded overflow-hidden border border-white/10 bg-white/[0.04]">
+                        {it.photo_drive_url && (
+                          <a href={driveLink!} target="_blank" rel="noreferrer" className="block">
+                            <DriveThumb url={it.photo_drive_url} className="w-full h-[42px] object-cover opacity-80 hover:opacity-100 transition-opacity" />
+                          </a>
+                        )}
+                        <div className="px-1 py-0.5 flex items-center gap-1">
+                          <span className="w-1.5 h-1.5 rounded-full shrink-0" style={{ background: STATUS_DOT[status] || '#9ca3af' }} />
+                          <span className="text-[7px] leading-tight text-white/70 truncate">
+                            {PLATFORM_EMOJI[it.platform] || ''} {parseCalTitle(it.title) || it.platform}
+                          </span>
+                        </div>
+                      </div>
+                    );
+                  })}
+                  {dayItems.length > 2 && <div className="text-[7px] text-white/40">+{dayItems.length - 2} more</div>}
+                </div>
+              );
+            })}
+          </div>
         </div>
 
-        {/* Calendar grid with photo previews */}
-        <div className="grid grid-cols-7 gap-1.5">
-          {calWeeks.flat().map((day) => {
-            const iso = localDateStr(day);
-            const inMonth = day.getMonth() === calMonth;
-            const isToday = iso === calTodayStr;
-            const dayItems = calByDay[iso] || [];
+        {/* Mobile: Agenda list view */}
+        <div className="md:hidden space-y-2">
+          {calMonthItems.length === 0 && (
+            <div className="text-center text-white/40 text-[12px] py-6">No posts this month</div>
+          )}
+          {calMonthItems.map((it) => {
+            const status = (it.client_approval_status || 'pending_review') as CalendarApprovalStatus;
+            const driveLink = driveViewUrl(it.photo_drive_url);
             return (
-              <div
-                key={iso}
-                className={`min-h-[90px] rounded-lg border p-1.5 flex flex-col gap-1 transition-colors ${
-                  isToday
-                    ? 'border-white bg-white/15'
-                    : inMonth
-                    ? 'border-white/10 bg-white/5'
-                    : 'border-white/5 bg-white/[0.02]'
-                }`}
-              >
-                <div className={`text-[9px] font-bold ${inMonth ? 'text-white/50' : 'text-white/25'}`}>
-                  {day.getDate()}
+              <div key={it.id} className="flex items-center gap-3 rounded-xl border border-white/10 bg-white/5 p-3">
+                {it.photo_drive_url && (
+                  <a href={driveLink!} target="_blank" rel="noreferrer" className="shrink-0 rounded-lg overflow-hidden w-14 h-14">
+                    <DriveThumb url={it.photo_drive_url} className="w-14 h-14 object-cover" />
+                  </a>
+                )}
+                <div className="flex-1 min-w-0">
+                  <div className="text-[10px] font-bold uppercase tracking-wider text-white/40">
+                    {new Date(`${it.post_date}T12:00:00`).toLocaleDateString(undefined, { weekday: 'short', month: 'short', day: 'numeric' })}
+                    {' · '}{it.platform}
+                  </div>
+                  <div className="text-[13px] font-semibold text-white truncate">{parseCalTitle(it.title) || 'Untitled'}</div>
+                  <div className="flex items-center gap-1.5 mt-1">
+                    <span className="w-2 h-2 rounded-full shrink-0" style={{ background: STATUS_DOT[status] || '#9ca3af' }} />
+                    <span className="text-[10px] text-white/60 capitalize">{status.replace('_', ' ')}</span>
+                  </div>
                 </div>
-                {dayItems.slice(0, 2).map((it) => {
-                  const driveLink = driveViewUrl(it.photo_drive_url);
-                  const status = (it.client_approval_status || 'pending_review') as CalendarApprovalStatus;
-                  return (
-                    <div key={it.id} className="rounded overflow-hidden border border-white/10 bg-white/[0.04]">
-                      {it.photo_drive_url && (
-                        <a href={driveLink!} target="_blank" rel="noreferrer" className="block">
-                          <DriveThumb url={it.photo_drive_url} className="w-full h-[42px] object-cover opacity-80 hover:opacity-100 transition-opacity" />
-                        </a>
-                      )}
-                      <div className="px-1 py-0.5 flex items-center gap-1">
-                        <span className="w-1.5 h-1.5 rounded-full shrink-0" style={{ background: STATUS_DOT[status] || '#9ca3af' }} />
-                        <span className="text-[7px] leading-tight text-white/70 truncate">
-                          {PLATFORM_EMOJI[it.platform] || ''} {parseCalTitle(it.title) || it.platform}
-                        </span>
-                      </div>
-                    </div>
-                  );
-                })}
-                {dayItems.length > 2 && <div className="text-[7px] text-white/40">+{dayItems.length - 2} more</div>}
               </div>
             );
           })}
