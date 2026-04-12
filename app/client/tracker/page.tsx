@@ -3,7 +3,7 @@
 import { useEffect, useState } from 'react';
 import { clients, Client } from '@/lib/clients';
 import { createClient } from '@/lib/supabase/client';
-import { driveThumbnailUrl, driveViewUrl } from '@/lib/drive';
+import { driveViewUrl } from '@/lib/drive';
 
 type ApprovalStatus = 'drafting' | 'pending_review' | 'approved' | 'changes_requested' | 'scheduled';
 
@@ -177,21 +177,9 @@ export default function ClientTrackerPage() {
             const parsed = parseTitle(it.title);
             const status = (it.client_approval_status || 'pending_review') as ApprovalStatus;
             const style = APPROVAL_STYLES[status];
-            const thumb = driveThumbnailUrl(it.photo_drive_url, 800);
             const driveLink = driveViewUrl(it.photo_drive_url);
             return (
               <div key={it.id} className="bg-white rounded-2xl overflow-hidden shadow-sm border border-black/5 flex flex-col">
-                {thumb ? (
-                  <a href={driveLink!} target="_blank" rel="noreferrer" className="block bg-black">
-                    <img src={thumb} alt="" className="w-full h-48 object-cover" />
-                  </a>
-                ) : (
-                  <div className="h-32 flex items-center justify-center text-[11px] text-neutral-300"
-                    style={{ background: `linear-gradient(135deg, ${gradientFrom}15, ${gradientTo}15)` }}
-                  >
-                    <span className="material-symbols-outlined" style={{ fontSize: 32, color: `${gradientFrom}40` }}>image</span>
-                  </div>
-                )}
                 <div className="p-5 flex flex-col gap-3 flex-1">
                   <div className="flex items-center justify-between text-[10px] font-bold uppercase tracking-wider text-neutral-500">
                     <span>{fmtDate(it.post_date)}</span>

@@ -2,7 +2,7 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { useClient } from '@/context/ClientContext';
 import { createClient } from '@/lib/supabase/client';
-import { driveThumbnailUrl, driveViewUrl } from '@/lib/drive';
+import { driveViewUrl } from '@/lib/drive';
 import { getPlaybooksForClient } from '@/lib/agents/playbooks';
 
 type ApprovalStatus = 'drafting' | 'pending_review' | 'approved' | 'changes_requested' | 'scheduled';
@@ -582,14 +582,19 @@ export default function ContentPage() {
 
                 {/* Photo / Drive link (staff can edit, client can view) */}
                 {(() => {
-                  const thumb = driveThumbnailUrl(it.photo_drive_url, 600);
                   const view = driveViewUrl(it.photo_drive_url);
                   const isEditingP = editingPhoto[it.id];
                   return (
                     <div className="space-y-2">
-                      {thumb && !isEditingP && (
-                        <a href={view!} target="_blank" rel="noreferrer" className="block rounded-lg overflow-hidden border border-white/10">
-                          <img src={thumb} alt="" className="w-full h-32 object-cover" />
+                      {view && !isEditingP && (
+                        <a
+                          href={view}
+                          target="_blank"
+                          rel="noreferrer"
+                          className="text-[10px] font-semibold text-white/50 hover:text-white inline-flex items-center gap-1 px-2 py-1 rounded bg-white/5 border border-white/10 hover:bg-white/10 transition-colors"
+                        >
+                          <span className="material-symbols-outlined" style={{ fontSize: 14 }}>photo_library</span>
+                          View Photo in Drive
                         </a>
                       )}
                       {isStaff && isEditingP ? (
@@ -611,8 +616,8 @@ export default function ContentPage() {
                           }}
                           className="text-[10px] font-semibold text-white/60 hover:text-white inline-flex items-center gap-1"
                         >
-                          <span className="material-symbols-outlined" style={{ fontSize: 14 }}>{thumb ? 'edit' : 'add_photo_alternate'}</span>
-                          {thumb ? 'Edit Drive link' : 'Add Drive link'}
+                          <span className="material-symbols-outlined" style={{ fontSize: 14 }}>{view ? 'edit' : 'add_photo_alternate'}</span>
+                          {view ? 'Edit Drive link' : 'Add Drive link'}
                         </button>
                       ) : null}
                     </div>

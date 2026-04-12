@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useMemo, useState } from 'react';
-import { driveThumbnailUrl, driveViewUrl } from '@/lib/drive';
+import { driveViewUrl } from '@/lib/drive';
 import { useClientPortal } from '@/components/client-portal/ClientPortalContext';
 
 function toDateOnly(s: string): string {
@@ -201,21 +201,13 @@ export default function ClientCalendarPage() {
                       const parsed = parseTitle(p.title);
                       const status = (p.client_approval_status || 'pending_review') as ApprovalStatus;
                       const style = APPROVAL_STYLES[status];
-                      const thumb = driveThumbnailUrl(p.photo_drive_url, 400);
                       return (
                         <button
                           key={p.id}
                           onClick={() => setActiveId(p.id)}
                           className="group relative text-left rounded-lg overflow-hidden border border-white/10 hover:ring-2 hover:ring-white/20 transition"
-                          style={{ background: thumb ? '#000' : 'rgba(255,255,255,0.06)' }}
+                          style={{ background: 'rgba(255,255,255,0.06)' }}
                         >
-                          {thumb && (
-                            <img
-                              src={thumb}
-                              alt=""
-                              className="w-full h-[54px] object-cover opacity-70 group-hover:opacity-90"
-                            />
-                          )}
                           <div className="px-1.5 py-1">
                             <div className="text-[9px] font-bold text-white/80 truncate">{parsed.title}</div>
                             <div
@@ -243,46 +235,38 @@ export default function ClientCalendarPage() {
             const parsed = parseTitle(it.title);
             const status = (it.client_approval_status || 'pending_review') as ApprovalStatus;
             const style = APPROVAL_STYLES[status];
-            const thumb = driveThumbnailUrl(it.photo_drive_url, 800);
             const driveLink = driveViewUrl(it.photo_drive_url);
             return (
               <div key={it.id} className="glass-card overflow-hidden flex flex-col">
-                {thumb ? (
-                  <a href={driveLink!} target="_blank" rel="noreferrer" className="block bg-black">
-                    <img src={thumb} alt="" className="w-full h-48 object-cover opacity-80" />
-                  </a>
-                ) : (
-                  <div className="h-48 bg-white/5 flex items-center justify-center text-[11px] text-white/30">
-                    No photo linked yet
-                  </div>
-                )}
                 <div className="p-5 flex flex-col gap-3 flex-1">
                   <div className="flex items-center justify-between text-[10px] font-bold uppercase tracking-wider text-white/40">
                     <span>{new Date(`${it.post_date.slice(0,10)}T12:00:00`).toLocaleDateString(undefined, { weekday: 'short', month: 'short', day: 'numeric' })}</span>
                     <span>{it.platform} · {it.content_type || 'Post'}</span>
                   </div>
                   <div className="text-[15px] font-bold text-white leading-tight">{parsed.title}</div>
-                  <div
-                    className="inline-block self-start text-[11px] font-bold px-2 py-1 rounded"
-                    style={{ background: style.bg, color: style.text }}
-                  >
-                    {style.label}
+                  <div className="flex items-center gap-2">
+                    <div
+                      className="inline-block text-[11px] font-bold px-2 py-1 rounded"
+                      style={{ background: style.bg, color: style.text }}
+                    >
+                      {style.label}
+                    </div>
+                    {driveLink && (
+                      <a
+                        href={driveLink}
+                        target="_blank"
+                        rel="noreferrer"
+                        className="text-[11px] font-semibold text-white/50 hover:text-white inline-flex items-center gap-1 px-2 py-1 rounded bg-white/5 border border-white/10 hover:bg-white/10 transition-colors"
+                      >
+                        <span className="material-symbols-outlined" style={{ fontSize: 14 }}>photo_library</span>
+                        View Photo
+                      </a>
+                    )}
                   </div>
                   {it.caption && (
                     <div className="text-[12px] text-white/60 whitespace-pre-wrap leading-relaxed bg-white/5 rounded-lg p-3 border border-white/10 max-h-40 overflow-y-auto">
                       {it.caption}
                     </div>
-                  )}
-                  {driveLink && (
-                    <a
-                      href={driveLink}
-                      target="_blank"
-                      rel="noreferrer"
-                      className="text-[11px] font-semibold text-white/50 hover:text-white inline-flex items-center gap-1"
-                    >
-                      <span className="material-symbols-outlined" style={{ fontSize: 14 }}>open_in_new</span>
-                      Open in Drive
-                    </a>
                   )}
                   {status !== 'scheduled' && (
                     <div className="pt-3 border-t border-white/10 flex flex-col gap-2">
@@ -333,15 +317,9 @@ export default function ClientCalendarPage() {
               const parsed = parseTitle(activeItem.title);
               const status = (activeItem.client_approval_status || 'pending_review') as ApprovalStatus;
               const style = APPROVAL_STYLES[status];
-              const thumb = driveThumbnailUrl(activeItem.photo_drive_url, 1200);
               const driveLink = driveViewUrl(activeItem.photo_drive_url);
               return (
                 <>
-                  {thumb && (
-                    <a href={driveLink!} target="_blank" rel="noreferrer" className="block bg-black rounded-t-2xl overflow-hidden">
-                      <img src={thumb} alt="" className="w-full max-h-80 object-contain" />
-                    </a>
-                  )}
                   <div className="p-6 space-y-4">
                     <div className="flex items-center justify-between">
                       <div className="text-[11px] font-bold uppercase tracking-wider text-white/40">
@@ -352,22 +330,24 @@ export default function ClientCalendarPage() {
                       </button>
                     </div>
                     <div className="text-[20px] font-bold text-white">{parsed.title}</div>
-                    <div
-                      className="inline-block text-[11px] font-bold px-2 py-1 rounded"
-                      style={{ background: style.bg, color: style.text }}
-                    >
-                      {style.label}
+                    <div className="flex items-center gap-2">
+                      <div
+                        className="inline-block text-[11px] font-bold px-2 py-1 rounded"
+                        style={{ background: style.bg, color: style.text }}
+                      >
+                        {style.label}
+                      </div>
+                      {driveLink && (
+                        <a href={driveLink} target="_blank" rel="noreferrer" className="text-[12px] font-semibold text-white/50 hover:text-white inline-flex items-center gap-1.5 px-2.5 py-1 rounded bg-white/5 border border-white/10 hover:bg-white/10 transition-colors">
+                          <span className="material-symbols-outlined" style={{ fontSize: 16 }}>photo_library</span>
+                          View Photo
+                        </a>
+                      )}
                     </div>
                     {activeItem.caption && (
                       <div className="text-[13px] text-white/60 whitespace-pre-wrap leading-relaxed bg-white/5 rounded-xl p-4 border border-white/10">
                         {activeItem.caption}
                       </div>
-                    )}
-                    {driveLink && (
-                      <a href={driveLink} target="_blank" rel="noreferrer" className="text-[12px] font-semibold text-white/50 hover:text-white inline-flex items-center gap-1">
-                        <span className="material-symbols-outlined" style={{ fontSize: 16 }}>open_in_new</span>
-                        Open in Drive
-                      </a>
                     )}
                     {activeItem.client_comments && (
                       <div className="text-[12px] bg-rose-500/15 border border-rose-500/30 rounded-lg p-3">
