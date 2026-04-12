@@ -8,6 +8,7 @@ import { getAttributionForClient } from '@/lib/data/attribution';
 import AttributionOverview from '@/components/client-portal/AttributionOverview';
 import { getPerformanceForClient } from '@/lib/data/performance';
 import PerformanceOverview from '@/components/client-portal/PerformanceOverview';
+import { driveThumbnailUrl, driveViewUrl } from '@/lib/drive';
 
 type KPI = { label: string; value: string; sub?: string; color: string };
 
@@ -128,7 +129,17 @@ type CalendarItem = {
   content_type: string | null;
   title: string | null;
   client_approval_status: CalendarApprovalStatus | null;
+  photo_drive_url: string | null;
+  caption: string | null;
 };
+
+/** Image with graceful fallback — hides itself if Drive thumbnail fails to load */
+function DriveThumb({ url, className }: { url: string | null | undefined; className?: string }) {
+  const thumb = driveThumbnailUrl(url, 400);
+  const [failed, setFailed] = useState(false);
+  if (!thumb || failed) return null;
+  return <img src={thumb} alt="" className={className} onError={() => setFailed(true)} />;
+}
 
 const STATUS_DOT: Record<CalendarApprovalStatus, string> = {
   drafting: '#9ca3af',
@@ -402,7 +413,7 @@ export default function ClientOverviewPage() {
           ))}
         </div>
 
-        {/* Calendar grid */}
+        {/* Calendar grid with photo previews */}
         <div className="grid grid-cols-7 gap-1.5">
           {calWeeks.flat().map((day) => {
             const iso = localDateStr(day);
@@ -412,7 +423,7 @@ export default function ClientOverviewPage() {
             return (
               <div
                 key={iso}
-                className={`min-h-[72px] rounded-lg border p-1.5 flex flex-col gap-1 transition-colors ${
+                className={`min-h-[90px] rounded-lg border p-1.5 flex flex-col gap-1 transition-colors ${
                   isToday
                     ? 'border-white bg-white/15'
                     : inMonth
@@ -423,15 +434,26 @@ export default function ClientOverviewPage() {
                 <div className={`text-[9px] font-bold ${inMonth ? 'text-white/50' : 'text-white/25'}`}>
                   {day.getDate()}
                 </div>
-                {dayItems.slice(0, 3).map((it) => (
-                  <div key={it.id} className="flex items-start gap-1">
-                    <span className="w-1.5 h-1.5 rounded-full mt-0.5 shrink-0" style={{ background: STATUS_DOT[(it.client_approval_status || 'pending_review') as CalendarApprovalStatus] || '#9ca3af' }} />
-                    <span className="text-[8px] leading-tight text-white/80 line-clamp-2">
-                      {PLATFORM_EMOJI[it.platform] || ''} {parseCalTitle(it.title) || it.platform}
-                    </span>
-                  </div>
-                ))}
-                {dayItems.length > 3 && <div className="text-[8px] text-white/40">+{dayItems.length - 3} more</div>}
+                {dayItems.slice(0, 2).map((it) => {
+                  const driveLink = driveViewUrl(it.photo_drive_url);
+                  const status = (it.client_approval_status || 'pending_review') as CalendarApprovalStatus;
+                  return (
+                    <div key={it.id} className="rounded overflow-hidden border border-white/10 bg-white/[0.04]">
+                      {it.photo_drive_url && (
+                        <a href={driveLink!} target="_blank" rel="noreferrer" className="block">
+                          <DriveThumb url={it.photo_drive_url} className="w-full h-[42px] object-cover opacity-80 hover:opacity-100 transition-opacity" />
+                        </a>
+                      )}
+                      <div className="px-1 py-0.5 flex items-center gap-1">
+                        <span className="w-1.5 h-1.5 rounded-full shrink-0" style={{ background: STATUS_DOT[status] || '#9ca3af' }} />
+                        <span className="text-[7px] leading-tight text-white/70 truncate">
+                          {PLATFORM_EMOJI[it.platform] || ''} {parseCalTitle(it.title) || it.platform}
+                        </span>
+                      </div>
+                    </div>
+                  );
+                })}
+                {dayItems.length > 2 && <div className="text-[7px] text-white/40">+{dayItems.length - 2} more</div>}
               </div>
             );
           })}

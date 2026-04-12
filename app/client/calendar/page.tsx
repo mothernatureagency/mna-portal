@@ -1,7 +1,15 @@
 'use client';
 
 import { useEffect, useMemo, useState } from 'react';
-import { driveViewUrl } from '@/lib/drive';
+import { driveThumbnailUrl, driveViewUrl } from '@/lib/drive';
+
+/** Image with graceful fallback — hides itself if Drive thumbnail fails */
+function DriveThumb({ url, className }: { url: string | null | undefined; className?: string }) {
+  const thumb = driveThumbnailUrl(url, 600);
+  const [failed, setFailed] = useState(false);
+  if (!thumb || failed) return null;
+  return <img src={thumb} alt="" className={className} onError={() => setFailed(true)} />;
+}
 import { useClientPortal } from '@/components/client-portal/ClientPortalContext';
 
 function toDateOnly(s: string): string {
@@ -208,6 +216,7 @@ export default function ClientCalendarPage() {
                           className="group relative text-left rounded-lg overflow-hidden border border-white/10 hover:ring-2 hover:ring-white/20 transition"
                           style={{ background: 'rgba(255,255,255,0.06)' }}
                         >
+                          <DriveThumb url={p.photo_drive_url} className="w-full h-[54px] object-cover opacity-70 group-hover:opacity-90 transition-opacity" />
                           <div className="px-1.5 py-1">
                             <div className="text-[9px] font-bold text-white/80 truncate">{parsed.title}</div>
                             <div
@@ -238,6 +247,11 @@ export default function ClientCalendarPage() {
             const driveLink = driveViewUrl(it.photo_drive_url);
             return (
               <div key={it.id} className="glass-card overflow-hidden flex flex-col">
+                {it.photo_drive_url && (
+                  <a href={driveViewUrl(it.photo_drive_url)!} target="_blank" rel="noreferrer" className="block bg-black/30">
+                    <DriveThumb url={it.photo_drive_url} className="w-full h-48 object-cover opacity-80 hover:opacity-100 transition-opacity" />
+                  </a>
+                )}
                 <div className="p-5 flex flex-col gap-3 flex-1">
                   <div className="flex items-center justify-between text-[10px] font-bold uppercase tracking-wider text-white/40">
                     <span>{new Date(`${it.post_date.slice(0,10)}T12:00:00`).toLocaleDateString(undefined, { weekday: 'short', month: 'short', day: 'numeric' })}</span>
@@ -320,6 +334,11 @@ export default function ClientCalendarPage() {
               const driveLink = driveViewUrl(activeItem.photo_drive_url);
               return (
                 <>
+                  {activeItem.photo_drive_url && (
+                    <a href={driveLink!} target="_blank" rel="noreferrer" className="block bg-black rounded-t-2xl overflow-hidden">
+                      <DriveThumb url={activeItem.photo_drive_url} className="w-full max-h-80 object-contain" />
+                    </a>
+                  )}
                   <div className="p-6 space-y-4">
                     <div className="flex items-center justify-between">
                       <div className="text-[11px] font-bold uppercase tracking-wider text-white/40">

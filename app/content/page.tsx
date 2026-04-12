@@ -2,7 +2,15 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { useClient } from '@/context/ClientContext';
 import { createClient } from '@/lib/supabase/client';
-import { driveViewUrl } from '@/lib/drive';
+import { driveThumbnailUrl, driveViewUrl } from '@/lib/drive';
+
+/** Image with graceful fallback — hides itself if Drive thumbnail fails */
+function DriveThumb({ url, className }: { url: string | null | undefined; className?: string }) {
+  const thumb = driveThumbnailUrl(url, 600);
+  const [failed, setFailed] = useState(false);
+  if (!thumb || failed) return null;
+  return <img src={thumb} alt="" className={className} onError={() => setFailed(true)} />;
+}
 import { getPlaybooksForClient } from '@/lib/agents/playbooks';
 
 type ApprovalStatus = 'drafting' | 'pending_review' | 'approved' | 'changes_requested' | 'scheduled';
@@ -586,15 +594,9 @@ export default function ContentPage() {
                   const isEditingP = editingPhoto[it.id];
                   return (
                     <div className="space-y-2">
-                      {view && !isEditingP && (
-                        <a
-                          href={view}
-                          target="_blank"
-                          rel="noreferrer"
-                          className="text-[10px] font-semibold text-white/50 hover:text-white inline-flex items-center gap-1 px-2 py-1 rounded bg-white/5 border border-white/10 hover:bg-white/10 transition-colors"
-                        >
-                          <span className="material-symbols-outlined" style={{ fontSize: 14 }}>photo_library</span>
-                          View Photo in Drive
+                      {it.photo_drive_url && !isEditingP && (
+                        <a href={view!} target="_blank" rel="noreferrer" className="block rounded-lg overflow-hidden border border-white/10">
+                          <DriveThumb url={it.photo_drive_url} className="w-full h-32 object-cover opacity-80 hover:opacity-100 transition-opacity" />
                         </a>
                       )}
                       {isStaff && isEditingP ? (
