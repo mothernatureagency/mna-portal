@@ -387,13 +387,13 @@ export default function ClientOverviewPage() {
       </div>
 
       {/* Monthly Content Calendar Preview */}
-      <div className="glass-card p-6">
-        <div className="flex items-center justify-between mb-4">
-          <div className="flex items-center gap-3">
+      <div className="glass-card p-4 md:p-6">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between mb-4 gap-2">
+          <div className="flex items-center gap-2 md:gap-3">
             <button onClick={() => setMonthOffset((o) => o - 1)} className="w-8 h-8 rounded-lg bg-white/10 hover:bg-white/20 flex items-center justify-center text-white/70 hover:text-white transition-colors">
               <span className="material-symbols-outlined" style={{ fontSize: 16 }}>chevron_left</span>
             </button>
-            <div className="text-[15px] font-bold text-white">{calLabel}</div>
+            <div className="text-[14px] md:text-[15px] font-bold text-white">{calLabel}</div>
             <button onClick={() => setMonthOffset((o) => o + 1)} className="w-8 h-8 rounded-lg bg-white/10 hover:bg-white/20 flex items-center justify-center text-white/70 hover:text-white transition-colors">
               <span className="material-symbols-outlined" style={{ fontSize: 16 }}>chevron_right</span>
             </button>
@@ -401,7 +401,7 @@ export default function ClientOverviewPage() {
               <button onClick={() => setMonthOffset(0)} className="text-[10px] font-semibold text-white/50 hover:text-white/80 ml-1">Today</button>
             )}
           </div>
-          <Link href="/client/calendar" className="text-[11px] font-semibold px-3 py-1.5 rounded-lg bg-white/10 text-white hover:bg-white/20">
+          <Link href="/client/calendar" className="text-[11px] font-semibold px-3 py-1.5 rounded-lg bg-white/10 text-white hover:bg-white/20 self-start sm:self-auto">
             Open Content Calendar →
           </Link>
         </div>
@@ -503,23 +503,23 @@ export default function ClientOverviewPage() {
       </div>
 
       {/* KPIs */}
-      <div className="grid gap-4" style={{ gridTemplateColumns: `repeat(${kpis.length}, 1fr)` }}>
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-3 md:gap-4">
         {kpis.map((k) => (
-          <div key={k.label} className="glass-card p-5 relative overflow-hidden">
+          <div key={k.label} className="glass-card p-4 md:p-5 relative overflow-hidden">
             <div className="absolute top-0 left-0 right-0 h-1 rounded-t-[22px]" style={{ background: k.color }} />
             <div className="text-[10px] font-bold uppercase tracking-wider text-white/60">{k.label}</div>
-            <div className="text-[34px] font-black text-white leading-none my-2">{k.value}</div>
+            <div className="text-[26px] md:text-[34px] font-black text-white leading-none my-2">{k.value}</div>
             {k.sub && <div className="text-[11px] text-white/70">{k.sub}</div>}
           </div>
         ))}
       </div>
 
       {/* Revenue Projections — Monthly */}
-      <div className="glass-card p-6">
-        <div className="flex items-center justify-between mb-4">
+      <div className="glass-card p-4 md:p-6">
+        <div className="flex flex-col md:flex-row md:items-center justify-between mb-4 gap-2">
           <div>
-            <div className="flex items-center gap-2">
-              <div className="text-[15px] font-bold text-white">Revenue Projections · {CURRENT_YEAR}</div>
+            <div className="flex items-center gap-2 flex-wrap">
+              <div className="text-[14px] md:text-[15px] font-bold text-white">Revenue Projections · {CURRENT_YEAR}</div>
               {avgGrowthPct > 0 && (
                 <span className="text-[11px] font-bold px-2 py-0.5 rounded-full bg-emerald-500/20 text-emerald-400">
                   +{avgGrowthPct.toFixed(1)}% avg MoM growth
@@ -544,7 +544,7 @@ export default function ClientOverviewPage() {
         </div>
 
         {/* Bar chart */}
-        <div className="flex items-end gap-2 h-44 mb-4">
+        <div className="flex items-end gap-1.5 md:gap-2 h-36 md:h-44 mb-4 overflow-x-auto">
           {chartMonths.map((m, i) => {
             const isPast = i <= currentMonthIdx;
             const isEditing = editingMonth === m.monthKey;
@@ -648,7 +648,7 @@ export default function ClientOverviewPage() {
       </div>
 
       {/* Quarterly Breakdown */}
-      <div className="grid grid-cols-4 gap-4">
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-3 md:gap-4">
         {quarters.map((q) => (
           <div
             key={q.label}
@@ -728,12 +728,12 @@ export default function ClientOverviewPage() {
               const pct = (item.monthly / total) * 100;
               return (
                 <div key={i}>
-                  <div className="flex items-center justify-between mb-1.5">
+                  <div className="flex flex-col sm:flex-row sm:items-center justify-between mb-1.5 gap-0.5">
                     <div>
                       <span className="text-[13px] font-bold text-white">{item.agency}</span>
                       <span className="text-[11px] text-white/70 ml-2">· {item.channel}</span>
                     </div>
-                    <div className="text-right">
+                    <div className="sm:text-right">
                       <div className="text-[14px] font-bold text-white">{fmtUSD(item.monthly)}/mo</div>
                       <div className="text-[10px] text-white/70">{item.note}</div>
                     </div>
@@ -792,20 +792,20 @@ export default function ClientOverviewPage() {
           </div>
           <div className="grid gap-3">
             {topPosts.map((p, i) => (
-              <div key={i} className="flex items-center justify-between p-3 rounded-xl bg-white/5 border border-white/10">
-                <div className="flex items-center gap-3">
+              <div key={i} className="flex flex-col sm:flex-row sm:items-center justify-between p-3 rounded-xl bg-white/5 border border-white/10 gap-2">
+                <div className="flex items-center gap-3 min-w-0">
                   <div
-                    className="w-9 h-9 rounded-lg flex items-center justify-center text-white text-[11px] font-bold"
+                    className="w-9 h-9 shrink-0 rounded-lg flex items-center justify-center text-white text-[11px] font-bold"
                     style={{ background: `linear-gradient(135deg, ${gradientFrom}, ${gradientTo})` }}
                   >
                     {p.platform.charAt(0)}
                   </div>
-                  <div>
-                    <div className="text-[13px] font-semibold text-white">{p.title}</div>
+                  <div className="min-w-0">
+                    <div className="text-[13px] font-semibold text-white truncate">{p.title}</div>
                     <div className="text-[10px] text-white/50">{p.platform} · {p.type}</div>
                   </div>
                 </div>
-                <div className="flex items-center gap-5 text-right">
+                <div className="flex items-center gap-5 pl-12 sm:pl-0 sm:text-right">
                   <div>
                     <div className="text-[10px] text-white/50">Engagement</div>
                     <div className="text-[13px] font-bold text-white">{p.engagement.toLocaleString()}</div>
@@ -832,7 +832,7 @@ export default function ClientOverviewPage() {
       {client.metaAds && (
         <div className="glass-card p-6">
           <div className="text-[15px] font-bold text-white mb-4">Meta Ads Account</div>
-          <div className="grid gap-4" style={{ gridTemplateColumns: '1.2fr 1fr 1fr' }}>
+          <div className="grid gap-4 grid-cols-1 sm:grid-cols-3">
             <div>
               <div className="text-[10px] font-bold uppercase tracking-wider text-white/60">Business Portfolio</div>
               <div className="text-[13px] font-bold text-white mt-1">{client.metaAds.businessPortfolioName}</div>
