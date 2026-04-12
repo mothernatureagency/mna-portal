@@ -54,7 +54,14 @@ export async function PATCH(req: NextRequest) {
   if (mna_comments !== undefined) { values.push(mna_comments); fields.push(`mna_comments = $${values.length}`); }
   if (photo_drive_url !== undefined) { values.push(photo_drive_url); fields.push(`photo_drive_url = $${values.length}`); }
   const client_visible = body?.client_visible;
-  if (client_visible !== undefined) { values.push(client_visible); fields.push(`client_visible = $${values.length}`); }
+  if (client_visible !== undefined) {
+    values.push(client_visible);
+    fields.push(`client_visible = $${values.length}`);
+    // When pushing to client, auto-promote drafting → pending_review
+    if (client_visible === true && client_approval_status === undefined) {
+      fields.push(`client_approval_status = CASE WHEN client_approval_status = 'drafting' THEN 'pending_review' ELSE client_approval_status END`);
+    }
+  }
   if (fields.length === 0) return NextResponse.json({ error: 'nothing to update' }, { status: 400 });
   values.push(id);
   const { rows } = await query(
