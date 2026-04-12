@@ -67,7 +67,7 @@ export async function middleware(request: NextRequest) {
   // Conversely, staff (anything other than 'client') should not linger on /client
   // unless they explicitly opt in (we allow it so you can QA the client view).
   const role = (user.user_metadata as Record<string, unknown> | null)?.role as string | undefined;
-  if (role === 'client' && !pathname.startsWith('/client')) {
+  if (role === 'client' && !pathname.startsWith('/client') && !pathname.startsWith('/api/')) {
     const url = request.nextUrl.clone();
     url.pathname = '/client';
     url.search = '';
