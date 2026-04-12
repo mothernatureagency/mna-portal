@@ -3,6 +3,7 @@ import { ensureSchema, query } from '@/lib/db';
 import { getPlaybook } from '@/lib/agents/playbooks';
 
 export const runtime = 'nodejs';
+export const dynamic = 'force-dynamic';
 
 async function getOrCreateProject(clientName: string): Promise<string> {
   const existing = await query<{ id: string }>(

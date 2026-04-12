@@ -4,6 +4,7 @@ import { ensureSchema, query } from '@/lib/db';
 import { getAgent } from '@/lib/agents/config';
 
 export const runtime = 'nodejs';
+export const dynamic = 'force-dynamic';
 
 export async function POST(req: NextRequest, { params }: { params: { id: string } }) {
   await ensureSchema();

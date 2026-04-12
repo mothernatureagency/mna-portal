@@ -3,6 +3,8 @@ import { redirect } from 'next/navigation';
 import { clients } from '@/lib/clients';
 import ClientPortalShell from '@/components/client-portal/ClientPortalShell';
 
+export const dynamic = 'force-dynamic';
+
 /**
  * Client Portal layout.
  *
