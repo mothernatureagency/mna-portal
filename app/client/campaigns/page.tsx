@@ -93,10 +93,10 @@ export default function ClientCampaignsPage() {
       <div>
         <div className="flex items-center gap-2 mb-1">
           <div className="w-1.5 h-6 rounded-full" style={{ background: `linear-gradient(180deg, ${gradientFrom}, ${gradientTo})` }} />
-          <h1 className="text-[22px] font-extrabold text-white tracking-tight">Campaigns</h1>
+          <h1 className="text-[22px] font-extrabold text-white tracking-tight">Email & SMS</h1>
         </div>
         <p className="text-[12px] text-white/60 pl-3.5">
-          Review and approve upcoming email and SMS campaigns.
+          Review and approve upcoming email and SMS copies before they send.
         </p>
       </div>
 

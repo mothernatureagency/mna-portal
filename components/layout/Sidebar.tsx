@@ -11,14 +11,14 @@ const NAV = [
   { sec: 'SOCIAL & CONTENT', items: [
     { label: 'Content Tracker', href: '/content', e: 'grid_view' },
     { label: 'Content Planner', href: '/planner', e: 'edit_calendar' },
+    { label: 'Email & SMS', href: '/campaigns', e: 'forward_to_inbox' },
     { label: 'Agenda', href: '/agenda', e: 'event_note' },
     { label: 'Task Manager', href: '/client-tasks', e: 'checklist' },
-    { label: 'Email Drafts', href: '/email-preview', e: 'mail' },
     { label: 'Meeting Notes', href: '/meeting-notes', e: 'description' },
+    { label: 'Email Drafts', href: '/email-preview', e: 'mail' },
   ]},
   { sec: 'ADVERTISING', items: [
     { label: 'Meta Ads (Live)', href: '/meta-ads', e: 'ads_click' },
-    { label: 'Campaigns', href: '/campaigns', e: 'rocket_launch' },
   ]},
   { sec: 'CRM', items: [
     { label: 'Pipeline', href: '/crm', e: 'task_alt' },

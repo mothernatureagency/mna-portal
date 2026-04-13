@@ -192,8 +192,8 @@ export default function CampaignsPage() {
       <div className="flex items-center justify-between">
         <div>
           <div className="flex items-center gap-3">
-            <span className="material-symbols-outlined text-white/80" style={{ fontSize: 28 }}>campaign</span>
-            <h1 className="text-3xl font-bold text-white tracking-tight">Email & SMS Campaigns</h1>
+            <span className="material-symbols-outlined text-white/80" style={{ fontSize: 28 }}>forward_to_inbox</span>
+            <h1 className="text-3xl font-bold text-white tracking-tight">Email & SMS</h1>
           </div>
           <p className="text-white/60 mt-1">
             {activeClient.name} · {campaigns.length} campaigns
