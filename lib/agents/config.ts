@@ -4,6 +4,7 @@ export type AgentId =
   | 'tiktok-ads'
   | 'content-calendar'
   | 'social-media'
+  | 'email-sms'
   | 'video-editor'
   | 'graphic-designer'
   | 'project-manager'
@@ -107,6 +108,23 @@ export const AGENTS: AgentConfig[] = [
       'Write 2 caption options for a NAD+ therapy before/after',
       'Draft a DM response to "how much does this cost?"',
       'How should I reply to a negative comment on Instagram?',
+    ],
+    model: HAIKU,
+  },
+  {
+    id: 'email-sms',
+    name: 'Email & SMS Copywriter',
+    role: 'Campaign Copy',
+    icon: 'mail',
+    tagline: 'Email subjects, bodies, SMS blasts',
+    description:
+      'Writes email and SMS marketing copy for campaigns. Knows character limits, deliverability best practices, and CAN-SPAM/TCPA compliance basics.',
+    systemPrompt:
+      'You are the Email & SMS Copywriter Agent for Mother Nature Agency, a marketing agency for wellness and IV therapy clinics. You write high-converting email and SMS marketing copy.\n\nFOR EMAIL CAMPAIGNS:\n- Write a compelling subject line (under 50 chars, no clickbait, no ALL CAPS)\n- Write the email body (200-400 words, HTML-safe)\n- Strong opening hook, scannable paragraphs, clear single CTA\n- Always include {{unsubscribe_link}} placeholder at the bottom\n- Give TWO options: Option A (primary) and Option B (different angle)\n\nFOR SMS CAMPAIGNS:\n- Each message MUST be under 160 characters\n- Clear CTA with urgency\n- Include "Reply STOP to opt out" at the end\n- No hashtags, no emojis overload\n- Give TWO options: Option A (primary) and Option B (different angle)\n\nWRITING STYLE: Write like a real person, not AI. Sound warm, human, and on-brand for wellness/IV therapy. Avoid overusing hyphens and em dashes. No generic filler. Be conversion-focused but never spammy.',
+    suggestions: [
+      'Write an email campaign for a new NAD+ therapy launch',
+      'Draft 2 SMS options for a flash sale on Myers Cocktail IVs',
+      'Write a re-engagement email for leads who haven\'t booked in 60 days',
     ],
     model: HAIKU,
   },

@@ -141,6 +141,41 @@ async function initSchema() {
                         synced_at timestamptz not null default now(),
                         unique (client_id, platform, review_id)
                   )`,
+                  // Email / SMS campaigns — planning, approval, sending via Revive (Twilio)
+                  `create table if not exists campaigns (
+                        id uuid primary key default uuid_generate_v4(),
+                        client_id text not null,
+                        campaign_type text not null,
+                        name text not null,
+                        subject text,
+                        body text,
+                        scheduled_date date not null,
+                        scheduled_time text,
+                        audience_segment text,
+                        audience_count integer,
+                        status text not null default 'drafting',
+                        client_visible boolean not null default false,
+                        client_comments text,
+                        mna_comments text,
+                        approved_at timestamptz,
+                        sent_at timestamptz,
+                        revive_campaign_id text,
+                        created_at timestamptz not null default now()
+                  )`,
+                  // Delivery / engagement metrics synced back from Revive
+                  `create table if not exists campaign_metrics (
+                        campaign_id uuid not null references campaigns(id) on delete cascade,
+                        recipients integer default 0,
+                        delivered integer default 0,
+                        bounced integer default 0,
+                        opened integer default 0,
+                        clicked integer default 0,
+                        unsubscribed integer default 0,
+                        open_rate numeric(5,2),
+                        click_rate numeric(5,2),
+                        synced_at timestamptz not null default now(),
+                        primary key (campaign_id)
+                  )`,
                   `create table if not exists users (
                         id uuid primary key default uuid_generate_v4(),
                               username text not null unique,
