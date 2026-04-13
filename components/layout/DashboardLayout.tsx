@@ -1,47 +1,51 @@
-import React from 'react';
+'use client';
+import React, { useState } from 'react';
 import Sidebar from './Sidebar';
 import Header from './Header';
 
-const darkBg = {
-      display: 'flex',
-      minHeight: '100vh',
-      background: 'linear-gradient(135deg,#0a1929 0%,#0d2b47 25%,#124b73 50%,#1e79a6 75%,#4ab8ce 100%)',
-      backgroundAttachment: 'fixed',
-} as React.CSSProperties;
-
-const innerWrap = {
-      position: 'relative' as const,
-      zIndex: 10,
-      display: 'flex',
-      width: '100%',
-};
-
-const contentCol = {
-      flex: 1,
-      display: 'flex',
-      flexDirection: 'column' as const,
-      minWidth: 0,
-};
-
-const mainStyle = {
-      flex: 1,
-      padding: '28px 32px',
-      overflowY: 'auto' as const,
-      position: 'relative' as const,
-      zIndex: 10,
-};
-
 export default function DashboardLayout({ children }: { children: React.ReactNode }) {
-      return React.createElement(
-              'div', { style: darkBg },
-              React.createElement(
-                        'div', { style: innerWrap },
-                        React.createElement(Sidebar, null),
-                        React.createElement(
-                                    'div', { style: contentCol },
-                                    React.createElement(Header, null),
-                                    React.createElement('main', { style: mainStyle }, children)
-                                  )
-                      )
-            );
+  const [mobileOpen, setMobileOpen] = useState(false);
+
+  return (
+    <div
+      style={{
+        display: 'flex',
+        minHeight: '100vh',
+        background: 'linear-gradient(135deg,#0a1929 0%,#0d2b47 25%,#124b73 50%,#1e79a6 75%,#4ab8ce 100%)',
+        backgroundAttachment: 'fixed',
+      }}
+    >
+      <div style={{ position: 'relative', zIndex: 10, display: 'flex', width: '100%' }}>
+        <Sidebar mobileOpen={mobileOpen} onClose={() => setMobileOpen(false)} />
+        <div style={{ flex: 1, display: 'flex', flexDirection: 'column', minWidth: 0 }}>
+          {/* Mobile top bar with hamburger */}
+          <div
+            className="md:hidden sticky top-0 z-30 flex items-center gap-3 px-4 py-3"
+            style={{
+              background: 'rgba(255,255,255,0.92)',
+              backdropFilter: 'blur(12px)',
+              borderBottom: '1px solid rgba(0,0,0,0.05)',
+            }}
+          >
+            <button
+              onClick={() => setMobileOpen(true)}
+              className="w-9 h-9 rounded-lg flex items-center justify-center"
+              style={{ background: '#f4f6f9', border: '1px solid rgba(0,0,0,0.06)' }}
+            >
+              <span className="material-symbols-outlined" style={{ fontSize: 20, color: '#374151' }}>menu</span>
+            </button>
+            <div style={{ width: 28, height: 28, borderRadius: 8, background: 'linear-gradient(135deg,#0c6da4,#4ab8ce)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, color: '#fff', fontWeight: 800, fontSize: 10 }}>MN</div>
+            <div style={{ fontSize: 13, fontWeight: 700, color: '#374151' }}>Mother Nature</div>
+          </div>
+          {/* Desktop header */}
+          <div className="hidden md:block">
+            <Header />
+          </div>
+          <main style={{ flex: 1, overflowY: 'auto', position: 'relative', zIndex: 10 }} className="px-4 py-5 md:px-8 md:py-7">
+            {children}
+          </main>
+        </div>
+      </div>
+    </div>
+  );
 }

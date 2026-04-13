@@ -122,6 +122,8 @@ export default function ContentPage() {
   const [redoGuidance, setRedoGuidance] = useState<Record<string, string>>({});
   const [showAddForm, setShowAddForm] = useState(false);
   const [sortAsc, setSortAsc] = useState(true); // sort by date ascending by default
+  const [newPostPlatforms, setNewPostPlatforms] = useState<string[]>(['Instagram']);
+  const [editPlatforms, setEditPlatforms] = useState<string[]>([]);
   const [newPost, setNewPost] = useState({ post_date: '', platform: 'Instagram', content_type: 'Post', title: '', caption: '' });
 
   // Detect user role
@@ -200,6 +202,7 @@ export default function ContentPage() {
   function startEdit(item: ContentItem) {
     const parsed = parseTitle(item.title);
     setEditingId(item.id);
+    setEditPlatforms([item.platform]);
     setEditDraft({
       post_date: item.post_date,
       platform: item.platform,
@@ -212,7 +215,7 @@ export default function ContentPage() {
     try {
       await patchItem(id, {
         post_date: editDraft.post_date,
-        platform: editDraft.platform,
+        platform: editPlatforms.length > 0 ? editPlatforms[0] : editDraft.platform,
         content_type: editDraft.content_type || null,
         title: editDraft.title || null,
       });
@@ -227,25 +230,25 @@ export default function ContentPage() {
   }
 
   async function addPost() {
-    if (!newPost.post_date || !newPost.platform || !newPost.title) { alert('Date, platform, and title are required'); return; }
+    if (!newPost.post_date || newPostPlatforms.length === 0 || !newPost.title) { alert('Date, at least one platform, and title are required'); return; }
+    // Create one row per selected platform so each shows independently in the calendar
+    const postItems = newPostPlatforms.map((p) => ({
+      post_date: newPost.post_date,
+      platform: p,
+      content_type: newPost.content_type || null,
+      title: newPost.title,
+      caption: newPost.caption || null,
+      status: 'Draft',
+      assigned_role: 'Social Media Manager',
+    }));
     const res = await fetch('/api/content-calendar', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        clientName: activeClient.name,
-        items: [{
-          post_date: newPost.post_date,
-          platform: newPost.platform,
-          content_type: newPost.content_type || null,
-          title: newPost.title,
-          caption: newPost.caption || null,
-          status: 'Draft',
-          assigned_role: 'Social Media Manager',
-        }],
-      }),
+      body: JSON.stringify({ clientName: activeClient.name, items: postItems }),
     });
     if (!res.ok) { alert('Failed to add post'); return; }
     setNewPost({ post_date: '', platform: 'Instagram', content_type: 'Post', title: '', caption: '' });
+    setNewPostPlatforms(['Instagram']);
     setShowAddForm(false);
     // Refresh
     const listRes = await fetch(`/api/content-calendar?client=${encodeURIComponent(activeClient.name)}`);
@@ -306,7 +309,7 @@ export default function ContentPage() {
       {/* Add post form (staff only) */}
       {isStaff && showAddForm && (
         <div className="glass-card p-5">
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-3">
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-3 mb-3">
             <input
               type="date"
               value={newPost.post_date}
@@ -314,19 +317,37 @@ export default function ContentPage() {
               className="text-[12px] px-3 py-2 rounded-xl bg-white/5 border border-white/15 text-white outline-none"
             />
             <select
-              value={newPost.platform}
-              onChange={(e) => setNewPost({ ...newPost, platform: e.target.value })}
-              className="text-[12px] px-3 py-2 rounded-xl bg-white/5 border border-white/15 text-white outline-none"
-            >
-              {PLATFORMS.map((p) => <option key={p} value={p}>{p}</option>)}
-            </select>
-            <select
               value={newPost.content_type}
               onChange={(e) => setNewPost({ ...newPost, content_type: e.target.value })}
               className="text-[12px] px-3 py-2 rounded-xl bg-white/5 border border-white/15 text-white outline-none"
             >
               {CONTENT_TYPES.map((t) => <option key={t} value={t}>{t}</option>)}
             </select>
+          </div>
+          {/* Multi-platform select */}
+          <div className="mb-3">
+            <div className="text-[10px] font-bold uppercase tracking-wider text-white/50 mb-2">Platforms (select multiple)</div>
+            <div className="flex flex-wrap gap-2">
+              {PLATFORMS.map((p) => {
+                const selected = newPostPlatforms.includes(p);
+                return (
+                  <button
+                    key={p}
+                    type="button"
+                    onClick={() => setNewPostPlatforms((prev) =>
+                      selected ? prev.filter((x) => x !== p) : [...prev, p]
+                    )}
+                    className={`text-[11px] font-semibold px-3 py-1.5 rounded-lg border transition-colors ${
+                      selected
+                        ? 'bg-white/15 text-white border-white/30'
+                        : 'bg-white/5 text-white/40 border-white/10 hover:border-white/20'
+                    }`}
+                  >
+                    {selected && <span className="mr-1">✓</span>}{p}
+                  </button>
+                );
+              })}
+            </div>
           </div>
           <input
             type="text"
@@ -519,13 +540,28 @@ export default function ContentPage() {
                       onChange={(e) => setEditDraft({ ...editDraft, post_date: e.target.value })}
                       className="text-[12px] px-3 py-2 rounded-lg bg-white/5 border border-white/15 text-white outline-none"
                     />
-                    <select
-                      value={editDraft.platform}
-                      onChange={(e) => setEditDraft({ ...editDraft, platform: e.target.value })}
-                      className="text-[12px] px-3 py-2 rounded-lg bg-white/5 border border-white/15 text-white outline-none"
-                    >
-                      {PLATFORMS.map((p) => <option key={p} value={p}>{p}</option>)}
-                    </select>
+                    <div>
+                      <div className="text-[10px] font-bold uppercase tracking-wider text-white/50 mb-1.5">Platform</div>
+                      <div className="flex flex-wrap gap-1.5">
+                        {PLATFORMS.map((p) => {
+                          const sel = editPlatforms.includes(p);
+                          return (
+                            <button
+                              key={p}
+                              type="button"
+                              onClick={() => setEditPlatforms((prev) =>
+                                sel ? prev.filter((x) => x !== p) : [...prev, p]
+                              )}
+                              className={`text-[10px] font-semibold px-2 py-1 rounded-lg border transition-colors ${
+                                sel ? 'bg-white/15 text-white border-white/30' : 'bg-white/5 text-white/40 border-white/10'
+                              }`}
+                            >
+                              {sel && '✓ '}{p}
+                            </button>
+                          );
+                        })}
+                      </div>
+                    </div>
                     <select
                       value={editDraft.content_type}
                       onChange={(e) => setEditDraft({ ...editDraft, content_type: e.target.value })}
@@ -732,6 +768,22 @@ export default function ContentPage() {
                           className="rounded-lg px-3 py-1.5 text-xs font-semibold bg-sky-500/70 text-white"
                         >
                           Mark scheduled
+                        </button>
+                      )}
+                      {isStaff && (approval === 'approved' || approval === 'changes_requested' || approval === 'scheduled') && (
+                        <button
+                          onClick={() => patchItem(it.id, { client_approval_status: 'pending_review' })}
+                          className="rounded-lg px-3 py-1.5 text-xs font-semibold bg-white/10 text-white/70 hover:bg-white/15"
+                        >
+                          ↩ Reset to pending
+                        </button>
+                      )}
+                      {isStaff && approval !== 'drafting' && (
+                        <button
+                          onClick={() => patchItem(it.id, { client_approval_status: 'drafting' })}
+                          className="rounded-lg px-3 py-1.5 text-xs font-semibold bg-white/5 text-white/40 hover:text-white/70"
+                        >
+                          Back to drafting
                         </button>
                       )}
                     </div>
