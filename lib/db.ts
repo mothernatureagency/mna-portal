@@ -176,6 +176,18 @@ async function initSchema() {
                         synced_at timestamptz not null default now(),
                         primary key (campaign_id)
                   )`,
+                  // Meeting notes — per-client, per-meeting, with optional client visibility
+                  `create table if not exists meeting_notes (
+                        id uuid primary key default uuid_generate_v4(),
+                        client_id text not null,
+                        meeting_date date not null,
+                        title text,
+                        summary text,
+                        attendees text,
+                        action_items jsonb,
+                        client_visible boolean not null default false,
+                        created_at timestamptz not null default now()
+                  )`,
                   `create table if not exists users (
                         id uuid primary key default uuid_generate_v4(),
                               username text not null unique,

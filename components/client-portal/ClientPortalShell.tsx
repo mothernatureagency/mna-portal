@@ -34,6 +34,7 @@ export default function ClientPortalShell({
     { href: '/client/agenda', label: 'Agenda', icon: 'event_note' },
     { href: '/client/calendar', label: 'Content Calendar', icon: 'calendar_month' },
     { href: '/client/campaigns', label: 'Campaigns', icon: 'campaign' },
+    { href: '/client/notes', label: 'Meeting Notes', icon: 'description' },
     { href: '/client/tasks', label: 'Tasks', icon: 'checklist' },
   ];
 

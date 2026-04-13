@@ -14,6 +14,7 @@ const NAV = [
     { label: 'Agenda', href: '/agenda', e: 'event_note' },
     { label: 'Task Manager', href: '/client-tasks', e: 'checklist' },
     { label: 'Email Drafts', href: '/email-preview', e: 'mail' },
+    { label: 'Meeting Notes', href: '/meeting-notes', e: 'description' },
   ]},
   { sec: 'ADVERTISING', items: [
     { label: 'Meta Ads (Live)', href: '/meta-ads', e: 'ads_click' },
