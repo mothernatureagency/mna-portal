@@ -770,7 +770,7 @@ export default function ContentPage() {
                           Mark scheduled
                         </button>
                       )}
-                      {isStaff && (approval === 'approved' || approval === 'changes_requested' || approval === 'scheduled') && (
+                      {isStaff && (approval === 'approved' || approval === 'changes_requested') && (
                         <button
                           onClick={() => patchItem(it.id, { client_approval_status: 'pending_review' })}
                           className="rounded-lg px-3 py-1.5 text-xs font-semibold bg-white/10 text-white/70 hover:bg-white/15"
@@ -778,7 +778,7 @@ export default function ContentPage() {
                           ↩ Reset to pending
                         </button>
                       )}
-                      {isStaff && approval !== 'drafting' && (
+                      {isStaff && approval !== 'drafting' && approval !== 'pending_review' && (
                         <button
                           onClick={() => patchItem(it.id, { client_approval_status: 'drafting' })}
                           className="rounded-lg px-3 py-1.5 text-xs font-semibold bg-white/5 text-white/40 hover:text-white/70"
@@ -794,6 +794,24 @@ export default function ContentPage() {
                       rows={2}
                       className="w-full text-xs rounded-lg bg-white/5 border border-white/10 p-2 text-white placeholder:text-white/30"
                     />
+                  </div>
+                )}
+
+                {/* Undo for scheduled posts (shown outside the main approval block) */}
+                {isStaff && approval === 'scheduled' && (
+                  <div className="pt-2 border-t border-white/10 flex gap-2 flex-wrap">
+                    <button
+                      onClick={() => patchItem(it.id, { client_approval_status: 'pending_review' })}
+                      className="rounded-lg px-3 py-1.5 text-xs font-semibold bg-white/10 text-white/70 hover:bg-white/15"
+                    >
+                      ↩ Reset to pending
+                    </button>
+                    <button
+                      onClick={() => patchItem(it.id, { client_approval_status: 'drafting' })}
+                      className="rounded-lg px-3 py-1.5 text-xs font-semibold bg-white/5 text-white/40 hover:text-white/70"
+                    >
+                      Back to drafting
+                    </button>
                   </div>
                 )}
 
