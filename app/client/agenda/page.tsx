@@ -51,14 +51,15 @@ export default function ClientAgendaPage() {
   const [manualItems, setManualItems] = useState<AgendaItem[]>([]);
   const [loading, setLoading] = useState(true);
 
-  // Load tasks for this client
+  // Load tasks for this client only
   useEffect(() => {
+    if (!client) return;
     setLoading(true);
-    fetch('/api/client-requests')
+    fetch(`/api/client-requests?clientId=${encodeURIComponent(client.id)}`)
       .then((r) => r.json())
       .then((d) => setTasks((d.items || []).filter((t: Task) => t.status !== 'done')))
       .finally(() => setLoading(false));
-  }, []);
+  }, [client]);
 
   // Load manual agenda items
   useEffect(() => {

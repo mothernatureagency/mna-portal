@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useEffect, useState, useRef, useMemo } from 'react';
+import React, { useEffect, useState, useRef, useMemo, useCallback } from 'react';
 import Link from 'next/link';
 import { createClient } from '@/lib/supabase/client';
 import { useClient } from '@/context/ClientContext';
@@ -110,6 +110,8 @@ export default function PersonalDashboard() {
   // Add event form
   const [showAdd, setShowAdd] = useState(false);
   const [showBlock, setShowBlock] = useState(false);
+  const [showWeekendMenu, setShowWeekendMenu] = useState(false);
+  const weekendMenuRef = useRef<HTMLDivElement>(null);
   const [newEvent, setNewEvent] = useState({
     title: '', description: '', event_date: '', start_time: '09:00', end_time: '10:00',
     event_type: 'task', priority: 'normal', client_id: '', attendees: '',
@@ -129,6 +131,18 @@ export default function PersonalDashboard() {
   const today = getTodayInTimezone(userTimezone);
   const timeGreeting = getTimeGreeting(userTimezone);
   const dateDisplay = getDateDisplay(userTimezone);
+
+  // Close weekend menu on click outside
+  useEffect(() => {
+    if (!showWeekendMenu) return;
+    function handleClick(e: MouseEvent) {
+      if (weekendMenuRef.current && !weekendMenuRef.current.contains(e.target as Node)) {
+        setShowWeekendMenu(false);
+      }
+    }
+    document.addEventListener('mousedown', handleClick);
+    return () => document.removeEventListener('mousedown', handleClick);
+  }, [showWeekendMenu]);
 
   // ── Initial load ──
   useEffect(() => {
@@ -269,6 +283,87 @@ export default function PersonalDashboard() {
       setBlockForm({ date: selectedDate || today, start_time: '09:00', end_time: '17:00', title: 'Blocked', allDay: false });
     }
   }
+
+  // ── Weekend blocking ──
+  // Find the next upcoming Friday (or current Friday if today is Fri)
+  function getNextFriday(from?: string) {
+    const d = from ? new Date(`${from}T12:00:00`) : new Date();
+    const dayOfWeek = d.getDay(); // 0=Sun
+    const daysUntilFri = dayOfWeek <= 5 ? (5 - dayOfWeek) : (5 + 7 - dayOfWeek);
+    d.setDate(d.getDate() + (daysUntilFri === 0 && dayOfWeek === 5 ? 0 : daysUntilFri));
+    return d.toLocaleDateString('en-CA');
+  }
+
+  async function blockWeekend(mode: 'allday-fri' | '12pm-fri' | '5pm-fri') {
+    const fri = getNextFriday(selectedDate || today);
+    const sat = datePlusDays(fri, 1);
+    const sun = datePlusDays(fri, 2);
+    const mon = datePlusDays(fri, 3);
+
+    const blocks: { date: string; start: string; end: string; title: string }[] = [];
+
+    if (mode === 'allday-fri') {
+      blocks.push({ date: fri, start: '00:00', end: '23:59', title: 'Weekend — Off' });
+    } else if (mode === '12pm-fri') {
+      blocks.push({ date: fri, start: '12:00', end: '23:59', title: 'Weekend — Off (from 12 PM)' });
+    } else {
+      blocks.push({ date: fri, start: '17:00', end: '23:59', title: 'Weekend — Off (from 5 PM)' });
+    }
+    blocks.push({ date: sat, start: '00:00', end: '23:59', title: 'Weekend — Off' });
+    blocks.push({ date: sun, start: '00:00', end: '23:59', title: 'Weekend — Off' });
+    blocks.push({ date: mon, start: '00:00', end: '09:00', title: 'Weekend — Off (until 9 AM)' });
+
+    for (const b of blocks) {
+      await fetch('/api/schedule', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          email: userEmail,
+          title: b.title,
+          eventDate: b.date,
+          startTime: b.start,
+          endTime: b.end,
+          eventType: 'blocked',
+          priority: 'normal',
+          meetingMode: 'none',
+        }),
+      });
+    }
+    refreshEvents();
+    setShowWeekendMenu(false);
+  }
+
+  async function unlockWeekend() {
+    // Find and delete all "Weekend — Off" blocked events for the upcoming Fri–Mon
+    const fri = getNextFriday(selectedDate || today);
+    const mon = datePlusDays(fri, 3);
+
+    // Get all events in range
+    const res = await fetch(`/api/schedule?email=${encodeURIComponent(userEmail)}&from=${fri}&to=${mon}`);
+    const data = await res.json();
+    const weekendBlocks = (data.events || []).filter(
+      (e: any) => e.event_type === 'blocked' && e.title?.startsWith('Weekend')
+    );
+
+    for (const ev of weekendBlocks) {
+      await fetch(`/api/schedule?id=${ev.id}`, { method: 'DELETE' });
+    }
+    refreshEvents();
+    setShowWeekendMenu(false);
+  }
+
+  // Check if upcoming weekend is blocked
+  const weekendBlocked = useMemo(() => {
+    const fri = getNextFriday(selectedDate || today);
+    const sat = datePlusDays(fri, 1);
+    const sun = datePlusDays(fri, 2);
+    const weekendDates = [fri, sat, sun];
+    return weekendDates.some(d => {
+      const dayEv = eventsByDate[d] || [];
+      return dayEv.some(e => e.event_type === 'blocked' && e.title?.startsWith('Weekend'));
+    });
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [eventsByDate, selectedDate, today]);
 
   async function toggleComplete(id: string, done: boolean) {
     await fetch('/api/schedule', {
@@ -558,6 +653,72 @@ export default function PersonalDashboard() {
               <span className="material-symbols-outlined" style={{ fontSize: 14 }}>block</span>
               {showBlock ? 'Cancel' : 'Block'}
             </button>
+
+            {/* Weekend block/unlock */}
+            <div className="relative" ref={weekendMenuRef}>
+              <button
+                onClick={() => setShowWeekendMenu(!showWeekendMenu)}
+                className={`text-[11px] font-bold px-3 py-1.5 rounded-lg transition-colors flex items-center gap-1 ${
+                  weekendBlocked
+                    ? 'bg-amber-500/20 text-amber-300 border border-amber-500/30'
+                    : 'text-white/50 hover:text-white/70'
+                }`}
+                style={!weekendBlocked ? { background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.08)' } : undefined}
+              >
+                <span className="material-symbols-outlined" style={{ fontSize: 14 }}>weekend</span>
+                Weekend
+                {weekendBlocked && <span className="material-symbols-outlined" style={{ fontSize: 12 }}>lock</span>}
+              </button>
+
+              {showWeekendMenu && (
+                <div className="absolute top-full right-0 mt-1.5 z-50 w-64 rounded-xl overflow-hidden shadow-2xl"
+                  style={{ background: '#0f1f2e', border: '1px solid rgba(255,255,255,0.12)' }}>
+                  <div className="px-4 py-3" style={{ borderBottom: '1px solid rgba(255,255,255,0.06)' }}>
+                    <div className="text-[12px] font-bold text-white">Block Weekend</div>
+                    <div className="text-[10px] text-white/40 mt-0.5">Prevents bookings Fri → Mon 9 AM</div>
+                  </div>
+                  <div className="py-1">
+                    <button onClick={() => blockWeekend('5pm-fri')}
+                      className="w-full text-left px-4 py-2.5 text-[12px] text-white/70 hover:bg-white/8 hover:text-white transition-colors flex items-center gap-2">
+                      <span className="material-symbols-outlined text-amber-400" style={{ fontSize: 16 }}>schedule</span>
+                      <div>
+                        <div className="font-semibold">From 5:00 PM Friday</div>
+                        <div className="text-[10px] text-white/40">Until Monday 9 AM</div>
+                      </div>
+                    </button>
+                    <button onClick={() => blockWeekend('12pm-fri')}
+                      className="w-full text-left px-4 py-2.5 text-[12px] text-white/70 hover:bg-white/8 hover:text-white transition-colors flex items-center gap-2">
+                      <span className="material-symbols-outlined text-orange-400" style={{ fontSize: 16 }}>schedule</span>
+                      <div>
+                        <div className="font-semibold">From 12:00 PM Friday</div>
+                        <div className="text-[10px] text-white/40">Half-day Friday → Monday 9 AM</div>
+                      </div>
+                    </button>
+                    <button onClick={() => blockWeekend('allday-fri')}
+                      className="w-full text-left px-4 py-2.5 text-[12px] text-white/70 hover:bg-white/8 hover:text-white transition-colors flex items-center gap-2">
+                      <span className="material-symbols-outlined text-red-400" style={{ fontSize: 16 }}>event_busy</span>
+                      <div>
+                        <div className="font-semibold">All Day Friday</div>
+                        <div className="text-[10px] text-white/40">Full 3-day weekend → Monday 9 AM</div>
+                      </div>
+                    </button>
+                  </div>
+                  {weekendBlocked && (
+                    <div className="py-1" style={{ borderTop: '1px solid rgba(255,255,255,0.06)' }}>
+                      <button onClick={unlockWeekend}
+                        className="w-full text-left px-4 py-2.5 text-[12px] text-emerald-400 hover:bg-emerald-500/10 transition-colors flex items-center gap-2">
+                        <span className="material-symbols-outlined" style={{ fontSize: 16 }}>lock_open</span>
+                        <div>
+                          <div className="font-semibold">Unlock Weekend</div>
+                          <div className="text-[10px] text-white/40">Remove all weekend blocks</div>
+                        </div>
+                      </button>
+                    </div>
+                  )}
+                </div>
+              )}
+            </div>
+
             <button
               onClick={() => {
                 setShowAdd(!showAdd); setShowBlock(false);

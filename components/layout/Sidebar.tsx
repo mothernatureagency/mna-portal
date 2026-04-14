@@ -42,6 +42,7 @@ const NAV = [
   ]},
   { sec: 'ACCOUNT', items: [
     { label: 'Settings', href: '/settings', e: 'settings' },
+    { label: 'Client View', href: '/client', e: 'swap_horiz' },
   ]},
 ];
 
@@ -74,18 +75,27 @@ export default function Sidebar({ mobileOpen, onClose }: { mobileOpen?: boolean;
 
   const navContent = (
     <>
-      {/* Brand */}
-      <div style={{ padding: '18px 20px 14px', display: 'flex', alignItems: 'center', gap: 10, borderBottom: '1px solid rgba(255,255,255,.07)' }}>
+      {/* Brand + Sign Out */}
+      <div style={{ padding: '18px 14px 14px 20px', display: 'flex', alignItems: 'center', gap: 10, borderBottom: '1px solid rgba(255,255,255,.07)' }}>
         {onClose && (
           <button onClick={onClose} className="md:hidden mr-1 w-8 h-8 rounded-lg bg-white/10 flex items-center justify-center text-white">
             <span className="material-symbols-outlined" style={{ fontSize: 18 }}>close</span>
           </button>
         )}
         <img src="/logos/mna-logo.png" alt="Mother Nature Agency" style={{ height: 32, width: 'auto', flexShrink: 0 }} />
-        <div>
+        <div style={{ flex: 1 }}>
           <div style={{ color: '#fff', fontSize: 11, fontWeight: 800, letterSpacing: '.04em', lineHeight: 1.2 }}>MOTHER NATURE</div>
           <div style={{ color: 'rgba(255,255,255,.5)', fontSize: 9, fontWeight: 600, letterSpacing: '.12em', textTransform: 'uppercase' }}>Agency</div>
         </div>
+        <button
+          onClick={signOut}
+          title="Sign out"
+          style={{ width: 30, height: 30, borderRadius: 8, display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'transparent', border: 'none', cursor: 'pointer', color: 'rgba(255,255,255,.35)', flexShrink: 0 }}
+          onMouseEnter={(e) => { e.currentTarget.style.background = 'rgba(255,255,255,.1)'; e.currentTarget.style.color = 'rgba(255,255,255,.7)'; }}
+          onMouseLeave={(e) => { e.currentTarget.style.background = 'transparent'; e.currentTarget.style.color = 'rgba(255,255,255,.35)'; }}
+        >
+          <span className="material-symbols-outlined" style={{ fontSize: 18 }}>logout</span>
+        </button>
       </div>
 
       {/* Active client */}
@@ -116,28 +126,6 @@ export default function Sidebar({ mobileOpen, onClose }: { mobileOpen?: boolean;
           </div>
         ))}
       </nav>
-
-      {/* Bottom */}
-      <div style={{ padding: 10, borderTop: '1px solid rgba(255,255,255,.07)' }}>
-        <button
-          onClick={() => router.push('/client')}
-          style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '8px 10px', borderRadius: 10, fontSize: 13, color: 'rgba(255,255,255,.6)', background: 'transparent', border: 'none', cursor: 'pointer', width: '100%', marginBottom: 2 }}
-          onMouseEnter={(e) => { e.currentTarget.style.background = 'rgba(74,184,206,.15)'; e.currentTarget.style.color = '#4ab8ce'; }}
-          onMouseLeave={(e) => { e.currentTarget.style.background = 'transparent'; e.currentTarget.style.color = 'rgba(255,255,255,.6)'; }}
-        >
-          <span className="material-symbols-outlined" style={{ fontSize: 18 }}>swap_horiz</span>
-          Switch to Client View
-        </button>
-        <button
-          onClick={signOut}
-          style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '8px 10px', borderRadius: 10, fontSize: 13, color: 'rgba(255,255,255,.6)', background: 'transparent', border: 'none', cursor: 'pointer', width: '100%' }}
-          onMouseEnter={(e) => { e.currentTarget.style.background = 'rgba(255,255,255,.1)'; e.currentTarget.style.color = '#fff'; }}
-          onMouseLeave={(e) => { e.currentTarget.style.background = 'transparent'; e.currentTarget.style.color = 'rgba(255,255,255,.6)'; }}
-        >
-          <span className="material-symbols-outlined" style={{ fontSize: 18 }}>logout</span>
-          Sign out
-        </button>
-      </div>
     </>
   );
 
