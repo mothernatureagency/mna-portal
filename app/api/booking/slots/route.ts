@@ -36,14 +36,14 @@ export async function GET(req: NextRequest) {
   const startHour = 9;
   const endHour = 17;
 
-  // Generate all possible slots
+  // Generate slots only on the hour (:00) and half-hour (:30)
   const allSlots: { start: string; end: string }[] = [];
   for (let hour = startHour; hour < endHour; hour++) {
-    for (let min = 0; min < 60; min += duration) {
-      const endMin = min + duration;
-      const endH = hour + Math.floor(endMin / 60);
-      const endM = endMin % 60;
-      if (endH > endHour || (endH === endHour && endM > 0)) break;
+    for (const min of [0, 30]) {
+      const totalEndMin = hour * 60 + min + duration;
+      const endH = Math.floor(totalEndMin / 60);
+      const endM = totalEndMin % 60;
+      if (endH > endHour || (endH === endHour && endM > 0)) continue;
 
       allSlots.push({
         start: `${String(hour).padStart(2, '0')}:${String(min).padStart(2, '0')}`,
@@ -88,7 +88,11 @@ export async function GET(req: NextRequest) {
     return { ...slot, available: !conflict };
   });
 
-  return NextResponse.json({ slots, date, timezone, duration });
+  // Only expose on-the-hour (:00) slots to clients — halves visible availability
+  // so the calendar doesn't look wide open
+  const clientSlots = slots.filter(s => s.start.endsWith(':00'));
+
+  return NextResponse.json({ slots: clientSlots, date, timezone, duration });
 }
 
 function addMinutes(time: string, minutes: number): string {
