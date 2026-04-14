@@ -34,6 +34,7 @@ const EVENT_COLORS: Record<string, { bg: string; text: string; icon: string }> =
   deadline: { bg: 'rgba(239,68,68,0.15)', text: '#f87171', icon: 'flag' },
   review: { bg: 'rgba(168,85,247,0.15)', text: '#c084fc', icon: 'rate_review' },
   personal: { bg: 'rgba(245,158,11,0.15)', text: '#fbbf24', icon: 'person' },
+  google: { bg: 'rgba(66,133,244,0.15)', text: '#4285f4', icon: 'event' },
 };
 
 export default function PersonalDashboard() {
@@ -45,6 +46,8 @@ export default function PersonalDashboard() {
   const [personalEvents, setPersonalEvents] = useState<ScheduleEvent[]>([]);
   const [businessEvents, setBusinessEvents] = useState<ScheduleEvent[]>([]);
   const [monthEvents, setMonthEvents] = useState<ScheduleEvent[]>([]);
+  const [googleEvents, setGoogleEvents] = useState<ScheduleEvent[]>([]);
+  const [gcalConnected, setGcalConnected] = useState(false);
   const [calMonth, setCalMonth] = useState(new Date().getMonth());
   const [calYear, setCalYear] = useState(new Date().getFullYear());
   const [selectedDate, setSelectedDate] = useState<string | null>(null);
@@ -79,6 +82,30 @@ export default function PersonalDashboard() {
         })
         .catch(() => {});
 
+      // Check Google Calendar connection and fetch today's Google events
+      fetch(`/api/google/status?email=${encodeURIComponent(email)}`)
+        .then(r => r.json())
+        .then(data => {
+          setGcalConnected(!!data.connected);
+          if (data.connected) {
+            const todayStr = new Date().toLocaleDateString('en-CA');
+            fetch(`/api/google/sync?email=${encodeURIComponent(email)}&from=${todayStr}&to=${todayStr}`)
+              .then(r => r.json())
+              .then(gData => {
+                const gEvents = (gData.events || []).map((e: any) => ({
+                  ...e,
+                  event_date: e.date,
+                  event_type: 'google',
+                  completed: false,
+                  priority: 'normal',
+                }));
+                setGoogleEvents(gEvents);
+              })
+              .catch(() => {});
+          }
+        })
+        .catch(() => {});
+
       // Fetch schedule
       fetch(`/api/schedule?email=${encodeURIComponent(email)}&from=${today}&to=${tomorrow}`)
         .then(r => r.json())
@@ -95,17 +122,32 @@ export default function PersonalDashboard() {
     });
   }, [today, tomorrow]);
 
-  // Fetch month events for calendar view
+  // Fetch month events for calendar view (MNA schedule + Google Calendar)
   useEffect(() => {
     if (!userEmail) return;
     const monthStart = `${calYear}-${String(calMonth + 1).padStart(2, '0')}-01`;
     const lastDay = new Date(calYear, calMonth + 1, 0).getDate();
     const monthEnd = `${calYear}-${String(calMonth + 1).padStart(2, '0')}-${lastDay}`;
+
+    // MNA schedule events
     fetch(`/api/schedule?email=${encodeURIComponent(userEmail)}&from=${monthStart}&to=${monthEnd}`)
       .then(r => r.json())
       .then(data => setMonthEvents(data.events || []))
       .catch(() => {});
-  }, [userEmail, calMonth, calYear]);
+
+    // Google Calendar events
+    if (gcalConnected) {
+      fetch(`/api/google/sync?email=${encodeURIComponent(userEmail)}&from=${monthStart}&to=${monthEnd}`)
+        .then(r => r.json())
+        .then(data => setGoogleEvents((data.events || []).map((e: any) => ({
+          ...e,
+          event_type: 'google',
+          completed: false,
+          priority: 'normal',
+        }))))
+        .catch(() => {});
+    }
+  }, [userEmail, calMonth, calYear, gcalConnected]);
 
   useEffect(() => {
     chatEndRef.current?.scrollIntoView({ behavior: 'smooth' });
@@ -160,20 +202,28 @@ export default function PersonalDashboard() {
     });
   }
 
-  function EventCard({ event }: { event: ScheduleEvent }) {
+  function EventCard({ event }: { event: any }) {
     const style = EVENT_COLORS[event.event_type] || EVENT_COLORS.task;
     const clientName = event.client_id ? allClientsList.find(c => c.id === event.client_id)?.shortName : null;
+    const isGoogle = event.event_type === 'google';
+    const startTime = event.start_time;
+    const endTime = event.end_time;
+
     return (
       <div className="flex items-center gap-3 py-2.5 px-3 rounded-xl transition-colors hover:bg-white/5 group">
-        <button
-          onClick={() => toggleComplete(event.id)}
-          className="w-5 h-5 rounded-md border flex items-center justify-center shrink-0 transition-colors"
-          style={{ borderColor: style.text + '40', background: 'transparent' }}
-          onMouseEnter={e => { e.currentTarget.style.background = style.bg; }}
-          onMouseLeave={e => { e.currentTarget.style.background = 'transparent'; }}
-        >
-          <span className="material-symbols-outlined text-transparent group-hover:text-white/40" style={{ fontSize: 14 }}>check</span>
-        </button>
+        {isGoogle ? (
+          <span className="material-symbols-outlined shrink-0" style={{ fontSize: 18, color: '#4285f4' }}>event</span>
+        ) : (
+          <button
+            onClick={() => toggleComplete(event.id)}
+            className="w-5 h-5 rounded-md border flex items-center justify-center shrink-0 transition-colors"
+            style={{ borderColor: style.text + '40', background: 'transparent' }}
+            onMouseEnter={e => { e.currentTarget.style.background = style.bg; }}
+            onMouseLeave={e => { e.currentTarget.style.background = 'transparent'; }}
+          >
+            <span className="material-symbols-outlined text-transparent group-hover:text-white/40" style={{ fontSize: 14 }}>check</span>
+          </button>
+        )}
         <span className="material-symbols-outlined shrink-0" style={{ fontSize: 16, color: style.text }}>{style.icon}</span>
         <div className="flex-1 min-w-0">
           <div className="text-[13px] font-semibold text-white truncate">
@@ -181,17 +231,23 @@ export default function PersonalDashboard() {
             {event.title}
           </div>
           <div className="flex items-center gap-2 text-[11px] text-white/40">
-            {event.start_time && <span>{event.start_time}{event.end_time ? ` - ${event.end_time}` : ''}</span>}
+            {startTime && <span>{startTime}{endTime ? ` - ${endTime}` : ''}</span>}
             {clientName && (
               <span className="px-1.5 py-0.5 rounded-md text-[9px] font-bold" style={{ background: style.bg, color: style.text }}>
                 {clientName}
               </span>
             )}
+            {isGoogle && event.location && <span className="truncate">{event.location}</span>}
           </div>
         </div>
         <span className="text-[10px] font-bold px-2 py-0.5 rounded-full shrink-0" style={{ background: style.bg, color: style.text }}>
-          {event.event_type}
+          {isGoogle ? 'Google' : event.event_type}
         </span>
+        {isGoogle && event.htmlLink && (
+          <a href={event.htmlLink} target="_blank" rel="noopener noreferrer" className="text-white/30 hover:text-white/60 transition-colors shrink-0">
+            <span className="material-symbols-outlined" style={{ fontSize: 14 }}>open_in_new</span>
+          </a>
+        )}
       </div>
     );
   }
@@ -229,10 +285,15 @@ export default function PersonalDashboard() {
         for (let i = 0; i < firstDay; i++) cells.push(null);
         for (let d = 1; d <= daysInMonth; d++) cells.push(d);
 
+        // Merge MNA + Google events
+        const allMonthEvents = [...monthEvents, ...googleEvents];
+
         // Build event map for this month
         const eventsByDay: Record<number, ScheduleEvent[]> = {};
-        monthEvents.forEach(e => {
-          const day = parseInt(e.event_date.split('-')[2], 10);
+        allMonthEvents.forEach(e => {
+          const dateStr = (e as any).date || e.event_date;
+          if (!dateStr) return;
+          const day = parseInt(dateStr.split('-')[2], 10);
           if (!eventsByDay[day]) eventsByDay[day] = [];
           eventsByDay[day].push(e);
         });
@@ -241,7 +302,10 @@ export default function PersonalDashboard() {
           ? new Date().getDate() : -1;
 
         const selectedDateStr = selectedDate;
-        const selectedDayEvents = selectedDate ? monthEvents.filter(e => e.event_date === selectedDate && !e.completed) : [];
+        const selectedDayEvents = selectedDate ? allMonthEvents.filter(e => {
+          const dateStr = (e as any).date || e.event_date;
+          return dateStr === selectedDate && !e.completed;
+        }) : [];
 
         return (
           <div className="rounded-2xl overflow-hidden" style={{ background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.07)' }}>
@@ -295,7 +359,8 @@ export default function PersonalDashboard() {
                 const isToday = day === todayNum;
                 const isSelected = dayStr === selectedDateStr;
                 const hasPersonal = dayEvents.some(e => e.event_type === 'personal');
-                const hasBusiness = dayEvents.some(e => e.event_type !== 'personal');
+                const hasBusiness = dayEvents.some(e => e.event_type !== 'personal' && e.event_type !== 'google');
+                const hasGoogle = dayEvents.some(e => e.event_type === 'google');
 
                 return (
                   <button
@@ -314,6 +379,7 @@ export default function PersonalDashboard() {
                       <div className="flex gap-0.5 mt-0.5">
                         {hasPersonal && <div className="w-1.5 h-1.5 rounded-full bg-amber-400" />}
                         {hasBusiness && <div className="w-1.5 h-1.5 rounded-full bg-cyan-400" />}
+                        {hasGoogle && <div className="w-1.5 h-1.5 rounded-full bg-blue-400" />}
                       </div>
                     )}
                   </button>
@@ -347,6 +413,12 @@ export default function PersonalDashboard() {
                 <div className="w-2 h-2 rounded-full bg-cyan-400" />
                 <span className="text-[10px] text-white/30">Business</span>
               </div>
+              {gcalConnected && (
+                <div className="flex items-center gap-1.5">
+                  <div className="w-2 h-2 rounded-full bg-blue-400" />
+                  <span className="text-[10px] text-white/30">Google Calendar</span>
+                </div>
+              )}
             </div>
           </div>
         );
@@ -396,6 +468,32 @@ export default function PersonalDashboard() {
               )}
             </div>
           </div>
+
+          {/* Google Calendar Today */}
+          {gcalConnected && (() => {
+            const todayGoogleEvents = googleEvents.filter(e => (e as any).date === today || e.event_date === today);
+            return (
+              <div className="rounded-2xl overflow-hidden" style={{ background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.07)' }}>
+                <div className="flex items-center justify-between px-5 py-3.5" style={{ borderBottom: '1px solid rgba(255,255,255,0.06)' }}>
+                  <div className="flex items-center gap-2">
+                    <span className="material-symbols-outlined text-blue-400" style={{ fontSize: 18 }}>event</span>
+                    <span className="text-[12px] font-bold uppercase tracking-wider text-blue-400">Google Calendar</span>
+                    {todayGoogleEvents.length > 0 && (
+                      <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-blue-400/15 text-blue-400">{todayGoogleEvents.length}</span>
+                    )}
+                  </div>
+                  <Link href="/settings" className="text-[11px] text-white/30 hover:text-white/60 transition-colors">Settings</Link>
+                </div>
+                <div className="px-3 py-2">
+                  {todayGoogleEvents.length > 0 ? (
+                    todayGoogleEvents.map((e: any) => <EventCard key={e.id} event={e} />)
+                  ) : (
+                    <div className="text-white/25 text-[12px] text-center py-4">No Google Calendar events today</div>
+                  )}
+                </div>
+              </div>
+            );
+          })()}
 
           {/* Tomorrow Preview */}
           {tomorrowEvents.length > 0 && (
