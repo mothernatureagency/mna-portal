@@ -240,12 +240,17 @@ async function initSchema() {
                         client_visible boolean not null default false,
                         created_at timestamptz not null default now()
                   )`,
-                  // User preferences (timezone, etc.)
+                  // User preferences (timezone, availability, etc.)
                   `create table if not exists user_preferences (
                         user_email text primary key,
                         timezone text not null default 'America/Chicago',
+                        availability jsonb not null default '{"days":{"mon":true,"tue":true,"wed":true,"thu":true,"fri":true,"sat":false,"sun":false},"startTime":"09:00","endTime":"17:00","slotDuration":30,"slotInterval":"hour","bufferMinutes":0,"maxPerDay":0}',
                         updated_at timestamptz not null default now()
                   )`,
+                  `DO $$ BEGIN
+                    ALTER TABLE user_preferences ADD COLUMN IF NOT EXISTS availability jsonb NOT NULL DEFAULT '{"days":{"mon":true,"tue":true,"wed":true,"thu":true,"fri":true,"sat":false,"sun":false},"startTime":"09:00","endTime":"17:00","slotDuration":30,"slotInterval":"hour","bufferMinutes":0,"maxPerDay":0}';
+                  EXCEPTION WHEN others THEN NULL;
+                  END $$`,
                   // Google Calendar OAuth tokens
                   `create table if not exists google_tokens (
                         user_email text primary key,

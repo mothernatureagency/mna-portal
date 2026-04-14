@@ -33,6 +33,7 @@ const EVENT_TYPES = [
   { value: 'deadline', label: 'Deadline', icon: 'alarm', color: 'bg-rose-500/20 text-rose-300' },
   { value: 'review', label: 'Review', icon: 'rate_review', color: 'bg-amber-500/20 text-amber-300' },
   { value: 'personal', label: 'Personal', icon: 'person', color: 'bg-white/10 text-white/60' },
+  { value: 'blocked', label: 'Blocked', icon: 'block', color: 'bg-red-500/20 text-red-300' },
 ];
 
 const PRIORITIES = [
@@ -82,6 +83,11 @@ export default function SchedulePage() {
   const [gcalConnected, setGcalConnected] = useState(false);
   const [gcalLoading, setGcalLoading] = useState(false);
   const [googleEvents, setGoogleEvents] = useState<any[]>([]);
+
+  const [showBlock, setShowBlock] = useState(false);
+  const [blockForm, setBlockForm] = useState({
+    date: todayStr(), start_time: '09:00', end_time: '17:00', title: 'Blocked', allDay: false,
+  });
 
   const [newEvent, setNewEvent] = useState({
     title: '', description: '', event_date: todayStr(), start_time: '09:00', end_time: '10:00',
@@ -154,6 +160,30 @@ export default function SchedulePage() {
     setEvents((prev) => [...prev, data.event].sort((a, b) => (a.start_time || '').localeCompare(b.start_time || '')));
     setNewEvent({ title: '', description: '', event_date: selectedDate, start_time: '09:00', end_time: '10:00', event_type: 'task', priority: 'normal', client_id: '', attendees: '', meeting_mode: 'none', location: '', recurrence: 'none', recurrence_end: '' });
     setShowAdd(false);
+  }
+
+  async function blockTime() {
+    const startTime = blockForm.allDay ? '00:00' : blockForm.start_time;
+    const endTime = blockForm.allDay ? '23:59' : blockForm.end_time;
+    const res = await fetch('/api/schedule', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        email: userEmail,
+        title: blockForm.title || 'Blocked',
+        eventDate: blockForm.date,
+        startTime,
+        endTime,
+        eventType: 'blocked',
+        priority: 'normal',
+        meetingMode: 'none',
+      }),
+    });
+    const data = await res.json();
+    if (!res.ok) { alert(data.error); return; }
+    setEvents((prev) => [...prev, data.event].sort((a, b) => (a.start_time || '').localeCompare(b.start_time || '')));
+    setBlockForm({ date: selectedDate, start_time: '09:00', end_time: '17:00', title: 'Blocked', allDay: false });
+    setShowBlock(false);
   }
 
   async function toggleComplete(id: string, completed: boolean) {
@@ -266,7 +296,17 @@ export default function SchedulePage() {
             </button>
           )}
           <button
-            onClick={() => { setShowAdd(!showAdd); setNewEvent((n) => ({ ...n, event_date: selectedDate })); }}
+            onClick={() => { setShowBlock(!showBlock); setShowAdd(false); setBlockForm((b) => ({ ...b, date: selectedDate })); }}
+            className={`text-[12px] font-bold px-4 py-2 rounded-xl transition-colors ${
+              showBlock ? 'bg-red-500/20 text-red-300 border border-red-500/30' : 'text-white/70 hover:text-white border border-white/15'
+            }`}
+            style={!showBlock ? { background: 'rgba(255,255,255,0.06)' } : undefined}
+          >
+            <span className="material-symbols-outlined mr-1" style={{ fontSize: 14, verticalAlign: 'middle' }}>block</span>
+            {showBlock ? 'Cancel' : 'Block Time'}
+          </button>
+          <button
+            onClick={() => { setShowAdd(!showAdd); setShowBlock(false); setNewEvent((n) => ({ ...n, event_date: selectedDate })); }}
             className="text-[12px] font-bold px-4 py-2 rounded-xl text-white"
             style={{ background: 'linear-gradient(135deg, #0c6da4, #4ab8ce)' }}
           >
@@ -293,6 +333,58 @@ export default function SchedulePage() {
           <span className="material-symbols-outlined" style={{ fontSize: 18 }}>chevron_right</span>
         </button>
       </div>
+
+      {/* Block time form */}
+      {showBlock && (
+        <div className="glass-card p-5 space-y-3" style={{ borderLeft: '3px solid #ef4444' }}>
+          <div className="flex items-center gap-2 mb-1">
+            <span className="material-symbols-outlined text-red-400" style={{ fontSize: 18 }}>block</span>
+            <div className="text-[13px] font-bold text-white">Block Time Off</div>
+            <span className="text-[11px] text-white/40">— prevents clients from booking during this time</span>
+          </div>
+          <div className="grid grid-cols-1 md:grid-cols-4 gap-3 items-end">
+            <div>
+              <label className="text-[10px] font-bold uppercase tracking-wider text-white/40 mb-1 block">Label</label>
+              <input type="text" placeholder="e.g. Lunch, Out of Office" value={blockForm.title}
+                onChange={(e) => setBlockForm({ ...blockForm, title: e.target.value })}
+                className="w-full text-[12px] px-3 py-2 rounded-xl bg-white/5 border border-white/15 text-white outline-none placeholder:text-white/30" />
+            </div>
+            <div>
+              <label className="text-[10px] font-bold uppercase tracking-wider text-white/40 mb-1 block">Date</label>
+              <input type="date" value={blockForm.date}
+                onChange={(e) => setBlockForm({ ...blockForm, date: e.target.value })}
+                className="w-full text-[12px] px-3 py-2 rounded-xl bg-white/5 border border-white/15 text-white outline-none" />
+            </div>
+            {!blockForm.allDay && (
+              <>
+                <div>
+                  <label className="text-[10px] font-bold uppercase tracking-wider text-white/40 mb-1 block">From</label>
+                  <input type="time" value={blockForm.start_time}
+                    onChange={(e) => setBlockForm({ ...blockForm, start_time: e.target.value })}
+                    className="w-full text-[12px] px-3 py-2 rounded-xl bg-white/5 border border-white/15 text-white outline-none" />
+                </div>
+                <div>
+                  <label className="text-[10px] font-bold uppercase tracking-wider text-white/40 mb-1 block">To</label>
+                  <input type="time" value={blockForm.end_time}
+                    onChange={(e) => setBlockForm({ ...blockForm, end_time: e.target.value })}
+                    className="w-full text-[12px] px-3 py-2 rounded-xl bg-white/5 border border-white/15 text-white outline-none" />
+                </div>
+              </>
+            )}
+          </div>
+          <div className="flex items-center justify-between">
+            <label className="flex items-center gap-2 cursor-pointer">
+              <input type="checkbox" checked={blockForm.allDay}
+                onChange={(e) => setBlockForm({ ...blockForm, allDay: e.target.checked })}
+                className="rounded border-white/30 bg-white/5 text-red-500 focus:ring-red-500/30" />
+              <span className="text-[12px] font-semibold text-white/60">Block entire day</span>
+            </label>
+            <button onClick={blockTime} className="text-[12px] font-bold px-5 py-2 rounded-xl text-white bg-red-500/80 hover:bg-red-500 transition-colors">
+              Block Time
+            </button>
+          </div>
+        </div>
+      )}
 
       {/* Add event form */}
       {showAdd && (
@@ -419,11 +511,17 @@ export default function SchedulePage() {
                 const pri = PRIORITIES.find((p) => p.value === ev.priority) || PRIORITIES[1];
                 const clientName = allClients.find((c: any) => c.id === ev.client_id)?.shortName;
                 return (
-                  <div key={ev.id} className={`flex items-start gap-3 p-4 transition-colors hover:bg-white/5 ${ev.completed ? 'opacity-50' : ''}`}>
-                    {/* Checkbox */}
+                  <div key={ev.id} className={`flex items-start gap-3 p-4 transition-colors hover:bg-white/5 ${ev.completed ? 'opacity-50' : ''} ${ev.event_type === 'blocked' ? 'bg-red-500/5 border-l-2 border-l-red-500/40' : ''}`}>
+                    {/* Checkbox (not for blocked) */}
+                    {ev.event_type === 'blocked' ? (
+                      <span className="mt-0.5 w-5 h-5 rounded-md flex items-center justify-center shrink-0 bg-red-500/20">
+                        <span className="material-symbols-outlined text-red-400" style={{ fontSize: 14 }}>block</span>
+                      </span>
+                    ) : (
                     <button onClick={() => toggleComplete(ev.id, !ev.completed)} className={`mt-0.5 w-5 h-5 rounded-md border-2 flex items-center justify-center shrink-0 transition-colors ${ev.completed ? 'bg-emerald-500/30 border-emerald-400' : 'border-white/30 hover:border-white/50'}`}>
                       {ev.completed && <span className="material-symbols-outlined text-emerald-300" style={{ fontSize: 14 }}>check</span>}
                     </button>
+                    )}
 
                     {/* Time */}
                     <div className="w-20 shrink-0 text-right">

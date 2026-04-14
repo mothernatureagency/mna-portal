@@ -5,6 +5,35 @@ import Card from '@/components/ui/Card';
 import { createClient } from '@/lib/supabase/client';
 import { TIMEZONE_OPTIONS } from '@/lib/timezone';
 
+const DAY_LABELS = [
+  { key: 'mon', label: 'Mon' },
+  { key: 'tue', label: 'Tue' },
+  { key: 'wed', label: 'Wed' },
+  { key: 'thu', label: 'Thu' },
+  { key: 'fri', label: 'Fri' },
+  { key: 'sat', label: 'Sat' },
+  { key: 'sun', label: 'Sun' },
+];
+
+const TIME_OPTIONS = Array.from({ length: 29 }, (_, i) => {
+  const totalMin = 7 * 60 + i * 30; // 7:00 AM to 9:00 PM
+  const h = Math.floor(totalMin / 60);
+  const m = totalMin % 60;
+  const label = `${h > 12 ? h - 12 : h === 0 ? 12 : h}:${String(m).padStart(2, '0')} ${h >= 12 ? 'PM' : 'AM'}`;
+  const value = `${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}`;
+  return { label, value };
+});
+
+const DEFAULT_AVAIL = {
+  days: { mon: true, tue: true, wed: true, thu: true, fri: true, sat: false, sun: false },
+  startTime: '09:00',
+  endTime: '17:00',
+  slotDuration: 30,
+  slotInterval: 'hour',
+  bufferMinutes: 0,
+  maxPerDay: 0,
+};
+
 export default function SettingsPage() {
   const { activeClient, userEmail } = useClient();
   const { gradientFrom, gradientTo } = activeClient.branding;
@@ -15,6 +44,11 @@ export default function SettingsPage() {
   const [gcalConnected, setGcalConnected] = useState(false);
   const [loadingGcal, setLoadingGcal] = useState(true);
   const [email, setEmail] = useState('');
+
+  // Availability state
+  const [avail, setAvail] = useState(DEFAULT_AVAIL);
+  const [availSaving, setAvailSaving] = useState(false);
+  const [availSaved, setAvailSaved] = useState(false);
 
   useEffect(() => {
     const supabase = createClient();
@@ -29,6 +63,9 @@ export default function SettingsPage() {
           .then(data => {
             if (data.preferences?.timezone) {
               setTimezone(data.preferences.timezone);
+            }
+            if (data.preferences?.availability) {
+              setAvail({ ...DEFAULT_AVAIL, ...data.preferences.availability });
             }
           })
           .catch(() => {});
@@ -57,6 +94,27 @@ export default function SettingsPage() {
       setTimeout(() => setSaved(false), 2000);
     } catch {}
     setSaving(false);
+  }
+
+  async function saveAvailability(updated: typeof DEFAULT_AVAIL) {
+    setAvail(updated);
+    setAvailSaving(true);
+    setAvailSaved(false);
+    try {
+      await fetch('/api/user-preferences', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email, availability: updated }),
+      });
+      setAvailSaved(true);
+      setTimeout(() => setAvailSaved(false), 2000);
+    } catch {}
+    setAvailSaving(false);
+  }
+
+  function toggleDay(dayKey: string) {
+    const updated = { ...avail, days: { ...avail.days, [dayKey]: !avail.days[dayKey as keyof typeof avail.days] } };
+    saveAvailability(updated);
   }
 
   async function connectGoogleCalendar() {
@@ -150,6 +208,159 @@ export default function SettingsPage() {
         </div>
       </Card>
 
+      {/* Availability (Calendly-style) */}
+      <Card className="p-6">
+        <div className="flex items-center gap-3 mb-5">
+          <div className="w-10 h-10 rounded-xl flex items-center justify-center text-white"
+            style={{ background: `linear-gradient(135deg, ${gradientFrom}, ${gradientTo})` }}>
+            <span className="material-symbols-outlined" style={{ fontSize: 20 }}>event_available</span>
+          </div>
+          <div className="flex-1">
+            <h2 className="text-[15px] font-bold text-gray-900">Availability</h2>
+            <p className="text-[12px] text-gray-400">Set when clients can book meetings with you</p>
+          </div>
+          {availSaving && <span className="text-[12px] text-gray-400">Saving...</span>}
+          {availSaved && (
+            <span className="text-[12px] text-emerald-600 font-semibold flex items-center gap-1">
+              <span className="material-symbols-outlined" style={{ fontSize: 14 }}>check_circle</span>
+              Saved
+            </span>
+          )}
+        </div>
+
+        {/* Available Days */}
+        <div className="mb-5">
+          <label className="text-[11px] font-bold uppercase tracking-wider text-gray-400 mb-2 block">Available Days</label>
+          <div className="flex gap-2">
+            {DAY_LABELS.map(({ key, label }) => {
+              const active = avail.days[key as keyof typeof avail.days];
+              return (
+                <button
+                  key={key}
+                  onClick={() => toggleDay(key)}
+                  className={`w-12 h-12 rounded-xl text-[13px] font-bold transition-all ${
+                    active
+                      ? 'text-white shadow-md'
+                      : 'bg-gray-100 text-gray-400 hover:bg-gray-200'
+                  }`}
+                  style={active ? { background: `linear-gradient(135deg, ${gradientFrom}, ${gradientTo})` } : undefined}
+                >
+                  {label}
+                </button>
+              );
+            })}
+          </div>
+        </div>
+
+        {/* Working Hours */}
+        <div className="mb-5">
+          <label className="text-[11px] font-bold uppercase tracking-wider text-gray-400 mb-2 block">Working Hours</label>
+          <div className="flex items-center gap-3">
+            <select
+              value={avail.startTime}
+              onChange={(e) => saveAvailability({ ...avail, startTime: e.target.value })}
+              className="text-[13px] font-medium border rounded-xl px-3 py-2.5 bg-white text-gray-700 focus:outline-none focus:ring-2 focus:ring-indigo-200"
+              style={{ border: '1px solid rgba(0,0,0,0.1)' }}
+            >
+              {TIME_OPTIONS.map(t => <option key={t.value} value={t.value}>{t.label}</option>)}
+            </select>
+            <span className="text-[13px] font-semibold text-gray-400">to</span>
+            <select
+              value={avail.endTime}
+              onChange={(e) => saveAvailability({ ...avail, endTime: e.target.value })}
+              className="text-[13px] font-medium border rounded-xl px-3 py-2.5 bg-white text-gray-700 focus:outline-none focus:ring-2 focus:ring-indigo-200"
+              style={{ border: '1px solid rgba(0,0,0,0.1)' }}
+            >
+              {TIME_OPTIONS.map(t => <option key={t.value} value={t.value}>{t.label}</option>)}
+            </select>
+          </div>
+        </div>
+
+        {/* Slot Duration & Interval */}
+        <div className="grid grid-cols-2 gap-4 mb-5">
+          <div>
+            <label className="text-[11px] font-bold uppercase tracking-wider text-gray-400 mb-2 block">Meeting Duration</label>
+            <div className="flex gap-2">
+              {[15, 30, 45, 60].map(d => (
+                <button
+                  key={d}
+                  onClick={() => saveAvailability({ ...avail, slotDuration: d })}
+                  className={`flex-1 py-2.5 rounded-xl text-[13px] font-bold transition-all ${
+                    avail.slotDuration === d
+                      ? 'text-white shadow-md'
+                      : 'bg-gray-100 text-gray-500 hover:bg-gray-200'
+                  }`}
+                  style={avail.slotDuration === d ? { background: `linear-gradient(135deg, ${gradientFrom}, ${gradientTo})` } : undefined}
+                >
+                  {d}m
+                </button>
+              ))}
+            </div>
+          </div>
+          <div>
+            <label className="text-[11px] font-bold uppercase tracking-wider text-gray-400 mb-2 block">Slot Interval</label>
+            <div className="flex gap-2">
+              {[{ key: 'hour', label: 'Hourly' }, { key: 'half', label: 'Every 30m' }].map(opt => (
+                <button
+                  key={opt.key}
+                  onClick={() => saveAvailability({ ...avail, slotInterval: opt.key })}
+                  className={`flex-1 py-2.5 rounded-xl text-[13px] font-bold transition-all ${
+                    avail.slotInterval === opt.key
+                      ? 'text-white shadow-md'
+                      : 'bg-gray-100 text-gray-500 hover:bg-gray-200'
+                  }`}
+                  style={avail.slotInterval === opt.key ? { background: `linear-gradient(135deg, ${gradientFrom}, ${gradientTo})` } : undefined}
+                >
+                  {opt.label}
+                </button>
+              ))}
+            </div>
+          </div>
+        </div>
+
+        {/* Buffer & Max Per Day */}
+        <div className="grid grid-cols-2 gap-4">
+          <div>
+            <label className="text-[11px] font-bold uppercase tracking-wider text-gray-400 mb-2 block">Buffer Between Meetings</label>
+            <div className="flex gap-2">
+              {[0, 5, 10, 15, 30].map(b => (
+                <button
+                  key={b}
+                  onClick={() => saveAvailability({ ...avail, bufferMinutes: b })}
+                  className={`flex-1 py-2.5 rounded-xl text-[12px] font-bold transition-all ${
+                    avail.bufferMinutes === b
+                      ? 'text-white shadow-md'
+                      : 'bg-gray-100 text-gray-500 hover:bg-gray-200'
+                  }`}
+                  style={avail.bufferMinutes === b ? { background: `linear-gradient(135deg, ${gradientFrom}, ${gradientTo})` } : undefined}
+                >
+                  {b === 0 ? 'None' : `${b}m`}
+                </button>
+              ))}
+            </div>
+          </div>
+          <div>
+            <label className="text-[11px] font-bold uppercase tracking-wider text-gray-400 mb-2 block">Max Bookings / Day</label>
+            <div className="flex gap-2">
+              {[0, 2, 3, 5, 8].map(m => (
+                <button
+                  key={m}
+                  onClick={() => saveAvailability({ ...avail, maxPerDay: m })}
+                  className={`flex-1 py-2.5 rounded-xl text-[12px] font-bold transition-all ${
+                    avail.maxPerDay === m
+                      ? 'text-white shadow-md'
+                      : 'bg-gray-100 text-gray-500 hover:bg-gray-200'
+                  }`}
+                  style={avail.maxPerDay === m ? { background: `linear-gradient(135deg, ${gradientFrom}, ${gradientTo})` } : undefined}
+                >
+                  {m === 0 ? '∞' : m}
+                </button>
+              ))}
+            </div>
+          </div>
+        </div>
+      </Card>
+
       {/* Google Calendar */}
       <Card className="p-6">
         <div className="flex items-center gap-3 mb-4">
@@ -212,7 +423,7 @@ export default function SettingsPage() {
             <p className="text-[12px] text-gray-400">Email digests and alerts</p>
           </div>
         </div>
-        <div className="text-[12px] text-gray-500">
+        <div className="text-[12px] text-gray-400">
           Daily briefing emails are sent via your Make.com automation. Contact your admin to adjust email frequency or recipients.
         </div>
       </Card>
