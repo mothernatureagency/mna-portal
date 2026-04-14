@@ -6,6 +6,7 @@ import { createClient } from '@/lib/supabase/client';
 import { useClient } from '@/context/ClientContext';
 import { clients as allClientsList } from '@/lib/clients';
 import { getTimeGreeting, getDateDisplay, getTodayInTimezone, DEFAULT_TIMEZONE } from '@/lib/timezone';
+import { getDisplayName } from '@/lib/display-names';
 
 type ScheduleEvent = {
   id: string;
@@ -64,8 +65,7 @@ export default function PersonalDashboard() {
     supabase.auth.getUser().then(({ data: { user } }) => {
       const email = user?.email || 'mn@mothernatureagency.com';
       setUserEmail(email);
-      const name = email.split('@')[0].split('.')[0];
-      setUserName(name.charAt(0).toUpperCase() + name.slice(1));
+      setUserName(getDisplayName(email));
 
       // Fetch user timezone preference
       fetch(`/api/user-preferences?email=${encodeURIComponent(email)}`)

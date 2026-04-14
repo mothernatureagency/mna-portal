@@ -57,12 +57,11 @@ function LoginForm() {
       >
         {/* Logo / Title */}
         <div className="flex flex-col items-center gap-3 mb-2">
-          <div
-            className="w-16 h-16 rounded-2xl flex items-center justify-center text-white text-3xl font-extrabold"
-            style={{ background: 'linear-gradient(135deg, #0c6da4, #4ab8ce)' }}
-          >
-            M
-          </div>
+          <img
+            src="/logos/mna-logo.png"
+            alt="Mother Nature Agency"
+            className="h-20 w-auto"
+          />
           <h1 className="text-white text-3xl font-bold tracking-tight">
             Mother Nature Agency
           </h1>

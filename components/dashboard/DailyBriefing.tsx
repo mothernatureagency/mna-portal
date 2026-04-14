@@ -4,6 +4,7 @@ import React, { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { createClient } from '@/lib/supabase/client';
 import { getTimeGreeting, getDateDisplay, DEFAULT_TIMEZONE } from '@/lib/timezone';
+import { getDisplayName } from '@/lib/display-names';
 
 type BriefingData = {
   events: any[];
@@ -43,9 +44,7 @@ export default function DailyBriefing() {
     const supabase = createClient();
     supabase.auth.getUser().then(({ data: { user } }) => {
       const email = user?.email || 'mn@mothernatureagency.com';
-      // Extract first name from email for greeting
-      const name = email.split('@')[0].split('.')[0];
-      setUserName(name.charAt(0).toUpperCase() + name.slice(1));
+      setUserName(getDisplayName(email));
 
       // Fetch user timezone preference
       fetch(`/api/user-preferences?email=${encodeURIComponent(email)}`)

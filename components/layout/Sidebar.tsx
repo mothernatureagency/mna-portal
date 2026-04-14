@@ -80,7 +80,7 @@ export default function Sidebar({ mobileOpen, onClose }: { mobileOpen?: boolean;
             <span className="material-symbols-outlined" style={{ fontSize: 18 }}>close</span>
           </button>
         )}
-        <div style={{ width: 36, height: 36, borderRadius: 10, background: 'linear-gradient(135deg,#0c6da4,#4ab8ce)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, color: '#fff', fontWeight: 800, fontSize: 12 }}>MN</div>
+        <img src="/logos/mna-logo.png" alt="Mother Nature Agency" style={{ height: 32, width: 'auto', flexShrink: 0 }} />
         <div>
           <div style={{ color: '#fff', fontSize: 11, fontWeight: 800, letterSpacing: '.04em', lineHeight: 1.2 }}>MOTHER NATURE</div>
           <div style={{ color: 'rgba(255,255,255,.5)', fontSize: 9, fontWeight: 600, letterSpacing: '.12em', textTransform: 'uppercase' }}>Agency</div>

@@ -2,6 +2,7 @@
 
 import React, { useState, useRef, useEffect } from 'react';
 import { createClient } from '@/lib/supabase/client';
+import { getDisplayName } from '@/lib/display-names';
 
 type Message = {
   id: string;
@@ -105,8 +106,7 @@ export default function AssistantPage() {
     }
   }
 
-  const greeting = userEmail ? userEmail.split('@')[0].split('.')[0] : '';
-  const greetingName = greeting.charAt(0).toUpperCase() + greeting.slice(1);
+  const greetingName = getDisplayName(userEmail);
   const hour = new Date().getHours();
   const timeGreeting = hour < 12 ? 'Good morning' : hour < 17 ? 'Good afternoon' : 'Good evening';
 
