@@ -45,9 +45,18 @@ export default async function ClientPortalLayout({
     accessibleIds.push(singleId);
   }
 
-  // Default for staff QA or missing metadata
+  // Staff/admin can see all non-mna clients in client view
+  const isStaff = role !== 'client' && role !== 'owner';
+  const isOwner = role === 'owner';
+
+  // If staff/admin with no specific client assignment, give access to all
   if (accessibleIds.length === 0) {
-    accessibleIds = role === 'client' ? ['prime-iv'] : ['prime-iv'];
+    if (isStaff) {
+      accessibleIds = clients.filter((c) => c.id !== 'mna').map((c) => c.id);
+    } else {
+      // Client role with no assignment — fallback
+      accessibleIds = ['prime-iv'];
+    }
   }
 
   // Resolve which client to show — check cookie for saved selection
@@ -64,9 +73,7 @@ export default async function ClientPortalLayout({
     .map((id) => clients.find((c) => c.id === id))
     .filter(Boolean) as typeof clients;
 
-  // Staff can see all clients, owners see only their assigned clients
-  const isStaff = role !== 'client' && role !== 'owner';
-  const isOwner = role === 'owner';
+  // Staff sees all non-mna clients, owners/clients see only their assigned
   const clientList = isStaff ? clients.filter((c) => c.id !== 'mna') : accessibleClients;
 
   return (
