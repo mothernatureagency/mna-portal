@@ -120,6 +120,7 @@ function buildInvoiceEmailHtml(invoice: InvoiceData): string {
       <!-- Payment methods -->
       <div style="background: #f0f9ff; border-radius: 12px; padding: 20px; margin-bottom: 24px;">
         <h3 style="margin: 0 0 12px; font-size: 14px; font-weight: 700; color: #0c6da4;">Payment Methods</h3>
+        <p style="font-size: 12px; color: #888; margin: 0 0 12px;">Please send to <strong style="color: #333;">Mother Nature Agency LLC</strong></p>
         <table style="width: 100%; border-collapse: collapse;">
           <tr>
             <td style="padding: 6px 0; font-size: 13px; color: #666;">PayPal</td>
@@ -130,10 +131,25 @@ function buildInvoiceEmailHtml(invoice: InvoiceData): string {
             <td style="padding: 6px 0; font-size: 13px; color: #333; font-weight: 600; text-align: right;">mn@mothernatureagency.com</td>
           </tr>
           <tr>
-            <td style="padding: 6px 0; font-size: 13px; color: #666;">Wire Transfer</td>
-            <td style="padding: 6px 0; font-size: 13px; color: #333; font-weight: 600; text-align: right;">Bank of America — MNA LLC</td>
+            <td colspan="2" style="padding: 12px 0 4px; font-size: 13px; font-weight: 700; color: #0c6da4;">Bank of America — Mother Nature Agency LLC</td>
+          </tr>
+          <tr>
+            <td style="padding: 4px 0; font-size: 13px; color: #666;">Account #</td>
+            <td style="padding: 4px 0; font-size: 13px; color: #333; font-weight: 600; text-align: right;">898165120338</td>
+          </tr>
+          <tr>
+            <td style="padding: 4px 0; font-size: 13px; color: #666;">ACH Routing #</td>
+            <td style="padding: 4px 0; font-size: 13px; color: #333; font-weight: 600; text-align: right;">063100277</td>
+          </tr>
+          <tr>
+            <td style="padding: 4px 0; font-size: 13px; color: #666;">Wire Routing #</td>
+            <td style="padding: 4px 0; font-size: 13px; color: #333; font-weight: 600; text-align: right;">026009593</td>
+          </tr>
+          <tr>
+            <td colspan="2" style="padding: 6px 0 0; font-size: 11px; color: #e65100; font-weight: 600;">* Please add $20 wire fee if sending via wire transfer</td>
           </tr>
         </table>
+        <p style="font-size: 12px; color: #666; margin: 12px 0 0;">Checks payable to: <strong style="color: #333;">Mother Nature Agency LLC / Alexus Williams</strong></p>
       </div>
 
       ${invoice.notes ? `

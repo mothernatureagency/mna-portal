@@ -46,6 +46,7 @@ export default function ClientPortalShell({
     { href: '/client/notes', label: 'Meeting Notes', icon: 'description' },
     { href: '/client/tasks', label: 'Tasks', icon: 'checklist' },
     { href: '/client/invoices', label: 'Invoices', icon: 'receipt_long' },
+    { href: '/client/booking', label: 'Book Meeting', icon: 'event_available' },
   ];
 
   const active = (href: string) =>

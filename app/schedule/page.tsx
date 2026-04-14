@@ -20,6 +20,9 @@ type ScheduleEvent = {
   meeting_mode: string | null;
   location: string | null;
   meet_link: string | null;
+  recurrence: string | null;
+  recurrence_end: string | null;
+  recurring_parent_id: string | null;
   created_at: string;
 };
 
@@ -84,6 +87,8 @@ export default function SchedulePage() {
     title: '', description: '', event_date: todayStr(), start_time: '09:00', end_time: '10:00',
     event_type: 'task', priority: 'normal', client_id: '', attendees: '',
     meeting_mode: 'none' as 'none' | 'google_meet' | 'in_person', location: '',
+    recurrence: 'none' as 'none' | 'daily' | 'weekly' | 'biweekly' | 'monthly',
+    recurrence_end: '',
   });
 
   useEffect(() => {
@@ -140,12 +145,14 @@ export default function SchedulePage() {
         attendees: newEvent.attendees || null,
         meetingMode: newEvent.meeting_mode,
         location: newEvent.location || null,
+        recurrence: newEvent.recurrence,
+        recurrenceEnd: newEvent.recurrence_end || null,
       }),
     });
     const data = await res.json();
     if (!res.ok) { alert(data.error); return; }
     setEvents((prev) => [...prev, data.event].sort((a, b) => (a.start_time || '').localeCompare(b.start_time || '')));
-    setNewEvent({ title: '', description: '', event_date: selectedDate, start_time: '09:00', end_time: '10:00', event_type: 'task', priority: 'normal', client_id: '', attendees: '', meeting_mode: 'none', location: '' });
+    setNewEvent({ title: '', description: '', event_date: selectedDate, start_time: '09:00', end_time: '10:00', event_type: 'task', priority: 'normal', client_id: '', attendees: '', meeting_mode: 'none', location: '', recurrence: 'none', recurrence_end: '' });
     setShowAdd(false);
   }
 
@@ -159,10 +166,30 @@ export default function SchedulePage() {
     if (res.ok) setEvents((prev) => prev.map((e) => (e.id === id ? { ...e, ...data.event } : e)));
   }
 
-  async function deleteEvent(id: string) {
-    if (!confirm('Delete this event?')) return;
-    await fetch(`/api/schedule?id=${id}`, { method: 'DELETE' });
-    setEvents((prev) => prev.filter((e) => e.id !== id));
+  async function deleteEvent(ev: ScheduleEvent) {
+    const isRecurring = (ev.recurrence && ev.recurrence !== 'none') || ev.recurring_parent_id;
+    let deleteSeries = false;
+
+    if (isRecurring) {
+      const choice = confirm('Delete entire recurring series? (OK = whole series, Cancel = just this one)');
+      if (choice) {
+        deleteSeries = true;
+      } else {
+        if (!confirm('Delete just this occurrence?')) return;
+      }
+    } else {
+      if (!confirm('Delete this event?')) return;
+    }
+
+    const parentId = ev.recurring_parent_id || ev.id;
+    const qs = deleteSeries ? `?id=${parentId}&series=true` : `?id=${ev.id}`;
+    await fetch(`/api/schedule${qs}`, { method: 'DELETE' });
+
+    if (deleteSeries) {
+      setEvents((prev) => prev.filter((e) => e.id !== parentId && e.recurring_parent_id !== parentId));
+    } else {
+      setEvents((prev) => prev.filter((e) => e.id !== ev.id));
+    }
   }
 
   const today = todayStr();
@@ -335,6 +362,38 @@ export default function SchedulePage() {
           )}
           <input type="text" placeholder="Attendees (e.g. Justin, Sable, jkulkusky@primeivhydration.com)" value={newEvent.attendees} onChange={(e) => setNewEvent({ ...newEvent, attendees: e.target.value })}
             className="w-full text-[12px] px-3 py-2 rounded-xl bg-white/5 border border-white/15 text-white outline-none placeholder:text-white/30" />
+          {/* Recurrence */}
+          <div className="flex gap-2 flex-wrap">
+            <div className="text-[11px] text-white/40 font-semibold self-center mr-1">Repeat:</div>
+            {([
+              { value: 'none', label: 'None' },
+              { value: 'daily', label: 'Daily' },
+              { value: 'weekly', label: 'Weekly' },
+              { value: 'biweekly', label: 'Every 2 Weeks' },
+              { value: 'monthly', label: 'Monthly' },
+            ] as const).map((opt) => (
+              <button
+                key={opt.value}
+                type="button"
+                onClick={() => setNewEvent({ ...newEvent, recurrence: opt.value })}
+                className={`text-[11px] font-semibold px-3 py-1.5 rounded-lg border transition-colors ${
+                  newEvent.recurrence === opt.value
+                    ? 'bg-purple-500/20 border-purple-500/40 text-purple-300'
+                    : 'bg-white/5 border-white/15 text-white/50 hover:text-white/70'
+                }`}
+              >
+                {opt.label}
+              </button>
+            ))}
+          </div>
+          {newEvent.recurrence !== 'none' && (
+            <div className="flex items-center gap-2">
+              <span className="text-[11px] text-white/40 font-semibold">Until:</span>
+              <input type="date" value={newEvent.recurrence_end} onChange={(e) => setNewEvent({ ...newEvent, recurrence_end: e.target.value })}
+                className="text-[12px] px-3 py-1.5 rounded-xl bg-white/5 border border-white/15 text-white outline-none" />
+              <span className="text-[10px] text-white/30">(leave blank for 3 months)</span>
+            </div>
+          )}
           <textarea placeholder="Description (optional)" value={newEvent.description} onChange={(e) => setNewEvent({ ...newEvent, description: e.target.value })}
             rows={2} className="w-full text-[12px] px-3 py-2 rounded-xl bg-white/5 border border-white/15 text-white outline-none placeholder:text-white/30" />
           <button onClick={createEvent} className="text-[12px] font-bold px-5 py-2 rounded-xl text-white" style={{ background: 'linear-gradient(135deg, #0c6da4, #4ab8ce)' }}>
@@ -388,6 +447,12 @@ export default function SchedulePage() {
                         </span>
                         {ev.priority === 'high' && <span className="text-[9px] font-bold px-2 py-0.5 rounded-full bg-rose-500/20 text-rose-300">High</span>}
                         {clientName && <span className="text-[9px] font-bold px-2 py-0.5 rounded-full bg-sky-500/15 text-sky-300">{clientName}</span>}
+                        {ev.recurrence && ev.recurrence !== 'none' && (
+                          <span className="text-[9px] font-bold px-2 py-0.5 rounded-full bg-purple-500/15 text-purple-300">
+                            <span className="material-symbols-outlined mr-0.5" style={{ fontSize: 10, verticalAlign: 'middle' }}>repeat</span>
+                            {ev.recurrence === 'daily' ? 'Daily' : ev.recurrence === 'weekly' ? 'Weekly' : ev.recurrence === 'biweekly' ? 'Biweekly' : 'Monthly'}
+                          </span>
+                        )}
                       </div>
                       {ev.attendees && (
                         <div className="flex items-center gap-1 mt-0.5">
@@ -412,7 +477,7 @@ export default function SchedulePage() {
                     </div>
 
                     {/* Delete */}
-                    <button onClick={() => deleteEvent(ev.id)} className="text-white/20 hover:text-rose-300 transition-colors shrink-0">
+                    <button onClick={() => deleteEvent(ev)} className="text-white/20 hover:text-rose-300 transition-colors shrink-0">
                       <span className="material-symbols-outlined" style={{ fontSize: 16 }}>close</span>
                     </button>
                   </div>

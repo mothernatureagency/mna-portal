@@ -32,22 +32,26 @@ function SwitcherLogo({ client, size }: { client: Client; size: 'button' | 'drop
   const dropdownHeight = 28;  // height inside the dropdown list rows
   const displayHeight = size === 'button' ? buttonHeight : dropdownHeight;
 
-  // 1. Square icon file (SVG) — render in a fixed square slot for consistency
+  // 1. Icon file — square SVG gets a square slot, wide PNG gets an adaptive slot
   if (iconUrl) {
+    const isWide = iconUrl.toLowerCase().endsWith('.png');
     return (
       <div
         className="flex items-center justify-center flex-shrink-0 overflow-hidden rounded-lg"
         style={{
-          width: `${displayHeight + 2}px`,
           height: `${displayHeight + 2}px`,
+          width: isWide ? 'auto' : `${displayHeight + 2}px`,
+          minWidth: `${displayHeight + 2}px`,
+          maxWidth: isWide ? '56px' : `${displayHeight + 2}px`,
           background: `${gradientFrom}08`,
+          padding: isWide ? '0 4px' : undefined,
         }}
       >
         <LogoImage
           src={iconUrl}
           alt={client.name}
-          height={displayHeight - 2}
-          maxWidth={displayHeight - 2}
+          height={displayHeight - 4}
+          maxWidth={isWide ? 48 : displayHeight - 2}
         />
       </div>
     );
@@ -122,11 +126,10 @@ export default function Header() {
     <header
       className="h-16 flex items-center px-8 gap-5 sticky top-0 z-30 flex-shrink-0"
       style={{
-        background: 'rgba(255,255,255,0.92)',
+        background: 'rgba(15,31,46,0.92)',
         backdropFilter: 'blur(12px)',
         WebkitBackdropFilter: 'blur(12px)',
-        borderBottom: '1px solid rgba(0,0,0,0.05)',
-        boxShadow: '0 1px 0 rgba(0,0,0,0.03), 0 4px 16px rgba(0,0,0,0.03)',
+        borderBottom: '1px solid rgba(255,255,255,0.07)',
       }}
     >
       {/* Search */}
@@ -134,30 +137,31 @@ export default function Header() {
         <div className="relative">
           <Search
             size={13}
-            className="absolute left-3.5 top-1/2 -translate-y-1/2 text-gray-350 pointer-events-none"
-            style={{ color: '#b0bac9' }}
+            className="absolute left-3.5 top-1/2 -translate-y-1/2 pointer-events-none"
+            style={{ color: 'rgba(255,255,255,0.35)' }}
           />
           <input
             type="text"
             placeholder="Search campaigns, leads, clients…"
-            className="w-full pl-9 pr-4 py-2 text-[13px] rounded-xl transition-all placeholder:text-gray-300"
+            className="w-full pl-9 pr-4 py-2 text-[13px] rounded-xl transition-all"
             style={{
-              background: '#f4f6f9',
-              border: '1px solid rgba(0,0,0,0.06)',
-              color: '#374151',
+              background: 'rgba(255,255,255,0.08)',
+              border: '1px solid rgba(255,255,255,0.1)',
+              color: '#fff',
               outline: 'none',
             }}
             onFocus={e => {
-              e.target.style.background = '#fff';
-              e.target.style.border = `1px solid ${gradientTo}80`;
+              e.target.style.background = 'rgba(255,255,255,0.12)';
+              e.target.style.border = `1px solid ${gradientTo}60`;
               e.target.style.boxShadow = `0 0 0 3px ${gradientTo}18`;
             }}
             onBlur={e => {
-              e.target.style.background = '#f4f6f9';
-              e.target.style.border = '1px solid rgba(0,0,0,0.06)';
+              e.target.style.background = 'rgba(255,255,255,0.08)';
+              e.target.style.border = '1px solid rgba(255,255,255,0.1)';
               e.target.style.boxShadow = 'none';
             }}
           />
+          <style jsx>{`input::placeholder { color: rgba(255,255,255,0.4) !important; }`}</style>
         </div>
       </div>
 
@@ -178,40 +182,40 @@ export default function Header() {
 
         {/* Notifications */}
         <button
-          className="relative w-8 h-8 flex items-center justify-center rounded-xl transition-all hover:bg-gray-50"
-          style={{ border: '1px solid rgba(0,0,0,0.07)' }}
+          className="relative w-8 h-8 flex items-center justify-center rounded-xl transition-all hover:bg-white/10"
+          style={{ border: '1px solid rgba(255,255,255,0.1)' }}
         >
-          <Bell size={14} style={{ color: '#6b7280' }} />
+          <Bell size={14} style={{ color: 'rgba(255,255,255,0.6)' }} />
           <span
-            className="absolute top-[7px] right-[7px] w-[6px] h-[6px] rounded-full border-[1.5px] border-white"
-            style={{ background: '#f87171' }}
+            className="absolute top-[7px] right-[7px] w-[6px] h-[6px] rounded-full"
+            style={{ background: '#f87171', border: '1.5px solid rgba(15,31,46,0.9)' }}
           />
         </button>
 
         {/* Divider */}
-        <div className="w-px h-6 bg-gray-100" />
+        <div className="w-px h-6" style={{ background: 'rgba(255,255,255,0.1)' }} />
 
         {/* Client Selector */}
         <div className="relative" ref={ref}>
           <button
             onClick={() => setOpen(!open)}
-            className="flex items-center gap-2.5 pl-2 pr-3 py-1.5 rounded-xl transition-all hover:bg-gray-50 group"
-            style={{ border: '1px solid rgba(0,0,0,0.07)' }}
+            className="flex items-center gap-2.5 pl-2 pr-3 py-1.5 rounded-xl transition-all hover:bg-white/10 group"
+            style={{ border: '1px solid rgba(255,255,255,0.1)' }}
           >
             {/* Header logo: icon file if available, else full logo, else fallback SVG */}
             <SwitcherLogo client={activeClient as Client} size="button" />
             <div className="hidden md:block text-left">
-              <div className="text-[12px] font-semibold text-gray-800 leading-tight max-w-[120px] truncate">
+              <div className="text-[12px] font-semibold text-white leading-tight max-w-[120px] truncate">
                 {activeClient.name}
               </div>
-              <div className="text-[10px] text-gray-400 leading-tight">
+              <div className="text-[10px] text-white/40 leading-tight">
                 {(activeClient as typeof activeClient & { industry: string }).industry}
               </div>
             </div>
             <ChevronDown
               size={12}
-              className="text-gray-400 transition-transform duration-200"
-              style={{ transform: open ? 'rotate(180deg)' : 'rotate(0deg)' }}
+              className="transition-transform duration-200"
+              style={{ color: 'rgba(255,255,255,0.4)', transform: open ? 'rotate(180deg)' : 'rotate(0deg)' }}
             />
           </button>
 
@@ -219,12 +223,12 @@ export default function Header() {
             <div
               className="absolute right-0 top-full mt-2 w-64 rounded-2xl py-2 z-50 animate-slide-down"
               style={{
-                background: '#fff',
-                boxShadow: '0 4px 6px rgba(0,0,0,0.04), 0 12px 32px rgba(0,0,0,0.10), 0 0 0 1px rgba(0,0,0,0.05)',
+                background: '#0f1f2e',
+                boxShadow: '0 4px 6px rgba(0,0,0,0.2), 0 12px 32px rgba(0,0,0,0.3), 0 0 0 1px rgba(255,255,255,0.08)',
               }}
             >
               <div className="px-4 pb-2 pt-1">
-                <span className="text-[10px] font-semibold tracking-[0.1em] text-gray-300 uppercase">
+                <span className="text-[10px] font-semibold tracking-[0.1em] text-white/30 uppercase">
                   Switch Account
                 </span>
               </div>
@@ -236,14 +240,13 @@ export default function Header() {
                   <button
                     key={client.id}
                     onClick={() => { setActiveClientId(client.id); setOpen(false); }}
-                    className="w-full flex items-center gap-3 px-3 py-2.5 mx-1 rounded-xl transition-all text-left hover:bg-gray-50"
+                    className="w-full flex items-center gap-3 px-3 py-2.5 mx-1 rounded-xl transition-all text-left hover:bg-white/8"
                     style={{ width: 'calc(100% - 8px)' }}
                   >
-                    {/* Real logo or fallback SVG — normalized to consistent visual weight */}
                     <SwitcherLogo client={clientTyped} size="dropdown" />
                     <div className="flex-1 min-w-0">
-                      <div className="text-[13px] font-semibold text-gray-800 truncate">{client.name}</div>
-                      <div className="text-[11px] text-gray-400 truncate">{(client as typeof client & { industry: string }).industry}</div>
+                      <div className="text-[13px] font-semibold text-white truncate">{client.name}</div>
+                      <div className="text-[11px] text-white/40 truncate">{(client as typeof client & { industry: string }).industry}</div>
                     </div>
                     {isActive && (
                       <div
@@ -257,14 +260,14 @@ export default function Header() {
                 );
               })}
 
-              <div className="mx-3 my-2 h-px bg-gray-100" />
+              <div className="mx-3 my-2 h-px" style={{ background: 'rgba(255,255,255,0.08)' }} />
 
               <button
-                className="w-full flex items-center gap-3 px-3 py-2.5 mx-1 rounded-xl transition-all text-left hover:bg-gray-50 text-gray-400 hover:text-gray-600"
+                className="w-full flex items-center gap-3 px-3 py-2.5 mx-1 rounded-xl transition-all text-left hover:bg-white/8 text-white/40 hover:text-white/60"
                 style={{ width: 'calc(100% - 8px)' }}
               >
-                <div className="w-8 h-8 rounded-xl border-2 border-dashed border-gray-200 flex items-center justify-center">
-                  <Plus size={13} className="text-gray-300" />
+                <div className="w-8 h-8 rounded-xl border-2 border-dashed flex items-center justify-center" style={{ borderColor: 'rgba(255,255,255,0.15)' }}>
+                  <Plus size={13} style={{ color: 'rgba(255,255,255,0.3)' }} />
                 </div>
                 <span className="text-[13px] font-medium">Add New Client</span>
               </button>

@@ -69,9 +69,9 @@ export const clients: Client[] = [
       accentColor: '#5bc4d4',
       mode: 'light',
       logoText: 'Mother Nature Agency',
-      // Real logo files — SVGs are handled with <img> tags (no Next.js optimization needed)
-      logoUrl: '/logos/mna-logo.svg',   // 500×500 square — full stacked logo mark
-      iconUrl: '/logos/mna-icon.svg',   // 500×500 square — icon mark only
+      // MNA gradient logo (PNG) — used in sidebar, header, login, etc.
+      logoUrl: '/logos/mna-logo.png',
+      iconUrl: '/logos/mna-logo.png',
     },
     kpiTargets: {
       leads: 500,

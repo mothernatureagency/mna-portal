@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { ensureSchema, query } from '@/lib/db';
 import Anthropic from '@anthropic-ai/sdk';
 import { createCalendarEvent, isConnected } from '@/lib/google-calendar';
-import { resolveAttendees, CONTACTS } from '@/lib/contacts';
+import { resolveAttendees, getContactsForPrompt } from '@/lib/contacts';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -127,7 +127,7 @@ async function executeTool(name: string, input: any, userEmail: string): Promise
   switch (name) {
     case 'add_event': {
       // Resolve attendees from names/emails
-      const resolvedAttendees = input.attendees ? resolveAttendees(input.attendees) : [];
+      const resolvedAttendees = input.attendees ? await resolveAttendees(input.attendees) : [];
       const attendeesStr = resolvedAttendees.length > 0
         ? resolvedAttendees.map(a => a.name || a.email).join(', ')
         : null;
@@ -330,7 +330,7 @@ When adding events, infer reasonable defaults:
 - Always set a start_time for meetings/calls so a proper Google Meet link can be created.
 
 Team & Contact Directory (for attendees):
-${CONTACTS.map(c => `- ${c.name} (${c.email}) — ${c.role}${c.clientId ? ` [${c.clientId}]` : ''}`).join('\n')}
+${await getContactsForPrompt()}
 
 When the user says "set up a call with Justin" or "meeting with Sable and Jennifer", pass their names as the attendees parameter. Google Calendar will automatically send them invite emails.
 ${memoryContext}`;

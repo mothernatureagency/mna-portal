@@ -148,6 +148,8 @@ export async function createCalendarEvent(
     attendees?: { name?: string; email: string }[];
     meetingMode?: 'in_person' | 'google_meet' | 'none'; // none = task/deadline
     location?: string; // for in-person meetings
+    recurrence?: 'none' | 'daily' | 'weekly' | 'biweekly' | 'monthly';
+    recurrenceEnd?: string; // YYYY-MM-DD
   }
 ): Promise<{ success: boolean; googleEventId?: string; htmlLink?: string; meetLink?: string; error?: string }> {
   const accessToken = await getAccessToken(userEmail);
@@ -195,6 +197,24 @@ export async function createCalendarEvent(
     // All-day event
     body.start = { date: event.date };
     body.end = { date: event.date };
+  }
+
+  // Add recurrence rule if set
+  if (event.recurrence && event.recurrence !== 'none') {
+    const rruleMap: Record<string, string> = {
+      daily: 'RRULE:FREQ=DAILY',
+      weekly: 'RRULE:FREQ=WEEKLY',
+      biweekly: 'RRULE:FREQ=WEEKLY;INTERVAL=2',
+      monthly: 'RRULE:FREQ=MONTHLY',
+    };
+    let rrule = rruleMap[event.recurrence] || '';
+    if (rrule && event.recurrenceEnd) {
+      // Google requires UNTIL in UTC format YYYYMMDDTHHMMSSZ
+      rrule += `;UNTIL=${event.recurrenceEnd.replace(/-/g, '')}T235959Z`;
+    }
+    if (rrule) {
+      body.recurrence = [rrule];
+    }
   }
 
   // Add Google Meet conference if requested

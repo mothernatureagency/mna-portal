@@ -40,6 +40,7 @@ import Image from 'next/image';
 // Update this map when adding new client PNG logos.
 export const PNG_DIMENSIONS: Record<string, { w: number; h: number }> = {
   '/logos/primeiv-logo.png': { w: 9088, h: 4420 },  // aspect ≈ 2.054
+  '/logos/mna-logo.png': { w: 1366, h: 768 },        // aspect ≈ 1.779
 };
 
 type LogoImageProps = {

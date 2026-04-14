@@ -34,7 +34,7 @@ const EVENT_COLORS: Record<string, { bg: string; text: string; icon: string }> =
   deadline: { bg: 'rgba(239,68,68,0.15)', text: '#f87171', icon: 'flag' },
   review: { bg: 'rgba(168,85,247,0.15)', text: '#c084fc', icon: 'rate_review' },
   personal: { bg: 'rgba(245,158,11,0.15)', text: '#fbbf24', icon: 'person' },
-  google: { bg: 'rgba(66,133,244,0.15)', text: '#4285f4', icon: 'event' },
+  google: { bg: 'rgba(191,219,254,0.15)', text: '#bfdbfe', icon: 'event' },
 };
 
 export default function PersonalDashboard() {
@@ -212,7 +212,7 @@ export default function PersonalDashboard() {
     return (
       <div className="flex items-center gap-3 py-2.5 px-3 rounded-xl transition-colors hover:bg-white/5 group">
         {isGoogle ? (
-          <span className="material-symbols-outlined shrink-0" style={{ fontSize: 18, color: '#4285f4' }}>event</span>
+          <span className="material-symbols-outlined shrink-0" style={{ fontSize: 18, color: '#bfdbfe' }}>event</span>
         ) : (
           <button
             onClick={() => toggleComplete(event.id)}
@@ -379,7 +379,7 @@ export default function PersonalDashboard() {
                       <div className="flex gap-0.5 mt-0.5">
                         {hasPersonal && <div className="w-1.5 h-1.5 rounded-full bg-amber-400" />}
                         {hasBusiness && <div className="w-1.5 h-1.5 rounded-full bg-cyan-400" />}
-                        {hasGoogle && <div className="w-1.5 h-1.5 rounded-full bg-blue-400" />}
+                        {hasGoogle && <div className="w-1.5 h-1.5 rounded-full bg-blue-300" />}
                       </div>
                     )}
                   </button>
@@ -415,7 +415,7 @@ export default function PersonalDashboard() {
               </div>
               {gcalConnected && (
                 <div className="flex items-center gap-1.5">
-                  <div className="w-2 h-2 rounded-full bg-blue-400" />
+                  <div className="w-2 h-2 rounded-full bg-blue-300" />
                   <span className="text-[10px] text-white/30">Google Calendar</span>
                 </div>
               )}
@@ -476,10 +476,10 @@ export default function PersonalDashboard() {
               <div className="rounded-2xl overflow-hidden" style={{ background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.07)' }}>
                 <div className="flex items-center justify-between px-5 py-3.5" style={{ borderBottom: '1px solid rgba(255,255,255,0.06)' }}>
                   <div className="flex items-center gap-2">
-                    <span className="material-symbols-outlined text-blue-400" style={{ fontSize: 18 }}>event</span>
-                    <span className="text-[12px] font-bold uppercase tracking-wider text-blue-400">Google Calendar</span>
+                    <span className="material-symbols-outlined text-blue-300" style={{ fontSize: 18 }}>event</span>
+                    <span className="text-[12px] font-bold uppercase tracking-wider text-blue-300">Google Calendar</span>
                     {todayGoogleEvents.length > 0 && (
-                      <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-blue-400/15 text-blue-400">{todayGoogleEvents.length}</span>
+                      <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-blue-300/15 text-blue-300">{todayGoogleEvents.length}</span>
                     )}
                   </div>
                   <Link href="/settings" className="text-[11px] text-white/30 hover:text-white/60 transition-colors">Settings</Link>

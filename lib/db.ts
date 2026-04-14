@@ -213,6 +213,9 @@ async function initSchema() {
                     ALTER TABLE schedule_events ADD COLUMN IF NOT EXISTS meeting_mode text DEFAULT 'none';
                     ALTER TABLE schedule_events ADD COLUMN IF NOT EXISTS location text;
                     ALTER TABLE schedule_events ADD COLUMN IF NOT EXISTS meet_link text;
+                    ALTER TABLE schedule_events ADD COLUMN IF NOT EXISTS recurrence text DEFAULT 'none';
+                    ALTER TABLE schedule_events ADD COLUMN IF NOT EXISTS recurrence_end date;
+                    ALTER TABLE schedule_events ADD COLUMN IF NOT EXISTS recurring_parent_id uuid;
                   EXCEPTION WHEN others THEN NULL;
                   END $$`,
                   // Invoices
@@ -268,6 +271,48 @@ async function initSchema() {
                         source text,
                         created_at timestamptz not null default now()
                   )`,
+                  // Contacts directory
+                  `create table if not exists contacts (
+                        id uuid primary key default uuid_generate_v4(),
+                        name text not null,
+                        email text not null,
+                        role text,
+                        contact_group text not null default 'client',
+                        client_id text,
+                        company text,
+                        created_at timestamptz not null default now()
+                  )`,
+                  // Booking requests
+                  `create table if not exists booking_requests (
+                        id uuid primary key default uuid_generate_v4(),
+                        requester_email text not null,
+                        requester_name text not null,
+                        owner_email text not null default 'mn@mothernatureagency.com',
+                        client_id text,
+                        title text not null,
+                        description text,
+                        requested_date date not null,
+                        requested_start_time text not null,
+                        requested_end_time text not null,
+                        meeting_mode text default 'google_meet',
+                        status text not null default 'confirmed',
+                        schedule_event_id uuid,
+                        google_event_id text,
+                        meet_link text,
+                        created_at timestamptz not null default now()
+                  )`,
+                  // Seed default contacts if empty
+                  `DO $$ BEGIN
+                    IF NOT EXISTS (SELECT 1 FROM contacts LIMIT 1) THEN
+                      INSERT INTO contacts (name, email, role, contact_group, client_id) VALUES
+                        ('Alexus Williams', 'mn@mothernatureagency.com', 'Owner', 'team', null),
+                        ('Sable', 'admin@mothernatureagency.com', 'Social Media', 'team', null),
+                        ('Vanessa', 'info@mothernatureagency.com', 'Manager', 'team', null),
+                        ('Justin Kulkusky', 'jkulkusky@primeivhydration.com', 'Owner', 'client', 'prime-iv'),
+                        ('Jennifer Burlison', 'niceville@primeivhydration.com', 'Admin', 'client', 'prime-iv');
+                    END IF;
+                  EXCEPTION WHEN others THEN NULL;
+                  END $$`,
                   `create table if not exists users (
                         id uuid primary key default uuid_generate_v4(),
                               username text not null unique,

@@ -14,6 +14,8 @@ function isPublicRoute(pathname: string) {
     pathname.startsWith('/api/meeting-notes') ||
     pathname.startsWith('/api/weekly-summary') ||
     pathname.startsWith('/api/send-weekly-email') ||
+    pathname.startsWith('/book') ||
+    pathname.startsWith('/api/booking') ||
     pathname.startsWith('/_next') ||
     pathname === '/favicon.ico'
   );
