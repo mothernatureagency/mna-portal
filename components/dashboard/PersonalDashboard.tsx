@@ -44,6 +44,10 @@ export default function PersonalDashboard() {
   const [tomorrowEvents, setTomorrowEvents] = useState<ScheduleEvent[]>([]);
   const [personalEvents, setPersonalEvents] = useState<ScheduleEvent[]>([]);
   const [businessEvents, setBusinessEvents] = useState<ScheduleEvent[]>([]);
+  const [monthEvents, setMonthEvents] = useState<ScheduleEvent[]>([]);
+  const [calMonth, setCalMonth] = useState(new Date().getMonth());
+  const [calYear, setCalYear] = useState(new Date().getFullYear());
+  const [selectedDate, setSelectedDate] = useState<string | null>(null);
   const [chatMessages, setChatMessages] = useState<ChatMessage[]>([]);
   const [chatInput, setChatInput] = useState('');
   const [chatLoading, setChatLoading] = useState(false);
@@ -90,6 +94,18 @@ export default function PersonalDashboard() {
         .catch(() => {});
     });
   }, [today, tomorrow]);
+
+  // Fetch month events for calendar view
+  useEffect(() => {
+    if (!userEmail) return;
+    const monthStart = `${calYear}-${String(calMonth + 1).padStart(2, '0')}-01`;
+    const lastDay = new Date(calYear, calMonth + 1, 0).getDate();
+    const monthEnd = `${calYear}-${String(calMonth + 1).padStart(2, '0')}-${lastDay}`;
+    fetch(`/api/schedule?email=${encodeURIComponent(userEmail)}&from=${monthStart}&to=${monthEnd}`)
+      .then(r => r.json())
+      .then(data => setMonthEvents(data.events || []))
+      .catch(() => {});
+  }, [userEmail, calMonth, calYear]);
 
   useEffect(() => {
     chatEndRef.current?.scrollIntoView({ behavior: 'smooth' });
@@ -203,6 +219,138 @@ export default function PersonalDashboard() {
           Full Schedule
         </Link>
       </div>
+
+      {/* ── Month Calendar Overview ── */}
+      {(() => {
+        const firstDay = new Date(calYear, calMonth, 1).getDay();
+        const daysInMonth = new Date(calYear, calMonth + 1, 0).getDate();
+        const monthName = new Date(calYear, calMonth).toLocaleString('en-US', { month: 'long', year: 'numeric' });
+        const cells: (number | null)[] = [];
+        for (let i = 0; i < firstDay; i++) cells.push(null);
+        for (let d = 1; d <= daysInMonth; d++) cells.push(d);
+
+        // Build event map for this month
+        const eventsByDay: Record<number, ScheduleEvent[]> = {};
+        monthEvents.forEach(e => {
+          const day = parseInt(e.event_date.split('-')[2], 10);
+          if (!eventsByDay[day]) eventsByDay[day] = [];
+          eventsByDay[day].push(e);
+        });
+
+        const todayNum = today === `${calYear}-${String(calMonth + 1).padStart(2, '0')}-${String(new Date().getDate()).padStart(2, '0')}`
+          ? new Date().getDate() : -1;
+
+        const selectedDateStr = selectedDate;
+        const selectedDayEvents = selectedDate ? monthEvents.filter(e => e.event_date === selectedDate && !e.completed) : [];
+
+        return (
+          <div className="rounded-2xl overflow-hidden" style={{ background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.07)' }}>
+            {/* Calendar header */}
+            <div className="flex items-center justify-between px-5 py-3.5" style={{ borderBottom: '1px solid rgba(255,255,255,0.06)' }}>
+              <div className="flex items-center gap-2">
+                <span className="material-symbols-outlined text-cyan-400" style={{ fontSize: 18 }}>calendar_month</span>
+                <span className="text-[14px] font-bold text-white">{monthName}</span>
+              </div>
+              <div className="flex items-center gap-1">
+                <button
+                  onClick={() => {
+                    if (calMonth === 0) { setCalMonth(11); setCalYear(y => y - 1); }
+                    else setCalMonth(m => m - 1);
+                  }}
+                  className="w-7 h-7 rounded-lg flex items-center justify-center text-white/40 hover:text-white hover:bg-white/10 transition-colors"
+                >
+                  <span className="material-symbols-outlined" style={{ fontSize: 16 }}>chevron_left</span>
+                </button>
+                <button
+                  onClick={() => { setCalMonth(new Date().getMonth()); setCalYear(new Date().getFullYear()); }}
+                  className="text-[11px] font-semibold text-white/40 hover:text-white px-2 py-1 rounded-lg hover:bg-white/10 transition-colors"
+                >
+                  Today
+                </button>
+                <button
+                  onClick={() => {
+                    if (calMonth === 11) { setCalMonth(0); setCalYear(y => y + 1); }
+                    else setCalMonth(m => m + 1);
+                  }}
+                  className="w-7 h-7 rounded-lg flex items-center justify-center text-white/40 hover:text-white hover:bg-white/10 transition-colors"
+                >
+                  <span className="material-symbols-outlined" style={{ fontSize: 16 }}>chevron_right</span>
+                </button>
+              </div>
+            </div>
+
+            {/* Day headers */}
+            <div className="grid grid-cols-7 px-4 pt-3 pb-1">
+              {['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'].map(d => (
+                <div key={d} className="text-center text-[10px] font-bold uppercase tracking-wider text-white/25 py-1">{d}</div>
+              ))}
+            </div>
+
+            {/* Day cells */}
+            <div className="grid grid-cols-7 px-4 pb-3">
+              {cells.map((day, i) => {
+                if (day === null) return <div key={`e-${i}`} />;
+                const dayStr = `${calYear}-${String(calMonth + 1).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
+                const dayEvents = eventsByDay[day] || [];
+                const isToday = day === todayNum;
+                const isSelected = dayStr === selectedDateStr;
+                const hasPersonal = dayEvents.some(e => e.event_type === 'personal');
+                const hasBusiness = dayEvents.some(e => e.event_type !== 'personal');
+
+                return (
+                  <button
+                    key={day}
+                    onClick={() => setSelectedDate(isSelected ? null : dayStr)}
+                    className="relative flex flex-col items-center py-1.5 rounded-lg transition-all hover:bg-white/5"
+                    style={{
+                      background: isSelected ? 'rgba(12,109,164,0.25)' : isToday ? 'rgba(255,255,255,0.06)' : 'transparent',
+                      border: isToday ? '1px solid rgba(74,184,206,0.3)' : '1px solid transparent',
+                    }}
+                  >
+                    <span className={`text-[12px] font-semibold ${isToday ? 'text-cyan-400' : isSelected ? 'text-white' : 'text-white/60'}`}>
+                      {day}
+                    </span>
+                    {dayEvents.length > 0 && (
+                      <div className="flex gap-0.5 mt-0.5">
+                        {hasPersonal && <div className="w-1.5 h-1.5 rounded-full bg-amber-400" />}
+                        {hasBusiness && <div className="w-1.5 h-1.5 rounded-full bg-cyan-400" />}
+                      </div>
+                    )}
+                  </button>
+                );
+              })}
+            </div>
+
+            {/* Selected day detail */}
+            {selectedDate && (
+              <div className="px-4 pb-4" style={{ borderTop: '1px solid rgba(255,255,255,0.06)' }}>
+                <div className="text-[11px] font-bold uppercase tracking-wider text-white/30 py-2.5">
+                  {new Date(selectedDate + 'T12:00:00').toLocaleDateString('en-US', { weekday: 'long', month: 'short', day: 'numeric' })}
+                </div>
+                {selectedDayEvents.length > 0 ? (
+                  <div className="space-y-1">
+                    {selectedDayEvents.map(e => <EventCard key={e.id} event={e} />)}
+                  </div>
+                ) : (
+                  <div className="text-white/25 text-[12px] text-center py-3">No events</div>
+                )}
+              </div>
+            )}
+
+            {/* Legend */}
+            <div className="flex items-center gap-4 px-5 pb-3">
+              <div className="flex items-center gap-1.5">
+                <div className="w-2 h-2 rounded-full bg-amber-400" />
+                <span className="text-[10px] text-white/30">Personal</span>
+              </div>
+              <div className="flex items-center gap-1.5">
+                <div className="w-2 h-2 rounded-full bg-cyan-400" />
+                <span className="text-[10px] text-white/30">Business</span>
+              </div>
+            </div>
+          </div>
+        );
+      })()}
 
       {/* ── Two-column layout: Schedule + Assistant ── */}
       <div className="grid grid-cols-1 lg:grid-cols-5 gap-5">
