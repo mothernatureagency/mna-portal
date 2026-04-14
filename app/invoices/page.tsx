@@ -480,7 +480,7 @@ export default function InvoicesPage() {
                       <div><span className="text-white/30">Account #</span> <span className="text-white font-semibold">{PAYMENT_INFO.accountNumber}</span></div>
                       <div><span className="text-white/30">ACH Routing #</span> <span className="text-white font-semibold">{PAYMENT_INFO.achRouting}</span></div>
                       <div><span className="text-white/30">Wire Routing #</span> <span className="text-white font-semibold">{PAYMENT_INFO.wireRouting}</span></div>
-                      <div className="text-amber-400/80 text-[11px] font-semibold self-center">+ $20 wire fee</div>
+                      <div className="text-amber-400/80 text-[11px] font-semibold self-center">* Wire fee may apply</div>
                     </div>
                   </div>
                   <div className="col-span-2 text-[11px] text-white/40">

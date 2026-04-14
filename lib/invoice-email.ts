@@ -146,7 +146,7 @@ function buildInvoiceEmailHtml(invoice: InvoiceData): string {
             <td style="padding: 4px 0; font-size: 13px; color: #333; font-weight: 600; text-align: right;">026009593</td>
           </tr>
           <tr>
-            <td colspan="2" style="padding: 6px 0 0; font-size: 11px; color: #e65100; font-weight: 600;">* Please add $20 wire fee if sending via wire transfer</td>
+            <td colspan="2" style="padding: 6px 0 0; font-size: 11px; color: #e65100; font-weight: 600;">* Wire fee may apply if sending via wire transfer</td>
           </tr>
         </table>
         <p style="font-size: 12px; color: #666; margin: 12px 0 0;">Checks payable to: <strong style="color: #333;">Mother Nature Agency LLC / Alexus Williams</strong></p>
