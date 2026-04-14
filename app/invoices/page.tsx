@@ -428,7 +428,22 @@ export default function InvoicesPage() {
                 </div>
                 <div className="text-right">
                   <div className="text-[10px] font-bold text-white/30 uppercase tracking-wider mb-1">Due Date</div>
-                  <div className="text-[14px] font-bold text-white">{selectedInvoice.due_date}</div>
+                  <input
+                    type="date"
+                    value={selectedInvoice.due_date}
+                    onChange={async (e) => {
+                      const newDate = e.target.value;
+                      if (!newDate) return;
+                      await fetch('/api/invoices', {
+                        method: 'PATCH',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ id: selectedInvoice.id, due_date: newDate }),
+                      });
+                      setSelectedInvoice({ ...selectedInvoice, due_date: newDate });
+                      fetchInvoices();
+                    }}
+                    className="text-[14px] font-bold text-white bg-white/5 border border-white/10 rounded-lg px-3 py-1.5 outline-none focus:border-cyan-500/50 cursor-pointer text-right"
+                  />
                 </div>
               </div>
 
