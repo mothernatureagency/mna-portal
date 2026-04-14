@@ -141,6 +141,58 @@ export default function InvoicesPage() {
     setSelectedInvoice(null);
   }
 
+  async function patchInvoice(fields: Record<string, any>) {
+    if (!selectedInvoice) return;
+    const res = await fetch('/api/invoices', {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ id: selectedInvoice.id, ...fields }),
+    });
+    if (res.ok) {
+      const data = await res.json();
+      setSelectedInvoice(data.invoice);
+      fetchInvoices();
+    }
+  }
+
+  function updateModalLineItem(idx: number, field: keyof LineItem, value: string | number) {
+    if (!selectedInvoice) return;
+    const items = [...(selectedInvoice.items as LineItem[])];
+    (items[idx] as any)[field] = value;
+    if (field === 'quantity' || field === 'rate') {
+      items[idx].amount = Number(items[idx].quantity) * Number(items[idx].rate);
+    }
+    const newSubtotal = items.reduce((s, i) => s + Number(i.amount), 0);
+    const newTaxAmount = newSubtotal * (Number(selectedInvoice.tax_rate) / 100);
+    const newTotal = newSubtotal + newTaxAmount;
+    setSelectedInvoice({ ...selectedInvoice, items, subtotal: newSubtotal, tax_amount: newTaxAmount, total: newTotal });
+  }
+
+  function saveModalLineItems() {
+    if (!selectedInvoice) return;
+    const items = selectedInvoice.items as LineItem[];
+    const newSubtotal = items.reduce((s, i) => s + Number(i.amount), 0);
+    const newTaxAmount = newSubtotal * (Number(selectedInvoice.tax_rate) / 100);
+    const newTotal = newSubtotal + newTaxAmount;
+    patchInvoice({ items, subtotal: newSubtotal, tax_amount: newTaxAmount, total: newTotal });
+  }
+
+  function addModalLineItem() {
+    if (!selectedInvoice) return;
+    const items = [...(selectedInvoice.items as LineItem[]), { description: '', quantity: 1, rate: 0, amount: 0 }];
+    setSelectedInvoice({ ...selectedInvoice, items });
+  }
+
+  function removeModalLineItem(idx: number) {
+    if (!selectedInvoice) return;
+    const items = (selectedInvoice.items as LineItem[]).filter((_, i) => i !== idx);
+    const newSubtotal = items.reduce((s, i) => s + Number(i.amount), 0);
+    const newTaxAmount = newSubtotal * (Number(selectedInvoice.tax_rate) / 100);
+    const newTotal = newSubtotal + newTaxAmount;
+    setSelectedInvoice({ ...selectedInvoice, items, subtotal: newSubtotal, tax_amount: newTaxAmount, total: newTotal });
+    patchInvoice({ items, subtotal: newSubtotal, tax_amount: newTaxAmount, total: newTotal });
+  }
+
   const shown = filter === 'all' ? invoices : invoices.filter(i => i.status === filter);
   const totals = {
     outstanding: invoices.filter(i => i.status === 'sent' || i.status === 'overdue').reduce((s, i) => s + Number(i.total), 0),
@@ -410,12 +462,18 @@ export default function InvoicesPage() {
             <div className="p-6">
               {/* Invoice header */}
               <div className="flex items-start justify-between mb-6">
-                <div>
+                <div className="flex-1 min-w-0 mr-4">
                   <div className="text-[10px] font-bold uppercase tracking-wider text-white/40 mb-1">Invoice</div>
                   <div className="text-[20px] font-extrabold text-white">{selectedInvoice.invoice_number}</div>
-                  <div className="text-[13px] text-white/50 mt-1">{selectedInvoice.title}</div>
+                  <input
+                    value={selectedInvoice.title}
+                    onChange={(e) => setSelectedInvoice({ ...selectedInvoice, title: e.target.value })}
+                    onBlur={() => patchInvoice({ title: selectedInvoice.title })}
+                    className="text-[13px] text-white/70 mt-1 bg-transparent border-b border-transparent hover:border-white/15 focus:border-cyan-500/50 outline-none w-full py-0.5 transition-colors"
+                    placeholder="Invoice title"
+                  />
                 </div>
-                <button onClick={() => setSelectedInvoice(null)} className="w-8 h-8 rounded-lg flex items-center justify-center text-white/40 hover:text-white hover:bg-white/10">
+                <button onClick={() => setSelectedInvoice(null)} className="w-8 h-8 rounded-lg flex items-center justify-center text-white/40 hover:text-white hover:bg-white/10 shrink-0">
                   <span className="material-symbols-outlined" style={{ fontSize: 18 }}>close</span>
                 </button>
               </div>
@@ -447,28 +505,86 @@ export default function InvoicesPage() {
                 </div>
               </div>
 
-              {/* Line items */}
+              {/* Line items — editable */}
               <div className="mb-6">
-                <div className="grid gap-0 text-[11px] font-bold text-white/30 uppercase tracking-wider mb-2" style={{ gridTemplateColumns: '1fr 70px 90px 90px' }}>
-                  <span>Description</span><span className="text-center">Qty</span><span className="text-right">Rate</span><span className="text-right">Amount</span>
+                <div className="grid gap-0 text-[11px] font-bold text-white/30 uppercase tracking-wider mb-2" style={{ gridTemplateColumns: '1fr 70px 90px 90px 32px' }}>
+                  <span>Description</span><span className="text-center">Qty</span><span className="text-right">Rate</span><span className="text-right">Amount</span><span></span>
                 </div>
                 {(selectedInvoice.items as LineItem[]).map((item, idx) => (
-                  <div key={idx} className="grid gap-0 py-2.5 text-[13px]" style={{ gridTemplateColumns: '1fr 70px 90px 90px', borderBottom: '1px solid rgba(255,255,255,0.05)' }}>
-                    <span className="text-white">{item.description}</span>
-                    <span className="text-white/50 text-center">{item.quantity}</span>
-                    <span className="text-white/50 text-right">${Number(item.rate).toFixed(2)}</span>
+                  <div key={idx} className="grid gap-1 py-1.5 items-center text-[13px]" style={{ gridTemplateColumns: '1fr 70px 90px 90px 32px', borderBottom: '1px solid rgba(255,255,255,0.05)' }}>
+                    <input
+                      value={item.description}
+                      onChange={(e) => updateModalLineItem(idx, 'description', e.target.value)}
+                      onBlur={saveModalLineItems}
+                      className="text-white bg-transparent border-b border-transparent hover:border-white/15 focus:border-cyan-500/50 outline-none py-0.5 text-[13px] transition-colors"
+                      placeholder="Description"
+                    />
+                    <input
+                      type="number"
+                      value={item.quantity || ''}
+                      onChange={(e) => updateModalLineItem(idx, 'quantity', Number(e.target.value))}
+                      onBlur={saveModalLineItems}
+                      className="text-white/50 bg-transparent border-b border-transparent hover:border-white/15 focus:border-cyan-500/50 outline-none py-0.5 text-[13px] text-center transition-colors w-full"
+                      min={1}
+                    />
+                    <input
+                      type="number"
+                      value={item.rate || ''}
+                      onChange={(e) => updateModalLineItem(idx, 'rate', Number(e.target.value))}
+                      onBlur={saveModalLineItems}
+                      className="text-white/50 bg-transparent border-b border-transparent hover:border-white/15 focus:border-cyan-500/50 outline-none py-0.5 text-[13px] text-right transition-colors w-full"
+                      min={0}
+                      step={0.01}
+                    />
                     <span className="text-white font-semibold text-right">${Number(item.amount).toFixed(2)}</span>
+                    <button
+                      onClick={() => removeModalLineItem(idx)}
+                      className="w-6 h-6 rounded flex items-center justify-center text-white/20 hover:text-rose-400 hover:bg-rose-400/10 transition-colors"
+                    >
+                      <span className="material-symbols-outlined" style={{ fontSize: 14 }}>close</span>
+                    </button>
                   </div>
                 ))}
+                <button
+                  onClick={addModalLineItem}
+                  className="mt-2 text-[12px] text-cyan-400 hover:text-cyan-300 font-semibold flex items-center gap-1"
+                >
+                  <span className="material-symbols-outlined" style={{ fontSize: 14 }}>add</span>
+                  Add line item
+                </button>
               </div>
 
               {/* Totals */}
               <div className="flex justify-end mb-6">
-                <div className="w-56 space-y-1.5">
+                <div className="w-64 space-y-1.5">
                   <div className="flex justify-between text-[13px]"><span className="text-white/40">Subtotal</span><span className="text-white">${Number(selectedInvoice.subtotal).toFixed(2)}</span></div>
-                  {Number(selectedInvoice.tax_rate) > 0 && (
-                    <div className="flex justify-between text-[13px]"><span className="text-white/40">Tax ({selectedInvoice.tax_rate}%)</span><span className="text-white">${Number(selectedInvoice.tax_amount).toFixed(2)}</span></div>
-                  )}
+                  <div className="flex items-center justify-between text-[13px]">
+                    <div className="flex items-center gap-1.5">
+                      <span className="text-white/40">Tax</span>
+                      <input
+                        type="number"
+                        value={selectedInvoice.tax_rate || ''}
+                        onChange={(e) => {
+                          const rate = Number(e.target.value);
+                          const sub = Number(selectedInvoice.subtotal);
+                          const taxAmt = sub * (rate / 100);
+                          setSelectedInvoice({ ...selectedInvoice, tax_rate: rate, tax_amount: taxAmt, total: sub + taxAmt });
+                        }}
+                        onBlur={() => {
+                          const rate = Number(selectedInvoice.tax_rate);
+                          const sub = Number(selectedInvoice.subtotal);
+                          const taxAmt = sub * (rate / 100);
+                          patchInvoice({ tax_rate: rate, tax_amount: taxAmt, total: sub + taxAmt });
+                        }}
+                        className="w-14 rounded-md px-1.5 py-0.5 bg-white/5 text-white text-[12px] border border-white/10 text-center outline-none focus:border-cyan-500/50"
+                        placeholder="0"
+                        min={0}
+                        step={0.5}
+                      />
+                      <span className="text-white/30 text-[11px]">%</span>
+                    </div>
+                    <span className="text-white">${Number(selectedInvoice.tax_amount).toFixed(2)}</span>
+                  </div>
                   <div className="flex justify-between text-[16px] font-extrabold pt-2" style={{ borderTop: '1px solid rgba(255,255,255,0.1)' }}>
                     <span className="text-white">Total</span>
                     <span className="text-white">${Number(selectedInvoice.total).toFixed(2)}</span>
@@ -504,11 +620,17 @@ export default function InvoicesPage() {
                 </div>
               </div>
 
-              {selectedInvoice.notes && (
-                <div className="text-[12px] text-white/40 mb-6">
-                  <span className="font-bold text-white/50">Notes: </span>{selectedInvoice.notes}
-                </div>
-              )}
+              <div className="mb-6">
+                <div className="text-[10px] font-bold text-white/30 uppercase tracking-wider mb-1.5">Notes</div>
+                <textarea
+                  value={selectedInvoice.notes || ''}
+                  onChange={(e) => setSelectedInvoice({ ...selectedInvoice, notes: e.target.value })}
+                  onBlur={() => patchInvoice({ notes: selectedInvoice.notes || null })}
+                  placeholder="Payment terms, additional info..."
+                  rows={2}
+                  className="w-full text-[12px] text-white/60 bg-white/5 border border-white/10 rounded-xl px-3 py-2 outline-none focus:border-cyan-500/50 resize-none placeholder:text-white/20 transition-colors"
+                />
+              </div>
 
               {/* Actions */}
               <div className="flex flex-wrap gap-2">
