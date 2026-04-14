@@ -55,11 +55,11 @@ type OnboardingStep = {
 // ─── TAB CONFIG ─────────────────────────────────────────────────────
 
 const TABS = [
+  { key: 'onboarding', label: 'Onboarding', icon: 'rocket_launch' },
   { key: 'overview', label: 'Overview', icon: 'dashboard' },
   { key: 'socials', label: 'Our Socials', icon: 'share' },
   { key: 'ai', label: 'AI Intelligence', icon: 'psychology' },
   { key: 'outreach', label: 'Outreach', icon: 'campaign' },
-  { key: 'onboarding', label: 'Onboarding', icon: 'rocket_launch' },
 ] as const;
 
 type TabKey = (typeof TABS)[number]['key'];
@@ -183,7 +183,7 @@ const DEFAULT_ONBOARDING_STEPS: OnboardingStep[] = [
 export default function MNADashboard() {
   const { activeClient } = useClient();
   const { gradientFrom, gradientTo } = activeClient.branding;
-  const [activeTab, setActiveTab] = useState<TabKey>('overview');
+  const [activeTab, setActiveTab] = useState<TabKey>('onboarding');
 
   // Prospects stored in client_kv
   const [prospects, setProspects] = useState<Prospect[]>([]);
