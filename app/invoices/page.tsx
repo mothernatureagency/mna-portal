@@ -39,8 +39,9 @@ const STATUS_STYLES: Record<string, { bg: string; text: string }> = {
 const PAYMENT_INFO = {
   bankName: 'Bank of America',
   accountName: 'Mother Nature Agency LLC',
-  routingNumber: '',   // Staff fills in from settings
-  accountNumber: '',   // Staff fills in from settings
+  accountNumber: '898165120338',
+  achRouting: '063100277',
+  wireRouting: '026009593',
   paypal: 'mn@mothernatureagency.com',
   zelle: 'mn@mothernatureagency.com',
 };
@@ -463,6 +464,7 @@ export default function InvoicesPage() {
               {/* Payment info */}
               <div className="rounded-xl p-4 mb-6" style={{ background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.07)' }}>
                 <div className="text-[11px] font-bold text-white/40 uppercase tracking-wider mb-3">Payment Methods</div>
+                <div className="text-[12px] text-white/40 mb-3">Send to <span className="text-white font-semibold">Mother Nature Agency LLC</span></div>
                 <div className="grid grid-cols-2 gap-4 text-[12px]">
                   <div>
                     <div className="text-white/30 mb-0.5">PayPal</div>
@@ -472,10 +474,17 @@ export default function InvoicesPage() {
                     <div className="text-white/30 mb-0.5">Zelle</div>
                     <div className="text-white font-semibold">{PAYMENT_INFO.zelle}</div>
                   </div>
-                  <div className="col-span-2">
-                    <div className="text-white/30 mb-0.5">Wire Transfer</div>
-                    <div className="text-white font-semibold">{PAYMENT_INFO.bankName} — {PAYMENT_INFO.accountName}</div>
-                    <div className="text-white/40 text-[11px] mt-0.5">Contact mn@mothernatureagency.com for wire details</div>
+                  <div className="col-span-2 pt-2" style={{ borderTop: '1px solid rgba(255,255,255,0.06)' }}>
+                    <div className="text-white/50 font-semibold mb-1.5">{PAYMENT_INFO.bankName} — {PAYMENT_INFO.accountName}</div>
+                    <div className="grid grid-cols-2 gap-2">
+                      <div><span className="text-white/30">Account #</span> <span className="text-white font-semibold">{PAYMENT_INFO.accountNumber}</span></div>
+                      <div><span className="text-white/30">ACH Routing #</span> <span className="text-white font-semibold">{PAYMENT_INFO.achRouting}</span></div>
+                      <div><span className="text-white/30">Wire Routing #</span> <span className="text-white font-semibold">{PAYMENT_INFO.wireRouting}</span></div>
+                      <div className="text-amber-400/80 text-[11px] font-semibold self-center">+ $20 wire fee</div>
+                    </div>
+                  </div>
+                  <div className="col-span-2 text-[11px] text-white/40">
+                    Checks payable to: <span className="text-white/60 font-semibold">Mother Nature Agency LLC / Alexus Williams</span>
                   </div>
                 </div>
               </div>
@@ -506,11 +515,38 @@ export default function InvoicesPage() {
                   </>
                 )}
                 {(selectedInvoice.status === 'sent' || selectedInvoice.status === 'overdue') && (
+                  <>
+                    <button
+                      onClick={() => updateStatus(selectedInvoice.id, 'paid', { paid_date: new Date().toISOString().slice(0, 10), paid_amount: selectedInvoice.total })}
+                      className="px-4 py-2 rounded-xl text-[12px] font-semibold text-white bg-emerald-600 hover:bg-emerald-500"
+                    >
+                      Mark as Paid
+                    </button>
+                    <button
+                      onClick={() => updateStatus(selectedInvoice.id, 'draft', { client_visible: false, issued_date: null })}
+                      className="px-4 py-2 rounded-xl text-[12px] font-semibold text-white/50 bg-white/5 hover:text-white flex items-center gap-1.5"
+                    >
+                      <span className="material-symbols-outlined" style={{ fontSize: 14 }}>undo</span>
+                      Undo to Draft
+                    </button>
+                  </>
+                )}
+                {selectedInvoice.status === 'paid' && (
                   <button
-                    onClick={() => updateStatus(selectedInvoice.id, 'paid', { paid_date: new Date().toISOString().slice(0, 10), paid_amount: selectedInvoice.total })}
-                    className="px-4 py-2 rounded-xl text-[12px] font-semibold text-white bg-emerald-600 hover:bg-emerald-500"
+                    onClick={() => updateStatus(selectedInvoice.id, 'sent', { paid_date: null, paid_amount: null })}
+                    className="px-4 py-2 rounded-xl text-[12px] font-semibold text-white/50 bg-white/5 hover:text-white flex items-center gap-1.5"
                   >
-                    Mark as Paid
+                    <span className="material-symbols-outlined" style={{ fontSize: 14 }}>undo</span>
+                    Undo Payment
+                  </button>
+                )}
+                {selectedInvoice.status === 'cancelled' && (
+                  <button
+                    onClick={() => updateStatus(selectedInvoice.id, 'draft')}
+                    className="px-4 py-2 rounded-xl text-[12px] font-semibold text-white/50 bg-white/5 hover:text-white flex items-center gap-1.5"
+                  >
+                    <span className="material-symbols-outlined" style={{ fontSize: 14 }}>undo</span>
+                    Reopen as Draft
                   </button>
                 )}
                 {selectedInvoice.status === 'draft' && !selectedInvoice.client_visible && (
@@ -521,6 +557,19 @@ export default function InvoicesPage() {
                     Make Visible to Client
                   </button>
                 )}
+                {/* Delete — always available */}
+                <button
+                  onClick={async () => {
+                    if (!confirm(`Delete invoice ${selectedInvoice.invoice_number}? This cannot be undone.`)) return;
+                    await fetch(`/api/invoices?id=${selectedInvoice.id}`, { method: 'DELETE' });
+                    setSelectedInvoice(null);
+                    fetchInvoices();
+                  }}
+                  className="px-4 py-2 rounded-xl text-[12px] font-semibold text-rose-400/70 hover:text-rose-300 bg-rose-500/10 hover:bg-rose-500/15 flex items-center gap-1.5 ml-auto transition-colors"
+                >
+                  <span className="material-symbols-outlined" style={{ fontSize: 14 }}>delete</span>
+                  Delete
+                </button>
               </div>
             </div>
           </div>
