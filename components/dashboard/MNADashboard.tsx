@@ -55,11 +55,11 @@ type OnboardingStep = {
 // ─── TAB CONFIG ─────────────────────────────────────────────────────
 
 const TABS = [
-  { key: 'onboarding', label: 'Onboarding', icon: 'rocket_launch' },
   { key: 'overview', label: 'Overview', icon: 'dashboard' },
-  { key: 'socials', label: 'Our Socials', icon: 'share' },
   { key: 'ai', label: 'AI Intelligence', icon: 'psychology' },
+  { key: 'onboarding', label: 'Onboarding', icon: 'rocket_launch' },
   { key: 'outreach', label: 'Outreach', icon: 'campaign' },
+  { key: 'socials', label: 'Our Socials', icon: 'share' },
 ] as const;
 
 type TabKey = (typeof TABS)[number]['key'];
@@ -183,7 +183,7 @@ const DEFAULT_ONBOARDING_STEPS: OnboardingStep[] = [
 export default function MNADashboard() {
   const { activeClient } = useClient();
   const { gradientFrom, gradientTo } = activeClient.branding;
-  const [activeTab, setActiveTab] = useState<TabKey>('onboarding');
+  const [activeTab, setActiveTab] = useState<TabKey>('overview');
 
   // Prospects stored in client_kv
   const [prospects, setProspects] = useState<Prospect[]>([]);
@@ -287,12 +287,7 @@ export default function MNADashboard() {
 
   return (
     <div className="space-y-6 max-w-[1400px]">
-      {/* Daily Briefing alert — shows on login */}
-      <DailyBriefing />
-
-      {activeTab !== 'overview' && <UserBanner />}
-
-      {/* Tab bar */}
+      {/* Tab bar — above briefing for easy navigation */}
       <div className="flex items-center gap-1 p-1 rounded-2xl" style={{ background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.08)' }}>
         {TABS.map((tab) => (
           <button
@@ -310,6 +305,11 @@ export default function MNADashboard() {
           </button>
         ))}
       </div>
+
+      {/* Daily Briefing alert — shows on login */}
+      <DailyBriefing />
+
+      {activeTab !== 'overview' && <UserBanner />}
 
       {/* ═══════════════════════════════════════════════════════════════ */}
       {/* TAB: Overview — existing AgencyOverview with all clients      */}
