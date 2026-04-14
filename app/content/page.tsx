@@ -92,6 +92,20 @@ function fmtDate(iso: string) {
   } catch { return iso; }
 }
 
+function monthKey(d: string) { return d.slice(0, 7); }
+function formatMonth(key: string) {
+  const [y, m] = key.split('-').map(Number);
+  return new Date(y, (m || 1) - 1, 1).toLocaleDateString(undefined, { month: 'long', year: 'numeric' });
+}
+function daysInMonth(key: string) {
+  const [y, m] = key.split('-').map(Number);
+  return new Date(y, m, 0).getDate();
+}
+function firstWeekday(key: string) {
+  const [y, m] = key.split('-').map(Number);
+  return new Date(y, (m || 1) - 1, 1).getDay();
+}
+
 export default function ContentPage() {
   const ctx = useClient() as any;
   const activeClient = ctx?.activeClient;
@@ -124,6 +138,8 @@ export default function ContentPage() {
   const [sortAsc, setSortAsc] = useState(true); // sort by date ascending by default
   const [newPostPlatforms, setNewPostPlatforms] = useState<string[]>(['Instagram']);
   const [editPlatforms, setEditPlatforms] = useState<string[]>([]);
+  const [viewMode, setViewMode] = useState<'cards' | 'calendar'>('calendar');
+  const [activeId, setActiveId] = useState<string | null>(null);
   const [newPost, setNewPost] = useState({ post_date: '', platform: 'Instagram', content_type: 'Post', title: '', caption: '' });
 
   // Detect user role
@@ -282,6 +298,19 @@ export default function ContentPage() {
     return sortAsc ? cmp : -cmp;
   });
 
+  // Calendar view: group by month
+  const calendarMonths = useMemo(() => {
+    const map = new Map<string, ContentItem[]>();
+    for (const it of shown) {
+      const k = monthKey(it.post_date);
+      if (!map.has(k)) map.set(k, []);
+      map.get(k)!.push(it);
+    }
+    return Array.from(map.entries()).sort((a, b) => a[0].localeCompare(b[0]));
+  }, [shown]);
+
+  const activeItem = items.find((i) => i.id === activeId) || null;
+
   return (
     <div className="flex flex-col gap-6">
       <div className="flex items-center justify-between">
@@ -295,15 +324,33 @@ export default function ContentPage() {
             {!isStaff && <span className="ml-2 text-white/40 text-xs">(View only — approve or request changes below)</span>}
           </p>
         </div>
-        {isStaff && (
-          <button
-            onClick={() => setShowAddForm(!showAddForm)}
-            className="text-[12px] font-bold px-4 py-2 rounded-xl text-white"
-            style={{ background: 'linear-gradient(135deg, #0c6da4, #4ab8ce)' }}
-          >
-            {showAddForm ? 'Cancel' : '+ Add Post'}
-          </button>
-        )}
+        <div className="flex items-center gap-2">
+          <div className="flex gap-1 p-1 rounded-xl" style={{ background: 'rgba(255,255,255,0.08)' }}>
+            <button
+              onClick={() => setViewMode('cards')}
+              className={`px-3 py-1.5 text-[12px] font-semibold rounded-lg transition-colors flex items-center gap-1.5 ${viewMode === 'cards' ? 'bg-white/15 text-white shadow' : 'text-white/50 hover:text-white/70'}`}
+            >
+              <span className="material-symbols-outlined" style={{ fontSize: 16 }}>grid_view</span>
+              Cards
+            </button>
+            <button
+              onClick={() => setViewMode('calendar')}
+              className={`px-3 py-1.5 text-[12px] font-semibold rounded-lg transition-colors flex items-center gap-1.5 ${viewMode === 'calendar' ? 'bg-white/15 text-white shadow' : 'text-white/50 hover:text-white/70'}`}
+            >
+              <span className="material-symbols-outlined" style={{ fontSize: 16 }}>calendar_month</span>
+              Calendar
+            </button>
+          </div>
+          {isStaff && (
+            <button
+              onClick={() => setShowAddForm(!showAddForm)}
+              className="text-[12px] font-bold px-4 py-2 rounded-xl text-white"
+              style={{ background: 'linear-gradient(135deg, #0c6da4, #4ab8ce)' }}
+            >
+              {showAddForm ? 'Cancel' : '+ Add Post'}
+            </button>
+          )}
+        </div>
       </div>
 
       {/* Add post form (staff only) */}
@@ -521,7 +568,195 @@ export default function ContentPage() {
         </div>
       )}
 
-      {!loading && shown.length > 0 && (
+      {/* Calendar grid view */}
+      {!loading && viewMode === 'calendar' && calendarMonths.map(([key, monthItems]) => {
+        const total = daysInMonth(key);
+        const offset = firstWeekday(key);
+        const byDay: Record<number, ContentItem[]> = {};
+        for (const it of monthItems) {
+          const day = Number(it.post_date.slice(8, 10));
+          if (!byDay[day]) byDay[day] = [];
+          byDay[day].push(it);
+        }
+        return (
+          <div key={key} className="glass-card p-5">
+            <div className="flex items-center justify-between mb-4">
+              <div className="text-[16px] font-bold text-white">{formatMonth(key)}</div>
+              <div className="text-[11px] text-white/40">{monthItems.length} posts</div>
+            </div>
+            <div className="grid grid-cols-7 gap-2">
+              {['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'].map((w) => (
+                <div key={w} className="text-[10px] font-bold uppercase tracking-wider text-white/40 text-center pb-2">{w}</div>
+              ))}
+              {Array.from({ length: offset }).map((_, i) => (
+                <div key={`pad-${i}`} />
+              ))}
+              {Array.from({ length: total }).map((_, i) => {
+                const day = i + 1;
+                const posts = byDay[day] || [];
+                const today = new Date();
+                const isToday = key === `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}` && day === today.getDate();
+                return (
+                  <div
+                    key={day}
+                    className={`min-h-[100px] rounded-xl border p-1.5 flex flex-col gap-1 ${
+                      isToday ? 'border-sky-400/40 bg-sky-500/10' : 'border-white/10 bg-white/5'
+                    }`}
+                  >
+                    <div className={`text-[10px] font-bold ${isToday ? 'text-sky-300' : 'text-white/40'}`}>{day}</div>
+                    {posts.map((p) => {
+                      const parsed = parseTitle(p.title);
+                      const status = (p.client_approval_status || 'pending_review') as ApprovalStatus;
+                      const astyle = APPROVAL_STYLES[status];
+                      return (
+                        <button
+                          key={p.id}
+                          onClick={() => setActiveId(p.id)}
+                          className="group relative text-left rounded-lg overflow-hidden border border-white/10 hover:ring-2 hover:ring-white/20 transition"
+                          style={{ background: 'rgba(255,255,255,0.06)' }}
+                        >
+                          <DriveThumb url={p.photo_drive_url} className="w-full h-[48px] object-cover opacity-70 group-hover:opacity-90 transition-opacity" />
+                          <div className="px-1.5 py-1">
+                            <div className="text-[9px] font-bold text-white/80 truncate">{parsed.title || p.platform}</div>
+                            <span className={`${astyle.bg} ${astyle.text} px-1 py-0.5 rounded text-[7px] font-bold mt-0.5 inline-block`}>{astyle.label}</span>
+                          </div>
+                        </button>
+                      );
+                    })}
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+        );
+      })}
+
+      {/* Modal when a calendar cell is clicked */}
+      {activeItem && (
+        <div className="fixed inset-0 bg-black/60 flex items-center justify-center p-4 z-50" onClick={() => setActiveId(null)}>
+          <div
+            className="max-w-2xl w-full max-h-[90vh] overflow-y-auto shadow-2xl rounded-2xl"
+            style={{
+              background: 'rgba(15,31,46,0.95)',
+              border: '1px solid rgba(255,255,255,0.15)',
+              backdropFilter: 'blur(24px) saturate(180%)',
+            }}
+            onClick={(e) => e.stopPropagation()}
+          >
+            {(() => {
+              const parsed = parseTitle(activeItem.title);
+              const status = (activeItem.client_approval_status || 'pending_review') as ApprovalStatus;
+              const astyle = APPROVAL_STYLES[status];
+              const driveLink = driveViewUrl(activeItem.photo_drive_url);
+              return (
+                <>
+                  {activeItem.photo_drive_url && (
+                    <a href={driveLink!} target="_blank" rel="noreferrer" className="block bg-black rounded-t-2xl overflow-hidden">
+                      <DriveThumb url={activeItem.photo_drive_url} className="w-full max-h-80 object-contain" />
+                    </a>
+                  )}
+                  <div className="p-6 space-y-4">
+                    <div className="flex items-center justify-between">
+                      <div className="text-[11px] font-bold uppercase tracking-wider text-white/40">
+                        {fmtDate(activeItem.post_date)} · {activeItem.platform} · {activeItem.content_type || 'Post'}
+                      </div>
+                      <button onClick={() => setActiveId(null)} className="text-white/40 hover:text-white">
+                        <span className="material-symbols-outlined">close</span>
+                      </button>
+                    </div>
+                    {parsed.phase && (
+                      <span className="inline-block text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded bg-white/10 text-white/60">{parsed.phase}</span>
+                    )}
+                    <div className="text-[20px] font-bold text-white leading-tight">{parsed.title}</div>
+                    <div className="flex items-center gap-2 flex-wrap">
+                      <span className={`text-[11px] font-bold px-2 py-1 rounded ${astyle.bg} ${astyle.text}`}>{astyle.label}</span>
+                      {activeItem.client_visible && (
+                        <span className="text-[9px] font-bold px-2 py-0.5 rounded-full bg-emerald-500/20 text-emerald-300">Live to client</span>
+                      )}
+                      {driveLink && (
+                        <a href={driveLink} target="_blank" rel="noreferrer" className="text-[11px] font-semibold text-white/50 hover:text-white inline-flex items-center gap-1 px-2 py-1 rounded bg-white/5 border border-white/10 hover:bg-white/10 transition-colors">
+                          <span className="material-symbols-outlined" style={{ fontSize: 14 }}>photo_library</span>
+                          View Photo
+                        </a>
+                      )}
+                    </div>
+                    {parsed.hook && (
+                      <div className="text-[12px] text-amber-200/80 bg-amber-500/10 rounded-lg p-3 border border-amber-500/20">
+                        <span className="text-[10px] font-bold uppercase text-amber-300/60 block mb-1">Hook</span>
+                        {parsed.hook}
+                      </div>
+                    )}
+                    {parsed.cta && (
+                      <div className="text-[12px] text-sky-200/80 bg-sky-500/10 rounded-lg p-3 border border-sky-500/20">
+                        <span className="text-[10px] font-bold uppercase text-sky-300/60 block mb-1">CTA</span>
+                        {parsed.cta}
+                      </div>
+                    )}
+                    {activeItem.caption && (
+                      <div>
+                        <div className="text-[10px] font-bold uppercase tracking-wider text-white/40 mb-1">Caption</div>
+                        <div className="text-[13px] text-white/70 whitespace-pre-wrap leading-relaxed bg-white/5 rounded-xl p-4 border border-white/10 max-h-60 overflow-y-auto">
+                          {activeItem.caption}
+                        </div>
+                      </div>
+                    )}
+                    {activeItem.client_comments && (
+                      <div className="text-[12px] bg-rose-500/15 border border-rose-500/30 rounded-lg p-3">
+                        <div className="text-[10px] uppercase font-bold text-rose-400 mb-1">Client Comments</div>
+                        <div className="text-rose-300 whitespace-pre-wrap">{activeItem.client_comments}</div>
+                      </div>
+                    )}
+                    {activeItem.mna_comments && (
+                      <div className="text-[12px] bg-sky-500/15 border border-sky-500/30 rounded-lg p-3">
+                        <div className="text-[10px] uppercase font-bold text-sky-400 mb-1">Internal Notes</div>
+                        <div className="text-sky-300 whitespace-pre-wrap">{activeItem.mna_comments}</div>
+                      </div>
+                    )}
+                    {/* Staff quick actions */}
+                    {isStaff && status !== 'scheduled' && (
+                      <div className="pt-4 border-t border-white/10 flex gap-2 flex-wrap">
+                        {(status === 'approved' || status === 'changes_requested') && (
+                          <button
+                            onClick={async () => { await patchItem(activeItem.id, { client_approval_status: 'pending_review' }); }}
+                            className="text-[11px] font-semibold px-3 py-2 rounded-lg bg-white/10 text-white/60 hover:bg-white/15"
+                          >
+                            ↩ Reset to pending
+                          </button>
+                        )}
+                        {status === 'pending_review' && (
+                          <button
+                            onClick={async () => { await patchItem(activeItem.id, { client_approval_status: 'approved' }); }}
+                            className="text-[11px] font-bold px-4 py-2 rounded-lg bg-emerald-500/20 text-emerald-200 hover:bg-emerald-500/30"
+                          >
+                            Approve
+                          </button>
+                        )}
+                        {status === 'approved' && (
+                          <button
+                            onClick={async () => { await patchItem(activeItem.id, { client_approval_status: 'scheduled' }); }}
+                            className="text-[11px] font-bold px-4 py-2 rounded-lg bg-sky-500/20 text-sky-200 hover:bg-sky-500/30"
+                          >
+                            Mark scheduled
+                          </button>
+                        )}
+                        <button
+                          onClick={() => { setActiveId(null); setViewMode('cards'); }}
+                          className="text-[11px] font-semibold px-3 py-2 rounded-lg bg-white/5 text-white/40 hover:bg-white/10 ml-auto"
+                        >
+                          Open in cards view
+                        </button>
+                      </div>
+                    )}
+                  </div>
+                </>
+              );
+            })()}
+          </div>
+        </div>
+      )}
+
+      {/* Card grid view */}
+      {!loading && viewMode === 'cards' && shown.length > 0 && (
         <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
           {shown.map((it) => {
             const parsed = parseTitle(it.title);

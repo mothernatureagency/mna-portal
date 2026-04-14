@@ -1,5 +1,6 @@
 import { createClient } from '@/lib/supabase/server';
 import { redirect } from 'next/navigation';
+import { cookies } from 'next/headers';
 import { clients } from '@/lib/clients';
 import ClientPortalShell from '@/components/client-portal/ClientPortalShell';
 
@@ -8,13 +9,11 @@ export const dynamic = 'force-dynamic';
 /**
  * Client Portal layout.
  *
- * Wraps /client/* in a stripped-down shell (no MNA sidebar, no agents/AI nav).
- * Resolves the authenticated Supabase user, pulls user_metadata.client_id, and
- * hands the matching client record down to the shell as a prop so every page
- * can read it without needing to re-query.
+ * Supports single-client accounts (client_id) and multi-client accounts
+ * (client_ids as comma-separated string, e.g. "prime-iv-pinecrest,serenity-bayfront").
  *
- * Staff (non-client users) who happen to land here are allowed through so we
- * can QA the portal, and their shell shows a small "staff preview" banner.
+ * When a user has access to multiple clients, they can switch between them
+ * via a dropdown in the sidebar. The active selection is stored in a cookie.
  */
 export default async function ClientPortalLayout({
   children,
@@ -30,21 +29,52 @@ export default async function ClientPortalLayout({
 
   const meta = (user.user_metadata || {}) as Record<string, unknown>;
   const role = (meta.role as string) || 'staff';
-  // For MVP: if the user is a client, their metadata must carry client_id.
-  // If it's missing, we default to Prime IV Niceville since that's the first
-  // live client portal. Staff users can hit /client to QA and we show them
-  // Niceville by default too.
-  const clientId =
-    (meta.client_id as string) ||
-    (role === 'client' ? 'prime-iv' : 'prime-iv'); // default QA target
 
-  const client = clients.find((c) => c.id === clientId) || clients.find((c) => c.id === 'prime-iv')!;
+  // Build the list of client IDs this user can access
+  let accessibleIds: string[] = [];
+
+  // Multi-client: comma-separated list in client_ids
+  const clientIdsRaw = meta.client_ids as string | undefined;
+  if (clientIdsRaw) {
+    accessibleIds = clientIdsRaw.split(',').map((s) => s.trim()).filter(Boolean);
+  }
+
+  // Single client fallback
+  const singleId = meta.client_id as string | undefined;
+  if (singleId && !accessibleIds.includes(singleId)) {
+    accessibleIds.push(singleId);
+  }
+
+  // Default for staff QA or missing metadata
+  if (accessibleIds.length === 0) {
+    accessibleIds = role === 'client' ? ['prime-iv'] : ['prime-iv'];
+  }
+
+  // Resolve which client to show — check cookie for saved selection
+  const cookieStore = cookies();
+  const savedClientId = cookieStore.get('mna_portal_client')?.value;
+  const activeId = savedClientId && accessibleIds.includes(savedClientId)
+    ? savedClientId
+    : accessibleIds[0];
+
+  const activeClient = clients.find((c) => c.id === activeId) || clients.find((c) => c.id === 'prime-iv')!;
+
+  // Build accessible client objects
+  const accessibleClients = accessibleIds
+    .map((id) => clients.find((c) => c.id === id))
+    .filter(Boolean) as typeof clients;
+
+  // Staff can see all clients, owners see only their assigned clients
+  const isStaff = role !== 'client' && role !== 'owner';
+  const isOwner = role === 'owner';
+  const clientList = isStaff ? clients.filter((c) => c.id !== 'mna') : accessibleClients;
 
   return (
     <ClientPortalShell
-      client={client}
+      client={activeClient}
       userEmail={user.email || ''}
-      isStaffPreview={role !== 'client'}
+      isStaffPreview={isStaff || isOwner}
+      accessibleClients={clientList}
     >
       {children}
     </ClientPortalShell>

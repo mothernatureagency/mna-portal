@@ -3,7 +3,7 @@ import { usePathname } from 'next/navigation';
 import DashboardLayout from './DashboardLayout';
 
 // Routes that should render without the dashboard shell
-const AUTH_ROUTES = ['/login', '/lock'];
+const AUTH_ROUTES = ['/login', '/lock', '/reset-password', '/auth'];
 // The /client portal renders its own layout (stripped down, no MNA sidebar).
 // Must match /client and /client/* but NOT /client-tasks (staff page).
 export default function ConditionalLayout({ children }: { children: React.ReactNode }) {

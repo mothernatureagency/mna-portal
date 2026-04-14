@@ -5,6 +5,9 @@ import { NextResponse, type NextRequest } from 'next/server';
 function isPublicRoute(pathname: string) {
   return (
     pathname.startsWith('/login') ||
+    pathname.startsWith('/reset-password') ||
+    pathname.startsWith('/auth/callback') ||
+    pathname.startsWith('/api/google/callback') ||
     pathname.startsWith('/api/lock') ||
     pathname.startsWith('/api/seed-users') ||
     pathname.startsWith('/api/hospitable-sync') ||

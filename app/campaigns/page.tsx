@@ -65,7 +65,9 @@ function fmtDate(iso: string) {
 export default function CampaignsPage() {
   const ctx = useClient() as any;
   const activeClient = ctx?.activeClient;
+  const allClients = ctx?.allClients || [];
   const { gradientFrom, gradientTo } = activeClient?.branding || { gradientFrom: '#0c6da4', gradientTo: '#4ab8ce' };
+  const isMna = activeClient?.id === 'mna';
 
   const [campaigns, setCampaigns] = useState<Campaign[]>([]);
   const [loading, setLoading] = useState(true);
@@ -81,6 +83,10 @@ export default function CampaignsPage() {
   const [bodyDraft, setBodyDraft] = useState<Record<string, string>>({});
   const [notesDraft, setNotesDraft] = useState<Record<string, string>>({});
   const [editingNotes, setEditingNotes] = useState<Record<string, boolean>>({});
+  const [recommendations, setRecommendations] = useState<any[]>([]);
+  const [loadingRecs, setLoadingRecs] = useState(false);
+  const [showRecs, setShowRecs] = useState(false);
+  const [selectedNonMemberTier, setSelectedNonMemberTier] = useState<Record<string, number>>({});
 
   const [newCampaign, setNewCampaign] = useState({
     campaign_type: 'email' as 'email' | 'sms',
@@ -173,6 +179,47 @@ export default function CampaignsPage() {
     }
   }
 
+  async function fetchRecommendations() {
+    setLoadingRecs(true);
+    setShowRecs(true);
+    setRecommendations([]);
+    try {
+      const res = await fetch(`/api/campaigns/recommend?clientId=${encodeURIComponent(activeClient.id)}`);
+      const text = await res.text();
+      let data;
+      try { data = JSON.parse(text); } catch { data = { recommendations: [] }; }
+      if (!res.ok) {
+        alert(data.error || 'Failed to get recommendations');
+        setShowRecs(false);
+        return;
+      }
+      setRecommendations(data.recommendations || []);
+    } catch (e: any) {
+      alert('Failed to load recommendations: ' + (e.message || 'Network error'));
+      setShowRecs(false);
+    } finally {
+      setLoadingRecs(false);
+    }
+  }
+
+  async function createFromRec(rec: any) {
+    const res = await fetch('/api/campaigns', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        clientId: activeClient.id,
+        campaignType: rec.type,
+        name: rec.name,
+        scheduledDate: rec.suggested_date,
+        audienceSegment: rec.audience || null,
+      }),
+    });
+    const data = await res.json();
+    if (!res.ok) { alert(data.error || 'Failed'); return; }
+    setCampaigns((prev) => [data.campaign, ...prev]);
+    setRecommendations((prev) => prev.filter((r) => r.name !== rec.name));
+  }
+
   // Stats
   const byStatus: Record<CampaignStatus, number> = { drafting: 0, pending_review: 0, approved: 0, changes_requested: 0, sent: 0, failed: 0 };
   campaigns.forEach((c) => { if (byStatus[c.status] !== undefined) byStatus[c.status]++; });
@@ -200,13 +247,22 @@ export default function CampaignsPage() {
           </p>
         </div>
         {isStaff && (
-          <button
-            onClick={() => setShowAddForm(!showAddForm)}
-            className="text-[12px] font-bold px-4 py-2 rounded-xl text-white"
-            style={{ background: `linear-gradient(135deg, ${gradientFrom}, ${gradientTo})` }}
-          >
-            {showAddForm ? 'Cancel' : '+ New Campaign'}
-          </button>
+          <div className="flex gap-2">
+            <button
+              onClick={fetchRecommendations}
+              disabled={loadingRecs}
+              className="text-[12px] font-bold px-4 py-2 rounded-xl text-white border border-white/20 bg-white/10 hover:bg-white/15 disabled:opacity-50 transition-colors"
+            >
+              {loadingRecs ? '✨ Analyzing...' : '✨ Get Recommendations'}
+            </button>
+            <button
+              onClick={() => setShowAddForm(!showAddForm)}
+              className="text-[12px] font-bold px-4 py-2 rounded-xl text-white"
+              style={{ background: `linear-gradient(135deg, ${gradientFrom}, ${gradientTo})` }}
+            >
+              {showAddForm ? 'Cancel' : '+ New Campaign'}
+            </button>
+          </div>
         )}
       </div>
 
@@ -289,6 +345,66 @@ export default function CampaignsPage() {
               className="text-[12px] px-3 py-2 rounded-xl bg-white/5 border border-white/15 text-white outline-none placeholder:text-white/30 w-36"
             />
           </div>
+        </div>
+      )}
+
+      {/* AI Recommendations panel */}
+      {isStaff && showRecs && (
+        <div className="glass-card p-5">
+          <div className="flex items-center justify-between mb-3">
+            <div className="flex items-center gap-2">
+              <span className="material-symbols-outlined text-amber-300" style={{ fontSize: 20 }}>auto_awesome</span>
+              <span className="text-[13px] font-bold text-white">AI Campaign Recommendations</span>
+              <span className="text-[10px] text-white/40">Based on your content calendar</span>
+            </div>
+            <button onClick={() => setShowRecs(false)} className="text-[11px] text-white/40 hover:text-white/70">
+              Dismiss
+            </button>
+          </div>
+
+          {loadingRecs && (
+            <div className="text-center py-6 text-white/50 text-[13px]">
+              <div className="animate-pulse">Analyzing your content calendar...</div>
+            </div>
+          )}
+
+          {!loadingRecs && recommendations.length === 0 && (
+            <div className="text-center py-4 text-white/40 text-[12px]">
+              No recommendations — add more content to your calendar first.
+            </div>
+          )}
+
+          {!loadingRecs && recommendations.length > 0 && (
+            <div className="space-y-3">
+              {recommendations.map((rec, i) => (
+                <div key={i} className="flex items-start gap-3 bg-white/5 rounded-xl p-3 border border-white/10">
+                  <div className={`shrink-0 w-9 h-9 rounded-lg flex items-center justify-center ${
+                    rec.type === 'email' ? 'bg-violet-500/20 text-violet-300' : 'bg-emerald-500/20 text-emerald-300'
+                  }`}>
+                    <span className="material-symbols-outlined" style={{ fontSize: 18 }}>
+                      {rec.type === 'email' ? 'mail' : 'sms'}
+                    </span>
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center gap-2 flex-wrap">
+                      <span className="text-[13px] font-bold text-white">{rec.name}</span>
+                      <span className="text-[10px] text-white/40">{rec.suggested_date}</span>
+                      {rec.audience && <span className="text-[10px] text-white/30">· {rec.audience}</span>}
+                    </div>
+                    <div className="text-[12px] text-white/70 mt-0.5">{rec.hook}</div>
+                    <div className="text-[11px] text-white/40 mt-1 italic">{rec.why}</div>
+                  </div>
+                  <button
+                    onClick={() => createFromRec(rec)}
+                    className="shrink-0 text-[11px] font-bold px-3 py-1.5 rounded-lg text-white"
+                    style={{ background: `linear-gradient(135deg, ${gradientFrom}, ${gradientTo})` }}
+                  >
+                    + Create
+                  </button>
+                </div>
+              ))}
+            </div>
+          )}
         </div>
       )}
 
@@ -415,6 +531,14 @@ export default function CampaignsPage() {
                       <span className="text-[9px] font-bold px-2 py-0.5 rounded-full bg-emerald-500/20 text-emerald-300">Live to client</span>
                     ) : (
                       <span className="text-[9px] font-bold px-2 py-0.5 rounded-full bg-white/10 text-white/40">Hidden</span>
+                    )}
+                    {isMna && c.client_id !== 'mna' && (
+                      <span className="text-[9px] font-bold px-2 py-0.5 rounded-full bg-sky-500/20 text-sky-300">
+                        {allClients.find((cl: any) => cl.id === c.client_id)?.shortName || c.client_id}
+                      </span>
+                    )}
+                    {isMna && c.client_id === 'mna' && (
+                      <span className="text-[9px] font-bold px-2 py-0.5 rounded-full bg-white/5 text-white/30">Unassigned</span>
                     )}
                   </div>
                   <div className="text-[11px] text-white/50 mt-0.5">
@@ -549,6 +673,131 @@ export default function CampaignsPage() {
                           </button>
                         </div>
                       </div>
+                    ) : c.body && c.campaign_type === 'sms' ? (
+                      /* SMS: split into Member / Non-Member sections */
+                      (() => {
+                        const body = c.body || '';
+                        // Parse member and non-member copy from the generated text
+                        const memberMatch = body.match(/MEMBER\s*(?:COPY)?[:\s]*\n?([\s\S]*?)(?=NON[- ]?MEMBER|$)/i);
+                        const nonMemberMatch = body.match(/NON[- ]?MEMBER\s*(?:COPY)?[:\s]*\n?([\s\S]*?)$/i);
+                        const memberCopy = memberMatch ? memberMatch[1].trim() : '';
+                        const nonMemberCopy = nonMemberMatch ? nonMemberMatch[1].trim() : '';
+                        const hasSplit = memberCopy || nonMemberCopy;
+
+                        // Segment calc helper
+                        const calcSegments = (text: string) => {
+                          const len = text.length;
+                          return len === 0 ? 1 : len <= 160 ? 1 : Math.ceil(len / 153);
+                        };
+                        const rate = 0.0079;
+                        const memberSegments = calcSegments(memberCopy);
+                        const nonMemberSegments = calcSegments(nonMemberCopy);
+                        const nonMemberTiers = [500, 1000, 2500, 5000];
+
+                        return (
+                          <div className="space-y-4">
+                            {hasSplit ? (
+                              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                {/* Member */}
+                                <div>
+                                  <div className="text-[11px] font-bold text-emerald-300 uppercase tracking-wider mb-2 flex items-center gap-1.5">
+                                    <span className="material-symbols-outlined" style={{ fontSize: 14 }}>loyalty</span>
+                                    Member
+                                  </div>
+                                  <div className="text-[12px] text-white/80 whitespace-pre-wrap bg-emerald-500/10 rounded-xl p-4 border border-emerald-500/20">
+                                    {memberCopy}
+                                  </div>
+                                  <div className="text-[10px] text-white/40 mt-1">{memberCopy.length} chars · {memberSegments} segment{memberSegments > 1 ? 's' : ''}</div>
+                                </div>
+                                {/* Non-Member */}
+                                <div>
+                                  <div className="text-[11px] font-bold text-amber-300 uppercase tracking-wider mb-2 flex items-center gap-1.5">
+                                    <span className="material-symbols-outlined" style={{ fontSize: 14 }}>person_add</span>
+                                    Non-Member
+                                  </div>
+                                  <div className="text-[12px] text-white/80 whitespace-pre-wrap bg-amber-500/10 rounded-xl p-4 border border-amber-500/20">
+                                    {nonMemberCopy}
+                                  </div>
+                                  <div className="text-[10px] text-white/40 mt-1">{nonMemberCopy.length} chars · {nonMemberSegments} segment{nonMemberSegments > 1 ? 's' : ''}</div>
+                                </div>
+                              </div>
+                            ) : (
+                              <div className="text-[12px] text-white/80 whitespace-pre-wrap bg-white/5 rounded-xl p-4 border border-white/10 max-h-80 overflow-y-auto">
+                                {body}
+                              </div>
+                            )}
+
+                            {/* Cost Breakdown */}
+                            <div>
+                              <div className="text-[11px] font-bold uppercase tracking-wider text-white/50 mb-2">
+                                SMS Cost Estimate
+                                <span className="text-[9px] font-normal text-white/30 ml-2">SMS only · does not include MMS</span>
+                              </div>
+                              <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                                {/* Member cost */}
+                                <div className="bg-emerald-500/5 rounded-xl p-4 border border-emerald-500/15">
+                                  <div className="text-[11px] font-bold text-emerald-300 mb-2 flex items-center gap-1.5">
+                                    <span className="material-symbols-outlined" style={{ fontSize: 14 }}>loyalty</span>
+                                    Member Cost
+                                    <span className="text-[9px] font-normal text-white/30 ml-1">per 100 members</span>
+                                  </div>
+                                  <div className="flex items-baseline justify-between">
+                                    <span className="text-[11px] text-white/60">{memberSegments} seg × 100 × $0.0079</span>
+                                    <span className="text-[18px] font-black text-emerald-300">${(memberSegments * 100 * rate).toFixed(2)}</span>
+                                  </div>
+                                  <div className="mt-2 grid grid-cols-4 gap-2 text-center">
+                                    {[100, 200, 500, 1000].map((n) => (
+                                      <div key={n} className="bg-white/5 rounded-lg py-1.5 px-1">
+                                        <div className="text-[9px] text-white/40">{n}</div>
+                                        <div className="text-[11px] font-bold text-white">${(memberSegments * n * rate).toFixed(2)}</div>
+                                      </div>
+                                    ))}
+                                  </div>
+                                </div>
+                                {/* Non-Member cost */}
+                                {(() => {
+                                  const selected = selectedNonMemberTier[c.id] || 0;
+                                  return (
+                                    <div className="bg-amber-500/5 rounded-xl p-4 border border-amber-500/15">
+                                      <div className="text-[11px] font-bold text-amber-300 mb-2 flex items-center gap-1.5">
+                                        <span className="material-symbols-outlined" style={{ fontSize: 14 }}>person_add</span>
+                                        Non-Member Cost
+                                        <span className="text-[9px] font-normal text-white/30 ml-1">select quantity</span>
+                                      </div>
+                                      <div className="grid grid-cols-4 gap-2 text-center mb-3">
+                                        {nonMemberTiers.map((n) => (
+                                          <button
+                                            key={n}
+                                            onClick={() => setSelectedNonMemberTier((prev) => ({ ...prev, [c.id]: n }))}
+                                            className={`rounded-lg py-2 px-1 transition-all border ${
+                                              selected === n
+                                                ? 'bg-amber-500/20 border-amber-400/40 ring-1 ring-amber-400/30'
+                                                : 'bg-white/5 border-white/10 hover:bg-white/10'
+                                            }`}
+                                          >
+                                            <div className={`text-[10px] font-bold ${selected === n ? 'text-amber-200' : 'text-white/50'}`}>{n.toLocaleString()}</div>
+                                            <div className="text-[9px] text-white/30">sms</div>
+                                          </button>
+                                        ))}
+                                      </div>
+                                      {selected > 0 ? (
+                                        <div className="bg-amber-500/10 rounded-lg p-3 border border-amber-500/20">
+                                          <div className="flex items-baseline justify-between">
+                                            <span className="text-[11px] text-white/60">{nonMemberSegments} seg × {selected.toLocaleString()} × $0.0079</span>
+                                            <span className="text-[20px] font-black text-amber-200">${(nonMemberSegments * selected * rate).toFixed(2)}</span>
+                                          </div>
+                                        </div>
+                                      ) : (
+                                        <div className="text-[11px] text-white/30 text-center py-1">Select a quantity above to calculate</div>
+                                      )}
+                                    </div>
+                                  );
+                                })()}
+                              </div>
+                            </div>
+                          </div>
+                        );
+                      })()
                     ) : c.body ? (
                       <div className="text-[12px] text-white/80 whitespace-pre-wrap bg-white/5 rounded-xl p-4 border border-white/10 max-h-80 overflow-y-auto">
                         {c.body}
@@ -654,10 +903,45 @@ export default function CampaignsPage() {
                         </button>
                       )}
                       {c.status === 'approved' && !c.sent_at && (
-                        <span className="text-[11px] text-sky-300 flex items-center gap-1 px-2">
-                          <span className="material-symbols-outlined" style={{ fontSize: 14 }}>schedule</span>
-                          Queued — Make.com will pick this up
-                        </span>
+                        <>
+                          <span className="text-[11px] text-sky-300 flex items-center gap-1 px-2">
+                            <span className="material-symbols-outlined" style={{ fontSize: 14 }}>schedule</span>
+                            Queued — Make.com will pick this up
+                          </span>
+                          <button
+                            onClick={() => patchCampaign(c.id, { status: 'pending_review' })}
+                            className="text-[11px] font-semibold px-3 py-2 rounded-lg bg-rose-500/15 text-rose-300 hover:bg-rose-500/25"
+                          >
+                            ↩ Pull back
+                          </button>
+                        </>
+                      )}
+                      {(c.status === 'pending_review' || c.status === 'changes_requested') && (
+                        <button
+                          onClick={() => patchCampaign(c.id, { status: 'drafting' })}
+                          className="text-[11px] font-semibold px-3 py-2 rounded-lg bg-white/5 text-white/40 hover:bg-white/10 hover:text-white/60"
+                        >
+                          ↩ Back to drafting
+                        </button>
+                      )}
+
+                      {/* Assign to client (MNA view) */}
+                      {isMna && (
+                        <select
+                          value={c.client_id}
+                          onChange={async (e) => {
+                            const newClientId = e.target.value;
+                            await patchCampaign(c.id, { client_id: newClientId });
+                          }}
+                          className="text-[11px] font-semibold px-3 py-2 rounded-lg bg-sky-500/15 text-sky-200 border border-sky-500/25 outline-none cursor-pointer"
+                        >
+                          <option value="mna" className="bg-[#0d1b2a] text-white">Unassigned (MNA)</option>
+                          {allClients.filter((cl: any) => cl.id !== 'mna').map((cl: any) => (
+                            <option key={cl.id} value={cl.id} className="bg-[#0d1b2a] text-white">
+                              {cl.shortName}
+                            </option>
+                          ))}
+                        </select>
                       )}
 
                       {/* Visibility toggle */}

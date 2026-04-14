@@ -17,17 +17,26 @@ export default function ClientPortalShell({
   client,
   userEmail,
   isStaffPreview,
+  accessibleClients,
   children,
 }: {
   client: Client;
   userEmail: string;
   isStaffPreview: boolean;
+  accessibleClients?: Client[];
   children: React.ReactNode;
 }) {
   const pathname = usePathname();
   const router = useRouter();
   const { gradientFrom, gradientTo } = client.branding;
   const [mobileOpen, setMobileOpen] = useState(false);
+  const hasMultipleClients = accessibleClients && accessibleClients.length > 1;
+
+  function switchClient(clientId: string) {
+    // Set cookie and reload to pick up the new client in the server layout
+    document.cookie = `mna_portal_client=${clientId};path=/;max-age=${60 * 60 * 24 * 365}`;
+    router.refresh();
+  }
 
   const nav = [
     { href: '/client', label: 'Overview', icon: 'dashboard' },
@@ -36,6 +45,7 @@ export default function ClientPortalShell({
     { href: '/client/campaigns', label: 'Email & SMS', icon: 'forward_to_inbox' },
     { href: '/client/notes', label: 'Meeting Notes', icon: 'description' },
     { href: '/client/tasks', label: 'Tasks', icon: 'checklist' },
+    { href: '/client/invoices', label: 'Invoices', icon: 'receipt_long' },
   ];
 
   const active = (href: string) =>
@@ -65,6 +75,37 @@ export default function ClientPortalShell({
           <div className="text-[9px] font-semibold text-white/40 uppercase tracking-widest">Client Portal</div>
         </div>
       </div>
+
+      {/* Client switcher (multi-client accounts) */}
+      {hasMultipleClients && (
+        <div className="mx-3 mt-3 mb-1">
+          <div className="text-[9.5px] font-semibold text-white/40 uppercase tracking-widest px-1 mb-1.5">Switch Account</div>
+          <div className="space-y-1">
+            {accessibleClients!.map((cl) => (
+              <button
+                key={cl.id}
+                onClick={() => switchClient(cl.id)}
+                className={`w-full text-left flex items-center gap-2.5 px-3 py-2 rounded-xl text-[12px] transition-all ${
+                  cl.id === client.id
+                    ? 'bg-white/12 text-white font-bold ring-1 ring-white/20'
+                    : 'text-white/60 hover:bg-white/8 hover:text-white'
+                }`}
+              >
+                <div
+                  className="w-6 h-6 rounded-lg flex items-center justify-center text-white font-extrabold text-[10px] shrink-0"
+                  style={{ background: `linear-gradient(135deg, ${cl.branding.gradientFrom}, ${cl.branding.gradientTo})` }}
+                >
+                  {cl.shortName.charAt(0)}
+                </div>
+                <span className="truncate">{cl.shortName}</span>
+                {cl.id === client.id && (
+                  <span className="material-symbols-outlined ml-auto text-emerald-400" style={{ fontSize: 14 }}>check</span>
+                )}
+              </button>
+            ))}
+          </div>
+        </div>
+      )}
 
       {/* User block */}
       <div
@@ -107,8 +148,17 @@ export default function ClientPortalShell({
         })}
       </nav>
 
-      {/* Sign out */}
+      {/* Bottom actions */}
       <div className="px-2.5 pb-4 pt-2" style={{ borderTop: '1px solid rgba(255,255,255,.07)' }}>
+        {isStaffPreview && (
+          <button
+            onClick={() => router.push('/')}
+            className="w-full flex items-center gap-2.5 px-2.5 py-2 rounded-xl text-[13px] text-white/60 hover:text-[#4ab8ce] hover:bg-[rgba(74,184,206,.15)] transition-colors mb-0.5"
+          >
+            <span className="material-symbols-outlined" style={{ fontSize: 18 }}>swap_horiz</span>
+            Switch to Admin
+          </button>
+        )}
         <button
           onClick={signOut}
           className="w-full flex items-center gap-2.5 px-2.5 py-2 rounded-xl text-[13px] text-white/60 hover:text-white hover:bg-white/10 transition-colors"

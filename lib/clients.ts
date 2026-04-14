@@ -24,6 +24,16 @@ export type MetaAdsAccount = {
   notes?: string;
 };
 
+export type ClientLinks = {
+  website?: string;
+  linktree?: string;
+  booking?: string;
+  instagram?: string;
+  facebook?: string;
+  tiktok?: string;
+  google?: string;
+};
+
 export type Client = {
   id: string;
   name: string;
@@ -31,6 +41,7 @@ export type Client = {
   industry: string;
   location?: string;
   branding: ClientBranding;
+  links?: ClientLinks;
   kpiTargets: {
     leads: number;
     costPerLead: number;
@@ -76,7 +87,7 @@ export const clients: Client[] = [
   {
     id: 'prime-iv',
     name: 'Prime IV — Niceville',
-    shortName: 'Prime IV',
+    shortName: 'Prime IV Niceville',
     industry: 'IV Therapy & Wellness',
     location: 'Niceville, FL',
     branding: {
@@ -99,6 +110,13 @@ export const clients: Client[] = [
       adSpend: 9500,
       appointments: 68,
       revenue: 88000,
+    },
+    links: {
+      website: 'https://primeivniceville.com',
+      linktree: 'https://linktr.ee/primeivniceville',
+      booking: 'https://primeivniceville.com/book',
+      instagram: 'https://instagram.com/primeivniceville',
+      facebook: 'https://facebook.com/primeivniceville',
     },
     notes: 'Premium IV therapy & wellness clinic in Niceville, FL. High-value clientele, focus on luxury health positioning and appointment-driven conversions.',
     integrations: ['Google Ads', 'Meta Ads', 'Jane App', 'Mailchimp'],
@@ -146,6 +164,9 @@ export const clients: Client[] = [
       adSpend: 8500,
       appointments: 50,
       revenue: 72000,
+    },
+    links: {
+      website: 'https://primeivpinecrest.com',
     },
     notes: 'Reopening location — Prime IV Pinecrest, FL. Co-owned by Alexus Williams and partner. Grand reopening launch focus: brand awareness, lead generation, memberships, and appointment bookings.',
     integrations: ['Google Ads', 'Meta Ads', 'Jane App', 'Mailchimp'],

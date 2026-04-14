@@ -15,6 +15,8 @@ import LeadFollowUp from '@/components/dashboard/LeadFollowUp';
 import ContentCalendar from '@/components/dashboard/ContentCalendar';
 import UserBanner from '@/components/dashboard/UserBanner';
 import Card from '@/components/ui/Card';
+import DailyBriefing from '@/components/dashboard/DailyBriefing';
+import PersonalDashboard from '@/components/dashboard/PersonalDashboard';
 
 // ─────────────────────────────────────────────────────────────────
 // Client-specific KPI data
@@ -151,22 +153,29 @@ function SectionLabel({ children }: { children: React.ReactNode }) {
 }
 
 export default function DashboardPage() {
-  const { activeClient } = useClient();
+  const { activeClient, userRole } = useClient();
 
-  // Prime IV Niceville gets its own completely custom layout built on real
-  // numbers from the client. Every other client falls through to the default
-  // dashboard below.
-  // Custom dashboards per client
-  if (activeClient.id === 'mna') {
-    return <MNADashboard />;
+  // Personal home dashboard for MNA staff and owner accounts
+  if (activeClient.id === 'mna' || userRole === 'owner') {
+    return <PersonalDashboard />;
   }
 
   if (activeClient.id === 'prime-iv') {
-    return <NicevilleDashboard client={activeClient} />;
+    return (
+      <>
+        <DailyBriefing />
+        <NicevilleDashboard client={activeClient} />
+      </>
+    );
   }
 
   if (activeClient.id === 'serenity-bayfront') {
-    return <SerenityDashboard client={activeClient} />;
+    return (
+      <>
+        <DailyBriefing />
+        <SerenityDashboard client={activeClient} />
+      </>
+    );
   }
 
   const { gradientFrom, gradientTo } = activeClient.branding;
@@ -176,6 +185,9 @@ export default function DashboardPage() {
   const campaigns = data.campaigns;
   return (
     <div className="space-y-8 max-w-[1400px]">
+
+      {/* Daily Briefing alert */}
+      <DailyBriefing />
 
       {/* ── User Session Banner ──────────────────────────── */}
       <UserBanner />

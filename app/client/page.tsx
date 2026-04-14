@@ -193,6 +193,7 @@ export default function ClientOverviewPage() {
   }
   const [leadSplit, setLeadSplit] = useState<Record<string, number> | null>(null);
   const [monthOffset, setMonthOffset] = useState(0);
+  const [activeCalId, setActiveCalId] = useState<string | null>(null);
 
   // Load projections from client_kv
   useEffect(() => {
@@ -434,14 +435,15 @@ export default function ClientOverviewPage() {
                     {day.getDate()}
                   </div>
                   {dayItems.slice(0, 2).map((it) => {
-                    const driveLink = driveViewUrl(it.photo_drive_url);
                     const status = (it.client_approval_status || 'pending_review') as CalendarApprovalStatus;
                     return (
-                      <div key={it.id} className="rounded overflow-hidden border border-white/10 bg-white/[0.04]">
+                      <button
+                        key={it.id}
+                        onClick={() => setActiveCalId(it.id)}
+                        className="w-full text-left rounded overflow-hidden border border-white/10 bg-white/[0.04] hover:ring-2 hover:ring-white/20 hover:bg-white/10 transition-all cursor-pointer"
+                      >
                         {it.photo_drive_url && (
-                          <a href={driveLink!} target="_blank" rel="noreferrer" className="block">
-                            <DriveThumb url={it.photo_drive_url} className="w-full h-[42px] object-cover opacity-80 hover:opacity-100 transition-opacity" />
-                          </a>
+                          <DriveThumb url={it.photo_drive_url} className="w-full h-[42px] object-cover opacity-80 group-hover:opacity-100 transition-opacity" />
                         )}
                         <div className="px-1 py-0.5 flex items-center gap-1">
                           <span className="w-1.5 h-1.5 rounded-full shrink-0" style={{ background: STATUS_DOT[status] || '#9ca3af' }} />
@@ -449,7 +451,7 @@ export default function ClientOverviewPage() {
                             {PLATFORM_EMOJI[it.platform] || ''} {parseCalTitle(it.title) || it.platform}
                           </span>
                         </div>
-                      </div>
+                      </button>
                     );
                   })}
                   {dayItems.length > 2 && <div className="text-[7px] text-white/40">+{dayItems.length - 2} more</div>}
@@ -466,13 +468,16 @@ export default function ClientOverviewPage() {
           )}
           {calMonthItems.map((it) => {
             const status = (it.client_approval_status || 'pending_review') as CalendarApprovalStatus;
-            const driveLink = driveViewUrl(it.photo_drive_url);
             return (
-              <div key={it.id} className="flex items-center gap-3 rounded-xl border border-white/10 bg-white/5 p-3">
+              <button
+                key={it.id}
+                onClick={() => setActiveCalId(it.id)}
+                className="w-full text-left flex items-center gap-3 rounded-xl border border-white/10 bg-white/5 p-3 hover:bg-white/10 hover:ring-2 hover:ring-white/20 transition-all"
+              >
                 {it.photo_drive_url && (
-                  <a href={driveLink!} target="_blank" rel="noreferrer" className="shrink-0 rounded-lg overflow-hidden w-14 h-14">
+                  <div className="shrink-0 rounded-lg overflow-hidden w-14 h-14">
                     <DriveThumb url={it.photo_drive_url} className="w-14 h-14 object-cover" />
-                  </a>
+                  </div>
                 )}
                 <div className="flex-1 min-w-0">
                   <div className="text-[10px] font-bold uppercase tracking-wider text-white/40">
@@ -485,7 +490,7 @@ export default function ClientOverviewPage() {
                     <span className="text-[10px] text-white/60 capitalize">{status.replace('_', ' ')}</span>
                   </div>
                 </div>
-              </div>
+              </button>
             );
           })}
         </div>
@@ -501,6 +506,71 @@ export default function ClientOverviewPage() {
         </div>
         <div className="text-[11px] text-white/50 mt-2">{calMonthItems.length} posts this month</div>
       </div>
+
+      {/* Calendar post preview modal */}
+      {activeCalId && (() => {
+        const item = calItems.find((i) => i.id === activeCalId);
+        if (!item) return null;
+        const status = (item.client_approval_status || 'pending_review') as CalendarApprovalStatus;
+        const statusLabel = status === 'pending_review' ? 'Ready for review' : status === 'changes_requested' ? 'Changes requested' : status.charAt(0).toUpperCase() + status.slice(1);
+        const driveLink = driveViewUrl(item.photo_drive_url);
+        return (
+          <div className="fixed inset-0 bg-black/60 flex items-center justify-center p-4 z-50" onClick={() => setActiveCalId(null)}>
+            <div
+              className="max-w-lg w-full max-h-[85vh] overflow-y-auto shadow-2xl rounded-2xl"
+              style={{
+                background: 'rgba(15,31,46,0.95)',
+                border: '1px solid rgba(255,255,255,0.15)',
+                backdropFilter: 'blur(24px) saturate(180%)',
+              }}
+              onClick={(e) => e.stopPropagation()}
+            >
+              {item.photo_drive_url && (
+                <a href={driveLink!} target="_blank" rel="noreferrer" className="block bg-black rounded-t-2xl overflow-hidden">
+                  <DriveThumb url={item.photo_drive_url} className="w-full max-h-72 object-contain" />
+                </a>
+              )}
+              <div className="p-5 space-y-3">
+                <div className="flex items-center justify-between">
+                  <div className="text-[11px] font-bold uppercase tracking-wider text-white/40">
+                    {new Date(`${item.post_date}T12:00:00`).toLocaleDateString(undefined, { weekday: 'long', month: 'long', day: 'numeric' })} · {item.platform} · {item.content_type || 'Post'}
+                  </div>
+                  <button onClick={() => setActiveCalId(null)} className="text-white/40 hover:text-white">
+                    <span className="material-symbols-outlined">close</span>
+                  </button>
+                </div>
+                <div className="text-[18px] font-bold text-white leading-tight">{parseCalTitle(item.title) || 'Untitled'}</div>
+                <div className="flex items-center gap-2">
+                  <span className="w-2.5 h-2.5 rounded-full" style={{ background: STATUS_DOT[status] || '#9ca3af' }} />
+                  <span className="text-[12px] font-semibold text-white/70">{statusLabel}</span>
+                </div>
+                {item.caption && (
+                  <div>
+                    <div className="text-[10px] font-bold uppercase tracking-wider text-white/40 mb-1">Caption</div>
+                    <div className="text-[13px] text-white/70 whitespace-pre-wrap leading-relaxed bg-white/5 rounded-xl p-4 border border-white/10 max-h-52 overflow-y-auto">
+                      {item.caption}
+                    </div>
+                  </div>
+                )}
+                {driveLink && (
+                  <a href={driveLink} target="_blank" rel="noreferrer" className="inline-flex items-center gap-1.5 text-[12px] font-semibold text-white/50 hover:text-white px-3 py-2 rounded-lg bg-white/5 border border-white/10 hover:bg-white/10 transition-colors">
+                    <span className="material-symbols-outlined" style={{ fontSize: 16 }}>photo_library</span>
+                    View Full Photo
+                  </a>
+                )}
+                <div className="pt-3 border-t border-white/10">
+                  <Link
+                    href="/client/calendar"
+                    className="text-[12px] font-semibold text-white/50 hover:text-white inline-flex items-center gap-1"
+                  >
+                    Open in Content Calendar →
+                  </Link>
+                </div>
+              </div>
+            </div>
+          </div>
+        );
+      })()}
 
       {/* KPIs */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-3 md:gap-4">

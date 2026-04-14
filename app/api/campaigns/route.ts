@@ -17,7 +17,7 @@ export async function GET(req: NextRequest) {
   let where = '';
   const params: any[] = [];
 
-  if (clientId) {
+  if (clientId && clientId !== 'mna') {
     params.push(clientId);
     where += ` where c.client_id = $${params.length}`;
   }
@@ -75,7 +75,7 @@ export async function PATCH(req: NextRequest) {
   const fields: string[] = [];
   const values: any[] = [];
 
-  const patchable = ['name', 'campaign_type', 'subject', 'body', 'scheduled_date', 'scheduled_time', 'audience_segment', 'audience_count', 'client_comments', 'mna_comments', 'revive_campaign_id'];
+  const patchable = ['name', 'campaign_type', 'subject', 'body', 'scheduled_date', 'scheduled_time', 'audience_segment', 'audience_count', 'client_comments', 'mna_comments', 'revive_campaign_id', 'client_id'];
   for (const key of patchable) {
     const val = body[key];
     if (val !== undefined) {

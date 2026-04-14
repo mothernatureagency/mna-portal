@@ -188,6 +188,74 @@ async function initSchema() {
                         client_visible boolean not null default false,
                         created_at timestamptz not null default now()
                   )`,
+                  `create table if not exists schedule_events (
+                        id uuid primary key default uuid_generate_v4(),
+                        user_email text not null,
+                        client_id text,
+                        title text not null,
+                        description text,
+                        event_date date not null,
+                        start_time text,
+                        end_time text,
+                        event_type text not null default 'task',
+                        priority text default 'normal',
+                        completed boolean not null default false,
+                        reminder_sent boolean not null default false,
+                        created_at timestamptz not null default now()
+                  )`,
+                  // Invoices
+                  `create table if not exists invoices (
+                        id uuid primary key default uuid_generate_v4(),
+                        invoice_number text not null unique,
+                        client_id text not null,
+                        title text not null,
+                        description text,
+                        items jsonb not null default '[]',
+                        subtotal numeric(10,2) not null default 0,
+                        tax_rate numeric(5,2) not null default 0,
+                        tax_amount numeric(10,2) not null default 0,
+                        total numeric(10,2) not null default 0,
+                        status text not null default 'draft',
+                        due_date date not null,
+                        issued_date date,
+                        paid_date date,
+                        paid_amount numeric(10,2),
+                        payment_method text,
+                        notes text,
+                        client_visible boolean not null default false,
+                        created_at timestamptz not null default now()
+                  )`,
+                  // User preferences (timezone, etc.)
+                  `create table if not exists user_preferences (
+                        user_email text primary key,
+                        timezone text not null default 'America/Chicago',
+                        updated_at timestamptz not null default now()
+                  )`,
+                  // Google Calendar OAuth tokens
+                  `create table if not exists google_tokens (
+                        user_email text primary key,
+                        access_token text not null,
+                        refresh_token text not null,
+                        token_expiry timestamptz not null,
+                        calendar_id text not null default 'primary',
+                        connected_at timestamptz not null default now()
+                  )`,
+                  // AI Assistant memory — stores things the user tells it to remember
+                  `create table if not exists assistant_memory (
+                        id uuid primary key default uuid_generate_v4(),
+                        user_email text not null,
+                        category text not null default 'general',
+                        content text not null,
+                        created_at timestamptz not null default now()
+                  )`,
+                  `create table if not exists sms_notifications (
+                        id uuid primary key default uuid_generate_v4(),
+                        phone text not null,
+                        message text not null,
+                        sent_at timestamptz,
+                        source text,
+                        created_at timestamptz not null default now()
+                  )`,
                   `create table if not exists users (
                         id uuid primary key default uuid_generate_v4(),
                               username text not null unique,

@@ -19,6 +19,7 @@ import AgencyOverview from './AgencyOverview';
 import MonthlyContentCalendar from './MonthlyContentCalendar';
 import AIInsightsPanel from './AIInsightsPanel';
 import UserBanner from './UserBanner';
+import DailyBriefing from './DailyBriefing';
 
 // ─── TYPES ──────────────────────────────────────────────────────────
 
@@ -286,6 +287,9 @@ export default function MNADashboard() {
 
   return (
     <div className="space-y-6 max-w-[1400px]">
+      {/* Daily Briefing alert — shows on login */}
+      <DailyBriefing />
+
       {activeTab !== 'overview' && <UserBanner />}
 
       {/* Tab bar */}

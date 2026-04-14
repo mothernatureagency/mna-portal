@@ -1,21 +1,29 @@
 'use client';
 import React, { useState } from 'react';
 import Link from 'next/link';
-import { usePathname } from 'next/navigation';
+import { usePathname, useRouter } from 'next/navigation';
 import { useClient } from '@/context/ClientContext';
+import { createClient } from '@/lib/supabase/client';
 
 const NAV = [
   { sec: 'MAIN', items: [
-    { label: 'Overview', href: '/', e: 'bar_chart' },
+    { label: 'Home', href: '/', e: 'home' },
+    { label: 'Schedule', href: '/schedule', e: 'calendar_today' },
+    { label: 'Business Overview', href: '/overview', e: 'bar_chart' },
   ]},
-  { sec: 'SOCIAL & CONTENT', items: [
+  { sec: 'CONTENT', items: [
     { label: 'Content Tracker', href: '/content', e: 'grid_view' },
     { label: 'Content Planner', href: '/planner', e: 'edit_calendar' },
-    { label: 'Email & SMS', href: '/campaigns', e: 'forward_to_inbox' },
     { label: 'Agenda', href: '/agenda', e: 'event_note' },
+  ]},
+  { sec: 'EMAIL & SMS', items: [
+    { label: 'Campaigns', href: '/campaigns', e: 'forward_to_inbox' },
+    { label: 'Email Drafts', href: '/email-preview', e: 'mail' },
+  ]},
+  { sec: 'CLIENT MGMT', items: [
     { label: 'Task Manager', href: '/client-tasks', e: 'checklist' },
     { label: 'Meeting Notes', href: '/meeting-notes', e: 'description' },
-    { label: 'Email Drafts', href: '/email-preview', e: 'mail' },
+    { label: 'Invoices', href: '/invoices', e: 'receipt_long' },
   ]},
   { sec: 'ADVERTISING', items: [
     { label: 'Meta Ads (Live)', href: '/meta-ads', e: 'ads_click' },
@@ -27,8 +35,12 @@ const NAV = [
     { label: 'AI Insights', href: '/reports', e: 'psychology' },
   ]},
   { sec: 'AGENTS', items: [
-    { label: 'AI Agents', href: '/agents/ai', e: 'smart_toy' },
+    { label: 'MNA Assistant', href: '/assistant', e: 'smart_toy' },
+    { label: 'AI Agents', href: '/agents/ai', e: 'robot_2' },
     { label: 'Team Roster', href: '/agents/team', e: 'groups' },
+  ]},
+  { sec: 'ACCOUNT', items: [
+    { label: 'Settings', href: '/settings', e: 'settings' },
   ]},
 ];
 
@@ -38,8 +50,15 @@ export function MobileMenuButton() {
 
 export default function Sidebar({ mobileOpen, onClose }: { mobileOpen?: boolean; onClose?: () => void }) {
   const path = usePathname();
+  const router = useRouter();
   const ctx = useClient();
   const client = (ctx as any)?.activeClient;
+
+  async function signOut() {
+    const supabase = createClient();
+    await supabase.auth.signOut();
+    router.push('/login');
+  }
   const active = (href: string) => href === '/' ? path === href : (path || '').startsWith(href);
 
   const sidebarStyle: React.CSSProperties = {
@@ -47,7 +66,6 @@ export default function Sidebar({ mobileOpen, onClose }: { mobileOpen?: boolean;
     minWidth: 240,
     height: '100vh',
     background: 'linear-gradient(180deg,#0f1f2e,#0d1b2a 60%,#0a1628)',
-    display: 'flex',
     flexDirection: 'column',
     borderRight: '1px solid rgba(255,255,255,.07)',
     flexShrink: 0,
@@ -100,10 +118,24 @@ export default function Sidebar({ mobileOpen, onClose }: { mobileOpen?: boolean;
 
       {/* Bottom */}
       <div style={{ padding: 10, borderTop: '1px solid rgba(255,255,255,.07)' }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '9px 12px', borderRadius: 10, background: 'rgba(255,255,255,.08)', border: '1px solid rgba(255,255,255,.1)' }}>
-          <span style={{ fontSize: 15 }}>&gt;&gt;</span>
-          <span style={{ color: '#fff', fontSize: 13, fontWeight: 600 }}>Revenue Forecast</span>
-        </div>
+        <button
+          onClick={() => router.push('/client')}
+          style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '8px 10px', borderRadius: 10, fontSize: 13, color: 'rgba(255,255,255,.6)', background: 'transparent', border: 'none', cursor: 'pointer', width: '100%', marginBottom: 2 }}
+          onMouseEnter={(e) => { e.currentTarget.style.background = 'rgba(74,184,206,.15)'; e.currentTarget.style.color = '#4ab8ce'; }}
+          onMouseLeave={(e) => { e.currentTarget.style.background = 'transparent'; e.currentTarget.style.color = 'rgba(255,255,255,.6)'; }}
+        >
+          <span className="material-symbols-outlined" style={{ fontSize: 18 }}>swap_horiz</span>
+          Switch to Client View
+        </button>
+        <button
+          onClick={signOut}
+          style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '8px 10px', borderRadius: 10, fontSize: 13, color: 'rgba(255,255,255,.6)', background: 'transparent', border: 'none', cursor: 'pointer', width: '100%' }}
+          onMouseEnter={(e) => { e.currentTarget.style.background = 'rgba(255,255,255,.1)'; e.currentTarget.style.color = '#fff'; }}
+          onMouseLeave={(e) => { e.currentTarget.style.background = 'transparent'; e.currentTarget.style.color = 'rgba(255,255,255,.6)'; }}
+        >
+          <span className="material-symbols-outlined" style={{ fontSize: 18 }}>logout</span>
+          Sign out
+        </button>
       </div>
     </>
   );
