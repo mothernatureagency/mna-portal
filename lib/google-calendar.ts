@@ -145,6 +145,7 @@ export async function createCalendarEvent(
     startTime?: string; // HH:MM
     endTime?: string;   // HH:MM
     eventType?: string;
+    attendees?: { name?: string; email: string }[];
   }
 ): Promise<{ success: boolean; googleEventId?: string; htmlLink?: string; error?: string }> {
   const accessToken = await getAccessToken(userEmail);
@@ -194,9 +195,18 @@ export async function createCalendarEvent(
     body.end = { date: event.date };
   }
 
+  // Add attendees if provided — Google sends calendar invites automatically
+  const hasAttendees = event.attendees && event.attendees.length > 0;
+  if (hasAttendees) {
+    body.attendees = event.attendees!
+      .filter(a => a.email)
+      .map(a => ({ email: a.email, displayName: a.name || undefined }));
+  }
+
   try {
+    const url = `https://www.googleapis.com/calendar/v3/calendars/${encodeURIComponent(calendarId)}/events${hasAttendees ? '?sendUpdates=all' : ''}`;
     const res = await fetch(
-      `https://www.googleapis.com/calendar/v3/calendars/${encodeURIComponent(calendarId)}/events`,
+      url,
       {
         method: 'POST',
         headers: {

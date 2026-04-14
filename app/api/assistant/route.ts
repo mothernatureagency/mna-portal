@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { ensureSchema, query } from '@/lib/db';
 import Anthropic from '@anthropic-ai/sdk';
 import { createCalendarEvent, isConnected } from '@/lib/google-calendar';
+import { resolveAttendees, CONTACTS } from '@/lib/contacts';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -25,6 +26,7 @@ const tools: Anthropic.Tool[] = [
         priority: { type: 'string', enum: ['normal', 'high'], description: 'Priority level' },
         description: { type: 'string', description: 'Optional description or notes' },
         client_id: { type: 'string', description: 'Client ID if related to a specific client (prime-iv, prime-iv-pinecrest, serenity-bayfront, mna-realty, mna). Optional.' },
+        attendees: { type: 'string', description: 'Comma-separated list of attendee names or emails to invite. e.g. "Justin, Sable" or "jkulkusky@primeivhydration.com, admin@mothernatureagency.com". Optional.' },
       },
       required: ['title', 'event_date', 'event_type'],
     },
@@ -122,13 +124,19 @@ async function executeTool(name: string, input: any, userEmail: string): Promise
 
   switch (name) {
     case 'add_event': {
+      // Resolve attendees from names/emails
+      const resolvedAttendees = input.attendees ? resolveAttendees(input.attendees) : [];
+      const attendeesStr = resolvedAttendees.length > 0
+        ? resolvedAttendees.map(a => a.name || a.email).join(', ')
+        : null;
+
       const { rows } = await query(
-        `INSERT INTO schedule_events (user_email, client_id, title, description, event_date, start_time, end_time, event_type, priority)
-         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9) RETURNING *`,
-        [userEmail, input.client_id || null, input.title, input.description || null, input.event_date, input.start_time || null, input.end_time || null, input.event_type, input.priority || 'normal']
+        `INSERT INTO schedule_events (user_email, client_id, title, description, event_date, start_time, end_time, event_type, priority, attendees)
+         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10) RETURNING *`,
+        [userEmail, input.client_id || null, input.title, input.description || null, input.event_date, input.start_time || null, input.end_time || null, input.event_type, input.priority || 'normal', attendeesStr]
       );
 
-      // Push to Google Calendar if connected
+      // Push to Google Calendar if connected (with attendees for invites)
       let googleSync = null;
       try {
         const connected = await isConnected(userEmail);
@@ -140,6 +148,7 @@ async function executeTool(name: string, input: any, userEmail: string): Promise
             startTime: input.start_time || undefined,
             endTime: input.end_time || undefined,
             eventType: input.event_type,
+            attendees: resolvedAttendees.filter(a => a.email),
           });
         }
       } catch {}
@@ -147,6 +156,7 @@ async function executeTool(name: string, input: any, userEmail: string): Promise
       return JSON.stringify({
         success: true,
         event: rows[0],
+        attendees_invited: resolvedAttendees.filter(a => a.email).map(a => a.email),
         google_calendar_synced: googleSync?.success || false,
       });
     }
@@ -300,6 +310,12 @@ When adding events, infer reasonable defaults:
 - If they say "meeting", set event_type to "meeting"
 - If they say "call", set event_type to "call"
 - Default priority is "normal" unless they say urgent/important/ASAP
+- When adding meetings/calls, ask who to invite if not specified. You can invite by name or email.
+
+Team & Contact Directory (for attendees):
+${CONTACTS.map(c => `- ${c.name} (${c.email}) — ${c.role}${c.clientId ? ` [${c.clientId}]` : ''}`).join('\n')}
+
+When the user says "set up a call with Justin" or "meeting with Sable and Jennifer", pass their names as the attendees parameter. Google Calendar will automatically send them invite emails.
 ${memoryContext}`;
 
     // Convert messages format and call Claude

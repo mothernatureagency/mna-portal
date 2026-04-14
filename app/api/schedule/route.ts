@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { ensureSchema, query } from '@/lib/db';
 import { createCalendarEvent, isConnected } from '@/lib/google-calendar';
+import { resolveAttendees } from '@/lib/contacts';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -57,19 +58,25 @@ export async function GET(req: NextRequest) {
 export async function POST(req: NextRequest) {
   await ensureSchema();
   const body = await req.json();
-  const { email, clientId, title, description, eventDate, startTime, endTime, eventType, priority } = body;
+  const { email, clientId, title, description, eventDate, startTime, endTime, eventType, priority, attendees } = body;
 
   if (!email || !title || !eventDate) {
     return NextResponse.json({ error: 'email, title, and eventDate required' }, { status: 400 });
   }
 
+  // Resolve attendees from names/emails
+  const resolvedAttendees = attendees ? resolveAttendees(attendees) : [];
+  const attendeesStr = resolvedAttendees.length > 0
+    ? resolvedAttendees.map(a => a.name || a.email).join(', ')
+    : (attendees || null);
+
   const { rows } = await query(
-    `insert into schedule_events (user_email, client_id, title, description, event_date, start_time, end_time, event_type, priority)
-     values ($1, $2, $3, $4, $5, $6, $7, $8, $9) returning *`,
-    [email, clientId || null, title, description || null, eventDate, startTime || null, endTime || null, eventType || 'task', priority || 'normal']
+    `insert into schedule_events (user_email, client_id, title, description, event_date, start_time, end_time, event_type, priority, attendees)
+     values ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10) returning *`,
+    [email, clientId || null, title, description || null, eventDate, startTime || null, endTime || null, eventType || 'task', priority || 'normal', attendeesStr]
   );
 
-  // Push to Google Calendar if connected
+  // Push to Google Calendar if connected (with attendees for invites)
   let googleEvent = null;
   try {
     const connected = await isConnected(email);
@@ -81,6 +88,7 @@ export async function POST(req: NextRequest) {
         startTime: startTime || undefined,
         endTime: endTime || undefined,
         eventType: eventType || 'task',
+        attendees: resolvedAttendees.filter(a => a.email),
       });
     }
   } catch (err) {
@@ -100,7 +108,7 @@ export async function PATCH(req: NextRequest) {
 
   const fields: string[] = [];
   const values: any[] = [];
-  const patchable = ['title', 'description', 'event_date', 'start_time', 'end_time', 'event_type', 'priority', 'completed', 'client_id', 'reminder_sent'];
+  const patchable = ['title', 'description', 'event_date', 'start_time', 'end_time', 'event_type', 'priority', 'completed', 'client_id', 'reminder_sent', 'attendees'];
 
   for (const key of patchable) {
     if (body[key] !== undefined) {

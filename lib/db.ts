@@ -201,8 +201,14 @@ async function initSchema() {
                         priority text default 'normal',
                         completed boolean not null default false,
                         reminder_sent boolean not null default false,
+                        attendees text,
                         created_at timestamptz not null default now()
                   )`,
+                  // Add attendees column if missing (migration for existing tables)
+                  `DO $$ BEGIN
+                    ALTER TABLE schedule_events ADD COLUMN IF NOT EXISTS attendees text;
+                  EXCEPTION WHEN others THEN NULL;
+                  END $$`,
                   // Invoices
                   `create table if not exists invoices (
                         id uuid primary key default uuid_generate_v4(),

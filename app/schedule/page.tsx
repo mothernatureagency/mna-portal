@@ -16,6 +16,7 @@ type ScheduleEvent = {
   priority: string;
   completed: boolean;
   reminder_sent: boolean;
+  attendees: string | null;
   created_at: string;
 };
 
@@ -78,7 +79,7 @@ export default function SchedulePage() {
 
   const [newEvent, setNewEvent] = useState({
     title: '', description: '', event_date: todayStr(), start_time: '09:00', end_time: '10:00',
-    event_type: 'task', priority: 'normal', client_id: '',
+    event_type: 'task', priority: 'normal', client_id: '', attendees: '',
   });
 
   useEffect(() => {
@@ -132,12 +133,13 @@ export default function SchedulePage() {
         endTime: newEvent.end_time || null,
         eventType: newEvent.event_type,
         priority: newEvent.priority,
+        attendees: newEvent.attendees || null,
       }),
     });
     const data = await res.json();
     if (!res.ok) { alert(data.error); return; }
     setEvents((prev) => [...prev, data.event].sort((a, b) => (a.start_time || '').localeCompare(b.start_time || '')));
-    setNewEvent({ title: '', description: '', event_date: selectedDate, start_time: '09:00', end_time: '10:00', event_type: 'task', priority: 'normal', client_id: '' });
+    setNewEvent({ title: '', description: '', event_date: selectedDate, start_time: '09:00', end_time: '10:00', event_type: 'task', priority: 'normal', client_id: '', attendees: '' });
     setShowAdd(false);
   }
 
@@ -288,6 +290,8 @@ export default function SchedulePage() {
               {allClients.filter((c: any) => c.id !== 'mna').map((c: any) => <option key={c.id} value={c.id}>{c.shortName}</option>)}
             </select>
           </div>
+          <input type="text" placeholder="Attendees (e.g. Justin, Sable, jkulkusky@primeivhydration.com)" value={newEvent.attendees} onChange={(e) => setNewEvent({ ...newEvent, attendees: e.target.value })}
+            className="w-full text-[12px] px-3 py-2 rounded-xl bg-white/5 border border-white/15 text-white outline-none placeholder:text-white/30" />
           <textarea placeholder="Description (optional)" value={newEvent.description} onChange={(e) => setNewEvent({ ...newEvent, description: e.target.value })}
             rows={2} className="w-full text-[12px] px-3 py-2 rounded-xl bg-white/5 border border-white/15 text-white outline-none placeholder:text-white/30" />
           <button onClick={createEvent} className="text-[12px] font-bold px-5 py-2 rounded-xl text-white" style={{ background: 'linear-gradient(135deg, #0c6da4, #4ab8ce)' }}>
@@ -342,6 +346,12 @@ export default function SchedulePage() {
                         {ev.priority === 'high' && <span className="text-[9px] font-bold px-2 py-0.5 rounded-full bg-rose-500/20 text-rose-300">High</span>}
                         {clientName && <span className="text-[9px] font-bold px-2 py-0.5 rounded-full bg-sky-500/15 text-sky-300">{clientName}</span>}
                       </div>
+                      {ev.attendees && (
+                        <div className="flex items-center gap-1 mt-0.5">
+                          <span className="material-symbols-outlined text-white/30" style={{ fontSize: 12 }}>group</span>
+                          <span className="text-[11px] text-white/40">{ev.attendees}</span>
+                        </div>
+                      )}
                       {ev.description && <div className="text-[11px] text-white/40 mt-0.5">{ev.description}</div>}
                     </div>
 
