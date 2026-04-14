@@ -58,7 +58,7 @@ export async function GET(req: NextRequest) {
 export async function POST(req: NextRequest) {
   await ensureSchema();
   const body = await req.json();
-  const { email, clientId, title, description, eventDate, startTime, endTime, eventType, priority, attendees } = body;
+  const { email, clientId, title, description, eventDate, startTime, endTime, eventType, priority, attendees, meetingMode, location } = body;
 
   if (!email || !title || !eventDate) {
     return NextResponse.json({ error: 'email, title, and eventDate required' }, { status: 400 });
@@ -71,12 +71,12 @@ export async function POST(req: NextRequest) {
     : (attendees || null);
 
   const { rows } = await query(
-    `insert into schedule_events (user_email, client_id, title, description, event_date, start_time, end_time, event_type, priority, attendees)
-     values ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10) returning *`,
-    [email, clientId || null, title, description || null, eventDate, startTime || null, endTime || null, eventType || 'task', priority || 'normal', attendeesStr]
+    `insert into schedule_events (user_email, client_id, title, description, event_date, start_time, end_time, event_type, priority, attendees, meeting_mode, location)
+     values ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12) returning *`,
+    [email, clientId || null, title, description || null, eventDate, startTime || null, endTime || null, eventType || 'task', priority || 'normal', attendeesStr, meetingMode || 'none', location || null]
   );
 
-  // Push to Google Calendar if connected (with attendees for invites)
+  // Push to Google Calendar if connected (with attendees + meeting mode)
   let googleEvent = null;
   try {
     const connected = await isConnected(email);
@@ -89,10 +89,20 @@ export async function POST(req: NextRequest) {
         endTime: endTime || undefined,
         eventType: eventType || 'task',
         attendees: resolvedAttendees.filter(a => a.email),
+        meetingMode: meetingMode || 'none',
+        location: location || undefined,
       });
+
+      // Store the Meet link if one was generated
+      if (googleEvent?.meetLink) {
+        await query(
+          'UPDATE schedule_events SET meet_link = $1 WHERE id = $2',
+          [googleEvent.meetLink, rows[0].id]
+        );
+        rows[0].meet_link = googleEvent.meetLink;
+      }
     }
   } catch (err) {
-    // Don't fail the request if Google sync fails
     console.error('Google Calendar sync error:', err);
   }
 
@@ -108,7 +118,7 @@ export async function PATCH(req: NextRequest) {
 
   const fields: string[] = [];
   const values: any[] = [];
-  const patchable = ['title', 'description', 'event_date', 'start_time', 'end_time', 'event_type', 'priority', 'completed', 'client_id', 'reminder_sent', 'attendees'];
+  const patchable = ['title', 'description', 'event_date', 'start_time', 'end_time', 'event_type', 'priority', 'completed', 'client_id', 'reminder_sent', 'attendees', 'meeting_mode', 'location', 'meet_link'];
 
   for (const key of patchable) {
     if (body[key] !== undefined) {

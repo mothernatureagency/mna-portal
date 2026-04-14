@@ -202,11 +202,17 @@ async function initSchema() {
                         completed boolean not null default false,
                         reminder_sent boolean not null default false,
                         attendees text,
+                        meeting_mode text default 'none',
+                        location text,
+                        meet_link text,
                         created_at timestamptz not null default now()
                   )`,
-                  // Add attendees column if missing (migration for existing tables)
+                  // Add columns if missing (migration for existing tables)
                   `DO $$ BEGIN
                     ALTER TABLE schedule_events ADD COLUMN IF NOT EXISTS attendees text;
+                    ALTER TABLE schedule_events ADD COLUMN IF NOT EXISTS meeting_mode text DEFAULT 'none';
+                    ALTER TABLE schedule_events ADD COLUMN IF NOT EXISTS location text;
+                    ALTER TABLE schedule_events ADD COLUMN IF NOT EXISTS meet_link text;
                   EXCEPTION WHEN others THEN NULL;
                   END $$`,
                   // Invoices

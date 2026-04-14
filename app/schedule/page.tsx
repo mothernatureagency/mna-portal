@@ -17,6 +17,9 @@ type ScheduleEvent = {
   completed: boolean;
   reminder_sent: boolean;
   attendees: string | null;
+  meeting_mode: string | null;
+  location: string | null;
+  meet_link: string | null;
   created_at: string;
 };
 
@@ -80,6 +83,7 @@ export default function SchedulePage() {
   const [newEvent, setNewEvent] = useState({
     title: '', description: '', event_date: todayStr(), start_time: '09:00', end_time: '10:00',
     event_type: 'task', priority: 'normal', client_id: '', attendees: '',
+    meeting_mode: 'none' as 'none' | 'google_meet' | 'in_person', location: '',
   });
 
   useEffect(() => {
@@ -134,12 +138,14 @@ export default function SchedulePage() {
         eventType: newEvent.event_type,
         priority: newEvent.priority,
         attendees: newEvent.attendees || null,
+        meetingMode: newEvent.meeting_mode,
+        location: newEvent.location || null,
       }),
     });
     const data = await res.json();
     if (!res.ok) { alert(data.error); return; }
     setEvents((prev) => [...prev, data.event].sort((a, b) => (a.start_time || '').localeCompare(b.start_time || '')));
-    setNewEvent({ title: '', description: '', event_date: selectedDate, start_time: '09:00', end_time: '10:00', event_type: 'task', priority: 'normal', client_id: '', attendees: '' });
+    setNewEvent({ title: '', description: '', event_date: selectedDate, start_time: '09:00', end_time: '10:00', event_type: 'task', priority: 'normal', client_id: '', attendees: '', meeting_mode: 'none', location: '' });
     setShowAdd(false);
   }
 
@@ -276,7 +282,11 @@ export default function SchedulePage() {
               className="text-[12px] px-3 py-2 rounded-xl bg-white/5 border border-white/15 text-white outline-none" />
             <input type="time" value={newEvent.end_time} onChange={(e) => setNewEvent({ ...newEvent, end_time: e.target.value })}
               className="text-[12px] px-3 py-2 rounded-xl bg-white/5 border border-white/15 text-white outline-none" />
-            <select value={newEvent.event_type} onChange={(e) => setNewEvent({ ...newEvent, event_type: e.target.value })}
+            <select value={newEvent.event_type} onChange={(e) => {
+              const t = e.target.value;
+              const mode = (t === 'meeting' || t === 'call') ? 'google_meet' : 'none';
+              setNewEvent({ ...newEvent, event_type: t, meeting_mode: mode });
+            }}
               className="text-[12px] px-3 py-2 rounded-xl bg-white/5 border border-white/15 text-white outline-none">
               {EVENT_TYPES.map((t) => <option key={t.value} value={t.value}>{t.label}</option>)}
             </select>
@@ -290,6 +300,39 @@ export default function SchedulePage() {
               {allClients.filter((c: any) => c.id !== 'mna').map((c: any) => <option key={c.id} value={c.id}>{c.shortName}</option>)}
             </select>
           </div>
+          {/* Meeting mode — only show for meetings/calls */}
+          {(newEvent.event_type === 'meeting' || newEvent.event_type === 'call') && (
+            <div className="flex gap-2">
+              <button
+                type="button"
+                onClick={() => setNewEvent({ ...newEvent, meeting_mode: 'google_meet' })}
+                className={`flex-1 flex items-center justify-center gap-2 text-[12px] font-semibold px-3 py-2.5 rounded-xl border transition-colors ${
+                  newEvent.meeting_mode === 'google_meet'
+                    ? 'bg-blue-500/20 border-blue-500/40 text-blue-300'
+                    : 'bg-white/5 border-white/15 text-white/50 hover:text-white/70'
+                }`}
+              >
+                <span className="material-symbols-outlined" style={{ fontSize: 16 }}>videocam</span>
+                Google Meet
+              </button>
+              <button
+                type="button"
+                onClick={() => setNewEvent({ ...newEvent, meeting_mode: 'in_person' })}
+                className={`flex-1 flex items-center justify-center gap-2 text-[12px] font-semibold px-3 py-2.5 rounded-xl border transition-colors ${
+                  newEvent.meeting_mode === 'in_person'
+                    ? 'bg-amber-500/20 border-amber-500/40 text-amber-300'
+                    : 'bg-white/5 border-white/15 text-white/50 hover:text-white/70'
+                }`}
+              >
+                <span className="material-symbols-outlined" style={{ fontSize: 16 }}>location_on</span>
+                In-Person
+              </button>
+            </div>
+          )}
+          {newEvent.meeting_mode === 'in_person' && (
+            <input type="text" placeholder="Location (e.g. Office, Coffee shop, 123 Main St)" value={newEvent.location} onChange={(e) => setNewEvent({ ...newEvent, location: e.target.value })}
+              className="w-full text-[12px] px-3 py-2 rounded-xl bg-white/5 border border-white/15 text-white outline-none placeholder:text-white/30" />
+          )}
           <input type="text" placeholder="Attendees (e.g. Justin, Sable, jkulkusky@primeivhydration.com)" value={newEvent.attendees} onChange={(e) => setNewEvent({ ...newEvent, attendees: e.target.value })}
             className="w-full text-[12px] px-3 py-2 rounded-xl bg-white/5 border border-white/15 text-white outline-none placeholder:text-white/30" />
           <textarea placeholder="Description (optional)" value={newEvent.description} onChange={(e) => setNewEvent({ ...newEvent, description: e.target.value })}
@@ -350,6 +393,19 @@ export default function SchedulePage() {
                         <div className="flex items-center gap-1 mt-0.5">
                           <span className="material-symbols-outlined text-white/30" style={{ fontSize: 12 }}>group</span>
                           <span className="text-[11px] text-white/40">{ev.attendees}</span>
+                        </div>
+                      )}
+                      {ev.meet_link && (
+                        <a href={ev.meet_link} target="_blank" rel="noopener noreferrer"
+                          className="inline-flex items-center gap-1 mt-0.5 text-[11px] text-blue-400 hover:text-blue-300 transition-colors">
+                          <span className="material-symbols-outlined" style={{ fontSize: 12 }}>videocam</span>
+                          Join Google Meet
+                        </a>
+                      )}
+                      {ev.location && (
+                        <div className="flex items-center gap-1 mt-0.5">
+                          <span className="material-symbols-outlined text-amber-400/60" style={{ fontSize: 12 }}>location_on</span>
+                          <span className="text-[11px] text-white/40">{ev.location}</span>
                         </div>
                       )}
                       {ev.description && <div className="text-[11px] text-white/40 mt-0.5">{ev.description}</div>}

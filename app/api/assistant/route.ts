@@ -26,7 +26,9 @@ const tools: Anthropic.Tool[] = [
         priority: { type: 'string', enum: ['normal', 'high'], description: 'Priority level' },
         description: { type: 'string', description: 'Optional description or notes' },
         client_id: { type: 'string', description: 'Client ID if related to a specific client (prime-iv, prime-iv-pinecrest, serenity-bayfront, mna-realty, mna). Optional.' },
-        attendees: { type: 'string', description: 'Comma-separated list of attendee names or emails to invite. e.g. "Justin, Sable" or "jkulkusky@primeivhydration.com, admin@mothernatureagency.com". Optional.' },
+        attendees: { type: 'string', description: 'Comma-separated list of attendee names or emails to invite. e.g. "Justin, Sable" or "jkulkusky@primeivhydration.com". Optional.' },
+        meeting_mode: { type: 'string', enum: ['google_meet', 'in_person', 'none'], description: 'Set to "google_meet" to auto-generate a Google Meet link, "in_person" for physical meetings, or "none" for tasks/deadlines. Default: "none" for tasks, "google_meet" for calls/meetings.' },
+        location: { type: 'string', description: 'Physical location for in-person meetings. Optional.' },
       },
       required: ['title', 'event_date', 'event_type'],
     },
@@ -130,13 +132,17 @@ async function executeTool(name: string, input: any, userEmail: string): Promise
         ? resolvedAttendees.map(a => a.name || a.email).join(', ')
         : null;
 
+      // Default meeting_mode: google_meet for calls/meetings, none for tasks/deadlines
+      const meetingMode = input.meeting_mode ||
+        (['meeting', 'call'].includes(input.event_type) ? 'google_meet' : 'none');
+
       const { rows } = await query(
-        `INSERT INTO schedule_events (user_email, client_id, title, description, event_date, start_time, end_time, event_type, priority, attendees)
-         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10) RETURNING *`,
-        [userEmail, input.client_id || null, input.title, input.description || null, input.event_date, input.start_time || null, input.end_time || null, input.event_type, input.priority || 'normal', attendeesStr]
+        `INSERT INTO schedule_events (user_email, client_id, title, description, event_date, start_time, end_time, event_type, priority, attendees, meeting_mode, location)
+         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12) RETURNING *`,
+        [userEmail, input.client_id || null, input.title, input.description || null, input.event_date, input.start_time || null, input.end_time || null, input.event_type, input.priority || 'normal', attendeesStr, meetingMode, input.location || null]
       );
 
-      // Push to Google Calendar if connected (with attendees for invites)
+      // Push to Google Calendar if connected (with attendees + Meet link)
       let googleSync = null;
       try {
         const connected = await isConnected(userEmail);
@@ -149,7 +155,15 @@ async function executeTool(name: string, input: any, userEmail: string): Promise
             endTime: input.end_time || undefined,
             eventType: input.event_type,
             attendees: resolvedAttendees.filter(a => a.email),
+            meetingMode,
+            location: input.location || undefined,
           });
+
+          // Store Meet link if generated
+          if (googleSync?.meetLink) {
+            await query('UPDATE schedule_events SET meet_link = $1 WHERE id = $2', [googleSync.meetLink, rows[0].id]);
+            rows[0].meet_link = googleSync.meetLink;
+          }
         }
       } catch {}
 
@@ -158,6 +172,7 @@ async function executeTool(name: string, input: any, userEmail: string): Promise
         event: rows[0],
         attendees_invited: resolvedAttendees.filter(a => a.email).map(a => a.email),
         google_calendar_synced: googleSync?.success || false,
+        meet_link: googleSync?.meetLink || null,
       });
     }
 
@@ -311,6 +326,8 @@ When adding events, infer reasonable defaults:
 - If they say "call", set event_type to "call"
 - Default priority is "normal" unless they say urgent/important/ASAP
 - When adding meetings/calls, ask who to invite if not specified. You can invite by name or email.
+- For meetings/calls, default to Google Meet (auto-generates a Meet link). If the user says "in-person" or mentions a location, use in_person mode instead.
+- Always set a start_time for meetings/calls so a proper Google Meet link can be created.
 
 Team & Contact Directory (for attendees):
 ${CONTACTS.map(c => `- ${c.name} (${c.email}) — ${c.role}${c.clientId ? ` [${c.clientId}]` : ''}`).join('\n')}

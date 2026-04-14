@@ -146,8 +146,10 @@ export async function createCalendarEvent(
     endTime?: string;   // HH:MM
     eventType?: string;
     attendees?: { name?: string; email: string }[];
+    meetingMode?: 'in_person' | 'google_meet' | 'none'; // none = task/deadline
+    location?: string; // for in-person meetings
   }
-): Promise<{ success: boolean; googleEventId?: string; htmlLink?: string; error?: string }> {
+): Promise<{ success: boolean; googleEventId?: string; htmlLink?: string; meetLink?: string; error?: string }> {
   const accessToken = await getAccessToken(userEmail);
   if (!accessToken) return { success: false, error: 'Google Calendar not connected' };
 
@@ -195,6 +197,21 @@ export async function createCalendarEvent(
     body.end = { date: event.date };
   }
 
+  // Add Google Meet conference if requested
+  if (event.meetingMode === 'google_meet') {
+    body.conferenceData = {
+      createRequest: {
+        requestId: `mna-${Date.now()}`,
+        conferenceSolutionKey: { type: 'hangoutsMeet' },
+      },
+    };
+  }
+
+  // Add location for in-person meetings
+  if (event.meetingMode === 'in_person' && event.location) {
+    body.location = event.location;
+  }
+
   // Add attendees if provided — Google sends calendar invites automatically
   const hasAttendees = event.attendees && event.attendees.length > 0;
   if (hasAttendees) {
@@ -204,7 +221,12 @@ export async function createCalendarEvent(
   }
 
   try {
-    const url = `https://www.googleapis.com/calendar/v3/calendars/${encodeURIComponent(calendarId)}/events${hasAttendees ? '?sendUpdates=all' : ''}`;
+    // conferenceDataVersion=1 required for Google Meet link creation
+    const params: string[] = [];
+    if (hasAttendees) params.push('sendUpdates=all');
+    if (event.meetingMode === 'google_meet') params.push('conferenceDataVersion=1');
+    const qs = params.length > 0 ? `?${params.join('&')}` : '';
+    const url = `https://www.googleapis.com/calendar/v3/calendars/${encodeURIComponent(calendarId)}/events${qs}`;
     const res = await fetch(
       url,
       {
@@ -223,7 +245,8 @@ export async function createCalendarEvent(
     }
 
     const data = await res.json();
-    return { success: true, googleEventId: data.id, htmlLink: data.htmlLink };
+    const meetLink = data.conferenceData?.entryPoints?.find((ep: any) => ep.entryPointType === 'video')?.uri || null;
+    return { success: true, googleEventId: data.id, htmlLink: data.htmlLink, meetLink };
   } catch (err: any) {
     return { success: false, error: err.message };
   }
