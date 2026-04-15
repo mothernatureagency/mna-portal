@@ -268,6 +268,22 @@ async function initSchema() {
                         content text not null,
                         created_at timestamptz not null default now()
                   )`,
+                  // Outbound email notifications queue.
+                  // Filled by the app (content approval events, etc.), drained
+                  // by Make.com which polls for status='pending' and sends via Gmail.
+                  `create table if not exists email_notifications (
+                        id uuid primary key default uuid_generate_v4(),
+                        to_email text not null,
+                        from_email text not null default 'mn@mothernatureagency.com',
+                        subject text not null,
+                        body text not null,
+                        event_type text,
+                        client_id text,
+                        related_id text,
+                        status text not null default 'pending',
+                        created_at timestamptz not null default now(),
+                        sent_at timestamptz
+                  )`,
                   `create table if not exists sms_notifications (
                         id uuid primary key default uuid_generate_v4(),
                         phone text not null,

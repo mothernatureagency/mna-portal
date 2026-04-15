@@ -5,6 +5,8 @@ import { notFound, useParams } from 'next/navigation';
 import { getAgent } from '@/lib/agents/config';
 import { useClient } from '@/context/ClientContext';
 import { getPlaybooksForClient } from '@/lib/agents/playbooks';
+import { VoiceButton } from '@/components/ai/VoiceButton';
+import { speak, cancelSpeak } from '@/lib/voice';
 
 type Msg = { role: 'user' | 'assistant'; content: string };
 
@@ -29,6 +31,8 @@ export default function AgentChatPage() {
   const [input, setInput] = useState('');
   const [loading, setLoading] = useState(false);
   const [saveStatus, setSaveStatus] = useState<string>('');
+  const [voiceReply, setVoiceReply] = useState(true);           // auto speak assistant replies
+  const voicePendingRef = useRef(false);                        // did user ask by voice?
   const scrollRef = useRef<HTMLDivElement>(null);
 
   // Get playbooks available for the active client
@@ -110,11 +114,25 @@ export default function AgentChatPage() {
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || 'Request failed');
       setMessages((m) => [...m, { role: 'assistant', content: data.reply }]);
+      // If the user spoke their question, speak the reply back.
+      if (voicePendingRef.current && voiceReply && data.reply) {
+        // Strip code blocks before speaking — they sound awful read aloud.
+        const spoken = String(data.reply).replace(/```[\s\S]*?```/g, ' ').replace(/\s+/g, ' ').trim();
+        if (spoken) speak(spoken);
+      }
+      voicePendingRef.current = false;
     } catch (e: any) {
       setMessages((m) => [...m, { role: 'assistant', content: `Error: ${e.message}` }]);
+      voicePendingRef.current = false;
     } finally {
       setLoading(false);
     }
+  }
+
+  // Called by the mic button once the user finishes a voice command.
+  function handleVoiceInput(text: string) {
+    voicePendingRef.current = true;
+    send(text);
   }
 
   return (
@@ -131,6 +149,21 @@ export default function AgentChatPage() {
             Working on: <span className="font-semibold text-white/80">{activeClient.name}</span>
           </div>
         )}
+        <button
+          type="button"
+          onClick={() => { setVoiceReply((v) => !v); if (voiceReply) cancelSpeak(); }}
+          title={voiceReply ? 'Voice replies on — click to mute' : 'Voice replies off — click to enable'}
+          className={`rounded-lg px-2.5 py-1.5 text-[11px] font-medium flex items-center gap-1.5 border ${
+            voiceReply
+              ? 'bg-emerald-500/20 border-emerald-400/40 text-emerald-200'
+              : 'bg-white/5 border-white/15 text-white/60 hover:bg-white/10'
+          }`}
+        >
+          <span className="material-symbols-outlined" style={{ fontSize: 14 }}>
+            {voiceReply ? 'volume_up' : 'volume_off'}
+          </span>
+          Voice {voiceReply ? 'on' : 'off'}
+        </button>
       </div>
 
       {saveStatus && (
@@ -250,12 +283,13 @@ export default function AgentChatPage() {
             e.preventDefault();
             send(input);
           }}
-          className="flex gap-2 p-4 border-t border-white/10"
+          className="flex gap-2 p-4 border-t border-white/10 items-center"
         >
+          <VoiceButton onTranscript={handleVoiceInput} />
           <input
             value={input}
             onChange={(e) => setInput(e.target.value)}
-            placeholder={`Message ${agent.name}…`}
+            placeholder={`Message ${agent.name} or tap the mic…`}
             className="flex-1 rounded-xl px-4 py-3 bg-white/5 border border-white/15 text-white placeholder:text-white/40 focus:outline-none focus:border-white/30"
           />
           <button

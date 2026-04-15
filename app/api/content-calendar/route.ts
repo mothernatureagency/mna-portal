@@ -1,6 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { ensureSchema, query } from '@/lib/db';
 import { getPlaybook } from '@/lib/agents/playbooks';
+import { queueEmailNotification, getClientNotificationEmail, STAFF_NOTIFY_EMAIL } from '@/lib/notifications';
+import { clients } from '@/lib/clients';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -64,11 +66,81 @@ export async function PATCH(req: NextRequest) {
   }
   if (fields.length === 0) return NextResponse.json({ error: 'nothing to update' }, { status: 400 });
   values.push(id);
-  const { rows } = await query(
+  const { rows } = await query<any>(
     `update content_calendar set ${fields.join(', ')} where id = $${values.length} returning *`,
     values
   );
-  return NextResponse.json({ item: rows[0] });
+  const updated = rows[0];
+
+  // Fire email notifications for key approval transitions.
+  // Wrapped so a notification failure never breaks the PATCH.
+  try {
+    if (updated) {
+      // Look up client name from the project, then map to a client id from lib/clients.
+      const { rows: projRows } = await query<{ client_name: string }>(
+        `select client_name from projects where id = $1`, [updated.project_id],
+      );
+      const clientName = projRows[0]?.client_name;
+      const matchedClient = clients.find(c => c.name === clientName || c.shortName === clientName);
+      const clientId = matchedClient?.id || clientName || '';
+
+      const postLabel = `${updated.platform || ''} ${updated.post_date || ''} — ${updated.title || 'Untitled post'}`.trim();
+
+      // 1) Client approved content → notify staff
+      if (client_approval_status === 'approved') {
+        await queueEmailNotification({
+          to: STAFF_NOTIFY_EMAIL,
+          subject: `✅ ${clientName || clientId} approved content: ${postLabel}`,
+          body: [
+            `${clientName || clientId} just approved a content calendar item.`,
+            '',
+            `Post: ${postLabel}`,
+            `Caption: ${updated.caption || '(no caption)'}`,
+            updated.client_comments ? `Client comments: ${updated.client_comments}` : '',
+            '',
+            `View: https://portal.mothernatureagency.com/content-calendar`,
+          ].filter(Boolean).join('\n'),
+          eventType: 'content_approved',
+          clientId,
+          relatedId: updated.id,
+        });
+      }
+
+      // 2) Staff pushed content to the client for review → notify client
+      // Triggered when visibility flips on OR when approval status is explicitly
+      // moved to 'pending_review' (i.e. "request approval" button).
+      const pushedForReview =
+        (client_visible === true && updated.client_approval_status !== 'approved') ||
+        client_approval_status === 'pending_review';
+
+      if (pushedForReview) {
+        const clientEmail = await getClientNotificationEmail(clientId);
+        if (clientEmail) {
+          await queueEmailNotification({
+            to: clientEmail,
+            subject: `New content ready for your review — ${clientName || 'your brand'}`,
+            body: [
+              `Hi! We've got new content ready for your approval.`,
+              '',
+              `Post: ${postLabel}`,
+              `Caption: ${updated.caption || '(draft in progress)'}`,
+              '',
+              `Review and approve here: https://portal.mothernatureagency.com/client`,
+              '',
+              '— Mother Nature Agency',
+            ].join('\n'),
+            eventType: 'approval_requested',
+            clientId,
+            relatedId: updated.id,
+          });
+        }
+      }
+    }
+  } catch (err) {
+    console.error('[content-calendar] notification enqueue failed', err);
+  }
+
+  return NextResponse.json({ item: updated });
 }
 
 // GET — list content for a client
