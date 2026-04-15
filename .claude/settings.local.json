@@ -18,7 +18,10 @@
       "Bash(kill 12661)",
       "Bash(xargs kill:*)",
       "Bash(/opt/homebrew/bin/node --version)",
-      "Bash(python3 -c \":*)"
+      "Bash(python3 -c \":*)",
+      "Bash(vercel --version)",
+      "Bash(vercel ls:*)",
+      "Bash(vercel alias:*)"
     ]
   }
 }

@@ -90,36 +90,57 @@ export function useVoiceRecognition(opts?: {
 }
 
 /**
- * Pick the best available female English voice.
- * Mother Nature Agency persona = warm, calm, feminine.
- * Priority order: known-high-quality female voices → anything labelled female →
- * en-GB / en-US fallbacks → first voice in the list.
+ * Pick the best available female English voice with a JARVIS-cool, neural feel.
+ * Prefers Apple/Microsoft/Google neural voices over old Festival/eSpeak ones.
+ * Priority: premium neural women → enhanced → regular known-female → any en-US/en-GB.
  */
 function pickMotherNatureVoice(voices: SpeechSynthesisVoice[]): SpeechSynthesisVoice | undefined {
   if (!voices.length) return undefined;
-  // Curated list of high-quality female voices across OSes + Google/Edge.
-  const PREFERRED = [
-    'Samantha',                          // macOS / iOS default female
-    'Ava (Premium)', 'Ava (Enhanced)', 'Ava',
-    'Allison (Premium)', 'Allison',
+
+  // Top tier — neural / premium / online voices (smoothest, most natural).
+  const NEURAL = [
+    // Microsoft Edge / Chromium on Windows — these are the best-sounding web voices, period.
+    'Microsoft Aria Online (Natural) - English (United States)',
+    'Microsoft Jenny Online (Natural) - English (United States)',
+    'Microsoft Emma Online (Natural) - English (United States)',
+    'Microsoft Libby Online (Natural) - English (United Kingdom)',
+    'Microsoft Sonia Online (Natural) - English (United Kingdom)',
+    'Microsoft Ava Online (Natural) - English (United States)',
+    'Microsoft Aria Online (Natural)', 'Microsoft Jenny Online (Natural)',
+    'Microsoft Emma Online (Natural)', 'Microsoft Libby Online (Natural)',
+    'Microsoft Sonia Online (Natural)', 'Microsoft Ava Online (Natural)',
+    // macOS premium / enhanced (downloadable via System Settings → Accessibility → Spoken Content)
+    'Ava (Premium)', 'Ava (Enhanced)',
+    'Samantha (Premium)', 'Samantha (Enhanced)',
+    'Allison (Premium)', 'Allison (Enhanced)',
+    'Zoe (Premium)', 'Zoe (Enhanced)',
+    // Google Chrome — these are WaveNet-ish on most builds
     'Google UK English Female',
-    'Google US English',                 // actually female on most Chrome builds
-    'Microsoft Aria Online (Natural)', 'Microsoft Aria',
-    'Microsoft Jenny Online (Natural)', 'Microsoft Jenny',
-    'Microsoft Emma Online (Natural)', 'Microsoft Emma',
-    'Microsoft Zira',
-    'Karen', 'Serena', 'Tessa', 'Moira', 'Fiona',
   ];
-  for (const name of PREFERRED) {
+  for (const name of NEURAL) {
     const found = voices.find((v) => v.name === name);
     if (found) return found;
   }
-  // Fallback: anything flagged female in the name.
+
+  // Second tier — regular high-quality female voices baked into the OS.
+  const STANDARD = [
+    'Samantha',                                  // macOS / iOS default female — warm, confident
+    'Ava', 'Allison', 'Zoe',
+    'Microsoft Aria', 'Microsoft Jenny', 'Microsoft Emma', 'Microsoft Libby',
+    'Microsoft Sonia', 'Microsoft Zira',
+    'Karen', 'Serena', 'Tessa', 'Moira', 'Fiona', 'Victoria', 'Kathy',
+  ];
+  for (const name of STANDARD) {
+    const found = voices.find((v) => v.name === name);
+    if (found) return found;
+  }
+
+  // Fallback: anything whose name contains a known female marker.
   const femaleByName = voices.find(
-    (v) => /female|woman|samantha|ava|allison|aria|jenny|emma|zira|karen|serena|tessa|moira|fiona|victoria|kathy/i.test(v.name),
+    (v) => /female|woman|samantha|ava|allison|aria|jenny|emma|libby|sonia|zira|karen|serena|tessa|moira|fiona|victoria|kathy|zoe/i.test(v.name),
   );
   if (femaleByName) return femaleByName;
-  // Fallback: GB then US English — default on those platforms is typically female.
+
   return (
     voices.find((v) => /en-GB/.test(v.lang)) ||
     voices.find((v) => /en-US/.test(v.lang)) ||
@@ -127,15 +148,19 @@ function pickMotherNatureVoice(voices: SpeechSynthesisVoice[]): SpeechSynthesisV
   );
 }
 
-/** Speak a string out loud. Cancels any queued utterance first. */
+/**
+ * Speak a string out loud. Cancels any queued utterance first.
+ * Defaults tuned for a JARVIS-style "cool" feminine read:
+ *   rate 0.95 — calm, measured
+ *   pitch 0.95 — lower, more confident than the stock bubbly default
+ */
 export function speak(text: string, opts?: { rate?: number; pitch?: number; voiceName?: string }) {
   if (typeof window === 'undefined' || !('speechSynthesis' in window)) return;
   const synth = window.speechSynthesis;
   synth.cancel();
   const u = new SpeechSynthesisUtterance(text);
-  // Slightly slower + higher pitch reads as warm/feminine.
-  u.rate = opts?.rate ?? 1.0;
-  u.pitch = opts?.pitch ?? 1.15;
+  u.rate = opts?.rate ?? 0.95;
+  u.pitch = opts?.pitch ?? 0.95;
   u.volume = 1;
   const voices = synth.getVoices();
   const override = opts?.voiceName ? voices.find((v) => v.name === opts.voiceName) : undefined;
