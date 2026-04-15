@@ -739,13 +739,29 @@ export default function PersonalDashboard() {
               {showAdd ? 'Cancel' : 'Add Event'}
             </button>
 
-            {/* Google Calendar badge */}
-            {gcalConnected && (
+            {/* Google Calendar status — connect button if not linked */}
+            {gcalConnected ? (
               <span className="flex items-center gap-1 px-2 py-1 rounded-lg text-[10px] font-semibold text-emerald-400" style={{ background: 'rgba(34,197,94,0.08)', border: '1px solid rgba(34,197,94,0.15)' }}>
                 <span className="material-symbols-outlined" style={{ fontSize: 12 }}>check_circle</span>
                 Google
               </span>
-            )}
+            ) : userEmail ? (
+              <button
+                type="button"
+                onClick={async () => {
+                  try {
+                    const r = await fetch(`/api/google/connect?email=${encodeURIComponent(userEmail)}`);
+                    const data = await r.json();
+                    if (data.url) window.location.href = data.url;
+                  } catch {}
+                }}
+                className="flex items-center gap-1 px-2.5 py-1 rounded-lg text-[10px] font-semibold text-white hover:opacity-90 transition"
+                style={{ background: 'linear-gradient(135deg,#4285F4,#34A853)' }}
+              >
+                <span className="material-symbols-outlined" style={{ fontSize: 12 }}>calendar_add_on</span>
+                Connect Google
+              </button>
+            ) : null}
           </div>
         </div>
 
