@@ -7,6 +7,8 @@ import { useClient } from '@/context/ClientContext';
 import { clients as allClientsList } from '@/lib/clients';
 import { getTimeGreeting, getDateDisplay, getTodayInTimezone, DEFAULT_TIMEZONE } from '@/lib/timezone';
 import { getDisplayName } from '@/lib/display-names';
+import { VoiceButton } from '@/components/ai/VoiceButton';
+import { speak } from '@/lib/voice';
 
 type ScheduleEvent = {
   id: string;
@@ -397,7 +399,7 @@ export default function PersonalDashboard() {
   // ── Chat ──
   useEffect(() => { chatEndRef.current?.scrollIntoView({ behavior: 'smooth' }); }, [chatMessages]);
 
-  async function sendChat(text?: string) {
+  async function sendChat(text?: string, opts?: { spokenInput?: boolean }) {
     const msg = (text || chatInput).trim();
     if (!msg || chatLoading) return;
     setChatInput('');
@@ -412,7 +414,13 @@ export default function PersonalDashboard() {
         body: JSON.stringify({ email: userEmail, messages: newMessages.map(m => ({ role: m.role, content: m.content })) }),
       });
       const data = await res.json();
-      setChatMessages([...newMessages, { id: crypto.randomUUID(), role: 'assistant', content: data.reply || 'Something went wrong.' }]);
+      const reply = data.reply || 'Something went wrong.';
+      setChatMessages([...newMessages, { id: crypto.randomUUID(), role: 'assistant', content: reply }]);
+      // If the user spoke, speak the reply back.
+      if (opts?.spokenInput) {
+        const spoken = String(reply).replace(/```[\s\S]*?```/g, ' ').replace(/\s+/g, ' ').trim();
+        if (spoken) speak(spoken);
+      }
     } catch {
       setChatMessages([...newMessages, { id: crypto.randomUUID(), role: 'assistant', content: 'Sorry, I had trouble connecting.' }]);
     } finally {
@@ -1128,11 +1136,15 @@ export default function PersonalDashboard() {
             <div className="shrink-0 px-3 pb-3">
               <div className="flex items-end gap-2 rounded-xl px-3 py-2.5"
                 style={{ background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.08)' }}>
+                <VoiceButton
+                  className="!w-8 !h-8"
+                  onTranscript={(t) => sendChat(t, { spokenInput: true })}
+                />
                 <textarea
                   value={chatInput}
                   onChange={e => setChatInput(e.target.value)}
                   onKeyDown={e => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); sendChat(); } }}
-                  placeholder="Tell me what to do..."
+                  placeholder="Tell me what to do or tap the mic..."
                   rows={1}
                   className="flex-1 bg-transparent text-white text-[13px] placeholder:text-white/25 focus:outline-none resize-none"
                   style={{ minHeight: 20, maxHeight: 80 }}

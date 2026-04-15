@@ -81,7 +81,7 @@ export default function JarvisFab() {
     <div className="fixed bottom-6 right-6 z-50 flex flex-col items-end gap-2">
       {lastReply && !listening && (
         <div className="glass-card max-w-sm p-3 text-sm text-white/90 shadow-xl">
-          <div className="text-[10px] uppercase tracking-wider text-white/50 mb-1">Nature Assistant</div>
+          <div className="text-[10px] uppercase tracking-wider text-white/50 mb-1">Mother Nature</div>
           {lastReply.length > 220 ? `${lastReply.slice(0, 220)}…` : lastReply}
           <button
             onClick={() => { cancelSpeak(); setLastReply(''); }}
@@ -94,25 +94,32 @@ export default function JarvisFab() {
           {transcript}
         </div>
       )}
-      <button
-        type="button"
-        onClick={() => (listening ? stop() : (cancelSpeak(), start()))}
-        disabled={busy}
-        title={listening ? 'Stop listening' : 'Talk to your assistant'}
-        className={`relative w-14 h-14 rounded-full flex items-center justify-center shadow-2xl transition
-          ${listening ? 'bg-rose-500 text-white' : busy ? 'bg-amber-500 text-white' : 'text-white'}
-        `}
-        style={
-          !listening && !busy
-            ? { background: 'linear-gradient(135deg,#0c6da4,#4ab8ce)' }
-            : undefined
-        }
-      >
-        <span className="material-symbols-outlined" style={{ fontSize: 26 }}>
-          {busy ? 'autorenew' : listening ? 'mic' : 'graphic_eq'}
-        </span>
-        {listening && <span className="absolute inset-0 rounded-full animate-ping bg-rose-500/40" />}
-      </button>
+      <div className="flex items-center gap-2">
+        {!listening && !busy && (
+          <div className="text-[11px] font-semibold text-white/90 bg-black/40 backdrop-blur px-2.5 py-1 rounded-full border border-white/10 shadow-lg">
+            Mother Nature
+          </div>
+        )}
+        <button
+          type="button"
+          onClick={() => (listening ? stop() : (cancelSpeak(), start()))}
+          disabled={busy}
+          title={listening ? 'Stop listening' : 'Talk to Mother Nature'}
+          className={`relative w-14 h-14 rounded-full flex items-center justify-center shadow-2xl transition
+            ${listening ? 'bg-rose-500 text-white' : busy ? 'bg-amber-500 text-white' : 'text-white'}
+          `}
+          style={
+            !listening && !busy
+              ? { background: 'linear-gradient(135deg,#0c6da4,#4ab8ce)' }
+              : undefined
+          }
+        >
+          <span className="material-symbols-outlined" style={{ fontSize: 26 }}>
+            {busy ? 'autorenew' : listening ? 'mic' : 'graphic_eq'}
+          </span>
+          {listening && <span className="absolute inset-0 rounded-full animate-ping bg-rose-500/40" />}
+        </button>
+      </div>
     </div>
   );
 }
