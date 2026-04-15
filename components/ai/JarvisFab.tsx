@@ -179,28 +179,43 @@ export default function JarvisFab() {
             aria-label="Mother Nature voice assistant"
             className="pointer-events-auto relative rounded-full w-full h-full flex items-center justify-center overflow-visible transition-all duration-500"
             style={{
-              // Outer glow — always blue/white. Listening is brighter white,
-              // speaking is saturated teal, thinking is a soft cyan pulse.
+              // Layered outer bloom — three rings of cyan/white glow for a
+              // genuinely luminous "glowing globe" look, not a drop shadow.
               boxShadow:
                 mode === 'listening'
-                  ? '0 0 40px rgba(255,255,255,0.95), 0 0 80px rgba(173,216,255,0.55)'
+                  ? '0 0 25px rgba(255,255,255,1), 0 0 55px rgba(173,220,255,0.85), 0 0 110px rgba(120,200,255,0.55), 0 0 180px rgba(74,184,206,0.35)'
                   : mode === 'speaking'
-                  ? '0 0 30px rgba(74,184,206,0.95), 0 0 60px rgba(12,109,164,0.55)'
+                  ? '0 0 25px rgba(134,214,225,1), 0 0 55px rgba(74,184,206,0.9), 0 0 110px rgba(12,150,200,0.55), 0 0 180px rgba(12,109,164,0.3)'
                   : mode === 'thinking'
-                  ? '0 0 28px rgba(134,214,225,0.8), 0 0 55px rgba(74,184,206,0.35)'
-                  : '0 0 20px rgba(74,184,206,0.55), 0 0 40px rgba(12,109,164,0.25)',
+                  ? '0 0 25px rgba(173,220,255,0.9), 0 0 55px rgba(120,200,255,0.7), 0 0 110px rgba(74,184,206,0.4)'
+                  : '0 0 22px rgba(134,214,225,0.85), 0 0 50px rgba(74,184,206,0.65), 0 0 100px rgba(12,109,164,0.35), 0 0 170px rgba(74,184,206,0.18)',
               background: 'transparent',
               border: 'none',
             }}
           >
-            {/* Halo ring — always cool blue/white */}
+            {/* Halo ring — breathing aurora around the globe */}
             <span
-              className="absolute inset-0 rounded-full nature-halo"
+              className="absolute rounded-full nature-halo"
               style={{
+                // Extends beyond the orb bounds so the aurora looks like
+                // atmosphere bleeding into space, not a bordered disk.
+                inset: '-18%',
                 background:
                   mode === 'listening'
-                    ? 'radial-gradient(circle, rgba(255,255,255,0.55) 0%, rgba(173,216,255,0) 70%)'
-                    : 'radial-gradient(circle, rgba(74,184,206,0.45) 0%, rgba(12,109,164,0) 70%)',
+                    ? 'radial-gradient(circle, rgba(255,255,255,0.75) 0%, rgba(170,220,255,0.35) 35%, rgba(74,184,206,0.12) 60%, rgba(12,109,164,0) 78%)'
+                    : 'radial-gradient(circle, rgba(134,214,225,0.65) 0%, rgba(74,184,206,0.35) 35%, rgba(12,150,200,0.12) 60%, rgba(12,109,164,0) 78%)',
+                filter: 'blur(2px)',
+              }}
+            />
+
+            {/* Atmosphere rim — thin bright ring right at the globe edge */}
+            <span
+              className="absolute inset-0 rounded-full pointer-events-none"
+              style={{
+                boxShadow:
+                  mode === 'listening'
+                    ? '0 0 0 1px rgba(255,255,255,0.6), 0 0 12px 2px rgba(200,230,255,0.55) inset'
+                    : '0 0 0 1px rgba(170,220,255,0.45), 0 0 12px 2px rgba(120,200,255,0.4) inset',
               }}
             />
 
