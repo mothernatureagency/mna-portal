@@ -248,7 +248,9 @@ export default function JarvisFab() {
 
             {/* Real Earth — NASA Blue Marble composite, set as a wide
                 background so the inner rotation animation feels like the
-                planet is spinning on its axis. */}
+                planet is spinning on its axis.
+                Brightness + saturation filters lift the old NASA photo into
+                a vivid, modern-looking sphere. */}
             <span
               className="nature-inner relative rounded-full overflow-hidden"
               style={{
@@ -258,8 +260,9 @@ export default function JarvisFab() {
                 backgroundSize: '220% 100%',
                 backgroundPosition: '0% 50%',
                 backgroundRepeat: 'repeat-x',
+                filter: 'brightness(1.35) saturate(1.55) contrast(1.1)',
                 boxShadow:
-                  'inset 0 0 22px rgba(120,180,235,0.45), inset 0 -12px 28px rgba(4,18,34,0.75), inset 12px 0 22px rgba(0,0,0,0.3)',
+                  'inset 0 0 22px rgba(170,220,255,0.55), inset 0 -10px 22px rgba(8,30,55,0.55), inset 10px 0 18px rgba(0,0,0,0.22)',
               }}
             >
               {/* Cloud overlay — very subtle white haze + noise-style dots */}
