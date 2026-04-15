@@ -178,31 +178,32 @@ export default function JarvisFab() {
             aria-label="Mother Nature voice assistant"
             className="pointer-events-auto relative rounded-full w-full h-full flex items-center justify-center overflow-visible transition-all duration-500"
             style={{
-              // Outer glow — shifts color with mode
+              // Outer glow — always blue/white. Listening is brighter white,
+              // speaking is saturated teal, thinking is a soft cyan pulse.
               boxShadow:
                 mode === 'listening'
-                  ? '0 0 30px rgba(244,63,94,0.85), 0 0 60px rgba(244,63,94,0.35)'
+                  ? '0 0 40px rgba(255,255,255,0.95), 0 0 80px rgba(173,216,255,0.55)'
                   : mode === 'speaking'
-                  ? '0 0 30px rgba(74,184,206,0.9), 0 0 60px rgba(12,109,164,0.45)'
+                  ? '0 0 30px rgba(74,184,206,0.95), 0 0 60px rgba(12,109,164,0.55)'
                   : mode === 'thinking'
-                  ? '0 0 28px rgba(245,158,11,0.8), 0 0 55px rgba(245,158,11,0.3)'
+                  ? '0 0 28px rgba(134,214,225,0.8), 0 0 55px rgba(74,184,206,0.35)'
                   : '0 0 20px rgba(74,184,206,0.55), 0 0 40px rgba(12,109,164,0.25)',
               background: 'transparent',
               border: 'none',
             }}
           >
-            {/* Halo ring */}
+            {/* Halo ring — always cool blue/white */}
             <span
               className="absolute inset-0 rounded-full nature-halo"
               style={{
                 background:
                   mode === 'listening'
-                    ? 'radial-gradient(circle, rgba(244,63,94,0.45) 0%, rgba(244,63,94,0) 70%)'
+                    ? 'radial-gradient(circle, rgba(255,255,255,0.55) 0%, rgba(173,216,255,0) 70%)'
                     : 'radial-gradient(circle, rgba(74,184,206,0.45) 0%, rgba(12,109,164,0) 70%)',
               }}
             />
 
-            {/* Speaking ripples */}
+            {/* Speaking ripples — blue */}
             {mode === 'speaking' && (
               <>
                 <span
@@ -223,39 +224,109 @@ export default function JarvisFab() {
               </>
             )}
 
-            {/* The orb core — rotating wire-sphere feel via stacked gradients */}
+            {/* Listening ripples — white */}
+            {mode === 'listening' && (
+              <>
+                <span
+                  className="absolute inset-0 rounded-full"
+                  style={{
+                    border: '2px solid rgba(255,255,255,0.75)',
+                    animation: 'nature-ripple 1.4s ease-out infinite',
+                  }}
+                />
+                <span
+                  className="absolute inset-0 rounded-full"
+                  style={{
+                    border: '2px solid rgba(255,255,255,0.5)',
+                    animation: 'nature-ripple 1.4s ease-out infinite',
+                    animationDelay: '0.5s',
+                  }}
+                />
+              </>
+            )}
+
+            {/* The globe — continents painted over an ocean gradient */}
             <span
-              className="nature-inner relative rounded-full"
+              className="nature-inner relative rounded-full overflow-hidden"
               style={{
-                width: '72%',
-                height: '72%',
+                width: '78%',
+                height: '78%',
+                // Ocean: deep sea blue with a soft atmospheric rim on top-left.
                 background:
-                  'radial-gradient(circle at 30% 30%, rgba(255,255,255,0.9) 0%, rgba(134,214,225,0.85) 25%, rgba(74,184,206,0.85) 45%, rgba(12,109,164,0.9) 75%, rgba(10,25,41,0.95) 100%)',
+                  'radial-gradient(circle at 30% 28%, rgba(170,220,255,0.55) 0%, rgba(74,184,206,0.95) 22%, rgba(20,90,140,1) 55%, rgba(8,40,72,1) 90%)',
                 boxShadow:
-                  'inset 0 0 20px rgba(255,255,255,0.35), inset 0 -10px 30px rgba(10,25,41,0.6)',
+                  'inset 0 0 22px rgba(173,216,255,0.35), inset 0 -12px 28px rgba(4,18,34,0.7)',
               }}
             >
-              {/* Latitudinal wire lines */}
-              <span className="absolute inset-0 rounded-full" style={{
-                background:
-                  'repeating-linear-gradient(transparent 0 7px, rgba(255,255,255,0.12) 7px 8px)',
-                borderRadius: '50%',
-                mixBlendMode: 'overlay',
-              }} />
+              {/* Continents — two irregular blobs styled as land masses.
+                  SVG so they scale crisply and don't read as random shapes. */}
+              <svg
+                viewBox="0 0 100 100"
+                className="absolute inset-0 w-full h-full"
+                preserveAspectRatio="xMidYMid meet"
+              >
+                <defs>
+                  <radialGradient id="landGrad" cx="40%" cy="35%" r="65%">
+                    <stop offset="0%" stopColor="#86d685" />
+                    <stop offset="60%" stopColor="#4a9a55" />
+                    <stop offset="100%" stopColor="#2c5a37" />
+                  </radialGradient>
+                </defs>
+                {/* Americas-ish silhouette */}
+                <path
+                  d="M22 30 Q30 22 38 28 Q42 34 40 42 Q44 48 38 56 Q32 66 28 62 Q22 58 26 50 Q20 44 22 30 Z"
+                  fill="url(#landGrad)"
+                  opacity="0.92"
+                />
+                {/* Eurasia/Africa-ish silhouette */}
+                <path
+                  d="M54 22 Q66 18 74 26 Q80 32 76 40 Q82 46 74 54 Q66 58 60 52 Q52 56 50 46 Q46 38 54 22 Z"
+                  fill="url(#landGrad)"
+                  opacity="0.9"
+                />
+                {/* Southern land mass */}
+                <path
+                  d="M44 72 Q54 68 62 74 Q66 80 58 82 Q48 84 44 80 Z"
+                  fill="url(#landGrad)"
+                  opacity="0.88"
+                />
+              </svg>
+
+              {/* Latitude lines — very subtle so the continents stay readable */}
+              <span
+                className="absolute inset-0 rounded-full"
+                style={{
+                  background:
+                    'repeating-linear-gradient(transparent 0 8px, rgba(255,255,255,0.08) 8px 9px)',
+                  mixBlendMode: 'overlay',
+                }}
+              />
+
+              {/* Longitude lines — curved via a subtle horizontal stripe with an arc mask feel */}
+              <span
+                className="absolute inset-0 rounded-full"
+                style={{
+                  background:
+                    'repeating-linear-gradient(90deg, transparent 0 10px, rgba(255,255,255,0.06) 10px 11px)',
+                  mixBlendMode: 'overlay',
+                }}
+              />
+
+              {/* Specular highlight — upper-left shine for a 3D sphere read */}
+              <span
+                className="absolute rounded-full"
+                style={{
+                  width: '40%',
+                  height: '30%',
+                  top: '8%',
+                  left: '12%',
+                  background:
+                    'radial-gradient(ellipse at center, rgba(255,255,255,0.55), rgba(255,255,255,0) 70%)',
+                  filter: 'blur(3px)',
+                }}
+              />
             </span>
 
-            {/* Center spark — brightens when speaking */}
-            <span
-              className="absolute rounded-full"
-              style={{
-                width: 10,
-                height: 10,
-                background: 'white',
-                opacity: mode === 'speaking' ? 1 : mode === 'listening' ? 0.9 : 0.6,
-                boxShadow: '0 0 20px rgba(255,255,255,0.9)',
-                transform: 'translate(0,0)',
-              }}
-            />
           </button>
         </div>
 
