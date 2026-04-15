@@ -21,7 +21,8 @@
       "Bash(python3 -c \":*)",
       "Bash(vercel --version)",
       "Bash(vercel ls:*)",
-      "Bash(vercel alias:*)"
+      "Bash(vercel alias:*)",
+      "Bash(vercel inspect:*)"
     ]
   }
 }
