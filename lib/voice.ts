@@ -97,9 +97,13 @@ export function useVoiceRecognition(opts?: {
 function pickMotherNatureVoice(voices: SpeechSynthesisVoice[]): SpeechSynthesisVoice | undefined {
   if (!voices.length) return undefined;
 
-  // Top tier — neural / premium / online voices (smoothest, most natural).
+  // Top tier — cloud-streamed neural voices with the clearest pronunciation.
+  // Google voices go FIRST because they're available in every Chrome build
+  // without a System Settings download, and their pronunciation is excellent.
   const NEURAL = [
-    // Microsoft Edge / Chromium on Windows — these are the best-sounding web voices, period.
+    'Google US English',                         // Chrome default, very clean female delivery
+    'Google UK English Female',
+    // Microsoft Edge cloud voices (Windows)
     'Microsoft Aria Online (Natural) - English (United States)',
     'Microsoft Jenny Online (Natural) - English (United States)',
     'Microsoft Emma Online (Natural) - English (United States)',
@@ -109,13 +113,11 @@ function pickMotherNatureVoice(voices: SpeechSynthesisVoice[]): SpeechSynthesisV
     'Microsoft Aria Online (Natural)', 'Microsoft Jenny Online (Natural)',
     'Microsoft Emma Online (Natural)', 'Microsoft Libby Online (Natural)',
     'Microsoft Sonia Online (Natural)', 'Microsoft Ava Online (Natural)',
-    // macOS premium / enhanced (downloadable via System Settings → Accessibility → Spoken Content)
+    // macOS premium / enhanced (downloadable)
     'Ava (Premium)', 'Ava (Enhanced)',
-    'Samantha (Premium)', 'Samantha (Enhanced)',
     'Allison (Premium)', 'Allison (Enhanced)',
+    'Samantha (Premium)', 'Samantha (Enhanced)',
     'Zoe (Premium)', 'Zoe (Enhanced)',
-    // Google Chrome — these are WaveNet-ish on most builds
-    'Google UK English Female',
   ];
   for (const name of NEURAL) {
     const found = voices.find((v) => v.name === name);
@@ -149,18 +151,44 @@ function pickMotherNatureVoice(voices: SpeechSynthesisVoice[]): SpeechSynthesisV
 }
 
 /**
+ * Clean a string for spoken output and visual display:
+ *  - Remove emojis and most symbol pictographs
+ *  - Strip markdown markers (** _ ` #)
+ *  - Collapse whitespace
+ * Keeps punctuation that affects prosody (. , ? ! ; :).
+ */
+export function sanitizeForSpeech(input: string): string {
+  if (!input) return '';
+  let s = String(input);
+  // Strip fenced code blocks entirely — they read awful out loud.
+  s = s.replace(/```[\s\S]*?```/g, ' ');
+  // Markdown markers
+  s = s.replace(/[*_`~#>]/g, '');
+  // Emoji / pictographs / symbols (BMP + SMP ranges).
+  // Covers miscellaneous symbols, dingbats, emoticons, transport, supplemental,
+  // regional indicators, and variation selectors.
+  s = s.replace(
+    /[\u{1F300}-\u{1FAFF}\u{1F600}-\u{1F64F}\u{1F680}-\u{1F6FF}\u{1F700}-\u{1F77F}\u{1F780}-\u{1F7FF}\u{1F800}-\u{1F8FF}\u{1F900}-\u{1F9FF}\u{1FA00}-\u{1FA6F}\u{2600}-\u{26FF}\u{2700}-\u{27BF}\u{2300}-\u{23FF}\u{2B00}-\u{2BFF}\u{FE0F}\u{200D}]/gu,
+    '',
+  );
+  return s.replace(/\s+/g, ' ').trim();
+}
+
+/**
  * Speak a string out loud. Cancels any queued utterance first.
- * Defaults tuned for a JARVIS-style "cool" feminine read:
- *   rate 0.95 — calm, measured
- *   pitch 0.95 — lower, more confident than the stock bubbly default
+ * Automatically strips asterisks, emojis, and markdown so the voice
+ * doesn't read "asterisk asterisk bold asterisk asterisk".
+ * Defaults tuned for a calm feminine read.
  */
 export function speak(text: string, opts?: { rate?: number; pitch?: number; voiceName?: string }) {
   if (typeof window === 'undefined' || !('speechSynthesis' in window)) return;
+  const clean = sanitizeForSpeech(text);
+  if (!clean) return;
   const synth = window.speechSynthesis;
   synth.cancel();
-  const u = new SpeechSynthesisUtterance(text);
-  u.rate = opts?.rate ?? 0.95;
-  u.pitch = opts?.pitch ?? 0.95;
+  const u = new SpeechSynthesisUtterance(clean);
+  u.rate = opts?.rate ?? 1.0;
+  u.pitch = opts?.pitch ?? 1.0;
   u.volume = 1;
   const voices = synth.getVoices();
   const override = opts?.voiceName ? voices.find((v) => v.name === opts.voiceName) : undefined;

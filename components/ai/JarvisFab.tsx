@@ -1,7 +1,7 @@
 'use client';
 
 /**
- * Mother Nature — floating JARVIS-style assistant.
+ * Flo — floating JARVIS-style assistant.
  *
  * Idle:      small animated orb in the bottom-left (doesn't overlap the top-right header)
  * Active:    orb scales up, drifts gently around the screen, inner sphere pulses
@@ -13,7 +13,7 @@
 
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { usePathname, useRouter } from 'next/navigation';
-import { useVoiceRecognition, speak, cancelSpeak } from '@/lib/voice';
+import { useVoiceRecognition, speak, cancelSpeak, sanitizeForSpeech } from '@/lib/voice';
 
 const NAV_PHRASES: { match: RegExp; path: string; label: string }[] = [
   { match: /open (?:the )?content calendar|show (?:me )?content/i, path: '/content-calendar', label: 'content calendar' },
@@ -58,13 +58,14 @@ export default function JarvisFab() {
       const data = await res.json();
       const reply = data?.reply || data?.message || data?.content || '';
       if (reply) {
-        setLastReply(reply);
-        const spoken = String(reply).replace(/```[\s\S]*?```/g, ' ').replace(/\s+/g, ' ').trim();
-        if (spoken) {
+        // Strip asterisks / markdown / emojis from the visible text too,
+        // so the chat bubble matches what she says out loud.
+        const cleanReply = sanitizeForSpeech(reply);
+        setLastReply(cleanReply);
+        if (cleanReply) {
           setMode('speaking');
-          speak(spoken);
-          // Rough estimate: ~12 chars per second for speech
-          scheduleIdle(Math.min(20000, Math.max(2500, spoken.length * 75)));
+          speak(cleanReply);
+          scheduleIdle(Math.min(20000, Math.max(2500, cleanReply.length * 75)));
         } else {
           setMode('idle');
         }
@@ -136,11 +137,10 @@ export default function JarvisFab() {
       `}</style>
 
       <div
-        className="fixed z-50 pointer-events-none"
+        className="fixed z-50 pointer-events-none flex flex-col items-end"
         style={{
-          // Bottom-left keeps her clear of the top-right header chips and any
-          // right-aligned panels. Lives above the bottom nav.
-          left: 24,
+          // Bottom-right, clear of the left sidebar and above-screen header chips.
+          right: 24,
           bottom: 24,
         }}
       >
@@ -148,7 +148,7 @@ export default function JarvisFab() {
         {lastReply && !listening && (
           <div className="pointer-events-auto glass-card mb-3 max-w-sm p-3 text-sm text-white/90 shadow-2xl">
             <div className="flex items-center justify-between mb-1">
-              <span className="text-[10px] uppercase tracking-wider text-white/50">Mother Nature</span>
+              <span className="text-[10px] uppercase tracking-wider text-white/50">Flo</span>
               <button
                 onClick={() => { cancelSpeak(); setLastReply(''); setMode('idle'); }}
                 className="text-white/40 hover:text-white/80 text-xs"
@@ -174,8 +174,8 @@ export default function JarvisFab() {
               cancelSpeak();
               start();
             }}
-            title={mode === 'listening' ? 'Stop listening' : 'Tap to talk to Mother Nature'}
-            aria-label="Mother Nature voice assistant"
+            title={mode === 'listening' ? 'Stop listening' : 'Tap to talk to Flo'}
+            aria-label="Flo voice assistant"
             className="pointer-events-auto relative rounded-full w-full h-full flex items-center justify-center overflow-visible transition-all duration-500"
             style={{
               // Outer glow — shifts color with mode
@@ -272,7 +272,7 @@ export default function JarvisFab() {
               textShadow: '0 2px 8px rgba(0,0,0,0.6)',
             }}
           >
-            Mother Nature
+            Flo
           </div>
         )}
       </div>
