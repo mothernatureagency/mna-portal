@@ -98,9 +98,10 @@ function pickMotherNatureVoice(voices: SpeechSynthesisVoice[]): SpeechSynthesisV
   if (!voices.length) return undefined;
 
   // Top tier — cloud-streamed neural voices with the clearest pronunciation.
-  // Google voices go FIRST because they're available in every Chrome build
-  // without a System Settings download, and their pronunciation is excellent.
+  // Flo (macOS Accessibility novelty voice, downloadable) goes first because
+  // the user explicitly prefers it. Falls through if not installed.
   const NEURAL = [
+    'Flo (Premium)', 'Flo (Enhanced)', 'Flo',
     'Google US English',                         // Chrome default, very clean female delivery
     'Google UK English Female',
     // Microsoft Edge cloud voices (Windows)

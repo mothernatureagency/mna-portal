@@ -1,7 +1,7 @@
 'use client';
 
 /**
- * Flo — floating JARVIS-style assistant.
+ * Mother Nature — floating JARVIS-style assistant.
  *
  * Idle:      small animated orb in the bottom-left (doesn't overlap the top-right header)
  * Active:    orb scales up, drifts gently around the screen, inner sphere pulses
@@ -148,7 +148,7 @@ export default function JarvisFab() {
         {lastReply && !listening && (
           <div className="pointer-events-auto glass-card mb-3 max-w-sm p-3 text-sm text-white/90 shadow-2xl">
             <div className="flex items-center justify-between mb-1">
-              <span className="text-[10px] uppercase tracking-wider text-white/50">Flo</span>
+              <span className="text-[10px] uppercase tracking-wider text-white/50">Mother Nature</span>
               <button
                 onClick={() => { cancelSpeak(); setLastReply(''); setMode('idle'); }}
                 className="text-white/40 hover:text-white/80 text-xs"
@@ -174,8 +174,8 @@ export default function JarvisFab() {
               cancelSpeak();
               start();
             }}
-            title={mode === 'listening' ? 'Stop listening' : 'Tap to talk to Flo'}
-            aria-label="Flo voice assistant"
+            title={mode === 'listening' ? 'Stop listening' : 'Tap to talk to Mother Nature'}
+            aria-label="Mother Nature voice assistant"
             className="pointer-events-auto relative rounded-full w-full h-full flex items-center justify-center overflow-visible transition-all duration-500"
             style={{
               // Outer glow — shifts color with mode
@@ -272,7 +272,7 @@ export default function JarvisFab() {
               textShadow: '0 2px 8px rgba(0,0,0,0.6)',
             }}
           >
-            Flo
+            Mother Nature
           </div>
         )}
       </div>
