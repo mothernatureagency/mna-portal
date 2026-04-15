@@ -168,13 +168,11 @@ export default function AgencyOverview() {
         <div className="flex items-center gap-2 mb-1">
           <div className="w-1.5 h-6 rounded-full" style={{ background: 'linear-gradient(180deg, #0c6da4, #4ab8ce)' }} />
           <h1 className="text-[22px] font-extrabold text-white tracking-tight">
-            {owner ? 'Agency Overview' : `Business Overview · ${staff?.name || ''}`}
+            Agency Overview
           </h1>
         </div>
         <p className="text-[12px] text-white/60 pl-3.5">
-          {owner
-            ? 'All clients at a glance · Click any card to view their full dashboard'
-            : `MNA overview + your ${visibleClientIds.length} assigned ${visibleClientIds.length === 1 ? 'client' : 'clients'}`}
+          All clients at a glance · Click any card to view their full dashboard
         </p>
       </div>
 

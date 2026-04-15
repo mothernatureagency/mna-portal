@@ -57,13 +57,12 @@ export function isOwner(email: string | null | undefined): boolean {
 
 /**
  * Return the list of client ids a given user should see in the business
- * overview. Owner → all clients. Other staff → their assignedClients.
- * Unknown email → empty array.
+ * overview. For now, ALL staff (owner + team) see every client so the
+ * team can access the full business manager. Unknown email → empty array.
  */
 export function getAssignedClientIds(email: string | null | undefined): string[] {
-  if (isOwner(email)) {
-    return STAFF[0].assignedClients; // full list
-  }
   const member = getStaffByEmail(email);
-  return member?.assignedClients || [];
+  if (!member) return [];
+  // Full portfolio for every staff member.
+  return STAFF[0].assignedClients;
 }
