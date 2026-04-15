@@ -12,6 +12,7 @@ import React, { useEffect, useState } from 'react';
 import { clients, Client } from '@/lib/clients';
 import { useClient } from '@/context/ClientContext';
 import { createClient as createSupabaseClient } from '@/lib/supabase/client';
+import { getAssignedClientIds, getStaffByEmail, isOwner } from '@/lib/staff';
 import UserBanner from './UserBanner';
 import StaffChecklist from './StaffChecklist';
 import StaffContentCalendar from './StaffContentCalendar';
@@ -133,6 +134,11 @@ export default function AgencyOverview() {
 
   const isAdmin = userEmail === 'admin@mothernatureagency.com';
   const isSocial = userEmail === 'info@mothernatureagency.com';
+  const staff = getStaffByEmail(userEmail);
+  const owner = isOwner(userEmail);
+  const visibleClientIds = getAssignedClientIds(userEmail);
+  const showAll = owner || visibleClientIds.length === 0;
+  const canSee = (clientId: string) => showAll || visibleClientIds.includes(clientId);
 
   // Fetch Serenity live data
   const [serenityData, setSerenityData] = useState<any>(null);
@@ -161,10 +167,14 @@ export default function AgencyOverview() {
       <div className="pt-1">
         <div className="flex items-center gap-2 mb-1">
           <div className="w-1.5 h-6 rounded-full" style={{ background: 'linear-gradient(180deg, #0c6da4, #4ab8ce)' }} />
-          <h1 className="text-[22px] font-extrabold text-white tracking-tight">Agency Overview</h1>
+          <h1 className="text-[22px] font-extrabold text-white tracking-tight">
+            {owner ? 'Agency Overview' : `Business Overview · ${staff?.name || ''}`}
+          </h1>
         </div>
         <p className="text-[12px] text-white/60 pl-3.5">
-          All clients at a glance · Click any card to view their full dashboard
+          {owner
+            ? 'All clients at a glance · Click any card to view their full dashboard'
+            : `MNA overview + your ${visibleClientIds.length} assigned ${visibleClientIds.length === 1 ? 'client' : 'clients'}`}
         </p>
       </div>
 
@@ -288,10 +298,12 @@ export default function AgencyOverview() {
       {isSocial && <StaffContentCalendar />}
 
       {/* ── HEALTH & WELLNESS ── */}
+      {(canSee('prime-iv') || canSee('prime-iv-pinecrest')) && (
       <div>
         <SectionLabel>Health & Wellness</SectionLabel>
         <div className="space-y-4">
           {/* Prime IV Niceville — REAL DATA */}
+          {canSee('prime-iv') && (
           <ClientCard
             client={niceville}
             statusLabel="Live · Real Data"
@@ -304,8 +316,10 @@ export default function AgencyOverview() {
               { label: 'Revenue', value: fmtUSD(NICEVILLE_REAL.revenue), note: NICEVILLE_REAL.revenueLabel, real: true },
             ]}
           />
+          )}
 
           {/* Prime IV Pinecrest — empty states */}
+          {canSee('prime-iv-pinecrest') && (
           <ClientCard
             client={pinecrest}
             statusLabel="Pre-Launch"
@@ -318,10 +332,13 @@ export default function AgencyOverview() {
               { label: 'Revenue', value: '—', note: 'Grand reopening, data pending', real: false },
             ]}
           />
+          )}
         </div>
       </div>
+      )}
 
       {/* ── REAL ESTATE — RENTALS ── */}
+      {canSee('serenity-bayfront') && (
       <div>
         <SectionLabel>Real Estate — Rentals</SectionLabel>
         <ClientCard
@@ -357,8 +374,10 @@ export default function AgencyOverview() {
           ]}
         />
       </div>
+      )}
 
       {/* ── REAL ESTATE ── */}
+      {canSee('mna-realty') && (
       <div>
         <SectionLabel>Real Estate</SectionLabel>
         <ClientCard
@@ -374,6 +393,7 @@ export default function AgencyOverview() {
           ]}
         />
       </div>
+      )}
     </div>
   );
 }

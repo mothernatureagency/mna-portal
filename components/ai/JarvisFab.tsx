@@ -116,10 +116,11 @@ export default function JarvisFab() {
           75%  { transform: translate(-14px, -6px); }
           100% { transform: translate(0, 0); }
         }
-        /* Inner sphere rotation */
+        /* Earth rotation — shift the background texture left to feel like
+           the planet spinning on its axis. Keeps the sphere orientation fixed. */
         @keyframes nature-spin {
-          from { transform: rotate(0deg); }
-          to   { transform: rotate(360deg); }
+          from { background-position: 0% 50%; }
+          to   { background-position: -220% 50%; }
         }
         /* Breathing halo */
         @keyframes nature-breathe {
@@ -132,7 +133,7 @@ export default function JarvisFab() {
           100% { transform: scale(2.1); opacity: 0; }
         }
         .nature-orb-wrap { animation: nature-drift 8s ease-in-out infinite; }
-        .nature-inner    { animation: nature-spin 14s linear infinite; }
+        .nature-inner    { animation: nature-spin 60s linear infinite; }
         .nature-halo     { animation: nature-breathe 3.2s ease-in-out infinite; }
       `}</style>
 
@@ -245,83 +246,50 @@ export default function JarvisFab() {
               </>
             )}
 
-            {/* The globe — continents painted over an ocean gradient */}
+            {/* Real Earth — NASA Blue Marble composite, set as a wide
+                background so the inner rotation animation feels like the
+                planet is spinning on its axis. */}
             <span
               className="nature-inner relative rounded-full overflow-hidden"
               style={{
-                width: '78%',
-                height: '78%',
-                // Ocean: deep sea blue with a soft atmospheric rim on top-left.
-                background:
-                  'radial-gradient(circle at 30% 28%, rgba(170,220,255,0.55) 0%, rgba(74,184,206,0.95) 22%, rgba(20,90,140,1) 55%, rgba(8,40,72,1) 90%)',
+                width: '82%',
+                height: '82%',
+                backgroundImage: 'url(/ai/earth.jpg)',
+                backgroundSize: '220% 100%',
+                backgroundPosition: '0% 50%',
+                backgroundRepeat: 'repeat-x',
                 boxShadow:
-                  'inset 0 0 22px rgba(173,216,255,0.35), inset 0 -12px 28px rgba(4,18,34,0.7)',
+                  'inset 0 0 22px rgba(120,180,235,0.45), inset 0 -12px 28px rgba(4,18,34,0.75), inset 12px 0 22px rgba(0,0,0,0.3)',
               }}
             >
-              {/* Continents — two irregular blobs styled as land masses.
-                  SVG so they scale crisply and don't read as random shapes. */}
-              <svg
-                viewBox="0 0 100 100"
-                className="absolute inset-0 w-full h-full"
-                preserveAspectRatio="xMidYMid meet"
-              >
-                <defs>
-                  <radialGradient id="landGrad" cx="40%" cy="35%" r="65%">
-                    <stop offset="0%" stopColor="#86d685" />
-                    <stop offset="60%" stopColor="#4a9a55" />
-                    <stop offset="100%" stopColor="#2c5a37" />
-                  </radialGradient>
-                </defs>
-                {/* Americas-ish silhouette */}
-                <path
-                  d="M22 30 Q30 22 38 28 Q42 34 40 42 Q44 48 38 56 Q32 66 28 62 Q22 58 26 50 Q20 44 22 30 Z"
-                  fill="url(#landGrad)"
-                  opacity="0.92"
-                />
-                {/* Eurasia/Africa-ish silhouette */}
-                <path
-                  d="M54 22 Q66 18 74 26 Q80 32 76 40 Q82 46 74 54 Q66 58 60 52 Q52 56 50 46 Q46 38 54 22 Z"
-                  fill="url(#landGrad)"
-                  opacity="0.9"
-                />
-                {/* Southern land mass */}
-                <path
-                  d="M44 72 Q54 68 62 74 Q66 80 58 82 Q48 84 44 80 Z"
-                  fill="url(#landGrad)"
-                  opacity="0.88"
-                />
-              </svg>
-
-              {/* Latitude lines — very subtle so the continents stay readable */}
+              {/* Cloud overlay — very subtle white haze + noise-style dots */}
               <span
                 className="absolute inset-0 rounded-full"
                 style={{
                   background:
-                    'repeating-linear-gradient(transparent 0 8px, rgba(255,255,255,0.08) 8px 9px)',
-                  mixBlendMode: 'overlay',
+                    'radial-gradient(ellipse at 70% 30%, rgba(255,255,255,0.18), rgba(255,255,255,0) 55%), radial-gradient(ellipse at 25% 70%, rgba(255,255,255,0.12), rgba(255,255,255,0) 60%)',
                 }}
               />
 
-              {/* Longitude lines — curved via a subtle horizontal stripe with an arc mask feel */}
+              {/* Atmospheric rim — cyan glow on the edge, darker shadow on the right */}
               <span
                 className="absolute inset-0 rounded-full"
                 style={{
-                  background:
-                    'repeating-linear-gradient(90deg, transparent 0 10px, rgba(255,255,255,0.06) 10px 11px)',
-                  mixBlendMode: 'overlay',
+                  boxShadow:
+                    'inset 0 0 18px rgba(170,220,255,0.35), inset -10px 0 22px rgba(0,0,0,0.45)',
                 }}
               />
 
               {/* Specular highlight — upper-left shine for a 3D sphere read */}
               <span
-                className="absolute rounded-full"
+                className="absolute rounded-full pointer-events-none"
                 style={{
-                  width: '40%',
-                  height: '30%',
-                  top: '8%',
-                  left: '12%',
+                  width: '38%',
+                  height: '28%',
+                  top: '10%',
+                  left: '14%',
                   background:
-                    'radial-gradient(ellipse at center, rgba(255,255,255,0.55), rgba(255,255,255,0) 70%)',
+                    'radial-gradient(ellipse at center, rgba(255,255,255,0.45), rgba(255,255,255,0) 70%)',
                   filter: 'blur(3px)',
                 }}
               />
