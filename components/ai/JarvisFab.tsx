@@ -13,7 +13,7 @@
 
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { usePathname, useRouter } from 'next/navigation';
-import { useVoiceRecognition, speak, cancelSpeak } from '@/lib/voice';
+import { useVoiceRecognition, speak, cancelSpeak, sanitizeForSpeech } from '@/lib/voice';
 
 const NAV_PHRASES: { match: RegExp; path: string; label: string }[] = [
   { match: /open (?:the )?content calendar|show (?:me )?content/i, path: '/content-calendar', label: 'content calendar' },
@@ -58,13 +58,14 @@ export default function JarvisFab() {
       const data = await res.json();
       const reply = data?.reply || data?.message || data?.content || '';
       if (reply) {
-        setLastReply(reply);
-        const spoken = String(reply).replace(/```[\s\S]*?```/g, ' ').replace(/\s+/g, ' ').trim();
-        if (spoken) {
+        // Strip asterisks / markdown / emojis from the visible text too,
+        // so the chat bubble matches what she says out loud.
+        const cleanReply = sanitizeForSpeech(reply);
+        setLastReply(cleanReply);
+        if (cleanReply) {
           setMode('speaking');
-          speak(spoken);
-          // Rough estimate: ~12 chars per second for speech
-          scheduleIdle(Math.min(20000, Math.max(2500, spoken.length * 75)));
+          speak(cleanReply);
+          scheduleIdle(Math.min(20000, Math.max(2500, cleanReply.length * 75)));
         } else {
           setMode('idle');
         }
@@ -136,11 +137,10 @@ export default function JarvisFab() {
       `}</style>
 
       <div
-        className="fixed z-50 pointer-events-none"
+        className="fixed z-50 pointer-events-none flex flex-col items-end"
         style={{
-          // Bottom-left keeps her clear of the top-right header chips and any
-          // right-aligned panels. Lives above the bottom nav.
-          left: 24,
+          // Bottom-right, clear of the left sidebar and above-screen header chips.
+          right: 24,
           bottom: 24,
         }}
       >
