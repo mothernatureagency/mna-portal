@@ -81,7 +81,9 @@ function generatePerformanceInsights(baseline: PeriodMetrics, current: PeriodMet
   if (current.inProgress && current.daysElapsed && current.daysInPeriod) {
     const ratio = current.daysInPeriod / current.daysElapsed;
     const projectedLeads = Math.round(current.totalLeads * ratio);
-    const projectedRevenue = current.revenueClosed * ratio;
+    // Manual override wins when set (lets the team factor in pipeline /
+    // scheduled appointments the simple linear extrapolation can't see).
+    const projectedRevenue = current.projectedRevenueOverride ?? current.revenueClosed * ratio;
     const projectedDeals = Math.round(current.wonDeals * ratio);
     // Conversion rate and rev/lead are already ratios — they don't scale.
     const baselineMonthlyLeads = baseline.totalLeads / 3; // Q1 → monthly avg

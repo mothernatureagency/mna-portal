@@ -29,6 +29,10 @@ export type PeriodMetrics = {
   daysElapsed?: number;
   /** Total days in the period — required when inProgress is true. */
   daysInPeriod?: number;
+  /** Optional manual override for the projected end-of-period revenue.
+   *  Use when the linear extrapolation undershoots known pipeline /
+   *  scheduled appointments / month-end push the team is confident about. */
+  projectedRevenueOverride?: number;
 };
 
 export type PerformanceData = {
@@ -65,6 +69,7 @@ export const PRIME_IV_PERFORMANCE: PerformanceData = {
       inProgress: true,
       daysElapsed: 16,   // Apr 1 – Apr 16, 2026
       daysInPeriod: 30,
+      projectedRevenueOverride: 20000,  // Manual estimate — pipeline + month-end push
     },
   ],
 };
