@@ -74,6 +74,50 @@ type Insight = {
 function generatePerformanceInsights(baseline: PeriodMetrics, current: PeriodMetrics): Insight[] {
   const insights: Insight[] = [];
 
+  // ── In-progress periods get projection-based, positive framing ──
+  // We only have partial data, so comparing raw "current" to a full baseline
+  // would always look like a drop. Instead we project current → full period
+  // and present the trajectory.
+  if (current.inProgress && current.daysElapsed && current.daysInPeriod) {
+    const ratio = current.daysInPeriod / current.daysElapsed;
+    const projectedLeads = Math.round(current.totalLeads * ratio);
+    const projectedRevenue = current.revenueClosed * ratio;
+    const projectedDeals = Math.round(current.wonDeals * ratio);
+    // Conversion rate and rev/lead are already ratios — they don't scale.
+    const baselineMonthlyLeads = baseline.totalLeads / 3; // Q1 → monthly avg
+    const baselineMonthlyRevenue = baseline.revenueClosed / 3;
+    const baselineMonthlyDeals = baseline.wonDeals / 3;
+
+    insights.push({
+      icon: 'rocket_launch',
+      title: `${current.shortLabel} is ${Math.round((current.daysElapsed / current.daysInPeriod) * 100)}% through · pacing strong`,
+      body: `Through day ${current.daysElapsed} of ${current.daysInPeriod}, ${current.shortLabel} is on pace for ~${projectedLeads} leads, ${projectedDeals} won deals, and ${fmtUSD(projectedRevenue)} in closed revenue. ${baseline.shortLabel} averaged ${Math.round(baselineMonthlyLeads)} leads · ${Math.round(baselineMonthlyDeals)} deals · ${fmtUSD(baselineMonthlyRevenue)}/mo.`,
+      tone: 'info',
+    });
+
+    // Surface positives where we already have them
+    if (current.totalLeads > 0) {
+      insights.push({
+        icon: 'trending_up',
+        title: 'Lead engine is already producing',
+        body: `${current.totalLeads} leads captured in the first ${current.daysElapsed} days of ${current.shortLabel} — that's a daily run-rate of ~${(current.totalLeads / current.daysElapsed).toFixed(1)} leads. We'll know the full picture once the month closes.`,
+        tone: 'success',
+      });
+    }
+
+    if (current.wonDeals > 0) {
+      insights.push({
+        icon: 'check_circle',
+        title: `${current.wonDeals} deals already closed this period`,
+        body: `${fmtUSD(current.revenueClosed)} booked so far. The team has runway to keep adding to this number through end of ${current.shortLabel}.`,
+        tone: 'success',
+      });
+    }
+
+    return insights;
+  }
+
+  // ── Full-period comparisons (only run once the period is complete) ──
   const convDelta = pctChange(current.conversionRate, baseline.conversionRate);
   if (convDelta < -20) {
     insights.push({
@@ -94,7 +138,7 @@ function generatePerformanceInsights(baseline: PeriodMetrics, current: PeriodMet
     });
   }
 
-  const leadDelta = pctChange(current.totalLeads, baseline.totalLeads / 3); // normalize Q1 to monthly
+  const leadDelta = pctChange(current.totalLeads, baseline.totalLeads / 3);
   if (leadDelta < -30) {
     insights.push({
       icon: 'person_off',
@@ -158,9 +202,15 @@ function PeriodCard({
       <div className="absolute top-0 left-0 right-0 h-1 rounded-t-[22px]" style={{ background: accentColor }} />
       <div className="flex items-center gap-2 mb-4">
         <div className="text-[14px] font-bold text-white">{period.label}</div>
-        {isStaff && baseline && period.conversionRate < baseline.conversionRate * 0.7 && (
-          <span className="text-[8px] font-bold uppercase tracking-wider px-1.5 py-0.5 rounded-full bg-rose-500/20 text-rose-400">
-            Performance Drop
+        {/* In-progress periods get a neutral pacing chip — never a "drop"
+            badge while data is partial, that's misleading and demoralizing. */}
+        {period.inProgress ? (
+          <span className="text-[8px] font-bold uppercase tracking-wider px-1.5 py-0.5 rounded-full bg-sky-500/20 text-sky-300">
+            In Progress
+          </span>
+        ) : isStaff && baseline && period.conversionRate < baseline.conversionRate * 0.7 && (
+          <span className="text-[8px] font-bold uppercase tracking-wider px-1.5 py-0.5 rounded-full bg-amber-500/20 text-amber-400">
+            Pacing Below Last Period
           </span>
         )}
       </div>
@@ -169,8 +219,11 @@ function PeriodCard({
           const delta = baseline && m.baseRaw !== undefined
             ? pctChange(m.raw, m.baseRaw)
             : null;
-          // On client-facing view, hide negative change badges
-          const showDelta = delta !== null && (isStaff || delta >= 0);
+          // Hide change badges when:
+          //   • period is still in progress (partial data → unfair comparison)
+          //   • client view + the change is negative (don't shout drops at clients)
+          const showDelta =
+            delta !== null && !period.inProgress && (isStaff || delta >= 0);
           return (
             <div key={m.label}>
               <div className="text-[9px] font-bold uppercase tracking-wider text-white/40">{m.label}</div>
