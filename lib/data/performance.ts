@@ -21,6 +21,14 @@ export type PeriodMetrics = {
   wonDeals: number;
   conversionRate: number;   // pre-calculated %
   revenuePerLead: number;   // pre-calculated $
+  /** Optional: set when the period is still in progress (mid-month, mid-quarter).
+   *  Triggers projection-based framing instead of a raw vs-baseline comparison
+   *  so we don't tell a client they're "down" before the period has finished. */
+  inProgress?: boolean;
+  /** Days elapsed in the period — required when inProgress is true. */
+  daysElapsed?: number;
+  /** Total days in the period — required when inProgress is true. */
+  daysInPeriod?: number;
 };
 
 export type PerformanceData = {
@@ -47,13 +55,16 @@ export const PRIME_IV_PERFORMANCE: PerformanceData = {
       revenuePerLead: 185.48,
     },
     {
-      label: 'April 2026 (Q2 Start)',
+      label: 'April 2026 (in progress)',
       shortLabel: 'Apr',
       totalLeads: 83,
       revenueClosed: 8857.75,
       wonDeals: 6,
       conversionRate: 7.2,
       revenuePerLead: 106.72,
+      inProgress: true,
+      daysElapsed: 16,   // Apr 1 – Apr 16, 2026
+      daysInPeriod: 30,
     },
   ],
 };
