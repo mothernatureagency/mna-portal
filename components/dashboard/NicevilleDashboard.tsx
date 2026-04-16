@@ -21,6 +21,7 @@ import type { Client } from '@/lib/clients';
 import UserBanner from './UserBanner';
 import MonthlyContentCalendar from './MonthlyContentCalendar';
 import LeadSourceSplitEditor from './LeadSourceSplitEditor';
+import CompetitorBenchmark from './CompetitorBenchmark';
 
 // ─── REAL DATA ────────────────────────────────────────────────────────────
 // Source: client provided directly on 2026-04-08
@@ -151,6 +152,12 @@ export default function NicevilleDashboard({ client }: { client: Client }) {
       <div>
         <SectionLabel>Content Calendar</SectionLabel>
         <MonthlyContentCalendar clientName={client.name} gradientFrom={gradientFrom} gradientTo={gradientTo} />
+      </div>
+
+      {/* ── COMPETITOR BENCHMARK (Meta + Google Reviews) ── */}
+      <div>
+        <SectionLabel>Competitive Position</SectionLabel>
+        <CompetitorBenchmark gradientFrom={gradientFrom} gradientTo={gradientTo} />
       </div>
 
       {/* ── KEY METRICS (honest — only values we actually have) ── */}
