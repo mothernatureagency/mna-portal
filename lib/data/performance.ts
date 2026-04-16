@@ -29,6 +29,14 @@ export type PeriodMetrics = {
   daysElapsed?: number;
   /** Total days in the period — required when inProgress is true. */
   daysInPeriod?: number;
+  /** Optional manual override for the projected end-of-period revenue.
+   *  Use when the linear extrapolation undershoots known pipeline /
+   *  scheduled appointments / month-end push the team is confident about. */
+  projectedRevenueOverride?: number;
+  /** Strategic month-over-month growth target as a percent (e.g. 5 for 5% MoM). */
+  momGrowthTargetPct?: number;
+  /** Previous month's actual revenue — used to compute the MoM goal display. */
+  previousMonthRevenue?: number;
 };
 
 export type PerformanceData = {
@@ -63,8 +71,11 @@ export const PRIME_IV_PERFORMANCE: PerformanceData = {
       conversionRate: 7.2,
       revenuePerLead: 106.72,
       inProgress: true,
-      daysElapsed: 16,   // Apr 1 – Apr 16, 2026
+      daysElapsed: 16,                 // Apr 1 – Apr 16, 2026
       daysInPeriod: 30,
+      projectedRevenueOverride: 20000, // Currently at $20K est for right now
+      momGrowthTargetPct: 5,           // Strategic 5% MoM growth target
+      previousMonthRevenue: 54500,     // Mar 2026 actual (from client)
     },
   ],
 };
