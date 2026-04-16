@@ -85,15 +85,20 @@ function generatePerformanceInsights(baseline: PeriodMetrics, current: PeriodMet
     // scheduled appointments the simple linear extrapolation can't see).
     const projectedRevenue = current.projectedRevenueOverride ?? current.revenueClosed * ratio;
     const projectedDeals = Math.round(current.wonDeals * ratio);
-    // Conversion rate and rev/lead are already ratios — they don't scale.
-    const baselineMonthlyLeads = baseline.totalLeads / 3; // Q1 → monthly avg
-    const baselineMonthlyRevenue = baseline.revenueClosed / 3;
-    const baselineMonthlyDeals = baseline.wonDeals / 3;
+
+    // ── MoM goal display ──
+    // Show alongside the current estimate so the client always sees the
+    // strategic target even when the period is still in progress.
+    let goalLine = '';
+    if (current.momGrowthTargetPct && current.previousMonthRevenue) {
+      const goal = current.previousMonthRevenue * (1 + current.momGrowthTargetPct / 100);
+      goalLine = ` Goal: ${fmtUSD(goal)} (${current.momGrowthTargetPct}% MoM from ${fmtUSD(current.previousMonthRevenue)}).`;
+    }
 
     insights.push({
       icon: 'rocket_launch',
-      title: `${current.shortLabel} is ${Math.round((current.daysElapsed / current.daysInPeriod) * 100)}% through · pacing strong`,
-      body: `Through day ${current.daysElapsed} of ${current.daysInPeriod}, ${current.shortLabel} is on pace for ~${projectedLeads} leads, ${projectedDeals} won deals, and ${fmtUSD(projectedRevenue)} in closed revenue. ${baseline.shortLabel} averaged ${Math.round(baselineMonthlyLeads)} leads · ${Math.round(baselineMonthlyDeals)} deals · ${fmtUSD(baselineMonthlyRevenue)}/mo.`,
+      title: `${current.shortLabel} is ${Math.round((current.daysElapsed / current.daysInPeriod) * 100)}% through · est. ${fmtUSD(projectedRevenue)}`,
+      body: `Through day ${current.daysElapsed} of ${current.daysInPeriod}, ${current.shortLabel} is currently estimated at ${fmtUSD(projectedRevenue)} in closed revenue with ~${projectedLeads} leads and ${projectedDeals} won deals.${goalLine}`,
       tone: 'info',
     });
 
