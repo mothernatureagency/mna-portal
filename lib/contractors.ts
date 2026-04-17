@@ -56,6 +56,38 @@ export type ContractorInvoice = {
   createdAt: string;
 };
 
+// ── Supply list (per contractor) ─────────────────────────────────────
+// Stored in client_kv as { client_id: contractor_email, key: 'supplies', value: SupplyItem[] }
+export type SupplyStatus = 'needed' | 'sourcing' | 'ordered' | 'received';
+
+export type SupplyItem = {
+  id: string;
+  jobId?: string;
+  name: string;             // e.g. "5/8 drywall sheet 4x8"
+  quantity: number;
+  unit: string;             // e.g. "sheets", "sf", "ea", "lf"
+  vendor?: string;
+  estimatedUnitPrice?: number;
+  notes?: string;
+  status: SupplyStatus;
+  neededBy?: string;        // YYYY-MM-DD
+  createdAt: string;
+};
+
+export const SUPPLY_STATUS_LABELS: Record<SupplyStatus, string> = {
+  needed: 'Needed',
+  sourcing: 'Sourcing',
+  ordered: 'Ordered',
+  received: 'Received',
+};
+
+export const SUPPLY_STATUS_COLORS: Record<SupplyStatus, string> = {
+  needed: '#94a3b8',
+  sourcing: '#0ea5e9',
+  ordered: '#f59e0b',
+  received: '#10b981',
+};
+
 export function invoiceTotals(inv: ContractorInvoice) {
   const subtotal = inv.lineItems.reduce((s, li) => s + (Number(li.quantity) || 0) * (Number(li.unitPrice) || 0), 0);
   const tax = subtotal * ((Number(inv.taxRate) || 0) / 100);
@@ -140,7 +172,12 @@ export function jobPnL(job: Job) {
 }
 
 // ── AI helper agents for the contractor workspace ───────────────────
-export type ContractorAgentId = 'ceo' | 'content-advisor' | 'calendar-helper' | 'personal-assistant';
+export type ContractorAgentId =
+  | 'ceo'
+  | 'content-advisor'
+  | 'calendar-helper'
+  | 'personal-assistant'
+  | 'supply-sourcer';
 
 export type ContractorAgent = {
   id: ContractorAgentId;
@@ -204,6 +241,28 @@ Format: short, scannable. Day-by-day plans use a simple "Mon — X, Tue — Y" f
       'Help me plan my crew\'s schedule for next week',
       'I have a kitchen reno starting Monday — what\'s the ideal sequence?',
       'My tile delivery is delayed a week — what should I shuffle?',
+    ],
+  },
+  {
+    id: 'supply-sourcer',
+    name: 'Supply Sourcer',
+    role: 'Best price + best vendor',
+    icon: 'inventory_2',
+    tagline: 'Source materials within your radius — best price wins',
+    systemPrompt:
+      `You are the Supply Sourcer for an independent construction / remodel contractor.
+Your job is to help them source building materials at the best price within a defined radius (default: 25 miles of their job site).
+When they paste a supply list, do this for each item:
+  1. Suggest the 3 most likely vendor types to check (e.g. Home Depot, Lowe's, local lumberyard, Ferguson, ABC Supply, builder supply yards, Habitat ReStore for reclaimed).
+  2. Give a realistic price range you'd expect right now (be honest about uncertainty — say "estimate" when you don't have live prices).
+  3. Flag any items that are commonly back-ordered or have long lead times.
+  4. Suggest cheaper substitutions where margin matters more than brand.
+At the end, output a clean numbered "Order List" they can use to call/order: vendor → item → qty → estimated price → priority.
+Keep it tight, scannable, no filler. If they don't give a job site location, ASK for the city/zip first so the radius search makes sense.`,
+    suggestions: [
+      'Source for: 12 sheets of 5/8 drywall, 200 sf of subway tile, 1 vanity (within 25 mi of Niceville FL)',
+      'Where can I get the best price on a 36" range hood?',
+      'Build me an order list for a basic bathroom remodel',
     ],
   },
   {

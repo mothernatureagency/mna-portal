@@ -152,31 +152,43 @@ function pickMotherNatureVoice(voices: SpeechSynthesisVoice[]): SpeechSynthesisV
 }
 
 /**
- * Clean a string for spoken output and visual display:
- *  - Remove emojis and most symbol pictographs
- *  - Strip markdown markers (** _ ` #)
- *  - Collapse whitespace
- * Keeps punctuation that affects prosody (. , ? ! ; :).
+ * Display sanitizer — strip markdown noise + emojis but KEEP parenthetical
+ * content. Pronunciation hints like "Xin chào (sin chow)" stay visible on
+ * screen so the learner can read them.
  */
-export function sanitizeForSpeech(input: string): string {
+export function sanitizeForDisplay(input: string): string {
   if (!input) return '';
   let s = String(input);
-  // Strip fenced code blocks entirely — they read awful out loud.
   s = s.replace(/```[\s\S]*?```/g, ' ');
-  // Markdown markers
   s = s.replace(/[*_`~#>]/g, '');
-  // Emoji / pictographs / symbols.
-  // Written without the `u` flag so the TS compile target (<ES6) accepts it:
-  //  - First alternative matches any UTF-16 surrogate pair (all SMP emoji).
-  //  - Remaining BMP ranges cover dingbats, misc symbols, arrows, etc.
-  //  - \uFE0F + \u200D are the variation selector + zero-width joiner used
-  //    to combine compound emoji; strip them too.
   s = s.replace(
     /[\uD800-\uDBFF][\uDC00-\uDFFF]|[\u2300-\u23FF\u2600-\u26FF\u2700-\u27BF\u2B00-\u2BFF\uFE0F\u200D]/g,
     '',
   );
-  // Also kill leftover lone surrogates.
   s = s.replace(/[\uD800-\uDFFF]/g, '');
+  return s.replace(/\s+/g, ' ').trim();
+}
+
+/**
+ * Speech sanitizer — everything `sanitizeForDisplay` removes, PLUS:
+ *  - Anything inside parentheses, brackets, or curly braces.
+ *    These are usually pronunciation hints, asides, or stage directions
+ *    — speaking them out loud sounds awful and makes a tutor say a foreign
+ *    word twice (once in the source language, again in butchered English).
+ *
+ * So "Xin chào (sin chow) — hello" is read as "Xin chào — hello", not
+ * "Xin chào sin chow hello".
+ */
+export function sanitizeForSpeech(input: string): string {
+  if (!input) return '';
+  let s = sanitizeForDisplay(input);
+  // Strip parens / brackets / braces and their contents (non-greedy).
+  s = s.replace(/\([^)]*\)/g, '');
+  s = s.replace(/\[[^\]]*\]/g, '');
+  s = s.replace(/\{[^}]*\}/g, '');
+  // Clean up any leftover double spaces or stranded punctuation pairs.
+  s = s.replace(/\s+([.,!?;:])/g, '$1');
+  s = s.replace(/—\s*—/g, '—');
   return s.replace(/\s+/g, ' ').trim();
 }
 

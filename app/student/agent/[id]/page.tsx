@@ -7,7 +7,7 @@ import { createClient as createSupabaseClient } from '@/lib/supabase/client';
 import { getStudentAgent, STUDENT_THEMES, getStudentByEmail, STUDENTS } from '@/lib/students';
 import { isMNAStaff } from '@/lib/staff';
 import { VoiceButton } from '@/components/ai/VoiceButton';
-import { speak, cancelSpeak, sanitizeForSpeech } from '@/lib/voice';
+import { speak, cancelSpeak, sanitizeForDisplay } from '@/lib/voice';
 import JarvisFab from '@/components/ai/JarvisFab';
 
 type Msg = { role: 'user' | 'assistant'; content: string };
@@ -60,17 +60,15 @@ export default function StudentAgentChat() {
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || 'Request failed');
-      setMessages((m) => [...m, { role: 'assistant', content: data.reply }]);
-      // Speak the tutor's reply out loud whenever:
-      //  • voiceOn toggle is enabled, AND
-      //  • either Marissa spoke her message OR voice is just always on
+      // Display: keep pronunciation hints in parens visible on screen so
+      // Marissa can read them. Speech: speak() internally strips parens
+      // so the tutor doesn't pronounce the English approximation aloud.
+      const displayed = sanitizeForDisplay(data.reply);
+      setMessages((m) => [...m, { role: 'assistant', content: displayed }]);
       if (voiceOn && data.reply) {
-        const spoken = sanitizeForSpeech(data.reply);
-        if (spoken) {
-          // Slightly higher pitch + a touch faster reads as warm and friendly
-          // for an 11-year-old (vs the slower, flatter staff voice).
-          speak(spoken, { rate: 1.0, pitch: 1.1 });
-        }
+        // Slightly higher pitch + a touch faster reads as warm and friendly
+        // for an 11-year-old (vs the slower, flatter staff voice).
+        speak(data.reply, { rate: 1.0, pitch: 1.1 });
       }
       voicePendingRef.current = false;
     } catch (e: any) {

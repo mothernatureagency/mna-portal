@@ -71,6 +71,9 @@ export default function StudentPortal() {
   const [newTaskDue, setNewTaskDue] = useState('');     // YYYY-MM-DD optional reminder
   const [newTaskNote, setNewTaskNote] = useState('');
 
+  // ── Google Calendar connection ──
+  const [gcalConnected, setGcalConnected] = useState(false);
+
   // ── New-event quick form ──
   const [newEventOpen, setNewEventOpen] = useState(false);
   const todayIso = new Date().toISOString().slice(0, 10);
@@ -104,7 +107,27 @@ export default function StudentPortal() {
           .then((r) => r.json()).then((d) => setEvents(d.events || [])).catch(() => {}),
         fetch(`/api/client-requests?assignedTo=${encodeURIComponent(fetchEmail)}`)
           .then((r) => r.json()).then((d) => setTasks(d.requests || d.items || [])).catch(() => {}),
+        fetch(`/api/google/status?email=${encodeURIComponent(fetchEmail)}`)
+          .then((r) => r.json()).then((d) => setGcalConnected(!!d.connected)).catch(() => {}),
       ]);
+      // After loading, also pull any Google Calendar events into the same array
+      if (fetchEmail) {
+        try {
+          const r = await fetch(`/api/google/sync?email=${encodeURIComponent(fetchEmail)}&from=${todayStr}&to=${futureStr}`);
+          const d = await r.json();
+          if (Array.isArray(d.events)) {
+            const gevents = d.events.map((e: any) => ({
+              id: `g-${e.id}`,
+              title: e.title,
+              event_date: e.date || e.event_date,
+              start_time: e.start_time,
+              end_time: e.end_time,
+              event_type: 'google',
+            }));
+            setEvents((prev) => [...prev, ...gevents]);
+          }
+        } catch {}
+      }
       setLoading(false);
     })();
   }, []);
@@ -432,13 +455,37 @@ export default function StudentPortal() {
                 </button>
               )}
             </div>
-            <button
-              onClick={() => setNewEventOpen((v) => !v)}
-              className="text-[12px] font-bold px-3 py-1.5 rounded-lg text-white"
-              style={{ background: `linear-gradient(135deg,${theme.gradientFrom},${theme.gradientTo})` }}
-            >
-              {newEventOpen ? 'Cancel' : '+ Add Event'}
-            </button>
+            <div className="flex items-center gap-2">
+              {gcalConnected ? (
+                <span className="flex items-center gap-1 px-2 py-1 rounded-lg text-[10px] font-bold text-emerald-300" style={{ background: 'rgba(34,197,94,0.12)', border: '1px solid rgba(34,197,94,0.25)' }}>
+                  <span className="material-symbols-outlined" style={{ fontSize: 12 }}>check_circle</span>
+                  Google
+                </span>
+              ) : student?.email ? (
+                <button
+                  type="button"
+                  onClick={async () => {
+                    try {
+                      const r = await fetch(`/api/google/connect?email=${encodeURIComponent(student!.email)}`);
+                      const data = await r.json();
+                      if (data.url) window.location.href = data.url;
+                    } catch {}
+                  }}
+                  className="flex items-center gap-1 px-2.5 py-1 rounded-lg text-[10px] font-bold text-white hover:opacity-90 transition"
+                  style={{ background: 'linear-gradient(135deg,#4285F4,#34A853)' }}
+                >
+                  <span className="material-symbols-outlined" style={{ fontSize: 12 }}>calendar_add_on</span>
+                  Connect Google
+                </button>
+              ) : null}
+              <button
+                onClick={() => setNewEventOpen((v) => !v)}
+                className="text-[12px] font-bold px-3 py-1.5 rounded-lg text-white"
+                style={{ background: `linear-gradient(135deg,${theme.gradientFrom},${theme.gradientTo})` }}
+              >
+                {newEventOpen ? 'Cancel' : '+ Add Event'}
+              </button>
+            </div>
           </div>
 
           {newEventOpen && (
