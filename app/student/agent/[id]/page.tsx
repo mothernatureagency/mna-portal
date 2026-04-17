@@ -6,6 +6,8 @@ import { notFound, useParams } from 'next/navigation';
 import { createClient as createSupabaseClient } from '@/lib/supabase/client';
 import { getStudentAgent, STUDENT_THEMES, getStudentByEmail, STUDENTS } from '@/lib/students';
 import { isMNAStaff } from '@/lib/staff';
+import { VoiceButton } from '@/components/ai/VoiceButton';
+import { speak, cancelSpeak, sanitizeForSpeech } from '@/lib/voice';
 
 type Msg = { role: 'user' | 'assistant'; content: string };
 
@@ -16,6 +18,8 @@ export default function StudentAgentChat() {
   const [messages, setMessages] = useState<Msg[]>([]);
   const [input, setInput] = useState('');
   const [loading, setLoading] = useState(false);
+  const [voiceOn, setVoiceOn] = useState(true);   // auto-speak tutor replies (on by default for kids)
+  const voicePendingRef = useRef(false);          // did Marissa ask by voice?
   const scrollRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -33,6 +37,10 @@ export default function StudentAgentChat() {
   useEffect(() => {
     scrollRef.current?.scrollTo({ top: scrollRef.current.scrollHeight, behavior: 'smooth' });
   }, [messages, loading]);
+
+  // Stop any ongoing speech when leaving the page (so the tutor doesn't
+  // keep talking after Marissa navigates back to the buddy grid).
+  useEffect(() => () => { cancelSpeak(); }, []);
 
   if (!agent) return notFound();
   const theme = STUDENT_THEMES[student.themeColor];
@@ -52,11 +60,30 @@ export default function StudentAgentChat() {
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || 'Request failed');
       setMessages((m) => [...m, { role: 'assistant', content: data.reply }]);
+      // Speak the tutor's reply out loud whenever:
+      //  • voiceOn toggle is enabled, AND
+      //  • either Marissa spoke her message OR voice is just always on
+      if (voiceOn && data.reply) {
+        const spoken = sanitizeForSpeech(data.reply);
+        if (spoken) {
+          // Slightly higher pitch + a touch faster reads as warm and friendly
+          // for an 11-year-old (vs the slower, flatter staff voice).
+          speak(spoken, { rate: 1.0, pitch: 1.1 });
+        }
+      }
+      voicePendingRef.current = false;
     } catch (e: any) {
       setMessages((m) => [...m, { role: 'assistant', content: `Hmm, something went wrong. Try again? (${e.message})` }]);
+      voicePendingRef.current = false;
     } finally {
       setLoading(false);
     }
+  }
+
+  // Called by the mic button when Marissa finishes speaking.
+  function handleVoiceInput(text: string) {
+    voicePendingRef.current = true;
+    send(text);
   }
 
   return (
@@ -69,6 +96,23 @@ export default function StudentAgentChat() {
             <span className="material-symbols-outlined" style={{ fontSize: 18 }}>arrow_back</span>
             My Buddies
           </Link>
+          <div className="flex-1" />
+          <button
+            type="button"
+            onClick={() => { setVoiceOn((v) => !v); if (voiceOn) cancelSpeak(); }}
+            title={voiceOn ? 'Voice on — click to mute' : 'Voice off — click to enable'}
+            className={`rounded-lg px-2.5 py-1.5 text-[11px] font-bold flex items-center gap-1.5 border transition ${
+              voiceOn
+                ? 'text-emerald-200'
+                : 'bg-white/5 border-white/15 text-white/60 hover:bg-white/10'
+            }`}
+            style={voiceOn ? { background: 'rgba(16,185,129,0.18)', borderColor: 'rgba(110,231,183,0.4)' } : undefined}
+          >
+            <span className="material-symbols-outlined" style={{ fontSize: 14 }}>
+              {voiceOn ? 'volume_up' : 'volume_off'}
+            </span>
+            Voice {voiceOn ? 'on' : 'off'}
+          </button>
         </div>
 
         {/* ── Agent card ── */}
@@ -135,12 +179,13 @@ export default function StudentAgentChat() {
           {/* ── Input ── */}
           <form
             onSubmit={(e) => { e.preventDefault(); send(input); }}
-            className="flex gap-2 p-3 border-t border-white/10"
+            className="flex gap-2 p-3 border-t border-white/10 items-center"
           >
+            <VoiceButton onTranscript={handleVoiceInput} />
             <input
               value={input}
               onChange={(e) => setInput(e.target.value)}
-              placeholder={`Ask ${agent.name} anything…`}
+              placeholder={`Ask ${agent.name} or tap the mic…`}
               className="flex-1 rounded-xl px-4 py-2.5 bg-white/8 border border-white/15 text-white placeholder:text-white/40 focus:outline-none focus:border-white/30 text-[13px]"
             />
             <button
