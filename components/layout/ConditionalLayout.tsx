@@ -13,8 +13,9 @@ export default function ConditionalLayout({ children }: { children: React.ReactN
   const isClientPortal = pathname === '/client' || pathname.startsWith('/client/');
   const isContractorPortal = pathname === '/contractor' || pathname.startsWith('/contractor/');
   const isStudentPortal = pathname === '/student' || pathname.startsWith('/student/');
+  const isCreatorPortal = pathname === '/creator' || pathname.startsWith('/creator/');
 
-  if (isAuthRoute || isClientPortal || isContractorPortal || isStudentPortal) {
+  if (isAuthRoute || isClientPortal || isContractorPortal || isStudentPortal || isCreatorPortal) {
     return <>{children}</>;
   }
 

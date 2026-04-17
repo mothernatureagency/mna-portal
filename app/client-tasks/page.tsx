@@ -23,6 +23,7 @@ const TEAM = [
   // Alexus can hand off chores, schoolwork, or practice goals.
   { email: 'marissa@mothernatureagency.com', name: 'Marissa', short: 'MM', color: '#c084fc' },
   { email: 'kyle@mothernatureagency.com',    name: 'Kyle',    short: 'KW', color: '#5eead4' },
+  { email: 'alexusaura@mothernatureagency.com', name: '@alexusaura', short: 'AA', color: '#f472b6' },
 ];
 
 // Client assignees — tasks can also be assigned to the client themselves
