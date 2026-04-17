@@ -20,6 +20,7 @@ import {
   STUDENTS,
   STUDENT_AGENTS,
   STUDENT_THEMES,
+  getWeeklyLesson,
   type Student,
 } from '@/lib/students';
 import { isMNAStaff } from '@/lib/staff';
@@ -288,6 +289,44 @@ export default function StudentPortal() {
             </button>
           )}
         </div>
+
+        {/* ── LESSON OF THE WEEK ── */}
+        {(() => {
+          const lesson = getWeeklyLesson();
+          return (
+            <div
+              className="rounded-2xl p-5 relative overflow-hidden"
+              style={{ background: 'rgba(255,255,255,0.06)', border: `1px solid ${theme.chipBorder}` }}
+            >
+              <div
+                className="absolute top-0 left-0 right-0 h-1"
+                style={{ background: `linear-gradient(90deg,${theme.gradientFrom},${theme.gradientTo})` }}
+              />
+              <div className="flex items-start gap-4 flex-wrap">
+                <div
+                  className="w-12 h-12 rounded-xl flex items-center justify-center shrink-0"
+                  style={{ background: `linear-gradient(135deg,${theme.gradientFrom},${theme.gradientTo})` }}
+                >
+                  <span className="material-symbols-outlined text-white" style={{ fontSize: 26 }}>auto_awesome</span>
+                </div>
+                <div className="flex-1 min-w-0">
+                  <div className="text-[10px] uppercase tracking-[0.15em] font-bold" style={{ color: theme.accent }}>
+                    Lesson of the Week · {lesson.topic}
+                  </div>
+                  <div className="text-[18px] font-extrabold mt-0.5">{lesson.title}</div>
+                  <p className="text-[13px] text-white/80 mt-1.5 leading-relaxed">{lesson.body}</p>
+                  <div
+                    className="mt-3 rounded-lg px-3 py-2 text-[11px] flex items-start gap-2"
+                    style={{ background: theme.chipBg, border: `1px solid ${theme.chipBorder}` }}
+                  >
+                    <span className="material-symbols-outlined" style={{ fontSize: 14, color: theme.accent }}>lightbulb</span>
+                    <span><span className="font-bold" style={{ color: theme.accent }}>Fun fact:</span> {lesson.funFact}</span>
+                  </div>
+                </div>
+              </div>
+            </div>
+          );
+        })()}
 
         {/* ── MY BUDDIES (AI tutor grid) ── */}
         <div>
