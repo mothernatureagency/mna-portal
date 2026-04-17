@@ -4,6 +4,7 @@ import React, { useEffect, useRef, useState } from 'react';
 import Link from 'next/link';
 import { notFound, useParams } from 'next/navigation';
 import { getContractorAgent } from '@/lib/contractors';
+import { sanitizeForDisplay } from '@/lib/voice';
 
 type Msg = { role: 'user' | 'assistant'; content: string };
 
@@ -35,7 +36,7 @@ export default function ContractorAgentChat() {
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || 'Request failed');
-      setMessages((m) => [...m, { role: 'assistant', content: data.reply }]);
+      setMessages((m) => [...m, { role: 'assistant', content: sanitizeForDisplay(data.reply) }]);
     } catch (e: any) {
       setMessages((m) => [...m, { role: 'assistant', content: `Error: ${e.message}` }]);
     } finally {

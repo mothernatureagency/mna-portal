@@ -27,9 +27,13 @@ import {
   JOB_STATUS_LABELS,
   JOB_STATUS_COLORS,
   jobPnL,
+  SUPPLY_STATUS_LABELS,
+  SUPPLY_STATUS_COLORS,
   type Contractor,
   type Job,
   type JobStatus,
+  type SupplyItem,
+  type SupplyStatus,
 } from '@/lib/contractors';
 import { isMNAStaff } from '@/lib/staff';
 
@@ -125,10 +129,17 @@ export default function ContractorDashboard() {
   const [contractor, setContractor] = useState<Contractor | null>(null);
   const [previewMode, setPreviewMode] = useState(false);
   const [jobs, setJobs] = useState<Job[]>([]);
+  const [supplies, setSupplies] = useState<SupplyItem[]>([]);
   const [events, setEvents] = useState<ScheduleEvent[]>([]);
   const [loading, setLoading] = useState(true);
   const [editingJob, setEditingJob] = useState<Job | null>(null);
   const [creating, setCreating] = useState(false);
+
+  // ── Supply quick-add form ──
+  const [showSupplyForm, setShowSupplyForm] = useState(false);
+  const [supplyDraft, setSupplyDraft] = useState<{ name: string; quantity: number; unit: string; vendor: string; estimatedUnitPrice: number; status: SupplyStatus }>({
+    name: '', quantity: 1, unit: 'ea', vendor: '', estimatedUnitPrice: 0, status: 'needed',
+  });
 
   // ── Load ────────────────────────────────────────────────────────
   useEffect(() => {
@@ -169,6 +180,10 @@ export default function ContractorDashboard() {
           .then((r) => r.json())
           .then((d) => setJobs(Array.isArray(d.value) ? d.value : []))
           .catch(() => {}),
+        fetch(`/api/client-kv?clientId=${encodeURIComponent(userEmail)}&key=supplies`)
+          .then((r) => r.json())
+          .then((d) => setSupplies(Array.isArray(d.value) ? d.value : []))
+          .catch(() => {}),
         fetch(`/api/schedule?email=${encodeURIComponent(userEmail)}&from=${todayStr}&to=${futureStr}`)
           .then((r) => r.json())
           .then((d) => setEvents(d.events || []))
@@ -189,6 +204,44 @@ export default function ContractorDashboard() {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ clientId: email, key: 'jobs', value: next }),
     });
+  }
+
+  async function saveSupplies(next: SupplyItem[]) {
+    setSupplies(next);
+    if (previewMode) return;
+    await fetch('/api/client-kv', {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ clientId: email, key: 'supplies', value: next }),
+    });
+  }
+
+  function addSupply(e: React.FormEvent) {
+    e.preventDefault();
+    if (!supplyDraft.name.trim()) return;
+    const item: SupplyItem = {
+      id: uuid(),
+      name: supplyDraft.name.trim(),
+      quantity: Number(supplyDraft.quantity) || 1,
+      unit: supplyDraft.unit || 'ea',
+      vendor: supplyDraft.vendor.trim() || undefined,
+      estimatedUnitPrice: Number(supplyDraft.estimatedUnitPrice) || 0,
+      status: supplyDraft.status,
+      createdAt: new Date().toISOString(),
+    };
+    saveSupplies([item, ...supplies]);
+    setSupplyDraft({ name: '', quantity: 1, unit: 'ea', vendor: '', estimatedUnitPrice: 0, status: 'needed' });
+    setShowSupplyForm(false);
+  }
+
+  function cycleSupplyStatus(item: SupplyItem) {
+    const order: SupplyStatus[] = ['needed', 'sourcing', 'ordered', 'received'];
+    const next = order[(order.indexOf(item.status) + 1) % order.length];
+    saveSupplies(supplies.map((s) => (s.id === item.id ? { ...s, status: next } : s)));
+  }
+
+  function deleteSupply(id: string) {
+    saveSupplies(supplies.filter((s) => s.id !== id));
   }
 
   // ── P&L roll-up across all jobs ─────────────────────────────────
@@ -348,6 +401,162 @@ export default function ContractorDashboard() {
                   </button>
                 );
               })}
+            </div>
+          )}
+        </div>
+
+        {/* ── SUPPLY LIST ── */}
+        <div className="glass-card p-5">
+          <div className="flex items-center justify-between mb-4">
+            <div>
+              <div className="text-[14px] font-bold">Supply List</div>
+              <div className="text-[11px] text-white/55">
+                {supplies.filter((s) => s.status === 'needed').length} to source ·{' '}
+                {supplies.filter((s) => s.status === 'ordered').length} ordered ·{' '}
+                {supplies.filter((s) => s.status === 'received').length} received
+              </div>
+            </div>
+            <div className="flex items-center gap-2">
+              <Link
+                href="/contractor/agent/supply-sourcer"
+                className="text-[11px] font-bold px-3 py-1.5 rounded-lg text-white"
+                style={{ background: 'linear-gradient(135deg,#0ea5e9,#06b6d4)' }}
+              >
+                Ask Sourcer
+              </Link>
+              <button
+                onClick={() => setShowSupplyForm((v) => !v)}
+                className="text-[11px] font-bold px-3 py-1.5 rounded-lg text-white"
+                style={{ background: 'linear-gradient(135deg,#0c6da4,#4ab8ce)' }}
+              >
+                {showSupplyForm ? 'Cancel' : '+ Add Item'}
+              </button>
+            </div>
+          </div>
+
+          {showSupplyForm && (
+            <form
+              onSubmit={addSupply}
+              className="rounded-xl p-3 mb-4 space-y-2"
+              style={{ background: 'rgba(0,0,0,0.35)', border: '1px solid rgba(255,255,255,0.15)' }}
+            >
+              <input
+                autoFocus
+                type="text"
+                placeholder="What do you need? (e.g. 5/8 drywall, subway tile, 36 vanity)"
+                value={supplyDraft.name}
+                onChange={(e) => setSupplyDraft({ ...supplyDraft, name: e.target.value })}
+                className="w-full px-3 py-2 rounded-lg border text-white text-[13px] placeholder:text-white/55 focus:outline-none"
+                style={{ background: 'rgba(0,0,0,0.45)', borderColor: 'rgba(255,255,255,0.25)' }}
+              />
+              <div className="grid grid-cols-2 md:grid-cols-5 gap-2">
+                <input
+                  type="number" min="1" value={supplyDraft.quantity}
+                  onChange={(e) => setSupplyDraft({ ...supplyDraft, quantity: Number(e.target.value) || 1 })}
+                  className="px-3 py-2 rounded-lg border text-white text-[12px] focus:outline-none"
+                  style={{ background: 'rgba(0,0,0,0.45)', borderColor: 'rgba(255,255,255,0.25)' }}
+                  placeholder="Qty"
+                />
+                <select
+                  value={supplyDraft.unit}
+                  onChange={(e) => setSupplyDraft({ ...supplyDraft, unit: e.target.value })}
+                  className="px-3 py-2 rounded-lg border text-white text-[12px] focus:outline-none"
+                  style={{ background: 'rgba(0,0,0,0.45)', borderColor: 'rgba(255,255,255,0.25)' }}
+                >
+                  {['ea', 'sheets', 'sf', 'lf', 'box', 'gal', 'lb'].map((u) => (
+                    <option key={u} value={u} className="bg-slate-900">{u}</option>
+                  ))}
+                </select>
+                <input
+                  type="text"
+                  placeholder="Vendor (optional)"
+                  value={supplyDraft.vendor}
+                  onChange={(e) => setSupplyDraft({ ...supplyDraft, vendor: e.target.value })}
+                  className="px-3 py-2 rounded-lg border text-white text-[12px] placeholder:text-white/55 focus:outline-none"
+                  style={{ background: 'rgba(0,0,0,0.45)', borderColor: 'rgba(255,255,255,0.25)' }}
+                />
+                <div className="flex items-center px-2 rounded-lg border" style={{ background: 'rgba(0,0,0,0.45)', borderColor: 'rgba(255,255,255,0.25)' }}>
+                  <span className="text-white/55 text-[12px] mr-1">$</span>
+                  <input
+                    type="number" min="0" step="1" value={supplyDraft.estimatedUnitPrice || ''}
+                    onChange={(e) => setSupplyDraft({ ...supplyDraft, estimatedUnitPrice: Number(e.target.value) || 0 })}
+                    className="flex-1 py-2 bg-transparent text-white text-[12px] outline-none"
+                    placeholder="Est. unit price"
+                  />
+                </div>
+                <select
+                  value={supplyDraft.status}
+                  onChange={(e) => setSupplyDraft({ ...supplyDraft, status: e.target.value as SupplyStatus })}
+                  className="px-3 py-2 rounded-lg border text-white text-[12px] focus:outline-none"
+                  style={{ background: 'rgba(0,0,0,0.45)', borderColor: 'rgba(255,255,255,0.25)' }}
+                >
+                  {(Object.keys(SUPPLY_STATUS_LABELS) as SupplyStatus[]).map((s) => (
+                    <option key={s} value={s} className="bg-slate-900">{SUPPLY_STATUS_LABELS[s]}</option>
+                  ))}
+                </select>
+              </div>
+              <button
+                type="submit"
+                className="text-[12px] font-bold px-4 py-2 rounded-lg text-white"
+                style={{ background: 'linear-gradient(135deg,#0c6da4,#4ab8ce)' }}
+              >
+                Add to Supply List
+              </button>
+            </form>
+          )}
+
+          {supplies.length === 0 ? (
+            <div className="text-[12px] text-white/55 text-center py-6">
+              No supplies tracked yet. Add items as you spec out a job, then tap <span className="text-white">Ask Sourcer</span> to find best price within a radius.
+            </div>
+          ) : (
+            <div className="overflow-x-auto -mx-2">
+              <table className="w-full text-[12px]">
+                <thead>
+                  <tr className="text-white/45 uppercase text-[9px] tracking-wider">
+                    <th className="text-left font-semibold px-2 py-2">Item</th>
+                    <th className="text-right font-semibold px-2 py-2">Qty</th>
+                    <th className="text-left font-semibold px-2 py-2">Vendor</th>
+                    <th className="text-right font-semibold px-2 py-2">Est $</th>
+                    <th className="text-right font-semibold px-2 py-2">Total</th>
+                    <th className="text-center font-semibold px-2 py-2">Status</th>
+                    <th className="px-2 py-2"></th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {supplies.map((s) => {
+                    const total = s.quantity * (s.estimatedUnitPrice || 0);
+                    return (
+                      <tr key={s.id} style={{ borderTop: '1px solid rgba(255,255,255,0.06)' }}>
+                        <td className="px-2 py-2 font-semibold text-white">{s.name}</td>
+                        <td className="px-2 py-2 text-right text-white/75">{s.quantity} {s.unit}</td>
+                        <td className="px-2 py-2 text-white/75">{s.vendor || '—'}</td>
+                        <td className="px-2 py-2 text-right text-white/75">{s.estimatedUnitPrice ? `$${s.estimatedUnitPrice}` : '—'}</td>
+                        <td className="px-2 py-2 text-right font-bold text-white">{total ? `$${total.toLocaleString()}` : '—'}</td>
+                        <td className="px-2 py-2 text-center">
+                          <button
+                            onClick={() => cycleSupplyStatus(s)}
+                            className="text-[9px] font-bold uppercase tracking-wider px-2 py-0.5 rounded-full"
+                            style={{ background: `${SUPPLY_STATUS_COLORS[s.status]}22`, color: SUPPLY_STATUS_COLORS[s.status] }}
+                            title="Click to advance status"
+                          >
+                            {SUPPLY_STATUS_LABELS[s.status]}
+                          </button>
+                        </td>
+                        <td className="px-2 py-2 text-right">
+                          <button
+                            onClick={() => deleteSupply(s.id)}
+                            className="text-white/30 hover:text-rose-400 transition"
+                            title="Delete"
+                          >
+                            <span className="material-symbols-outlined" style={{ fontSize: 16 }}>delete</span>
+                          </button>
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
             </div>
           )}
         </div>

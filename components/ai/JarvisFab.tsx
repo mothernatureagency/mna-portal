@@ -13,7 +13,7 @@
 
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { usePathname, useRouter } from 'next/navigation';
-import { useVoiceRecognition, speak, cancelSpeak, sanitizeForSpeech } from '@/lib/voice';
+import { useVoiceRecognition, speak, cancelSpeak, sanitizeForDisplay } from '@/lib/voice';
 
 const NAV_PHRASES: { match: RegExp; path: string; label: string }[] = [
   { match: /open (?:the )?content calendar|show (?:me )?content/i, path: '/content-calendar', label: 'content calendar' },
@@ -58,14 +58,14 @@ export default function JarvisFab() {
       const data = await res.json();
       const reply = data?.reply || data?.message || data?.content || '';
       if (reply) {
-        // Strip asterisks / markdown / emojis from the visible text too,
-        // so the chat bubble matches what she says out loud.
-        const cleanReply = sanitizeForSpeech(reply);
-        setLastReply(cleanReply);
-        if (cleanReply) {
+        // Display keeps parens (visual learning aid). speak() internally
+        // strips them so she doesn't read pronunciation hints aloud.
+        const displayed = sanitizeForDisplay(reply);
+        setLastReply(displayed);
+        if (displayed) {
           setMode('speaking');
-          speak(cleanReply);
-          scheduleIdle(Math.min(20000, Math.max(2500, cleanReply.length * 75)));
+          speak(reply);
+          scheduleIdle(Math.min(20000, Math.max(2500, displayed.length * 75)));
         } else {
           setMode('idle');
         }
