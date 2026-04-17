@@ -20,6 +20,7 @@ import React, { useEffect, useMemo, useState } from 'react';
 import { createClient as createSupabaseClient } from '@/lib/supabase/client';
 import {
   getContractorByEmail,
+  CONTRACTORS,
   TRADE_LABELS,
   JOB_STATUS_LABELS,
   JOB_STATUS_COLORS,
@@ -28,6 +29,7 @@ import {
   type Job,
   type JobStatus,
 } from '@/lib/contractors';
+import { isMNAStaff } from '@/lib/staff';
 
 // ── Types ───────────────────────────────────────────────────────────
 type ScheduleEvent = {
@@ -66,9 +68,60 @@ const EMPTY_JOB: Omit<Job, 'id' | 'createdAt'> = {
 };
 
 // ── Component ───────────────────────────────────────────────────────
+// Sample jobs shown to staff in preview mode so they can see the UI populated.
+// Real contractors get an empty workspace + the placeholder hint.
+const PREVIEW_JOBS: Job[] = [
+  {
+    id: 'preview-1',
+    name: 'Smith — Kitchen Remodel',
+    address: '142 Magnolia Dr, Niceville FL',
+    status: 'active',
+    contractAmount: 48000,
+    invoicedToDate: 24000,
+    paidToDate: 24000,
+    materialsCost: 11200,
+    laborCost: 7800,
+    startDate: '2026-03-12',
+    targetCompletion: '2026-05-20',
+    notes: 'Cabinets installed. Countertop template scheduled for next Tuesday. Waiting on tile delivery.',
+    createdAt: '2026-03-10T09:00:00Z',
+  },
+  {
+    id: 'preview-2',
+    name: 'Harper — Bathroom Renovation',
+    address: '88 Bayshore Ln, Destin FL',
+    status: 'punch_list',
+    contractAmount: 22500,
+    invoicedToDate: 22500,
+    paidToDate: 18000,
+    materialsCost: 6800,
+    laborCost: 5200,
+    startDate: '2026-02-20',
+    targetCompletion: '2026-04-10',
+    notes: 'Final inspection passed. Touch-up paint and grout sealing left. Awaiting last $4,500 payment.',
+    createdAt: '2026-02-18T09:00:00Z',
+  },
+  {
+    id: 'preview-3',
+    name: 'Lakeside — New Build',
+    address: '210 Bayou Way, Freeport FL',
+    status: 'bidding',
+    contractAmount: 425000,
+    invoicedToDate: 0,
+    paidToDate: 0,
+    materialsCost: 0,
+    laborCost: 0,
+    startDate: '',
+    targetCompletion: '',
+    notes: 'Estimate submitted 4/12. Owner reviewing with bank. Decision expected this week.',
+    createdAt: '2026-04-12T09:00:00Z',
+  },
+];
+
 export default function ContractorDashboard() {
   const [email, setEmail] = useState('');
   const [contractor, setContractor] = useState<Contractor | null>(null);
+  const [previewMode, setPreviewMode] = useState(false);
   const [jobs, setJobs] = useState<Job[]>([]);
   const [events, setEvents] = useState<ScheduleEvent[]>([]);
   const [loading, setLoading] = useState(true);
@@ -83,6 +136,25 @@ export default function ContractorDashboard() {
       const userEmail = user?.email || '';
       setEmail(userEmail);
       const c = getContractorByEmail(userEmail);
+
+      // Staff/owner preview mode — let MNA team review the workspace using
+      // the first contractor in the directory as a stand-in. Read-only-ish:
+      // changes still write to client_kv but keyed off the placeholder email,
+      // so staff can play around without polluting a real contractor's data.
+      if (!c && isMNAStaff(userEmail)) {
+        setPreviewMode(true);
+        const placeholder = CONTRACTORS[0] || null;
+        setContractor(placeholder);
+        setJobs(PREVIEW_JOBS);
+        setEvents([
+          { id: 'p-evt-1', title: 'Smith Remodel — countertop template', event_date: new Date(Date.now() + 2 * 86400000).toISOString().slice(0, 10), start_time: '10:00', end_time: '11:30', event_type: 'meeting', description: null },
+          { id: 'p-evt-2', title: 'Harper Reno — final walk-through', event_date: new Date(Date.now() + 5 * 86400000).toISOString().slice(0, 10), start_time: '14:00', end_time: '15:00', event_type: 'meeting', description: null },
+          { id: 'p-evt-3', title: 'Lakeside Bid — owner meeting', event_date: new Date(Date.now() + 7 * 86400000).toISOString().slice(0, 10), start_time: '09:30', end_time: '10:30', event_type: 'call', description: null },
+        ]);
+        setLoading(false);
+        return;
+      }
+
       setContractor(c);
       if (!c) { setLoading(false); return; }
 
@@ -107,6 +179,9 @@ export default function ContractorDashboard() {
   // ── Save jobs back to client_kv ─────────────────────────────────
   async function saveJobs(next: Job[]) {
     setJobs(next);
+    // In staff preview mode the changes are session-only — we don't write
+    // to a real contractor's KV row.
+    if (previewMode) return;
     await fetch('/api/client-kv', {
       method: 'PUT',
       headers: { 'Content-Type': 'application/json' },
@@ -157,6 +232,29 @@ export default function ContractorDashboard() {
     >
       <div className="max-w-[1200px] mx-auto px-4 md:px-8 py-6 md:py-10 space-y-6">
 
+        {/* ── STAFF PREVIEW BANNER ── */}
+        {previewMode && (
+          <div
+            className="rounded-xl px-4 py-3 flex items-center gap-3 flex-wrap"
+            style={{ background: 'rgba(245,158,11,0.12)', border: '1px solid rgba(245,158,11,0.35)' }}
+          >
+            <span className="material-symbols-outlined text-amber-400" style={{ fontSize: 20 }}>visibility</span>
+            <div className="flex-1 min-w-0">
+              <div className="text-[12px] font-bold text-amber-200">Staff Preview Mode</div>
+              <div className="text-[11px] text-white/65">
+                You're viewing this as a real contractor would. Sample data shown — edits aren't persisted.
+                Decide if you want to keep this as its own account or fold it into MNA Realty.
+              </div>
+            </div>
+            <a
+              href="/"
+              className="text-[11px] font-semibold px-3 py-1.5 rounded-lg bg-white/10 hover:bg-white/20 text-white shrink-0"
+            >
+              ← Back to staff portal
+            </a>
+          </div>
+        )}
+
         {/* ── HEADER ── */}
         <div className="flex items-center justify-between flex-wrap gap-3">
           <div>
@@ -166,12 +264,14 @@ export default function ContractorDashboard() {
               {contractor.name} · {TRADE_LABELS[contractor.trade]}{contractor.serviceArea ? ` · ${contractor.serviceArea}` : ''}
             </div>
           </div>
-          <button
-            onClick={async () => { await createSupabaseClient().auth.signOut(); window.location.href = '/login'; }}
-            className="text-[11px] font-semibold px-3 py-1.5 rounded-lg bg-white/10 hover:bg-white/20"
-          >
-            Sign out
-          </button>
+          {!previewMode && (
+            <button
+              onClick={async () => { await createSupabaseClient().auth.signOut(); window.location.href = '/login'; }}
+              className="text-[11px] font-semibold px-3 py-1.5 rounded-lg bg-white/10 hover:bg-white/20"
+            >
+              Sign out
+            </button>
+          )}
         </div>
 
         {/* ── P&L SUMMARY ── */}
