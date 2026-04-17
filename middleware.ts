@@ -90,6 +90,12 @@ export async function middleware(request: NextRequest) {
     url.search = '';
     return NextResponse.redirect(url);
   }
+  if (role === 'creator' && !pathname.startsWith('/creator') && !pathname.startsWith('/api/')) {
+    const url = request.nextUrl.clone();
+    url.pathname = '/creator';
+    url.search = '';
+    return NextResponse.redirect(url);
+  }
 
   // Authenticated → allow access
   return supabaseResponse;

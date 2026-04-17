@@ -640,6 +640,295 @@ export const WEEKLY_WORDS_KINDER: WeeklyWords[] = [
   { theme: 'Family words',      words: ['mom', 'dad', 'son', 'sis', 'pop'],    funFact: '"Mom" and "Dad" are some of the first words babies say in many languages.' },
 ];
 
+// ── HOMESCHOOL WEEKLY SCHEDULE ──────────────────────────────────────
+// Shared between Marissa and Kyle. Day-of-week based.
+
+export type HomeschoolBlock = {
+  time?: string;            // e.g. "8:00–8:30" — omit for all-day blocks
+  who?: 'marissa' | 'kyle' | 'both';
+  subject: string;          // e.g. "Language Arts"
+  detail?: string;          // optional context
+};
+
+export type HomeschoolDay = {
+  weekday: 0 | 1 | 2 | 3 | 4 | 5 | 6;  // Sun..Sat
+  name: string;             // 'Monday'
+  theme: string;            // 'Montessori Monday' / 'Workout Wednesday'
+  blocks: HomeschoolBlock[];
+  notes?: string;
+};
+
+export const HOMESCHOOL_WEEK: HomeschoolDay[] = [
+  { weekday: 1, name: 'Monday', theme: 'Montessori Monday', blocks: [
+    { who: 'both', subject: 'Art / Projects', detail: 'Hands-on Montessori activity from this week\'s plan' },
+    { who: 'both', subject: 'Outdoor Play',   detail: 'Nature observation, gross motor, free movement' },
+    { who: 'both', subject: 'Reading',        detail: 'Independent + read-aloud time' },
+  ]},
+  { weekday: 2, name: 'Tuesday', theme: 'Core Subjects', blocks: [
+    { time: '8:00–8:30', who: 'marissa', subject: 'Language Arts' },
+    { time: '9:00–9:30', who: 'kyle',    subject: 'Language' },
+    { time: '9:15–9:45', who: 'marissa', subject: 'Math' },
+    { who: 'both', subject: 'Stretch / Yoga', detail: '10–15 min cool-down before lunch' },
+  ]},
+  { weekday: 3, name: 'Wednesday', theme: 'Workout Wednesday', blocks: [
+    { who: 'both', subject: 'Workout',  detail: '20–30 min movement (dance, walk, strength game)' },
+    { who: 'both', subject: 'Classwork', detail: 'FLVS lessons + any catch-up' },
+  ]},
+  { weekday: 4, name: 'Thursday', theme: 'Core Subjects', blocks: [
+    { time: '8:00–8:30', who: 'marissa', subject: 'Language Arts' },
+    { time: '9:00–9:30', who: 'kyle',    subject: 'Language' },
+    { time: '9:15–9:45', who: 'marissa', subject: 'Math' },
+  ]},
+  { weekday: 5, name: 'Friday', theme: 'Friday Wrap + Freeplay', blocks: [
+    { who: 'both', subject: 'Wrap Up', detail: 'All assignments completed' },
+    { who: 'both', subject: 'Tidy',    detail: 'Room is clean, dirty clothes put away' },
+    { who: 'both', subject: 'Submit',  detail: 'All quizzes & assignments submitted by 11:59 PM' },
+    { who: 'both', subject: '🎉 Freeplay Friday', detail: 'Once everything above is done — go enjoy it!' },
+  ]},
+];
+
+export function getHomeschoolDay(date: Date = new Date()): HomeschoolDay | null {
+  return HOMESCHOOL_WEEK.find((d) => d.weekday === date.getDay()) || null;
+}
+
+// ── SUMMER BREAK MODE ───────────────────────────────────────────────
+// Memorial Day weekend through start-of-school. Configurable per year.
+export const SUMMER_BREAK = {
+  start: '2026-05-22',  // Friday before Memorial Day 2026
+  end:   '2026-08-10',  // Estimated FLVS resume — adjust as needed
+};
+
+export function isSummerBreak(date: Date = new Date()): boolean {
+  const iso = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`;
+  return iso >= SUMMER_BREAK.start && iso <= SUMMER_BREAK.end;
+}
+
+// Summer activity suggestions — rotated weekly. Same format as homeschool
+// blocks but light, fun, child-led. No "subject" rigidity.
+export const SUMMER_WEEKLY_THEMES: { theme: string; ideas: { who: 'marissa' | 'kyle' | 'both'; activity: string }[] }[] = [
+  { theme: 'Beach + Bay Week', ideas: [
+    { who: 'both',    activity: 'Morning beach walk — collect 5 cool shells each' },
+    { who: 'marissa', activity: 'Film a sunset Reel for @alexusaura support content' },
+    { who: 'kyle',    activity: 'Practice writing names in the sand' },
+    { who: 'both',    activity: 'Family swim or paddleboard outing' },
+  ]},
+  { theme: 'Music Camp Week', ideas: [
+    { who: 'kyle',    activity: '15 min of guitar practice + 15 min of drums' },
+    { who: 'marissa', activity: 'Record a singing cover and post to TikTok' },
+    { who: 'both',    activity: 'Family jam session (Kyle on drums, Marissa singing)' },
+    { who: 'both',    activity: 'Listen to 3 new artists and pick a favorite song' },
+  ]},
+  { theme: 'Read-A-Thon Week', ideas: [
+    { who: 'marissa', activity: 'Finish one novel from the summer reading list' },
+    { who: 'kyle',    activity: '20 min daily reading — sight word books' },
+    { who: 'both',    activity: 'Visit the library — pick 3 books each' },
+    { who: 'both',    activity: 'Family read-aloud: pick one chapter book together' },
+  ]},
+  { theme: 'Maker Week', ideas: [
+    { who: 'both',    activity: 'Build something from a cardboard box' },
+    { who: 'marissa', activity: 'Edit a 60-sec video for socials with B-roll + text' },
+    { who: 'kyle',    activity: 'Draw a comic with 4 panels' },
+    { who: 'both',    activity: 'Bake cookies from scratch — Kyle measures, Marissa reads recipe' },
+  ]},
+  { theme: 'Money + Hustle Week', ideas: [
+    { who: 'marissa', activity: 'Plan a small thing to sell or a service to offer (lemonade stand, dog walking)' },
+    { who: 'kyle',    activity: 'Count coins and trade for a small treat' },
+    { who: 'both',    activity: 'Open a "summer savings jar" — track weekly progress' },
+  ]},
+  { theme: 'Adventure Week', ideas: [
+    { who: 'both',    activity: 'Pick one new place to visit this week (state park, farmers market, museum)' },
+    { who: 'marissa', activity: 'Plan the day: time, route, snacks list' },
+    { who: 'kyle',    activity: 'Bring a notebook and draw 3 things you saw' },
+  ]},
+];
+
+export function getSummerThemeForWeek(date: Date = new Date()) {
+  const target = new Date(date.valueOf());
+  const dayNr = (date.getDay() + 6) % 7;
+  target.setDate(target.getDate() - dayNr + 3);
+  const firstThursday = target.valueOf();
+  target.setMonth(0, 1);
+  if (target.getDay() !== 4) target.setMonth(0, 1 + ((4 - target.getDay()) + 7) % 7);
+  const week = 1 + Math.ceil((firstThursday - target.valueOf()) / 604800000);
+  return SUMMER_WEEKLY_THEMES[(week - 1 + SUMMER_WEEKLY_THEMES.length) % SUMMER_WEEKLY_THEMES.length];
+}
+
+export function getBlocksForChild(day: HomeschoolDay, who: 'marissa' | 'kyle'): HomeschoolBlock[] {
+  return day.blocks.filter((b) => !b.who || b.who === who || b.who === 'both');
+}
+
+// ── MONTESSORI MONDAY WEEKLY ACTIVITIES ─────────────────────────────
+// 12 weekly themes that rotate by ISO week. Each theme has age-tailored
+// activities for both kids — Montessori lean: hands-on, sensorial,
+// child-led, real materials, no screens.
+
+export type MontessoriPlan = {
+  theme: string;                // e.g. "Botany Week"
+  bigIdea: string;              // 1-line learning objective
+  marissaActivities: string[];  // 3-5 things Marissa can do
+  kyleActivities: string[];     // 3-5 things Kyle can do
+  jointActivity: string;        // one shared thing they do together
+  supplies: string[];           // simple list of stuff to gather
+};
+
+export const MONTESSORI_PLANS: MontessoriPlan[] = [
+  {
+    theme: 'Botany Week — Parts of a Plant',
+    bigIdea: 'Plants are living systems with parts that each do a job (root, stem, leaf, flower).',
+    marissaActivities: [
+      'Dissect a real flower; sketch each part with labels',
+      'Plant 3 bean seeds in clear cups — track growth daily for 2 weeks',
+      'Read about photosynthesis & write one paragraph in your own words',
+      'Make a leaf-rubbing collage using crayons + 5 different leaves',
+    ],
+    kyleActivities: [
+      'Sort a tray of leaves by size, then by color',
+      'Match real plant parts to a printed plant diagram',
+      'Plant a bean seed and water it daily',
+      'Trace and color the word "PLANT" then "ROOT" "STEM" "LEAF"',
+    ],
+    jointActivity: 'Take a 30-min nature walk and collect 5 different leaves each. Compare back home.',
+    supplies: ['flower (any kind)', 'magnifying glass', 'clear cups', 'soil', 'bean seeds', 'leaves', 'crayons', 'paper'],
+  },
+  {
+    theme: 'Number Sense — Counting in Real Life',
+    bigIdea: 'Numbers describe things we can see and touch. Counting is the foundation of math.',
+    marissaActivities: [
+      'Skip-count practice: 2s, 5s, 10s up to 200 — race the clock',
+      'Open a "store" with priced items; do change-making with real coins',
+      'Multiplication facts 6× and 7× tables — flashcard sprint',
+      'Find 5 fractions in the kitchen (1/2 cup, 1/4 tsp, etc.) and write them down',
+    ],
+    kyleActivities: [
+      'Count groups of 1-20 objects (Cheerios, blocks, pebbles)',
+      'Place number cards 1-20 in order on the floor',
+      'Do "number hunt": find one of each numeral 0-9 around the house',
+      'Roll dice and add the dots together (start with 2 dice, then 3)',
+    ],
+    jointActivity: 'Bake muffins together — Marissa measures, Kyle counts paper liners.',
+    supplies: ['real coins', 'flashcards', 'small objects to count', 'dice', 'measuring spoons'],
+  },
+  {
+    theme: 'Geography — Continents & Maps',
+    bigIdea: 'Earth has 7 continents and 5 oceans. Where things ARE shapes how people live.',
+    marissaActivities: [
+      'Label all 7 continents and 5 oceans on a blank world map',
+      'Pick one continent — write 5 facts and find one country flag from it',
+      'Use Google Earth (with parent) to "fly" to 3 famous landmarks',
+      'Make a passport: list 5 countries you want to visit + one reason each',
+    ],
+    kyleActivities: [
+      'Color the continents in a printed world map (each one a different color)',
+      'Sing the continents song until you can name all 7 from memory',
+      'Match animal cards to the continent they live on (kangaroo → Australia, etc.)',
+      'Trace and color the word "EARTH"',
+    ],
+    jointActivity: 'Globe + sticky notes: place 5 sticky notes on places family has been or wants to visit.',
+    supplies: ['blank world map printout', 'globe', 'sticky notes', 'crayons', 'animal pictures'],
+  },
+  {
+    theme: 'Practical Life — Real Skills',
+    bigIdea: 'Doing real things with real tools builds confidence and capability.',
+    marissaActivities: [
+      'Cook a full breakfast for the family from scratch',
+      'Hand-wash 3 dishes — water temp, soap order, drying rack',
+      'Sew a simple button onto fabric',
+      'Write a thank-you note to someone (real card, real stamp)',
+    ],
+    kyleActivities: [
+      'Pour water from pitcher to cup — 5 times without spilling',
+      'Use child-safe scissors to cut along a curved line',
+      'Sort silverware into the drawer (forks, spoons, knives)',
+      'Tie shoes (or velcro practice) until you get it 3x in a row',
+    ],
+    jointActivity: 'Plan and pack a picnic together — list, gather, fold, carry.',
+    supplies: ['breakfast ingredients', 'safe knife', 'needle + thread + button + scrap fabric', 'card + stamp', 'pitcher'],
+  },
+  {
+    theme: 'Sensory Week — 5 Senses',
+    bigIdea: 'We learn about the world through 5 senses. Tuning each one in is a superpower.',
+    marissaActivities: [
+      'Blindfold taste test: identify 5 foods by taste alone',
+      'Sound walk: sit outside 10 min, list every sound you hear',
+      'Texture sort: 10 objects sorted by rough/smooth/soft/hard',
+      'Mindfulness journal: 5-4-3-2-1 grounding (5 see, 4 hear, 3 touch, 2 smell, 1 taste)',
+    ],
+    kyleActivities: [
+      'Mystery bag: feel objects and guess what each one is',
+      'Smell jars: match scents (cinnamon, lemon, mint, vanilla, lavender)',
+      'Color hunt: find one thing in the house for each rainbow color',
+      'Quiet time: lie down 5 min and just LISTEN',
+    ],
+    jointActivity: 'Make smoothies — pick fruits by smell, taste-test each variation.',
+    supplies: ['blindfold', 'small foods', 'mystery bag with objects', 'smell jars', 'fruit'],
+  },
+  {
+    theme: 'Music + Sound',
+    bigIdea: 'Music = vibrations + patterns. Anyone can make music with anything.',
+    marissaActivities: [
+      'Practice singing scales (do-re-mi) with proper breathing for 10 min',
+      'Learn the chorus of one new song and record yourself',
+      'Identify 5 instruments by sound from a YouTube playlist',
+      'Beat-tap along to one song in 4/4 — count and clap',
+    ],
+    kyleActivities: [
+      'Play drums on pillows / pots / table — find a steady "boom-tap-boom-tap"',
+      'Try one chord on the guitar (with parent help) — strum 10 times',
+      'Listen to 3 songs and pick which one is fastest, slowest, in between',
+      'Make a playlist of 5 favorite songs',
+    ],
+    jointActivity: 'Family jam session — each pick an instrument or pot, jam for 5 minutes.',
+    supplies: ['guitar', 'pots / drums', 'speaker / phone for music'],
+  },
+  {
+    theme: 'Animals & Habitats',
+    bigIdea: 'Every animal has a home that fits its needs. Habitats are matched to bodies.',
+    marissaActivities: [
+      'Pick one animal — write a habitat profile: where, what eats, what eats it, how it survives',
+      'Compare 3 animals in 3 different habitats (desert, ocean, rainforest)',
+      'Watch 1 nature documentary clip and take 5 notes',
+      'Draw a food chain: sun → plant → herbivore → carnivore',
+    ],
+    kyleActivities: [
+      'Sort animal cards by where they live (water / land / sky)',
+      'Match baby animals to mom animals (calf → cow, joey → kangaroo)',
+      'Pretend-play: act out being 3 different animals',
+      'Trace + color the word "ANIMAL"',
+    ],
+    jointActivity: 'Visit a real backyard / park — find and ID 3 living creatures (bug, bird, lizard).',
+    supplies: ['animal cards / pictures', 'paper + crayons'],
+  },
+  {
+    theme: 'Color, Light, & Art',
+    bigIdea: 'All the colors come from light. Art is how we play with what we see.',
+    marissaActivities: [
+      'Color theory: paint a color wheel — primary, secondary, complementary',
+      'Take 10 photos of the same object in different lighting',
+      'Draw something using ONLY shades of one color (monochrome)',
+      'Watercolor a sunset using wet-on-wet technique',
+    ],
+    kyleActivities: [
+      'Mix 2 primary colors in a tray — name what you made (red+blue=purple)',
+      'Sort crayons by color family (warm vs cool)',
+      'Finger-paint a rainbow in correct order (ROYGBIV)',
+      'Find 5 things in the house for each color',
+    ],
+    jointActivity: 'Paint a single canvas together — each does half. Hang it up.',
+    supplies: ['paints', 'paper', 'water cups', 'crayons', 'canvas'],
+  },
+];
+
+export function getMontessoriPlan(date: Date = new Date()): MontessoriPlan {
+  const target = new Date(date.valueOf());
+  const dayNr = (date.getDay() + 6) % 7;
+  target.setDate(target.getDate() - dayNr + 3);
+  const firstThursday = target.valueOf();
+  target.setMonth(0, 1);
+  if (target.getDay() !== 4) target.setMonth(0, 1 + ((4 - target.getDay()) + 7) % 7);
+  const week = 1 + Math.ceil((firstThursday - target.valueOf()) / 604800000);
+  return MONTESSORI_PLANS[(week - 1 + MONTESSORI_PLANS.length) % MONTESSORI_PLANS.length];
+}
+
 export function getWeeklyWordsForKid(date: Date = new Date()): WeeklyWords {
   const target = new Date(date.valueOf());
   const dayNr = (date.getDay() + 6) % 7;

@@ -22,6 +22,10 @@ import {
   getAgentsForStudent,
   getWeeklyLesson,
   getWeeklyWordsForKid,
+  getHomeschoolDay,
+  getBlocksForChild,
+  isSummerBreak,
+  getSummerThemeForWeek,
   type Student,
 } from '@/lib/students';
 import { isMNAStaff } from '@/lib/staff';
@@ -303,6 +307,88 @@ export default function StudentPortal() {
             </button>
           )}
         </div>
+
+        {/* ── SUMMER BREAK BANNER ── */}
+        {isSummerBreak() && (() => {
+          const summer = getSummerThemeForWeek();
+          const who: 'marissa' | 'kyle' | null =
+            student.email === 'marissa@mothernatureagency.com' ? 'marissa' :
+            student.email === 'kyle@mothernatureagency.com' ? 'kyle' : null;
+          const ideas = who ? summer.ideas.filter((i) => i.who === who || i.who === 'both') : summer.ideas;
+          return (
+            <div className="rounded-2xl p-5 relative overflow-hidden"
+                 style={{ background: 'linear-gradient(135deg, rgba(249,115,22,0.18), rgba(250,204,21,0.12))', border: '1px solid rgba(250,204,21,0.4)' }}>
+              <div className="flex items-start gap-4 flex-wrap">
+                <div className="w-12 h-12 rounded-xl flex items-center justify-center shrink-0"
+                     style={{ background: 'linear-gradient(135deg,#f97316,#facc15)' }}>
+                  <span className="material-symbols-outlined text-white" style={{ fontSize: 26 }}>wb_sunny</span>
+                </div>
+                <div className="flex-1 min-w-0">
+                  <div className="text-[10px] uppercase tracking-[0.15em] font-bold text-amber-300">
+                    Summer Break · {summer.theme}
+                  </div>
+                  <div className="text-[18px] font-extrabold mt-0.5">School's out — let's play!</div>
+                  <ul className="space-y-1.5 mt-3">
+                    {ideas.map((i, idx) => (
+                      <li key={idx} className="flex items-start gap-2 text-[12px] text-white/85">
+                        <span className="text-[14px] leading-none mt-0.5 text-amber-300">•</span>
+                        <span>{i.activity}</span>
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              </div>
+            </div>
+          );
+        })()}
+
+        {/* ── TODAY'S HOMESCHOOL PLAN ── (hidden during summer) */}
+        {!isSummerBreak() && (() => {
+          const day = getHomeschoolDay();
+          if (!day) return null;
+          const who: 'marissa' | 'kyle' | null =
+            student.email === 'marissa@mothernatureagency.com' ? 'marissa' :
+            student.email === 'kyle@mothernatureagency.com' ? 'kyle' : null;
+          if (!who) return null;
+          const blocks = getBlocksForChild(day, who);
+          return (
+            <div className="rounded-2xl p-5 relative overflow-hidden"
+                 style={{ background: 'rgba(255,255,255,0.06)', border: `1px solid ${theme.chipBorder}` }}>
+              <div className="absolute top-0 left-0 right-0 h-1"
+                   style={{ background: `linear-gradient(90deg,${theme.gradientFrom},${theme.gradientTo})` }} />
+              <div className="flex items-center justify-between mb-3 flex-wrap gap-2">
+                <div>
+                  <div className="text-[10px] uppercase tracking-[0.15em] font-bold" style={{ color: theme.accent }}>
+                    Today · {day.theme}
+                  </div>
+                  <div className="text-[18px] font-extrabold mt-0.5">{day.name}'s Schedule</div>
+                </div>
+                <Link href="/student/week" className="text-[11px] font-bold px-3 py-1.5 rounded-lg text-white"
+                      style={{ background: `linear-gradient(135deg,${theme.gradientFrom},${theme.gradientTo})` }}>
+                  Full Week →
+                </Link>
+              </div>
+              {blocks.length === 0 ? (
+                <div className="text-[12px] text-white/55 text-center py-4">Nothing on the schedule today — enjoy!</div>
+              ) : (
+                <ul className="space-y-2">
+                  {blocks.map((b, i) => (
+                    <li key={i} className="flex items-start gap-3 rounded-xl px-3 py-2.5"
+                        style={{ background: 'rgba(255,255,255,0.05)' }}>
+                      {b.time && (
+                        <div className="text-[11px] font-bold w-24 shrink-0" style={{ color: theme.accent }}>{b.time}</div>
+                      )}
+                      <div className="flex-1 min-w-0">
+                        <div className="text-[13px] font-bold">{b.subject}</div>
+                        {b.detail && <div className="text-[11px] text-white/65 mt-0.5">{b.detail}</div>}
+                      </div>
+                    </li>
+                  ))}
+                </ul>
+              )}
+            </div>
+          );
+        })()}
 
         {/* ── WEEKLY LESSON / WORDS ── */}
         {student.email === 'kyle@mothernatureagency.com' ? (

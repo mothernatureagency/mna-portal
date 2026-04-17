@@ -45,6 +45,7 @@ const NAV = [
     { label: 'Client View', href: '/client', e: 'swap_horiz' },
     { label: 'Contractor View', href: '/contractor', e: 'engineering' },
     { label: 'Student View', href: '/student', e: 'school' },
+    { label: 'Creator Studio', href: '/creator', e: 'movie' },
   ]},
 ];
 
