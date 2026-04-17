@@ -193,12 +193,36 @@ export function sanitizeForSpeech(input: string): string {
 }
 
 /**
- * Speak a string out loud. Cancels any queued utterance first.
- * Automatically strips asterisks, emojis, and markdown so the voice
- * doesn't read "asterisk asterisk bold asterisk asterisk".
- * Defaults tuned for a calm feminine read.
+ * Pick a native voice for a BCP-47 lang prefix ('es', 'vi', etc.).
+ * Returns undefined when no matching voice is installed.
  */
-export function speak(text: string, opts?: { rate?: number; pitch?: number; voiceName?: string }) {
+function pickLangVoice(voices: SpeechSynthesisVoice[], lang: string): SpeechSynthesisVoice | undefined {
+  if (!voices.length || !lang) return undefined;
+  const prefix = lang.toLowerCase().split('-')[0];
+  const matches = voices.filter((v) => v.lang.toLowerCase().startsWith(prefix));
+  if (!matches.length) return undefined;
+  // Prefer female voices in that language.
+  const female = matches.find(
+    (v) => /female|woman|paulina|monica|isabela|catalina|marisol|esperanza|sofia|gabriela|linh|huong|hoai|ngoc/i.test(v.name),
+  );
+  return female || matches[0];
+}
+
+/**
+ * Speak a string out loud. Cancels any queued utterance first.
+ * Automatically strips asterisks, emojis, markdown, and parens so the
+ * voice doesn't read pronunciation hints out loud.
+ *
+ * Pass `lang` (e.g. 'es-ES', 'vi-VN') to use a native speaker of that
+ * language — used by the Spanish + Vietnamese tutors so words sound
+ * authentic. Without `lang`, falls back to the Mother Nature picker so
+ * every other agent shares one consistent voice.
+ *
+ * Also dispatches `mn-speech-start` and `mn-speech-end` window events so
+ * the floating globe (JarvisFab) can animate in sync with any audio that
+ * plays anywhere in the app.
+ */
+export function speak(text: string, opts?: { rate?: number; pitch?: number; voiceName?: string; lang?: string }) {
   if (typeof window === 'undefined' || !('speechSynthesis' in window)) return;
   const clean = sanitizeForSpeech(text);
   if (!clean) return;
@@ -208,14 +232,34 @@ export function speak(text: string, opts?: { rate?: number; pitch?: number; voic
   u.rate = opts?.rate ?? 1.0;
   u.pitch = opts?.pitch ?? 1.0;
   u.volume = 1;
+  if (opts?.lang) u.lang = opts.lang;
+
+  function pickVoice(list: SpeechSynthesisVoice[]) {
+    if (opts?.voiceName) {
+      const named = list.find((v) => v.name === opts.voiceName);
+      if (named) return named;
+    }
+    if (opts?.lang) {
+      const langVoice = pickLangVoice(list, opts.lang);
+      if (langVoice) return langVoice;
+    }
+    return pickMotherNatureVoice(list);
+  }
+
+  // Animation hooks — let the globe (or any other listener) react.
+  u.onstart = () => {
+    try { window.dispatchEvent(new CustomEvent('mn-speech-start', { detail: { text: clean } })); } catch {}
+  };
+  u.onend = u.onerror = () => {
+    try { window.dispatchEvent(new CustomEvent('mn-speech-end')); } catch {}
+  };
+
   const voices = synth.getVoices();
-  const override = opts?.voiceName ? voices.find((v) => v.name === opts.voiceName) : undefined;
-  const voice = override || pickMotherNatureVoice(voices);
+  const voice = pickVoice(voices);
   if (voice) u.voice = voice;
-  // Some browsers load voices asynchronously — retry once if the list was empty.
   if (!voices.length) {
     synth.onvoiceschanged = () => {
-      const later = pickMotherNatureVoice(synth.getVoices());
+      const later = pickVoice(synth.getVoices());
       if (later) u.voice = later;
       synth.speak(u);
       synth.onvoiceschanged = null;

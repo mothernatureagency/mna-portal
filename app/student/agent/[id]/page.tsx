@@ -66,9 +66,10 @@ export default function StudentAgentChat() {
       const displayed = sanitizeForDisplay(data.reply);
       setMessages((m) => [...m, { role: 'assistant', content: displayed }]);
       if (voiceOn && data.reply) {
-        // Slightly higher pitch + a touch faster reads as warm and friendly
-        // for an 11-year-old (vs the slower, flatter staff voice).
-        speak(data.reply, { rate: 1.0, pitch: 1.1 });
+        // Use the same Mother Nature voice as the floating assistant for
+        // every tutor — except language tutors (es / vi) which switch to
+        // a native voice so the words sound authentic.
+        speak(data.reply, agent!.voiceLang ? { lang: agent!.voiceLang } : undefined);
       }
       voicePendingRef.current = false;
     } catch (e: any) {
