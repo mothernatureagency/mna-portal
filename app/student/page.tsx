@@ -33,6 +33,16 @@ type SchedEv = {
   event_type: string;
 };
 
+type StudentTask = {
+  id: string;
+  title: string;
+  description: string | null;
+  status: string;
+  client_id: string;
+  created_at: string;
+  completed_at: string | null;
+};
+
 const FRIENDLY_LINES = [
   'You\'re going to crush today.',
   'Small steps, big wins.',
@@ -50,7 +60,9 @@ export default function StudentPortal() {
   const [student, setStudent] = useState<Student | null>(null);
   const [previewMode, setPreviewMode] = useState(false);
   const [events, setEvents] = useState<SchedEv[]>([]);
+  const [tasks, setTasks] = useState<StudentTask[]>([]);
   const [loading, setLoading] = useState(true);
+  const [calMonthOffset, setCalMonthOffset] = useState(0);
 
   useEffect(() => {
     (async () => {
@@ -60,25 +72,39 @@ export default function StudentPortal() {
       setEmail(userEmail);
 
       const s = getStudentByEmail(userEmail);
+      // Use the student's email for fetches (or first student's email in staff preview)
+      const fetchEmail = s?.email || (isMNAStaff(userEmail) ? STUDENTS[0]?.email : '') || '';
       if (!s && isMNAStaff(userEmail)) {
-        // Staff preview — show the first student's portal
         setPreviewMode(true);
         setStudent(STUDENTS[0] || null);
-        setLoading(false);
-        return;
+      } else {
+        setStudent(s);
       }
-      setStudent(s);
-      if (!s) { setLoading(false); return; }
+      if (!s && !isMNAStaff(userEmail)) { setLoading(false); return; }
 
       const todayStr = new Date().toISOString().slice(0, 10);
-      const futureStr = new Date(Date.now() + 7 * 86400000).toISOString().slice(0, 10);
-      fetch(`/api/schedule?email=${encodeURIComponent(userEmail)}&from=${todayStr}&to=${futureStr}`)
-        .then((r) => r.json())
-        .then((d) => setEvents(d.events || []))
-        .catch(() => {});
+      const futureStr = new Date(Date.now() + 35 * 86400000).toISOString().slice(0, 10);
+
+      await Promise.all([
+        fetch(`/api/schedule?email=${encodeURIComponent(fetchEmail)}&from=${todayStr}&to=${futureStr}`)
+          .then((r) => r.json()).then((d) => setEvents(d.events || [])).catch(() => {}),
+        fetch(`/api/client-requests?assignedTo=${encodeURIComponent(fetchEmail)}`)
+          .then((r) => r.json()).then((d) => setTasks(d.requests || d.items || [])).catch(() => {}),
+      ]);
       setLoading(false);
     })();
   }, []);
+
+  // Toggle a task complete/open
+  async function toggleTask(t: StudentTask) {
+    const next = t.status === 'completed' ? 'open' : 'completed';
+    await fetch('/api/client-requests', {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ id: t.id, status: next }),
+    }).catch(() => {});
+    setTasks((prev) => prev.map((x) => (x.id === t.id ? { ...x, status: next, completed_at: next === 'completed' ? new Date().toISOString() : null } : x)));
+  }
 
   if (loading) {
     return (
@@ -208,23 +234,155 @@ export default function StudentPortal() {
           </div>
         </div>
 
-        {/* ── THIS WEEK ── */}
+        {/* ── MY TASKS ── */}
         <div className="glass-card p-5">
-          <div className="text-[14px] font-bold mb-3">This Week</div>
-          {events.length === 0 ? (
+          <div className="flex items-center justify-between mb-3">
+            <div>
+              <div className="text-[14px] font-bold">My Tasks</div>
+              <div className="text-[11px] text-white/60">{tasks.filter((t) => t.status !== 'completed').length} to do</div>
+            </div>
+          </div>
+          {tasks.length === 0 ? (
             <div className="text-[12px] text-white/60 text-center py-6">
-              No events scheduled — that's a clean slate to learn something new.
+              No tasks yet. When Mom assigns you something, it shows up here.
             </div>
           ) : (
             <ul className="space-y-2">
-              {events.slice(0, 8).map((e) => (
-                <li key={e.id} className="flex items-center gap-3 rounded-xl px-3 py-2.5" style={{ background: 'rgba(255,255,255,0.05)' }}>
-                  <div className="text-[11px] text-white/65 w-24 shrink-0 font-semibold">{fmtDate(e.event_date)}</div>
-                  <div className="text-[11px] text-white/65 w-28 shrink-0">{e.start_time || 'all day'}{e.end_time ? `–${e.end_time}` : ''}</div>
-                  <div className="text-sm font-semibold flex-1 truncate">{e.title}</div>
-                </li>
-              ))}
+              {tasks.slice(0, 12).map((t) => {
+                const done = t.status === 'completed';
+                return (
+                  <li
+                    key={t.id}
+                    className="flex items-start gap-3 rounded-xl px-3 py-2.5"
+                    style={{ background: 'rgba(255,255,255,0.05)', opacity: done ? 0.55 : 1 }}
+                  >
+                    <button
+                      type="button"
+                      onClick={() => toggleTask(t)}
+                      className="mt-0.5 w-5 h-5 rounded-md flex items-center justify-center shrink-0 transition"
+                      style={{
+                        background: done ? `linear-gradient(135deg,${theme.gradientFrom},${theme.gradientTo})` : 'rgba(255,255,255,0.08)',
+                        border: `1px solid ${done ? theme.gradientTo : 'rgba(255,255,255,0.25)'}`,
+                      }}
+                      aria-label={done ? 'Mark as not done' : 'Mark as done'}
+                    >
+                      {done && <span className="material-symbols-outlined text-white" style={{ fontSize: 14 }}>check</span>}
+                    </button>
+                    <div className="flex-1 min-w-0">
+                      <div className={`text-[13px] font-semibold ${done ? 'line-through text-white/55' : 'text-white'}`}>{t.title}</div>
+                      {t.description && <div className="text-[11px] text-white/55 mt-0.5">{t.description}</div>}
+                    </div>
+                  </li>
+                );
+              })}
             </ul>
+          )}
+        </div>
+
+        {/* ── MONTHLY CALENDAR ── */}
+        <div className="glass-card p-5">
+          <div className="flex items-center justify-between mb-4">
+            <div className="flex items-center gap-2">
+              <button
+                onClick={() => setCalMonthOffset((o) => o - 1)}
+                className="w-8 h-8 rounded-lg bg-white/10 hover:bg-white/20 flex items-center justify-center text-white/75"
+              >
+                <span className="material-symbols-outlined" style={{ fontSize: 18 }}>chevron_left</span>
+              </button>
+              <div className="text-[14px] font-bold min-w-[140px] text-center">
+                {(() => {
+                  const d = new Date();
+                  d.setDate(1);
+                  d.setMonth(d.getMonth() + calMonthOffset);
+                  return d.toLocaleDateString(undefined, { month: 'long', year: 'numeric' });
+                })()}
+              </div>
+              <button
+                onClick={() => setCalMonthOffset((o) => o + 1)}
+                className="w-8 h-8 rounded-lg bg-white/10 hover:bg-white/20 flex items-center justify-center text-white/75"
+              >
+                <span className="material-symbols-outlined" style={{ fontSize: 18 }}>chevron_right</span>
+              </button>
+              {calMonthOffset !== 0 && (
+                <button onClick={() => setCalMonthOffset(0)} className="text-[10px] font-semibold text-white/55 hover:text-white/85 ml-1">
+                  Today
+                </button>
+              )}
+            </div>
+          </div>
+
+          {/* Calendar grid */}
+          {(() => {
+            const today = new Date();
+            const view = new Date(today.getFullYear(), today.getMonth() + calMonthOffset, 1);
+            const firstDow = view.getDay();
+            const daysInMonth = new Date(view.getFullYear(), view.getMonth() + 1, 0).getDate();
+            const cells: { day: number | null; iso: string | null }[] = [];
+            for (let i = 0; i < firstDow; i++) cells.push({ day: null, iso: null });
+            for (let d = 1; d <= daysInMonth; d++) {
+              const iso = `${view.getFullYear()}-${String(view.getMonth() + 1).padStart(2, '0')}-${String(d).padStart(2, '0')}`;
+              cells.push({ day: d, iso });
+            }
+            while (cells.length % 7 !== 0) cells.push({ day: null, iso: null });
+            const todayIso = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}-${String(today.getDate()).padStart(2, '0')}`;
+            const eventsByDay = events.reduce<Record<string, SchedEv[]>>((acc, e) => {
+              (acc[e.event_date] ||= []).push(e); return acc;
+            }, {});
+            return (
+              <>
+                <div className="grid grid-cols-7 gap-1 mb-1">
+                  {['S', 'M', 'T', 'W', 'T', 'F', 'S'].map((d, i) => (
+                    <div key={i} className="text-[10px] font-bold uppercase tracking-wider text-white/45 text-center">{d}</div>
+                  ))}
+                </div>
+                <div className="grid grid-cols-7 gap-1">
+                  {cells.map((c, i) => {
+                    if (!c.day) return <div key={i} className="aspect-square rounded-md" style={{ background: 'rgba(255,255,255,0.02)' }} />;
+                    const dayEvents = c.iso ? eventsByDay[c.iso] || [] : [];
+                    const isToday = c.iso === todayIso;
+                    return (
+                      <div
+                        key={i}
+                        className="aspect-square rounded-md p-1.5 flex flex-col gap-0.5 overflow-hidden"
+                        style={{
+                          background: isToday ? `linear-gradient(135deg,${theme.gradientFrom}33,${theme.gradientTo}22)` : 'rgba(255,255,255,0.04)',
+                          border: isToday ? `1px solid ${theme.gradientTo}` : '1px solid rgba(255,255,255,0.06)',
+                        }}
+                      >
+                        <div className={`text-[10px] font-bold ${isToday ? 'text-white' : 'text-white/65'}`}>{c.day}</div>
+                        {dayEvents.slice(0, 2).map((ev) => (
+                          <div
+                            key={ev.id}
+                            className="text-[8px] leading-tight px-1 py-0.5 rounded truncate"
+                            style={{ background: theme.chipBg, color: theme.accent }}
+                            title={ev.title}
+                          >
+                            {ev.title}
+                          </div>
+                        ))}
+                        {dayEvents.length > 2 && <div className="text-[7px] text-white/45">+{dayEvents.length - 2}</div>}
+                      </div>
+                    );
+                  })}
+                </div>
+              </>
+            );
+          })()}
+
+          {/* Upcoming list under the grid */}
+          {events.length > 0 && (
+            <div className="mt-5">
+              <div className="text-[10px] font-bold uppercase tracking-wider text-white/55 mb-2">Coming Up</div>
+              <ul className="space-y-2">
+                {events.slice(0, 6).map((e) => (
+                  <li key={e.id} className="flex items-center gap-3 rounded-xl px-3 py-2" style={{ background: 'rgba(255,255,255,0.04)' }}>
+                    <div className="text-[11px] text-white/65 w-24 shrink-0 font-semibold">{fmtDate(e.event_date)}</div>
+                    <div className="text-[11px] text-white/65 w-24 shrink-0">{e.start_time || 'all day'}</div>
+                    <div className="text-sm font-semibold flex-1 truncate">{e.title}</div>
+                  </li>
+                ))}
+              </ul>
+            </div>
           )}
         </div>
 
