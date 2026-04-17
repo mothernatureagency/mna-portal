@@ -9,6 +9,7 @@ import { isMNAStaff } from '@/lib/staff';
 import { VoiceButton } from '@/components/ai/VoiceButton';
 import { speak, cancelSpeak, sanitizeForDisplay } from '@/lib/voice';
 import JarvisFab from '@/components/ai/JarvisFab';
+import { uid, type Flashcard, type MemoryItem } from '@/lib/student-memory';
 
 type Msg = { role: 'user' | 'assistant'; content: string };
 
@@ -22,6 +23,74 @@ export default function StudentAgentChat() {
   const [voiceOn, setVoiceOn] = useState(true);   // auto-speak tutor replies (on by default for kids)
   const voicePendingRef = useRef(false);          // did Marissa ask by voice?
   const scrollRef = useRef<HTMLDivElement>(null);
+  const [savedToast, setSavedToast] = useState<string>('');
+
+  // ── Persistence helpers (all keyed off the student's email) ──
+  async function saveKV(key: string, value: any) {
+    if (!student?.email) return;
+    await fetch('/api/client-kv', {
+      method: 'PUT', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ clientId: student.email, key, value }),
+    }).catch(() => {});
+  }
+  async function loadKV<T = any>(key: string): Promise<T[]> {
+    if (!student?.email) return [];
+    try {
+      const r = await fetch(`/api/client-kv?clientId=${encodeURIComponent(student.email)}&key=${key}`);
+      const d = await r.json();
+      return Array.isArray(d.value) ? d.value : [];
+    } catch { return []; }
+  }
+
+  function flashToast(msg: string) {
+    setSavedToast(msg);
+    setTimeout(() => setSavedToast(''), 2500);
+  }
+
+  async function saveAsFlashcard(text: string) {
+    flashToast('Making a flashcard…');
+    try {
+      const r = await fetch('/api/student-memory/extract-card', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ text, subject: agent?.role || 'General' }),
+      });
+      const data = await r.json();
+      if (!data.question || !data.answer) {
+        flashToast('Couldn\'t make a card from that — try a different reply.');
+        return;
+      }
+      const card: Flashcard = {
+        id: uid(),
+        question: data.question,
+        answer: data.answer,
+        subject: data.subject || agent?.role || 'General',
+        source: agent?.id,
+        reviewedCount: 0,
+        knownCount: 0,
+        createdAt: new Date().toISOString(),
+      };
+      const existing = await loadKV<Flashcard>('flashcards');
+      await saveKV('flashcards', [card, ...existing]);
+      flashToast(`✓ Saved flashcard (${existing.length + 1} total)`);
+    } catch {
+      flashToast('Couldn\'t save that card.');
+    }
+  }
+
+  async function saveToMemory(text: string) {
+    const item: MemoryItem = {
+      id: uid(),
+      title: text.slice(0, 60).trim() + (text.length > 60 ? '…' : ''),
+      body: text,
+      subject: agent?.role,
+      source: agent?.id,
+      tags: [],
+      createdAt: new Date().toISOString(),
+    };
+    const existing = await loadKV<MemoryItem>('memory');
+    await saveKV('memory', [item, ...existing]);
+    flashToast(`✓ Saved to memory (${existing.length + 1} total)`);
+  }
 
   useEffect(() => {
     (async () => {
@@ -90,6 +159,15 @@ export default function StudentAgentChat() {
     <div className="min-h-screen text-white flex flex-col relative" style={{ background: theme.bgGradient, backgroundAttachment: 'fixed' }}>
       {/* Mother Nature floating globe — available on every tutor page */}
       <JarvisFab />
+      {/* Save toast */}
+      {savedToast && (
+        <div
+          className="fixed top-6 left-1/2 -translate-x-1/2 z-50 px-4 py-2 rounded-xl text-white text-[12px] font-semibold shadow-2xl"
+          style={{ background: `linear-gradient(135deg,${theme.gradientFrom},${theme.gradientTo})` }}
+        >
+          {savedToast}
+        </div>
+      )}
       <div className="max-w-[820px] w-full mx-auto px-4 md:px-6 py-5 flex flex-col flex-1 gap-4">
 
         {/* ── Header ── */}
@@ -156,18 +234,39 @@ export default function StudentAgentChat() {
               </div>
             )}
             {messages.map((m, i) => (
-              <div
-                key={i}
-                className={`rounded-2xl px-4 py-2.5 max-w-[85%] text-[13px] whitespace-pre-wrap leading-relaxed ${
-                  m.role === 'user' ? 'self-end text-white' : 'self-start text-white/95'
-                }`}
-                style={
-                  m.role === 'user'
-                    ? { background: `linear-gradient(135deg,${theme.gradientFrom},${theme.gradientTo})` }
-                    : { background: 'rgba(255,255,255,0.08)', border: '1px solid rgba(255,255,255,0.1)' }
-                }
-              >
-                {m.content}
+              <div key={i} className={`flex flex-col ${m.role === 'user' ? 'items-end' : 'items-start'} max-w-[85%] ${m.role === 'user' ? 'self-end' : 'self-start'}`}>
+                <div
+                  className={`rounded-2xl px-4 py-2.5 text-[13px] whitespace-pre-wrap leading-relaxed ${
+                    m.role === 'user' ? 'text-white' : 'text-white/95'
+                  }`}
+                  style={
+                    m.role === 'user'
+                      ? { background: `linear-gradient(135deg,${theme.gradientFrom},${theme.gradientTo})` }
+                      : { background: 'rgba(255,255,255,0.08)', border: '1px solid rgba(255,255,255,0.1)' }
+                  }
+                >
+                  {m.content}
+                </div>
+                {m.role === 'assistant' && (
+                  <div className="flex items-center gap-2 mt-1.5">
+                    <button
+                      onClick={() => saveAsFlashcard(m.content)}
+                      className="text-[10px] font-bold px-2 py-1 rounded-md text-white/80 hover:text-white"
+                      style={{ background: 'rgba(255,255,255,0.07)', border: `1px solid ${theme.chipBorder}` }}
+                    >
+                      <span className="material-symbols-outlined align-middle mr-1" style={{ fontSize: 12 }}>style</span>
+                      Save as Flashcard
+                    </button>
+                    <button
+                      onClick={() => saveToMemory(m.content)}
+                      className="text-[10px] font-bold px-2 py-1 rounded-md text-white/80 hover:text-white"
+                      style={{ background: 'rgba(255,255,255,0.07)', border: `1px solid ${theme.chipBorder}` }}
+                    >
+                      <span className="material-symbols-outlined align-middle mr-1" style={{ fontSize: 12 }}>bookmark_add</span>
+                      Save to Memory
+                    </button>
+                  </div>
+                )}
               </div>
             ))}
             {loading && (

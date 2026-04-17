@@ -140,6 +140,7 @@ export default function ContractorDashboard() {
   const [supplyDraft, setSupplyDraft] = useState<{ name: string; quantity: number; unit: string; vendor: string; estimatedUnitPrice: number; status: SupplyStatus }>({
     name: '', quantity: 1, unit: 'ea', vendor: '', estimatedUnitPrice: 0, status: 'needed',
   });
+  const [estimating, setEstimating] = useState(false);
 
   // ── Load ────────────────────────────────────────────────────────
   useEffect(() => {
@@ -214,6 +215,29 @@ export default function ContractorDashboard() {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ clientId: email, key: 'supplies', value: next }),
     });
+  }
+
+  // Hit the Sourcer agent for a quick price estimate based on the item +
+  // service area. Auto-fills the est. unit price field.
+  async function estimateCost() {
+    if (!supplyDraft.name.trim()) return;
+    setEstimating(true);
+    try {
+      const r = await fetch('/api/contractor-agent/supply-sourcer', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          messages: [{
+            role: 'user',
+            content: `Give me ONE realistic average unit price (USD) for: "${supplyDraft.name}" in ${contractor?.serviceArea || 'the Florida Panhandle'}. Reply with ONLY a number (no $, no text). If you genuinely don't know, reply 0.`,
+          }],
+        }),
+      });
+      const data = await r.json();
+      const num = parseFloat(String(data.reply || '').replace(/[^0-9.]/g, ''));
+      if (num > 0) setSupplyDraft((d) => ({ ...d, estimatedUnitPrice: Math.round(num) }));
+    } finally {
+      setEstimating(false);
+    }
   }
 
   function addSupply(e: React.FormEvent) {
@@ -495,13 +519,25 @@ export default function ContractorDashboard() {
                   ))}
                 </select>
               </div>
-              <button
-                type="submit"
-                className="text-[12px] font-bold px-4 py-2 rounded-lg text-white"
-                style={{ background: 'linear-gradient(135deg,#0c6da4,#4ab8ce)' }}
-              >
-                Add to Supply List
-              </button>
+              <div className="flex items-center gap-2 flex-wrap">
+                <button
+                  type="button"
+                  onClick={estimateCost}
+                  disabled={estimating || !supplyDraft.name.trim()}
+                  className="text-[12px] font-bold px-3 py-2 rounded-lg text-white disabled:opacity-50 flex items-center gap-1"
+                  style={{ background: 'linear-gradient(135deg,#0ea5e9,#06b6d4)' }}
+                >
+                  <span className="material-symbols-outlined" style={{ fontSize: 14 }}>price_change</span>
+                  {estimating ? 'Estimating…' : 'Estimate Cost'}
+                </button>
+                <button
+                  type="submit"
+                  className="text-[12px] font-bold px-4 py-2 rounded-lg text-white"
+                  style={{ background: 'linear-gradient(135deg,#0c6da4,#4ab8ce)' }}
+                >
+                  Add to Supply List
+                </button>
+              </div>
             </form>
           )}
 
@@ -556,6 +592,25 @@ export default function ContractorDashboard() {
                     );
                   })}
                 </tbody>
+                {(() => {
+                  const sum = (status: SupplyStatus | null = null) =>
+                    supplies
+                      .filter((s) => !status || s.status === status)
+                      .reduce((acc, s) => acc + s.quantity * (s.estimatedUnitPrice || 0), 0);
+                  return (
+                    <tfoot>
+                      <tr style={{ borderTop: '1px solid rgba(255,255,255,0.15)' }}>
+                        <td className="px-2 py-3 text-[10px] uppercase tracking-wider text-white/55 font-bold">Totals</td>
+                        <td className="px-2 py-3"></td>
+                        <td className="px-2 py-3 text-[10px] text-white/55">Needed: ${sum('needed').toLocaleString()}</td>
+                        <td className="px-2 py-3 text-[10px] text-white/55">Ordered: ${sum('ordered').toLocaleString()}</td>
+                        <td className="px-2 py-3 text-right text-[12px] font-extrabold text-white">${sum().toLocaleString()}</td>
+                        <td className="px-2 py-3 text-[10px] text-emerald-400 text-center">Received: ${sum('received').toLocaleString()}</td>
+                        <td></td>
+                      </tr>
+                    </tfoot>
+                  );
+                })()}
               </table>
             </div>
           )}

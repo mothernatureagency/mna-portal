@@ -296,6 +296,13 @@ export default function StudentPortal() {
               <h2 className="text-[18px] font-extrabold">My Buddies</h2>
               <p className="text-[12px] text-white/60">Pick someone to help you out today.</p>
             </div>
+            <Link
+              href="/student/study"
+              className="text-[11px] font-bold px-3 py-1.5 rounded-lg text-white"
+              style={{ background: `linear-gradient(135deg,${theme.gradientFrom},${theme.gradientTo})` }}
+            >
+              📚 Study & Flashcards
+            </Link>
           </div>
 
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
