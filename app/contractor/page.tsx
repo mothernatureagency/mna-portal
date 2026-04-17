@@ -18,9 +18,11 @@
 
 import React, { useEffect, useMemo, useState } from 'react';
 import { createClient as createSupabaseClient } from '@/lib/supabase/client';
+import Link from 'next/link';
 import {
   getContractorByEmail,
   CONTRACTORS,
+  CONTRACTOR_AGENTS,
   TRADE_LABELS,
   JOB_STATUS_LABELS,
   JOB_STATUS_COLORS,
@@ -348,6 +350,31 @@ export default function ContractorDashboard() {
               })}
             </div>
           )}
+        </div>
+
+        {/* ── AI HELPERS ── */}
+        <div>
+          <div className="text-[10px] font-bold uppercase tracking-[0.15em] text-white/55 mb-2">AI Helpers</div>
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
+            {CONTRACTOR_AGENTS.map((a) => (
+              <Link
+                key={a.id}
+                href={`/contractor/agent/${a.id}`}
+                className="rounded-2xl p-4 glass-card transition hover:scale-[1.02]"
+                style={{ borderLeft: '3px solid #4ab8ce' }}
+              >
+                <div
+                  className="w-11 h-11 rounded-xl flex items-center justify-center mb-2"
+                  style={{ background: 'linear-gradient(135deg,#0c6da4,#4ab8ce)' }}
+                >
+                  <span className="material-symbols-outlined text-white" style={{ fontSize: 24 }}>{a.icon}</span>
+                </div>
+                <div className="text-[14px] font-bold">{a.name}</div>
+                <div className="text-[10px] uppercase tracking-wider text-white/55 font-semibold mt-0.5">{a.role}</div>
+                <div className="text-[12px] text-white/65 mt-1.5 leading-snug">{a.tagline}</div>
+              </Link>
+            ))}
+          </div>
         </div>
 
         {/* ── SCHEDULE ── */}
