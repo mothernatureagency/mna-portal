@@ -84,6 +84,12 @@ export async function middleware(request: NextRequest) {
     url.search = '';
     return NextResponse.redirect(url);
   }
+  if (role === 'student' && !pathname.startsWith('/student') && !pathname.startsWith('/api/')) {
+    const url = request.nextUrl.clone();
+    url.pathname = '/student';
+    url.search = '';
+    return NextResponse.redirect(url);
+  }
 
   // Authenticated → allow access
   return supabaseResponse;

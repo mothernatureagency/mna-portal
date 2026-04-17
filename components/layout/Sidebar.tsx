@@ -44,6 +44,7 @@ const NAV = [
     { label: 'Settings', href: '/settings', e: 'settings' },
     { label: 'Client View', href: '/client', e: 'swap_horiz' },
     { label: 'Contractor View', href: '/contractor', e: 'engineering' },
+    { label: 'Student View', href: '/student', e: 'school' },
   ]},
 ];
 
