@@ -25,7 +25,8 @@
       "Bash(vercel inspect:*)",
       "Bash(curl -sL -o \"/Users/alexuswilliams/MNA Code/.claude/worktrees/tender-davinci/public/ai/earth.jpg\" \"https://upload.wikimedia.org/wikipedia/commons/thumb/9/97/The_Earth_seen_from_Apollo_17.jpg/512px-The_Earth_seen_from_Apollo_17.jpg\")",
       "Bash(curl -sL -o \"/Users/alexuswilliams/MNA Code/.claude/worktrees/tender-davinci/public/ai/earth.jpg\" \"https://eoimages.gsfc.nasa.gov/images/imagerecords/73000/73909/world.topo.bathy.200412.3x5400x2700.jpg\" --max-time 30)",
-      "Bash(sips -Z 256 \"/Users/alexuswilliams/MNA Code/.claude/worktrees/tender-davinci/public/ai/earth.jpg\" --out \"/Users/alexuswilliams/MNA Code/.claude/worktrees/tender-davinci/public/ai/earth.jpg\")"
+      "Bash(sips -Z 256 \"/Users/alexuswilliams/MNA Code/.claude/worktrees/tender-davinci/public/ai/earth.jpg\" --out \"/Users/alexuswilliams/MNA Code/.claude/worktrees/tender-davinci/public/ai/earth.jpg\")",
+      "Bash(grep -l \"service_role\\\\|SUPABASE_SERVICE\" \"/Users/alexuswilliams/MNA Code/.claude/worktrees/tender-davinci/lib/supabase/\"*.ts)"
     ]
   }
 }
