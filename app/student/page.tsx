@@ -23,6 +23,7 @@ import {
   type Student,
 } from '@/lib/students';
 import { isMNAStaff } from '@/lib/staff';
+import JarvisFab from '@/components/ai/JarvisFab';
 
 type SchedEv = {
   id: string;
@@ -63,6 +64,19 @@ export default function StudentPortal() {
   const [tasks, setTasks] = useState<StudentTask[]>([]);
   const [loading, setLoading] = useState(true);
   const [calMonthOffset, setCalMonthOffset] = useState(0);
+
+  // ── New-task quick form ──
+  const [newTaskOpen, setNewTaskOpen] = useState(false);
+  const [newTaskText, setNewTaskText] = useState('');
+  const [newTaskDue, setNewTaskDue] = useState('');     // YYYY-MM-DD optional reminder
+  const [newTaskNote, setNewTaskNote] = useState('');
+
+  // ── New-event quick form ──
+  const [newEventOpen, setNewEventOpen] = useState(false);
+  const todayIso = new Date().toISOString().slice(0, 10);
+  const [eventForm, setEventForm] = useState({
+    title: '', date: todayIso, start_time: '15:00', end_time: '16:00', event_type: 'task',
+  });
 
   useEffect(() => {
     (async () => {
@@ -106,6 +120,62 @@ export default function StudentPortal() {
     setTasks((prev) => prev.map((x) => (x.id === t.id ? { ...x, status: next, completed_at: next === 'completed' ? new Date().toISOString() : null } : x)));
   }
 
+  // Create a new task. Reminder date is appended into the description so it
+  // surfaces in the list without needing a new column.
+  async function addTask(e: React.FormEvent) {
+    e.preventDefault();
+    if (!newTaskText.trim()) return;
+    const fetchEmail = student?.email || STUDENTS[0].email;
+    const description = [
+      newTaskNote.trim(),
+      newTaskDue ? `Reminder: ${newTaskDue}` : '',
+    ].filter(Boolean).join(' · ');
+    const res = await fetch('/api/client-requests', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        clientId: 'mna',           // logical owner of the task
+        title: newTaskText.trim(),
+        description: description || null,
+        assignedTo: fetchEmail,
+      }),
+    }).catch(() => null);
+    if (res && res.ok) {
+      const data = await res.json();
+      const created = data.request || data.item || null;
+      if (created) setTasks((prev) => [created, ...prev]);
+    }
+    setNewTaskText(''); setNewTaskNote(''); setNewTaskDue('');
+    setNewTaskOpen(false);
+  }
+
+  // Create a new schedule event so it shows up on her calendar grid.
+  async function addEvent(e: React.FormEvent) {
+    e.preventDefault();
+    if (!eventForm.title.trim()) return;
+    const fetchEmail = student?.email || STUDENTS[0].email;
+    const res = await fetch('/api/schedule', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        email: fetchEmail,
+        title: eventForm.title.trim(),
+        event_date: eventForm.date,
+        start_time: eventForm.start_time || null,
+        end_time: eventForm.end_time || null,
+        event_type: eventForm.event_type,
+        priority: 'normal',
+      }),
+    }).catch(() => null);
+    if (res && res.ok) {
+      const data = await res.json();
+      const created = data.event || null;
+      if (created) setEvents((prev) => [...prev, created]);
+    }
+    setEventForm({ ...eventForm, title: '' });
+    setNewEventOpen(false);
+  }
+
   if (loading) {
     return (
       <div className="min-h-screen flex items-center justify-center text-white/60 text-sm">
@@ -132,9 +202,11 @@ export default function StudentPortal() {
 
   return (
     <div
-      className="min-h-screen text-white"
+      className="min-h-screen text-white relative"
       style={{ background: theme.bgGradient, backgroundAttachment: 'fixed' }}
     >
+      {/* Mother Nature floating globe — Marissa can tap her to talk anytime */}
+      <JarvisFab />
       <div className="max-w-[1200px] mx-auto px-4 md:px-8 py-6 md:py-10 space-y-6">
 
         {/* ── STAFF PREVIEW BANNER ── */}
@@ -241,12 +313,63 @@ export default function StudentPortal() {
               <div className="text-[14px] font-bold">My Tasks</div>
               <div className="text-[11px] text-white/60">{tasks.filter((t) => t.status !== 'completed').length} to do</div>
             </div>
+            <button
+              onClick={() => setNewTaskOpen((v) => !v)}
+              className="text-[12px] font-bold px-3 py-1.5 rounded-lg text-white"
+              style={{ background: `linear-gradient(135deg,${theme.gradientFrom},${theme.gradientTo})` }}
+            >
+              {newTaskOpen ? 'Cancel' : '+ Add Task'}
+            </button>
           </div>
-          {tasks.length === 0 ? (
+
+          {newTaskOpen && (
+            <form
+              onSubmit={addTask}
+              className="rounded-xl p-3 mb-3 space-y-2"
+              style={{ background: 'rgba(0,0,0,0.35)', border: `1px solid ${theme.chipBorder}` }}
+            >
+              <input
+                autoFocus
+                type="text"
+                placeholder="What do you need to do?"
+                value={newTaskText}
+                onChange={(e) => setNewTaskText(e.target.value)}
+                className="w-full px-3 py-2 rounded-lg border text-white text-[13px] placeholder:text-white/55 focus:outline-none"
+                style={{ background: 'rgba(0,0,0,0.45)', borderColor: 'rgba(255,255,255,0.25)' }}
+              />
+              <div className="grid grid-cols-2 gap-2">
+                <input
+                  type="date"
+                  value={newTaskDue}
+                  onChange={(e) => setNewTaskDue(e.target.value)}
+                  className="px-3 py-2 rounded-lg border text-white text-[12px] focus:outline-none"
+                  style={{ background: 'rgba(0,0,0,0.45)', borderColor: 'rgba(255,255,255,0.25)' }}
+                />
+                <input
+                  type="text"
+                  placeholder="Notes (optional)"
+                  value={newTaskNote}
+                  onChange={(e) => setNewTaskNote(e.target.value)}
+                  className="px-3 py-2 rounded-lg border text-white text-[12px] placeholder:text-white/55 focus:outline-none"
+                  style={{ background: 'rgba(0,0,0,0.45)', borderColor: 'rgba(255,255,255,0.25)' }}
+                />
+              </div>
+              <button
+                type="submit"
+                className="w-full text-[13px] font-bold px-3 py-2 rounded-lg text-white"
+                style={{ background: `linear-gradient(135deg,${theme.gradientFrom},${theme.gradientTo})` }}
+              >
+                Save Task
+              </button>
+            </form>
+          )}
+
+          {tasks.length === 0 && !newTaskOpen ? (
             <div className="text-[12px] text-white/60 text-center py-6">
-              No tasks yet. When Mom assigns you something, it shows up here.
+              No tasks yet. Tap <span className="text-white">+ Add Task</span> to add one,
+              or wait for Mom to assign you something.
             </div>
-          ) : (
+          ) : tasks.length === 0 ? null : (
             <ul className="space-y-2">
               {tasks.slice(0, 12).map((t) => {
                 const done = t.status === 'completed';
@@ -309,7 +432,73 @@ export default function StudentPortal() {
                 </button>
               )}
             </div>
+            <button
+              onClick={() => setNewEventOpen((v) => !v)}
+              className="text-[12px] font-bold px-3 py-1.5 rounded-lg text-white"
+              style={{ background: `linear-gradient(135deg,${theme.gradientFrom},${theme.gradientTo})` }}
+            >
+              {newEventOpen ? 'Cancel' : '+ Add Event'}
+            </button>
           </div>
+
+          {newEventOpen && (
+            <form
+              onSubmit={addEvent}
+              className="rounded-xl p-3 mb-4 space-y-2"
+              style={{ background: 'rgba(0,0,0,0.35)', border: `1px solid ${theme.chipBorder}` }}
+            >
+              <input
+                autoFocus
+                type="text"
+                placeholder="Event title (e.g. Math homework, Singing practice)"
+                value={eventForm.title}
+                onChange={(e) => setEventForm({ ...eventForm, title: e.target.value })}
+                className="w-full px-3 py-2 rounded-lg border text-white text-[13px] placeholder:text-white/55 focus:outline-none"
+                style={{ background: 'rgba(0,0,0,0.45)', borderColor: 'rgba(255,255,255,0.25)' }}
+              />
+              <div className="grid grid-cols-2 md:grid-cols-4 gap-2">
+                <input
+                  type="date"
+                  value={eventForm.date}
+                  onChange={(e) => setEventForm({ ...eventForm, date: e.target.value })}
+                  className="px-3 py-2 rounded-lg border text-white text-[12px] focus:outline-none"
+                  style={{ background: 'rgba(0,0,0,0.45)', borderColor: 'rgba(255,255,255,0.25)' }}
+                />
+                <input
+                  type="time"
+                  value={eventForm.start_time}
+                  onChange={(e) => setEventForm({ ...eventForm, start_time: e.target.value })}
+                  className="px-3 py-2 rounded-lg border text-white text-[12px] focus:outline-none"
+                  style={{ background: 'rgba(0,0,0,0.45)', borderColor: 'rgba(255,255,255,0.25)' }}
+                />
+                <input
+                  type="time"
+                  value={eventForm.end_time}
+                  onChange={(e) => setEventForm({ ...eventForm, end_time: e.target.value })}
+                  className="px-3 py-2 rounded-lg border text-white text-[12px] focus:outline-none"
+                  style={{ background: 'rgba(0,0,0,0.45)', borderColor: 'rgba(255,255,255,0.25)' }}
+                />
+                <select
+                  value={eventForm.event_type}
+                  onChange={(e) => setEventForm({ ...eventForm, event_type: e.target.value })}
+                  className="px-3 py-2 rounded-lg border text-white text-[12px] focus:outline-none"
+                  style={{ background: 'rgba(0,0,0,0.45)', borderColor: 'rgba(255,255,255,0.25)' }}
+                >
+                  <option value="task" className="bg-slate-900">School / Task</option>
+                  <option value="meeting" className="bg-slate-900">Class / Meeting</option>
+                  <option value="personal" className="bg-slate-900">Personal</option>
+                  <option value="deadline" className="bg-slate-900">Deadline</option>
+                </select>
+              </div>
+              <button
+                type="submit"
+                className="w-full text-[13px] font-bold px-3 py-2 rounded-lg text-white"
+                style={{ background: `linear-gradient(135deg,${theme.gradientFrom},${theme.gradientTo})` }}
+              >
+                Save to Calendar
+              </button>
+            </form>
+          )}
 
           {/* Calendar grid */}
           {(() => {
