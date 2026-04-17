@@ -68,14 +68,19 @@ export async function middleware(request: NextRequest) {
   }
 
   // Role-based routing.
-  // A user with user_metadata.role === 'client' is a client portal user and can
-  // only see /client/*. If they hit anything else, bounce them to their portal.
-  // Conversely, staff (anything other than 'client') should not linger on /client
-  // unless they explicitly opt in (we allow it so you can QA the client view).
+  // - role 'client'     → locked to /client/*
+  // - role 'contractor' → locked to /contractor/*
+  // - everything else (staff, owner, admin) → full app
   const role = (user.user_metadata as Record<string, unknown> | null)?.role as string | undefined;
   if (role === 'client' && !pathname.startsWith('/client') && !pathname.startsWith('/api/')) {
     const url = request.nextUrl.clone();
     url.pathname = '/client';
+    url.search = '';
+    return NextResponse.redirect(url);
+  }
+  if (role === 'contractor' && !pathname.startsWith('/contractor') && !pathname.startsWith('/api/')) {
+    const url = request.nextUrl.clone();
+    url.pathname = '/contractor';
     url.search = '';
     return NextResponse.redirect(url);
   }
