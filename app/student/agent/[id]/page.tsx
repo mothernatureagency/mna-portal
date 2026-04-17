@@ -8,6 +8,7 @@ import { getStudentAgent, STUDENT_THEMES, getStudentByEmail, STUDENTS } from '@/
 import { isMNAStaff } from '@/lib/staff';
 import { VoiceButton } from '@/components/ai/VoiceButton';
 import { speak, cancelSpeak, sanitizeForSpeech } from '@/lib/voice';
+import JarvisFab from '@/components/ai/JarvisFab';
 
 type Msg = { role: 'user' | 'assistant'; content: string };
 
@@ -87,7 +88,9 @@ export default function StudentAgentChat() {
   }
 
   return (
-    <div className="min-h-screen text-white flex flex-col" style={{ background: theme.bgGradient, backgroundAttachment: 'fixed' }}>
+    <div className="min-h-screen text-white flex flex-col relative" style={{ background: theme.bgGradient, backgroundAttachment: 'fixed' }}>
+      {/* Mother Nature floating globe — available on every tutor page */}
+      <JarvisFab />
       <div className="max-w-[820px] w-full mx-auto px-4 md:px-6 py-5 flex flex-col flex-1 gap-4">
 
         {/* ── Header ── */}
@@ -186,7 +189,13 @@ export default function StudentAgentChat() {
               value={input}
               onChange={(e) => setInput(e.target.value)}
               placeholder={`Ask ${agent.name} or tap the mic…`}
-              className="flex-1 rounded-xl px-4 py-2.5 bg-white/8 border border-white/15 text-white placeholder:text-white/40 focus:outline-none focus:border-white/30 text-[13px]"
+              // Darker fill so white type stays clearly readable on every theme
+              className="flex-1 rounded-xl px-4 py-2.5 border text-white placeholder:text-white/55 focus:outline-none text-[14px]"
+              style={{
+                background: 'rgba(0,0,0,0.45)',
+                borderColor: 'rgba(255,255,255,0.25)',
+                caretColor: '#fff',
+              }}
             />
             <button
               type="submit"
