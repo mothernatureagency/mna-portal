@@ -18,9 +18,10 @@ import { createClient as createSupabaseClient } from '@/lib/supabase/client';
 import {
   getStudentByEmail,
   STUDENTS,
-  STUDENT_AGENTS,
   STUDENT_THEMES,
+  getAgentsForStudent,
   getWeeklyLesson,
+  getWeeklyWordsForKid,
   type Student,
 } from '@/lib/students';
 import { isMNAStaff } from '@/lib/staff';
@@ -243,14 +244,27 @@ export default function StudentPortal() {
             <div className="flex-1 min-w-0">
               <div className="text-[12px] font-bold text-amber-100">Staff Preview Mode</div>
               <div className="text-[11px] text-white/70">
-                Viewing {student.firstName}'s portal. This is what she sees when she logs in.
+                Viewing <span className="font-bold text-white">{student.firstName}</span>'s portal.
               </div>
+            </div>
+            {/* Quick flip between students in preview */}
+            <div className="flex items-center gap-1">
+              {STUDENTS.map((s) => (
+                <button
+                  key={s.email}
+                  onClick={() => setStudent(s)}
+                  className={`text-[11px] font-bold px-3 py-1.5 rounded-lg transition ${student.email === s.email ? 'text-white' : 'text-white/65 hover:text-white bg-white/10'}`}
+                  style={student.email === s.email ? { background: `linear-gradient(135deg,${STUDENT_THEMES[s.themeColor].gradientFrom},${STUDENT_THEMES[s.themeColor].gradientTo})` } : {}}
+                >
+                  {s.firstName}
+                </button>
+              ))}
             </div>
             <a
               href="/"
               className="text-[11px] font-semibold px-3 py-1.5 rounded-lg bg-white/10 hover:bg-white/20 text-white shrink-0"
             >
-              ← Back to staff portal
+              ← Back
             </a>
           </div>
         )}
@@ -290,43 +304,94 @@ export default function StudentPortal() {
           )}
         </div>
 
-        {/* ── LESSON OF THE WEEK ── */}
-        {(() => {
-          const lesson = getWeeklyLesson();
-          return (
-            <div
-              className="rounded-2xl p-5 relative overflow-hidden"
-              style={{ background: 'rgba(255,255,255,0.06)', border: `1px solid ${theme.chipBorder}` }}
-            >
+        {/* ── WEEKLY LESSON / WORDS ── */}
+        {student.email === 'kyle@mothernatureagency.com' ? (
+          (() => {
+            // Kyle gets Words of the Week — kindergarten word family + tracing CTA
+            const w = getWeeklyWordsForKid();
+            return (
               <div
-                className="absolute top-0 left-0 right-0 h-1"
-                style={{ background: `linear-gradient(90deg,${theme.gradientFrom},${theme.gradientTo})` }}
-              />
-              <div className="flex items-start gap-4 flex-wrap">
+                className="rounded-2xl p-5 relative overflow-hidden"
+                style={{ background: 'rgba(255,255,255,0.06)', border: `1px solid ${theme.chipBorder}` }}
+              >
                 <div
-                  className="w-12 h-12 rounded-xl flex items-center justify-center shrink-0"
-                  style={{ background: `linear-gradient(135deg,${theme.gradientFrom},${theme.gradientTo})` }}
-                >
-                  <span className="material-symbols-outlined text-white" style={{ fontSize: 26 }}>auto_awesome</span>
-                </div>
-                <div className="flex-1 min-w-0">
-                  <div className="text-[10px] uppercase tracking-[0.15em] font-bold" style={{ color: theme.accent }}>
-                    Lesson of the Week · {lesson.topic}
-                  </div>
-                  <div className="text-[18px] font-extrabold mt-0.5">{lesson.title}</div>
-                  <p className="text-[13px] text-white/80 mt-1.5 leading-relaxed">{lesson.body}</p>
+                  className="absolute top-0 left-0 right-0 h-1"
+                  style={{ background: `linear-gradient(90deg,${theme.gradientFrom},${theme.gradientTo})` }}
+                />
+                <div className="flex items-start gap-4 flex-wrap">
                   <div
-                    className="mt-3 rounded-lg px-3 py-2 text-[11px] flex items-start gap-2"
-                    style={{ background: theme.chipBg, border: `1px solid ${theme.chipBorder}` }}
+                    className="w-12 h-12 rounded-xl flex items-center justify-center shrink-0"
+                    style={{ background: `linear-gradient(135deg,${theme.gradientFrom},${theme.gradientTo})` }}
                   >
-                    <span className="material-symbols-outlined" style={{ fontSize: 14, color: theme.accent }}>lightbulb</span>
-                    <span><span className="font-bold" style={{ color: theme.accent }}>Fun fact:</span> {lesson.funFact}</span>
+                    <span className="material-symbols-outlined text-white" style={{ fontSize: 26 }}>spellcheck</span>
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <div className="text-[10px] uppercase tracking-[0.15em] font-bold" style={{ color: theme.accent }}>
+                      Words of the Week · {w.theme}
+                    </div>
+                    <div className="flex flex-wrap gap-2 mt-3">
+                      {w.words.map((word) => (
+                        <Link
+                          key={word}
+                          href={`/student/trace?word=${encodeURIComponent(word)}`}
+                          className="text-[28px] font-extrabold px-4 py-2 rounded-xl text-white tracking-wide hover:scale-105 transition-transform"
+                          style={{ background: `linear-gradient(135deg,${theme.gradientFrom},${theme.gradientTo})`, fontFamily: 'system-ui' }}
+                        >
+                          {word}
+                        </Link>
+                      ))}
+                    </div>
+                    <div
+                      className="mt-4 rounded-lg px-3 py-2 text-[12px] flex items-start gap-2"
+                      style={{ background: theme.chipBg, border: `1px solid ${theme.chipBorder}` }}
+                    >
+                      <span className="material-symbols-outlined" style={{ fontSize: 14, color: theme.accent }}>lightbulb</span>
+                      <span><span className="font-bold" style={{ color: theme.accent }}>Fun fact:</span> {w.funFact}</span>
+                    </div>
+                    <div className="text-[11px] text-white/55 mt-2">Tap any word to trace it!</div>
                   </div>
                 </div>
               </div>
-            </div>
-          );
-        })()}
+            );
+          })()
+        ) : (
+          (() => {
+            const lesson = getWeeklyLesson();
+            return (
+              <div
+                className="rounded-2xl p-5 relative overflow-hidden"
+                style={{ background: 'rgba(255,255,255,0.06)', border: `1px solid ${theme.chipBorder}` }}
+              >
+                <div
+                  className="absolute top-0 left-0 right-0 h-1"
+                  style={{ background: `linear-gradient(90deg,${theme.gradientFrom},${theme.gradientTo})` }}
+                />
+                <div className="flex items-start gap-4 flex-wrap">
+                  <div
+                    className="w-12 h-12 rounded-xl flex items-center justify-center shrink-0"
+                    style={{ background: `linear-gradient(135deg,${theme.gradientFrom},${theme.gradientTo})` }}
+                  >
+                    <span className="material-symbols-outlined text-white" style={{ fontSize: 26 }}>auto_awesome</span>
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <div className="text-[10px] uppercase tracking-[0.15em] font-bold" style={{ color: theme.accent }}>
+                      Lesson of the Week · {lesson.topic}
+                    </div>
+                    <div className="text-[18px] font-extrabold mt-0.5">{lesson.title}</div>
+                    <p className="text-[13px] text-white/80 mt-1.5 leading-relaxed">{lesson.body}</p>
+                    <div
+                      className="mt-3 rounded-lg px-3 py-2 text-[11px] flex items-start gap-2"
+                      style={{ background: theme.chipBg, border: `1px solid ${theme.chipBorder}` }}
+                    >
+                      <span className="material-symbols-outlined" style={{ fontSize: 14, color: theme.accent }}>lightbulb</span>
+                      <span><span className="font-bold" style={{ color: theme.accent }}>Fun fact:</span> {lesson.funFact}</span>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            );
+          })()
+        )}
 
         {/* ── MY BUDDIES (AI tutor grid) ── */}
         <div>
@@ -335,17 +400,28 @@ export default function StudentPortal() {
               <h2 className="text-[18px] font-extrabold">My Buddies</h2>
               <p className="text-[12px] text-white/60">Pick someone to help you out today.</p>
             </div>
-            <Link
-              href="/student/study"
-              className="text-[11px] font-bold px-3 py-1.5 rounded-lg text-white"
-              style={{ background: `linear-gradient(135deg,${theme.gradientFrom},${theme.gradientTo})` }}
-            >
-              📚 Study & Flashcards
-            </Link>
+            <div className="flex items-center gap-2">
+              {student.email === 'kyle@mothernatureagency.com' && (
+                <Link
+                  href="/student/trace"
+                  className="text-[11px] font-bold px-3 py-1.5 rounded-lg text-white"
+                  style={{ background: `linear-gradient(135deg,${theme.gradientFrom},${theme.gradientTo})` }}
+                >
+                  ✏️ Trace Words
+                </Link>
+              )}
+              <Link
+                href="/student/study"
+                className="text-[11px] font-bold px-3 py-1.5 rounded-lg text-white"
+                style={{ background: `linear-gradient(135deg,${theme.gradientFrom},${theme.gradientTo})` }}
+              >
+                📚 Study & Flashcards
+              </Link>
+            </div>
           </div>
 
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
-            {STUDENT_AGENTS.map((a) => (
+            {getAgentsForStudent(student).map((a) => (
               <Link
                 key={a.id}
                 href={`/student/agent/${a.id}`}
