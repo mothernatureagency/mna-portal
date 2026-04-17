@@ -177,7 +177,7 @@ export default function CreatorPortal() {
             calMode={calMode} setCalMode={setCalMode}
             creatorEmail={creator.email}
             previewMode={previewMode}
-            onAdded={(ev) => setEvents((prev) => [...prev, ev])}
+            onAdded={(ev: any) => setEvents((prev) => [...prev, ev])}
           />
         )}
         {tab === 'deals' && (
