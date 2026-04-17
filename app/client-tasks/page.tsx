@@ -22,6 +22,7 @@ const TEAM = [
   // Family / personal task assignees — show up in the same picker so
   // Alexus can hand off chores, schoolwork, or practice goals.
   { email: 'marissa@mothernatureagency.com', name: 'Marissa', short: 'MM', color: '#c084fc' },
+  { email: 'kyle@mothernatureagency.com',    name: 'Kyle',    short: 'KW', color: '#5eead4' },
 ];
 
 // Client assignees — tasks can also be assigned to the client themselves
@@ -46,7 +47,7 @@ function getClientColor(clientId: string) {
   return c?.branding.gradientFrom || '#0c6da4';
 }
 
-const FILTERS = ['All', 'My Tasks', 'Alexus', 'Vanessa', 'Sable', 'Marissa', 'Unassigned'] as const;
+const FILTERS = ['All', 'My Tasks', 'Alexus', 'Vanessa', 'Sable', 'Marissa', 'Kyle', 'Unassigned'] as const;
 
 export default function TaskManagerPage() {
   const [tasks, setTasks] = useState<Task[]>([]);

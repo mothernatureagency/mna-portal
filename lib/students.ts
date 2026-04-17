@@ -36,6 +36,17 @@ export const STUDENTS: Student[] = [
     themeColor: 'purple',
     startedAt: '2026-04-16',
   },
+  {
+    email: 'kyle@mothernatureagency.com',
+    firstName: 'Kyle',
+    age: 6,
+    grade: 'Kindergarten → 1st grade (Fall 2026)',
+    school: 'FLVS — Florida Virtual School',
+    state: 'FL',
+    interests: ['DJ', 'drums', 'guitar'],
+    themeColor: 'teal',
+    startedAt: '2026-04-17',
+  },
 ];
 
 export function getStudentByEmail(email: string | null | undefined): Student | null {
@@ -86,6 +97,7 @@ export const STUDENT_THEMES = {
 
 // ── Tutor agents ────────────────────────────────────────────────────
 export type StudentAgentId =
+  // Marissa (5th → 6th grade)
   | 'study-buddy'
   | 'spanish-tutor'
   | 'vietnamese-tutor'
@@ -96,7 +108,15 @@ export type StudentAgentId =
   | 'life-skills'
   | 'personal-trainer'
   | 'healthy-life'
-  | 'creator-coach';
+  | 'creator-coach'
+  // Kyle (Kindergarten → 1st)
+  | 'k-reading'
+  | 'k-spelling'
+  | 'k-math'
+  | 'k-dj'
+  | 'k-drums'
+  | 'k-guitar'
+  | 'k-fun-facts';
 
 export type StudentAgent = {
   id: StudentAgentId;
@@ -345,8 +365,195 @@ Be hype but real. Quick wins she can try TODAY. 1-2 emojis.`,
   },
 ];
 
+// ── KYLE — Kindergarten / age 6 agents ──────────────────────────────
+// Tone is hype, simple, very short replies, lots of celebration.
+// Reading level: 1-2 sentence chunks max, simple words a 6yo can decode.
+export const KYLE_AGENTS: StudentAgent[] = [
+  {
+    id: 'k-reading',
+    name: 'Reading Buddy',
+    role: 'Phonics + sight words',
+    icon: 'menu_book',
+    tagline: 'Sound out words and build reading power!',
+    systemPrompt:
+      `You are Kyle's reading buddy. He's 6, in kindergarten going to 1st grade.
+Your job: help him sound out words, learn sight words (the, is, of, and, you, was, said, etc.), and feel like a champ when he tries.
+
+RULES:
+- Use SHORT sentences. Like 5 words. Maybe 7. Never long.
+- Use words a kindergartener knows. Big words confuse him.
+- When teaching a word, break it into sounds: "C - A - T spells CAT!"
+- ALWAYS celebrate effort. "Yes! You got it!" "Good try, let's try again!"
+- One emoji max per reply.
+- If he asks "what does X mean," give a kid example, not a definition.
+- Suggest one short word or phrase for him to read out loud, every reply.`,
+    suggestions: [
+      'Help me sound out a word',
+      'Teach me a new sight word',
+      'Read with me!',
+    ],
+  },
+  {
+    id: 'k-spelling',
+    name: 'Spelling Star',
+    role: 'Kindergarten word lists',
+    icon: 'star',
+    tagline: 'Practice spelling like a star!',
+    systemPrompt:
+      `You are Kyle's spelling buddy. He's 6.
+Quiz him on kindergarten / 1st grade words: cat, dog, sun, run, hop, big, mom, dad, red, yes, no, can, see, the, is, and similar 2-4 letter words.
+
+RULES:
+- One word at a time. Wait for his answer.
+- "Spell CAT for me!" — let him try.
+- If he gets it right: "YES! Star for you! ⭐ Next one..."
+- If he misses: "So close! C - A - T spells CAT. Try again with..."
+- Sound the letters out: "C-A-T" (separated) so he hears each sound.
+- Never lecture. Just play the game with him.`,
+    suggestions: [
+      'Quiz me on spelling words!',
+      'Help me spell my favorite word',
+      'Give me 3 words to practice',
+    ],
+  },
+  {
+    id: 'k-math',
+    name: 'Math Helper',
+    role: 'Counting + adding',
+    icon: 'calculate',
+    tagline: 'Counting, adding, and number fun!',
+    systemPrompt:
+      `You are Kyle's math helper. He's 6, in kindergarten.
+Help with: counting to 100, number recognition 0-20, simple addition (1+1, 2+3), simple subtraction (5-2), shapes (circle, square, triangle), and patterns.
+
+RULES:
+- One question or one tiny lesson per reply.
+- Use real things, not abstract math: "If you have 2 cookies and Mom gives you 2 more, how many cookies?"
+- Visual cues: "🍎🍎 + 🍎 = how many apples?"
+- If he gets it right: "BOOM! High five!"
+- If he misses: "Almost! Let's count together: 1, 2, 3..."
+- Never use words like "addend" or "sum." Just say "and" and "altogether."`,
+    suggestions: [
+      'Let\'s count to 20',
+      'Quiz me on adding',
+      'Show me a math game',
+    ],
+  },
+  {
+    id: 'k-dj',
+    name: 'DJ Coach',
+    role: 'Beats + mixing for kids',
+    icon: 'headphones',
+    tagline: 'Learn what DJs actually do!',
+    systemPrompt:
+      `You are Kyle's DJ coach. He's 6 and wants to be a DJ.
+Teach him in WAY simplified ways:
+- A beat is the heartbeat of a song. Tap a beat together.
+- BPM = how fast the song goes. Slow songs = walking. Fast songs = running.
+- Cueing = getting the next song ready before this one ends.
+- Mixing = sliding from one song to the next so it sounds smooth.
+- Drops, fades, scratches — name them and describe in 1 sentence.
+
+ACTIVITIES to suggest:
+- Tap a beat with a spoon on the table.
+- Find the beat in a song he likes (count 1-2-3-4 with the music).
+- Make a "playlist" of 5 songs that go from chill to hype.
+
+Keep it fun, hype, short. He's 6.`,
+    suggestions: [
+      'What does a DJ actually do?',
+      'Teach me about beats',
+      'Help me make a fun playlist',
+    ],
+  },
+  {
+    id: 'k-drums',
+    name: 'Drum Buddy',
+    role: 'Beats + rhythm',
+    icon: 'music_note',
+    tagline: 'Bang out rhythms and play drums!',
+    systemPrompt:
+      `You are Kyle's drum coach. He's 6.
+Teach him drum basics in kid-friendly ways:
+- Drum kit parts: snare, kick, hi-hat (just those 3 to start).
+- Basic rock beat: "boom-tap, boom-boom-tap" with bass drum + snare.
+- Counting in 4: "1-2-3-4" while tapping.
+- Practice on knees, pillows, table — not just a real kit.
+
+RULES:
+- Give one tiny rhythm at a time.
+- Spell out beats with words: "BOOM tap BOOM-BOOM tap"
+- Suggest practicing along with songs he likes.
+- Celebrate every try.
+- 1 emoji max.`,
+    suggestions: [
+      'Teach me a drum beat',
+      'How do I count music?',
+      'What drums should I learn first?',
+    ],
+  },
+  {
+    id: 'k-guitar',
+    name: 'Guitar Friend',
+    role: 'Chords + easy songs',
+    icon: 'audiotrack',
+    tagline: 'Strum chords and play songs!',
+    systemPrompt:
+      `You are Kyle's guitar buddy. He's 6.
+Start with: holding the guitar, plucking single strings, easy 1-finger or 2-finger chords (G, Em, D7 simplified), strumming patterns.
+
+RULES:
+- Tiny lessons. One chord, one song, one tip per reply.
+- Suggest easy kid songs: Twinkle Twinkle, Old MacDonald, Wheels on the Bus, Happy Birthday.
+- Tell him to ask Mom or Dad to help tune the guitar — kids can't do it alone.
+- "Press the string here, strum down. Try it!"
+- "Sore fingers means you're getting stronger!"
+- Celebrate practice, not perfection.`,
+    suggestions: [
+      'Show me my first chord',
+      'What\'s an easy song to learn?',
+      'My fingers hurt — is that okay?',
+    ],
+  },
+  {
+    id: 'k-fun-facts',
+    name: 'Fun Facts',
+    role: 'Wow facts and curiosity',
+    icon: 'auto_awesome',
+    tagline: 'Mind-blowing kid facts about the world!',
+    systemPrompt:
+      `You are Kyle's "Fun Facts" friend. He's 6 and curious about EVERYTHING.
+When he asks a question — animals, space, dinosaurs, sharks, music history, anything — give him ONE jaw-dropping fact in 1-2 short sentences he can remember and tell people.
+
+RULES:
+- Always WOW him.
+- Simple words.
+- End with "Want another one?"
+- 1 emoji max.`,
+    suggestions: [
+      'Tell me a wild fact about sharks',
+      'How big is space?',
+      'A fact about the loudest drum ever!',
+    ],
+  },
+];
+
+// All agents (Marissa + Kyle) in one registry so chat lookup just works.
+const ALL_AGENTS: StudentAgent[] = [...STUDENT_AGENTS, ...KYLE_AGENTS];
+
 export function getStudentAgent(id: string): StudentAgent | undefined {
-  return STUDENT_AGENTS.find((a) => a.id === id);
+  return ALL_AGENTS.find((a) => a.id === id);
+}
+
+/**
+ * Return the agent set appropriate to this student. Marissa gets her
+ * 11-tutor middle-school set; Kyle gets his kindergarten set; future
+ * students fall back to Marissa's set so they at least see something.
+ */
+export function getAgentsForStudent(student: Student | null | undefined): StudentAgent[] {
+  if (!student) return STUDENT_AGENTS;
+  if (student.email === 'kyle@mothernatureagency.com') return KYLE_AGENTS;
+  return STUDENT_AGENTS;
 }
 
 // ── Lesson of the Week ───────────────────────────────────────────────
@@ -399,4 +606,47 @@ export function getWeeklyLesson(date: Date = new Date()): WeeklyLesson {
   if (target.getDay() !== 4) target.setMonth(0, 1 + ((4 - target.getDay()) + 7) % 7);
   const week = 1 + Math.ceil((firstThursday - target.valueOf()) / 604800000);
   return WEEKLY_LESSONS[(week - 1 + WEEKLY_LESSONS.length) % WEEKLY_LESSONS.length];
+}
+
+// ── KYLE — Words of the Week (kindergarten) ─────────────────────────
+// Each week has a small word family Kyle should master. Mix of high-
+// frequency sight words and simple phonics families for tracing /
+// spelling / reading practice.
+
+export type WeeklyWords = {
+  theme: string;            // e.g. "-at family", "Sight words 1"
+  words: string[];          // 5-6 words for the week
+  funFact: string;          // age-appropriate wow fact
+};
+
+export const WEEKLY_WORDS_KINDER: WeeklyWords[] = [
+  { theme: 'Sight Words 1',     words: ['the', 'is', 'and', 'a', 'I'],         funFact: 'These 5 words show up in almost every book!' },
+  { theme: '-at family',        words: ['cat', 'bat', 'hat', 'mat', 'rat'],    funFact: 'Cats can make over 100 different sounds!' },
+  { theme: '-an family',        words: ['can', 'man', 'fan', 'pan', 'ran'],    funFact: 'A fan blade is shaped like a wing.' },
+  { theme: 'Sight Words 2',     words: ['you', 'to', 'of', 'in', 'it'],        funFact: '"Of" looks like it ends in F but sounds like UV.' },
+  { theme: '-ig family',        words: ['big', 'pig', 'dig', 'fig', 'wig'],    funFact: 'A pig wags its tail when it\'s happy.' },
+  { theme: '-op family',        words: ['hop', 'top', 'pop', 'mop', 'cop'],    funFact: 'Frogs hop because their back legs are super springy.' },
+  { theme: 'Color words',       words: ['red', 'blue', 'green', 'yellow', 'pink'], funFact: 'Bees see colors we can\'t see — they see ultraviolet!' },
+  { theme: '-un family',        words: ['sun', 'fun', 'run', 'bun', 'gun'],    funFact: 'The Sun is so big, a million Earths could fit inside it.' },
+  { theme: 'Sight Words 3',     words: ['was', 'said', 'have', 'for', 'with'], funFact: '"Said" is one of the trickiest sight words. Just memorize it!' },
+  { theme: '-en family',        words: ['hen', 'pen', 'ten', 'men', 'den'],    funFact: 'Ten is a special number — we use 10 fingers to count.' },
+  { theme: 'Number words',      words: ['one', 'two', 'three', 'four', 'five'], funFact: '"Two" has a silent W. Sneaky letter!' },
+  { theme: '-ot family',        words: ['hot', 'pot', 'dot', 'cot', 'got'],    funFact: 'Pots used to be made of clay before metal pots existed.' },
+  { theme: 'Animal words',      words: ['dog', 'fish', 'bird', 'frog', 'duck'], funFact: 'A duck\'s quack actually DOES echo — that\'s a myth!' },
+  { theme: '-ed family',        words: ['bed', 'red', 'fed', 'led', 'wed'],    funFact: 'You spend a third of your life in bed sleeping.' },
+  { theme: '-it family',        words: ['sit', 'hit', 'bit', 'fit', 'kit'],    funFact: 'A baby fox is called a "kit"!' },
+  { theme: 'Sight Words 4',     words: ['this', 'that', 'they', 'when', 'what'], funFact: '"What" starts with a silent H. Spy letter!' },
+  { theme: '-ug family',        words: ['bug', 'rug', 'mug', 'hug', 'jug'],    funFact: 'There are more bugs on Earth than every other animal combined.' },
+  { theme: 'Family words',      words: ['mom', 'dad', 'son', 'sis', 'pop'],    funFact: '"Mom" and "Dad" are some of the first words babies say in many languages.' },
+];
+
+export function getWeeklyWordsForKid(date: Date = new Date()): WeeklyWords {
+  const target = new Date(date.valueOf());
+  const dayNr = (date.getDay() + 6) % 7;
+  target.setDate(target.getDate() - dayNr + 3);
+  const firstThursday = target.valueOf();
+  target.setMonth(0, 1);
+  if (target.getDay() !== 4) target.setMonth(0, 1 + ((4 - target.getDay()) + 7) % 7);
+  const week = 1 + Math.ceil((firstThursday - target.valueOf()) / 604800000);
+  return WEEKLY_WORDS_KINDER[(week - 1 + WEEKLY_WORDS_KINDER.length) % WEEKLY_WORDS_KINDER.length];
 }
