@@ -26,6 +26,43 @@ export type Contractor = {
   startedAt: string;       // YYYY-MM-DD
 };
 
+// ── Invoice model (contractor → homeowner) ──────────────────────────
+// Stored in client_kv as { client_id: contractor_email, key: 'invoices', value: ContractorInvoice[] }
+// Separate from the agency `invoices` table because contractor invoices
+// are written/seen only by the contractor — never by MNA staff.
+
+export type InvoiceLineItem = {
+  description: string;
+  quantity: number;
+  unitPrice: number;
+};
+
+export type ContractorInvoice = {
+  id: string;
+  invoiceNumber: string;       // human-readable, e.g. "INV-2026-001"
+  jobId?: string;              // optional link back to a Job
+  customerName: string;
+  customerEmail?: string;
+  customerAddress?: string;
+  issuedDate: string;          // YYYY-MM-DD
+  dueDate: string;             // YYYY-MM-DD
+  lineItems: InvoiceLineItem[];
+  taxRate: number;             // percent, e.g. 7
+  notes?: string;
+  paymentInstructions: string; // free text — Zelle, Venmo, ACH, check, etc.
+  status: 'draft' | 'sent' | 'paid' | 'overdue' | 'void';
+  paidAmount?: number;
+  paidDate?: string;
+  createdAt: string;
+};
+
+export function invoiceTotals(inv: ContractorInvoice) {
+  const subtotal = inv.lineItems.reduce((s, li) => s + (Number(li.quantity) || 0) * (Number(li.unitPrice) || 0), 0);
+  const tax = subtotal * ((Number(inv.taxRate) || 0) / 100);
+  const total = subtotal + tax;
+  return { subtotal, tax, total };
+}
+
 export const CONTRACTORS: Contractor[] = [
   // Seeded placeholder — replace with real contractor info once onboarded.
   {
