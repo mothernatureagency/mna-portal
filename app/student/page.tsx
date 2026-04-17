@@ -233,7 +233,9 @@ export default function StudentPortal() {
   );
 }
 
-function Chip({ label, theme }: { label: string; theme: typeof STUDENT_THEMES['purple'] }) {
+type Theme = (typeof STUDENT_THEMES)[keyof typeof STUDENT_THEMES];
+
+function Chip({ label, theme }: { label: string; theme: Theme }) {
   return (
     <span
       className="text-[11px] font-semibold px-3 py-1 rounded-full"
