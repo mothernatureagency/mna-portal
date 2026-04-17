@@ -90,7 +90,28 @@ export default function JarvisFab() {
     if (speakingTimeoutRef.current) window.clearTimeout(speakingTimeoutRef.current);
   }, []);
 
-  const { supported, listening, transcript, start, stop } = useVoiceRecognition({ onFinalResult: handleFinal });
+  // Continuous mode = orb keeps listening across multiple utterances until
+  // the user explicitly stops it. Every final transcript triggers a query.
+  const { supported, listening, transcript, start, stop } = useVoiceRecognition({
+    onFinalResult: handleFinal,
+    continuous: true,
+  });
+
+  // Animate when any speech is playing anywhere in the app (tutor replies,
+  // etc.). Lets the globe pulse in sync with audio she's hearing.
+  useEffect(() => {
+    function onStart() { setMode('speaking'); }
+    function onEnd() {
+      // If we were speaking and not actively listening, drop back to idle.
+      setMode((current) => current === 'speaking' && !listening ? 'idle' : current);
+    }
+    window.addEventListener('mn-speech-start', onStart);
+    window.addEventListener('mn-speech-end', onEnd);
+    return () => {
+      window.removeEventListener('mn-speech-start', onStart);
+      window.removeEventListener('mn-speech-end', onEnd);
+    };
+  }, [listening]);
 
   // Sync recognition state → UI mode
   useEffect(() => {

@@ -104,6 +104,10 @@ export type StudentAgent = {
   tagline: string;
   systemPrompt: string;
   suggestions: string[];
+  /** BCP-47 language hint for text-to-speech. Set on language tutors so
+   *  their replies use a native Spanish / Vietnamese voice. Defaults to
+   *  the shared Mother Nature voice when omitted. */
+  voiceLang?: string;
 };
 
 export const STUDENT_AGENTS: StudentAgent[] = [
@@ -142,6 +146,7 @@ Use 1-2 emojis per reply. Keep it short and engaging.`,
       'How do I say "I want to be a singer" in Spanish?',
       'Quiz me on colors and numbers',
     ],
+    voiceLang: 'es-ES',
   },
   {
     id: 'vietnamese-tutor',
@@ -161,6 +166,7 @@ Make it feel like learning from a fun bilingual friend. Never make her feel bad 
       'How do I say "I love singing" in Vietnamese?',
       'Quiz me on Vietnamese food words',
     ],
+    voiceLang: 'vi-VN',
   },
   {
     id: 'math-tutor',
