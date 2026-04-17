@@ -43,6 +43,7 @@ const NAV = [
   { sec: 'ACCOUNT', items: [
     { label: 'Settings', href: '/settings', e: 'settings' },
     { label: 'Client View', href: '/client', e: 'swap_horiz' },
+    { label: 'Contractor View', href: '/contractor', e: 'engineering' },
   ]},
 ];
 
