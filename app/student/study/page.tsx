@@ -48,9 +48,41 @@ export default function StudyPage() {
       if (!fetchEmail) return;
       await Promise.all([
         fetch(`/api/client-kv?clientId=${encodeURIComponent(fetchEmail)}&key=flashcards`)
-          .then((r) => r.json()).then((d) => setCards(Array.isArray(d.value) ? d.value : [])).catch(() => {}),
+          .then((r) => r.json()).then((d) => {
+            const raw = Array.isArray(d.value) ? d.value : [];
+            // Normalize so old / partially-populated cards don't crash the UI:
+            // every card must have id, question, answer, subject, and counters.
+            const safe: Flashcard[] = raw
+              .filter((c: any) => c && typeof c === 'object' && c.question && c.answer)
+              .map((c: any) => ({
+                id: String(c.id || `${Date.now()}-${Math.random()}`),
+                question: String(c.question),
+                answer: String(c.answer),
+                subject: String(c.subject || 'General'),
+                source: c.source ? String(c.source) : undefined,
+                reviewedCount: Number(c.reviewedCount) || 0,
+                knownCount: Number(c.knownCount) || 0,
+                createdAt: String(c.createdAt || new Date().toISOString()),
+                lastReviewedAt: c.lastReviewedAt ? String(c.lastReviewedAt) : undefined,
+              }));
+            setCards(safe);
+          }).catch(() => {}),
         fetch(`/api/client-kv?clientId=${encodeURIComponent(fetchEmail)}&key=memory`)
-          .then((r) => r.json()).then((d) => setMemory(Array.isArray(d.value) ? d.value : [])).catch(() => {}),
+          .then((r) => r.json()).then((d) => {
+            const raw = Array.isArray(d.value) ? d.value : [];
+            const safe: MemoryItem[] = raw
+              .filter((m: any) => m && typeof m === 'object' && (m.body || m.title))
+              .map((m: any) => ({
+                id: String(m.id || `${Date.now()}-${Math.random()}`),
+                title: String(m.title || (m.body || '').slice(0, 60) || 'Untitled'),
+                body: String(m.body || ''),
+                subject: m.subject ? String(m.subject) : undefined,
+                source: m.source ? String(m.source) : undefined,
+                tags: Array.isArray(m.tags) ? m.tags.map(String) : [],
+                createdAt: String(m.createdAt || new Date().toISOString()),
+              }));
+            setMemory(safe);
+          }).catch(() => {}),
       ]);
     })();
   }, []);
@@ -67,7 +99,10 @@ export default function StudyPage() {
   // ── Subject filter for cards ──
   const subjects = useMemo(() => ['All', ...Array.from(new Set(cards.map((c) => c.subject))).sort()], [cards]);
   const filtered = useMemo(() => subject === 'All' ? cards : cards.filter((c) => c.subject === subject), [cards, subject]);
-  const currentCard = filtered[practiceIdx % Math.max(1, filtered.length)];
+  // Always-safe lookup — empty filtered → no current card; out-of-bounds idx wraps.
+  const currentCard: Flashcard | undefined = filtered.length > 0
+    ? filtered[((practiceIdx % filtered.length) + filtered.length) % filtered.length]
+    : undefined;
 
   async function saveCards(next: Flashcard[]) {
     setCards(next);
