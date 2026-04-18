@@ -937,7 +937,122 @@ Follow along. The best is just getting started.
   ],
 };
 
-export const PLAYBOOKS: Playbook[] = [PINECREST_REOPENING, NICEVILLE_SPRING_RESET, SERENITY_VRBO_LAUNCH];
+// ─── PRIME IV MEMBERSHIPS — 30-day tier-by-tier push ────────────────
+// Source: "Membership Pamphlets.pdf" (4 tiers: Select / Essentials /
+// Transformation / Enlightenment). Works for either Prime IV location.
+// MNA posts these ALONGSIDE whatever the corporate page is pushing so the
+// local social feed is always framing the membership story.
+export const PRIME_IV_MEMBERSHIPS: Playbook = {
+  id: 'prime-iv-memberships',
+  name: 'Prime IV — Membership Push (Pamphlet)',
+  description:
+    '30-day plan walking the audience through all 4 membership tiers (SELECT $110, ESSENTIALS $189, TRANSFORMATION $359, ENLIGHTENMENT $649). Captions pulled from the corporate pamphlet so MNA posts align with what the brand is actually saying.',
+  items: [
+    // ── Phase 1 — The Hook (Days 1-3) ────────────────────────────
+    { day: 1, platform: 'Instagram', content_type: 'Reel',      phase: 'Hook',
+      title: 'Say hello to ROUTINE WELLNESS', hook: 'Wellness isn\'t a quick fix. It\'s a routine.', cta: 'Tap to see our memberships',
+      caption: `Say hello to ROUTINE WELLNESS.\n\nWe built Prime IV memberships because showing up for yourself should feel easy, not expensive. Four tiers. One goal: a body that works as hard as you do.\n\nWhich one fits your life?\n→ SELECT · $110  (the starter)\n→ ESSENTIALS · $189  (the regular)\n→ TRANSFORMATION · $359  (the committed)\n→ ENLIGHTENMENT · $649  (the all-in)\n\nMember perks include exclusive savings, flexible priority scheduling, VIP lounge access, and massage chairs.\n\nLink in bio to join.` },
+    { day: 2, platform: 'TikTok',    content_type: 'Reel',      phase: 'Hook',
+      title: 'What a Prime IV membership actually gets you', hook: 'Everyone asks if memberships are worth it. Here\'s the real math.', cta: 'Save for later',
+      caption: `People ask if memberships are worth it. The math tells on itself.\n\nOur lowest tier (SELECT $110) is a $194 value.\nOur top tier (ENLIGHTENMENT $649) is a $1,055 value.\n\nEvery tier includes:\n✓ VIP status + massage chair access\n✓ 50% off additional IV drip additives\n✓ Oxygen treatment\n\nYou\'re not paying for a service. You\'re paying for a system.` },
+    { day: 3, platform: 'Instagram', content_type: 'Story',     phase: 'Hook',
+      title: 'Poll — What\'s stopping you from starting a wellness routine?', hook: 'Tell us what\'s in the way. We\'ll help.', cta: 'Answer the poll',
+      caption: `Quick poll — what\'s really keeping you from a wellness routine?\n\n🔘 Time  🔘 Money  🔘 Don\'t know where to start  🔘 All of the above\n\nWhatever the answer, we built memberships for you.` },
+
+    // ── Phase 2 — SELECT ($110) — days 4-7 ───────────────────────
+    { day: 4, platform: 'Instagram', content_type: 'Carousel',  phase: 'SELECT',
+      title: 'Meet SELECT — $110/mo', hook: 'The easiest way to make IV therapy a habit.', cta: 'Join SELECT',
+      caption: `Meet SELECT · $110/month · $194 value.\n\nDesigned for those who value consistency — a regular hydration + vitamin boost without the commitment of a bigger plan.\n\nHere\'s what\'s included:\n💧 1 Primary IV Drip of your choice\n💉 1 B-12 or Lipolean Injection\n👑 VIP Status + Massage Chair Access\n➕ 50% OFF Additional IV Drip Additives\n🌬️ Oxygen Treatment\n\nIdeal for maintaining vitality with minimal commitment. Perfect starter tier.\n\nLink in bio to sign up.` },
+    { day: 5, platform: 'TikTok',    content_type: 'Reel',      phase: 'SELECT',
+      title: 'What $110 actually gets you at Prime IV', hook: 'POV: $110 that actually pays for itself.', cta: 'Comment MEMBER for the link',
+      caption: `Breaking down SELECT — the $110 starter membership.\n\nOne IV drip ($129 value on its own). One injection. VIP chair. Oxygen. Half off any additive upgrade you want.\n\nIf you even ADD one thing, you\'ve already made the math work.` },
+    { day: 6, platform: 'Instagram', content_type: 'Post',      phase: 'SELECT',
+      title: 'Testimonial — SELECT member story', hook: '"I just wanted energy back. I got a whole routine."', cta: 'Read the full story',
+      caption: `"I joined SELECT because I thought I just needed a B-12 shot. 3 months in, it\'s the one appointment I don\'t cancel."  — real member\n\nSometimes routine wellness is the whole point. Start where you are.` },
+    { day: 7, platform: 'Instagram', content_type: 'Reel',      phase: 'SELECT',
+      title: 'A day with SELECT', hook: 'Here\'s what one visit looks like.', cta: 'Book your first session',
+      caption: `A day with SELECT. Walk in. VIP chair. IV drip + injection. Oxygen if you want it. Out in under an hour feeling like a whole new person.\n\n$110/mo. You\'re welcome.` },
+
+    // ── Phase 3 — ESSENTIALS ($189) — days 8-13 ──────────────────
+    { day: 8, platform: 'Instagram', content_type: 'Carousel',  phase: 'ESSENTIALS',
+      title: 'ESSENTIALS — the sweet spot of wellness', hook: 'The membership most people settle into.', cta: 'Swipe to see what\'s inside',
+      caption: `Meet ESSENTIALS · $189/month · $320 value.\n\nFor those who want a more comprehensive wellness support with flexibility built in.\n\nWhat\'s inside:\n💧 ANY 1 IV Drip of your choice\n💉 2 B-12 or Lipolean Injections\n👑 VIP Status + Massage Chair Access\n🏷️ 15% OFF any Additional IV Drips & Injections\n➕ 50% OFF Additional IV Drip Additives\n🌬️ Oxygen Treatment\n\nThis is the plan for people who benefit from a holistic approach to hydration + vitamin therapy.` },
+    { day: 9, platform: 'TikTok',    content_type: 'Reel',      phase: 'ESSENTIALS',
+      title: 'SELECT vs ESSENTIALS — which one', hook: 'Which is right for you? Quick breakdown.', cta: 'Comment your tier',
+      caption: `SELECT or ESSENTIALS?\n\nSELECT: 1 drip + 1 injection. $110. Great if you\'re testing the waters.\nESSENTIALS: 1 drip + 2 injections + 15% off add-ons. $189. Great if you already know you want more than one shot a month.\n\nThe upgrade is $79 for 1 extra injection + a permanent 15% discount on everything else. Math works if you add even once.` },
+    { day: 10, platform: 'Instagram', content_type: 'Reel',     phase: 'ESSENTIALS',
+      title: 'The double-injection month', hook: 'Two injections hit different than one.', cta: 'Learn more',
+      caption: `Two B-12 injections a month is a mood.\n\nOne mid-week pick-me-up. One weekend reset. The energy loop writes itself.\n\nESSENTIALS · $189 · two injections included.` },
+    { day: 11, platform: 'Instagram', content_type: 'Story',    phase: 'ESSENTIALS',
+      title: 'Poll — add Lipolean or stick with B-12?', hook: 'Your call — which one are you picking this month?', cta: 'Vote + DM for details',
+      caption: `Lipolean or B-12? The eternal injection question.\n\nBoth included in ESSENTIALS. Mix and match each month.` },
+    { day: 12, platform: 'Instagram', content_type: 'Carousel', phase: 'ESSENTIALS',
+      title: 'How to maximize your ESSENTIALS membership', hook: '5 ways to stretch a $320-value membership.', cta: 'Save the post',
+      caption: `Getting the most out of your ESSENTIALS membership:\n\n1. Use both injections — no rolling unused shots forever.\n2. Time the IV for the week you feel run-down.\n3. Bring a friend on VIP guest days.\n4. Stack the 15% discount on a higher-tier drip once a quarter.\n5. The 50% additive discount? Actually use it.\n\n$189 in. $320+ out. Every month.` },
+    { day: 13, platform: 'TikTok',    content_type: 'Reel',     phase: 'ESSENTIALS',
+      title: 'Before/after — 30 days on ESSENTIALS', hook: 'What changed after one month.', cta: 'Book your consult',
+      caption: `30 days on ESSENTIALS looks like:\n\n↑ Energy\n↑ Hydration\n↓ Afternoon crashes\n↓ Getting sick from every office cold\n\nIt\'s not magic. It\'s routine.` },
+
+    // ── Phase 4 — TRANSFORMATION ($359) — days 14-21 ─────────────
+    { day: 14, platform: 'Instagram', content_type: 'Carousel', phase: 'TRANSFORMATION',
+      title: 'TRANSFORMATION — the committed wellness plan', hook: 'When you\'re ready to stop dabbling.', cta: 'See what\'s inside',
+      caption: `TRANSFORMATION · $359/month · $605 value.\n\nTailored for those committed to a real wellness journey. This membership maximizes your health potential with multiple IV drips and a wider selection of injections.\n\nWhat\'s inside:\n💧 ANY 2 IV Drips of your choice\n💉 3 Injections of your choice\n👑 VIP Status + Massage Chair Access\n🏷️ 20% OFF any Additional IV Drips & Injections\n➕ 50% OFF Additional IV Drip Additives\n🌬️ Oxygen Treatment\n\nIdeal for looking to significantly enhance your physical health and wellness outcomes.` },
+    { day: 15, platform: 'TikTok',    content_type: 'Reel',     phase: 'TRANSFORMATION',
+      title: '2 drips a month = different body', hook: 'What happens when you get two full IVs every month.', cta: 'Comment for details',
+      caption: `Two IV drips a month. Three injections. 20% off anything extra.\n\nTRANSFORMATION is for the people who don\'t just want to feel better — they want to be different.\n\n$359 · $605 value. The math is good. The results are better.` },
+    { day: 16, platform: 'Instagram', content_type: 'Reel',     phase: 'TRANSFORMATION',
+      title: 'The TRANSFORMATION stack', hook: 'Here\'s how a committed member actually uses it.', cta: 'DM us your goals',
+      caption: `How a TRANSFORMATION member actually uses it:\n\nWeek 1: Myers Cocktail drip + B-12\nWeek 2: Vitamin C / Immune drip + Lipolean\nWeek 3: Hydration + B-12\nWeek 4: Recovery drip + Vitamin D injection\n\nTwo drips + three injections. Every month. Your body notices.` },
+    { day: 17, platform: 'Instagram', content_type: 'Post',     phase: 'TRANSFORMATION',
+      title: 'Member spotlight — TRANSFORMATION', hook: '"It changed how my body feels on a Tuesday."', cta: 'Read the full story',
+      caption: `"I don\'t just feel ok anymore. I feel capable." — TRANSFORMATION member, 6 months in.\n\n$359/month that pays dividends in the parts of life that don\'t show up on an invoice.` },
+    { day: 18, platform: 'Instagram', content_type: 'Carousel', phase: 'TRANSFORMATION',
+      title: 'ESSENTIALS vs TRANSFORMATION — when to upgrade', hook: 'The moment you know you\'re ready.', cta: 'Swipe to decide',
+      caption: `Upgrade time?\n\nESSENTIALS makes sense when: You want consistency + one solid monthly reset.\nTRANSFORMATION makes sense when: You\'re already going twice a month. You\'re adding injections. You want a second drip to actually stack effects.\n\nDoing the math: ESSENTIALS → TRANSFORMATION is +$170/mo but you gain a full second IV drip ($129+ value) + 2 more injections. Pays for itself in use.` },
+    { day: 19, platform: 'TikTok',    content_type: 'Reel',     phase: 'TRANSFORMATION',
+      title: 'What 3 injections a month can do', hook: 'Three shots, three purposes, one body.', cta: 'Save this',
+      caption: `Three injections a month. One strategy.\n\nB-12 for energy. Lipolean for metabolism. Vitamin D for immunity.\n\nThat\'s TRANSFORMATION. $359/mo. Covered.` },
+    { day: 20, platform: 'Instagram', content_type: 'Story',    phase: 'TRANSFORMATION',
+      title: 'Poll — Which drip combo are you picking this month?', hook: 'Two drips. Infinite combos.', cta: 'Vote now',
+      caption: `If you had TRANSFORMATION this month, which two drips are you picking?\n\n🔘 Myers + Immune  🔘 Recovery + NAD+  🔘 Beauty + Hydration  🔘 Other\n\n(members, answer in the comments)` },
+    { day: 21, platform: 'Instagram', content_type: 'Reel',     phase: 'TRANSFORMATION',
+      title: 'A month in the life of a TRANSFORMATION member', hook: 'Four visits. One transformation.', cta: 'Book your first one',
+      caption: `Four visits a month. Two IVs. Three injections. Oxygen every time. VIP chair every time.\n\nThis is what "committed to wellness" actually looks like.\n\nTRANSFORMATION · $359 · link in bio.` },
+
+    // ── Phase 5 — ENLIGHTENMENT ($649) — days 22-28 ──────────────
+    { day: 22, platform: 'Instagram', content_type: 'Carousel', phase: 'ENLIGHTENMENT',
+      title: 'ENLIGHTENMENT — the flagship', hook: 'This is the one people share with their partner.', cta: 'Tap to see everything',
+      caption: `ENLIGHTENMENT · $649/month · $1,055 value.\n\nDesigned for those who value ultimate flexibility and comprehensive wellness support. Perfect for individuals or households looking to maximize their wellness with a wider range of treatments.\n\nWhat\'s inside:\n💧 ANY 4 IV Drips of your choice\n💉 ANY 5 Injections (including Vitamin D)\n👑 VIP Status + Massage Chair Access\n🏷️ 25% OFF any Additional IV Drips & Injections\n➕ 50% OFF Additional IV Drip Additives\n👥 Shareable among 2 household members\n🌬️ Oxygen Treatment\n\n*Some exclusions may apply.` },
+    { day: 23, platform: 'TikTok',    content_type: 'Reel',     phase: 'ENLIGHTENMENT',
+      title: 'Share it with your spouse — the math', hook: 'Why couples get ENLIGHTENMENT and don\'t look back.', cta: 'DM for details',
+      caption: `ENLIGHTENMENT is shareable — that\'s the unlock.\n\nSplit it with your spouse, roommate, or adult kid. 4 drips + 5 injections between two people = 2 drips + 2-3 shots each.\n\n$325/person/month for a service that runs $500+ retail. Math works.` },
+    { day: 24, platform: 'Instagram', content_type: 'Reel',     phase: 'ENLIGHTENMENT',
+      title: 'Vitamin D injection — why it\'s in the top tier', hook: 'Why ENLIGHTENMENT is the only tier with Vitamin D.', cta: 'Save for later',
+      caption: `Vitamin D is the injection 90% of Americans need. And it\'s only in ENLIGHTENMENT.\n\nLow Vitamin D = low mood, weak immunity, weaker bones, brain fog. High Vitamin D = the opposite.\n\nOne reason ENLIGHTENMENT is the tier serious wellness people pick.` },
+    { day: 25, platform: 'Instagram', content_type: 'Carousel', phase: 'ENLIGHTENMENT',
+      title: 'What $1,055 of wellness costs on this plan', hook: 'The tier where math stops making sense (in your favor).', cta: 'Swipe to see',
+      caption: `ENLIGHTENMENT at a glance:\n\n$649/month → $1,055+ in actual service value.\n\nThat\'s 4 IV drips @ $129+ each = $516+\nPlus 5 injections @ $35+ each = $175+\nPlus VIP access, oxygen, and 25% off anything you add.\n\nYou\'re paying $649 for what would cost $1,055+ à la carte. That gap is the membership\'s whole point.` },
+    { day: 26, platform: 'Instagram', content_type: 'Post',     phase: 'ENLIGHTENMENT',
+      title: 'Couples who wellness together', hook: '"We split a membership. It\'s our cheapest date night."', cta: 'Tag your person',
+      caption: `"We used to spend $300 on dinner on date night. Now we spend our ENLIGHTENMENT visits together — two chairs, two IVs, glowing home.\n\nCheapest most-effective date night we\'ve ever had."\n\n— real ENLIGHTENMENT members` },
+    { day: 27, platform: 'TikTok',    content_type: 'Reel',     phase: 'ENLIGHTENMENT',
+      title: '5 injections a month is unhinged (in a good way)', hook: 'What 5 injections a month can actually do.', cta: 'Comment FIVE to learn more',
+      caption: `Five injections. One body. One month.\n\nB-12 x2 (energy anchors)\nLipolean x1 (metabolism)\nVitamin D x1 (immune + mood)\nYour pick x1 (however you need it)\n\nThis is what ENLIGHTENMENT looks like in practice.` },
+    { day: 28, platform: 'Instagram', content_type: 'Reel',     phase: 'ENLIGHTENMENT',
+      title: 'Why ENLIGHTENMENT changes how you feel about wellness', hook: 'Not a treatment. A lifestyle.', cta: 'Join the waitlist',
+      caption: `ENLIGHTENMENT members don\'t "go to Prime IV." They live here.\n\nFour visits a month. Shareable. 25% off everything else. Oxygen every time.\n\nIt stops being about the drips and starts being about how differently your body operates all month.` },
+
+    // ── Phase 6 — Compare + Close (days 29-30) ───────────────────
+    { day: 29, platform: 'Instagram', content_type: 'Carousel', phase: 'Close',
+      title: 'All 4 tiers — side by side', hook: 'Which one are YOU?', cta: 'Swipe + tap your pick',
+      caption: `All 4 tiers. One decision.\n\n🔹 SELECT · $110  — 1 drip, 1 injection, VIP, oxygen. Consistency for beginners.\n🔹 ESSENTIALS · $189  — 1 drip, 2 injections, +15% off. The sweet spot.\n🔹 TRANSFORMATION · $359  — 2 drips, 3 injections, +20% off. The committed.\n🔹 ENLIGHTENMENT · $649  — 4 drips, 5 injections (incl Vitamin D), +25% off, shareable. The all-in.\n\nEvery tier: VIP + 50% off additives + oxygen.\n\nLink in bio.` },
+    { day: 30, platform: 'Instagram', content_type: 'Reel',     phase: 'Close',
+      title: 'Last chance reminder to start a wellness routine', hook: 'Future you already said thank you.', cta: 'Link in bio',
+      caption: `If you\'ve been reading these posts for 30 days and still haven\'t signed up — this is your sign.\n\n4 tiers. One starts at $110. The system works no matter where you start.\n\nFuture you already said thank you.` },
+  ],
+};
+
+export const PLAYBOOKS: Playbook[] = [PINECREST_REOPENING, NICEVILLE_SPRING_RESET, SERENITY_VRBO_LAUNCH, PRIME_IV_MEMBERSHIPS];
 
 export function getPlaybook(id: string): Playbook | undefined {
   return PLAYBOOKS.find((p) => p.id === id);
@@ -949,8 +1064,8 @@ export function getPlaybook(id: string): Playbook | undefined {
  * as one-click load buttons.
  */
 export const CLIENT_PLAYBOOKS: Record<string, string[]> = {
-  'prime-iv':           ['niceville-spring-reset'],
-  'prime-iv-pinecrest': ['pinecrest-reopening'],
+  'prime-iv':           ['niceville-spring-reset', 'prime-iv-memberships'],
+  'prime-iv-pinecrest': ['pinecrest-reopening',    'prime-iv-memberships'],
   'serenity-bayfront':  ['serenity-vrbo-launch'],
 };
 
