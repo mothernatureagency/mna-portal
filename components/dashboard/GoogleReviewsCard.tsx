@@ -150,6 +150,18 @@ export default function GoogleReviewsCard({
     window.location.reload();  // simplest — re-trigger load with new place
   }
 
+  // Direct paste fallback when search doesn't return anything
+  async function savePastedId(rawId: string) {
+    const id = rawId.trim();
+    if (!id) return;
+    await fetch('/api/client-kv', {
+      method: 'PUT', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ clientId, key: 'google_place_id', value: id }),
+    }).catch(() => {});
+    setLookupOpen(false);
+    window.location.reload();
+  }
+
   if (loading) {
     return <div className="glass-card p-5 text-[12px] text-white/55">Loading Google reviews…</div>;
   }
@@ -196,61 +208,109 @@ export default function GoogleReviewsCard({
         </div>
       </div>
 
-      {/* Place ID picker — essential when there are multiple Google profiles on the map */}
+      {/* Place ID picker */}
       {lookupOpen && (
-        <div className="rounded-xl p-4 mb-4"
+        <div className="rounded-xl p-4 mb-4 space-y-4"
              style={{ background: 'rgba(0,0,0,0.35)', border: '1px solid rgba(255,255,255,0.15)' }}>
-          <div className="text-[11px] font-bold uppercase tracking-wider text-white/55 mb-2">
-            Search for the right Google profile
-          </div>
-          <div className="flex gap-2">
-            <input
-              type="text"
-              autoFocus
-              value={lookupQuery}
-              onChange={(e) => setLookupQuery(e.target.value)}
-              onKeyDown={(e) => { if (e.key === 'Enter') searchPlaces(); }}
-              placeholder="Prime IV Niceville FL"
-              className="flex-1 px-3 py-2 rounded-lg border text-white text-[13px] placeholder:text-white/55 focus:outline-none"
-              style={{ background: 'rgba(0,0,0,0.45)', borderColor: 'rgba(255,255,255,0.25)' }}
-            />
-            <button
-              onClick={searchPlaces}
-              disabled={lookupBusy || !lookupQuery.trim()}
-              className="text-[12px] font-bold px-4 py-2 rounded-lg text-white disabled:opacity-50"
-              style={{ background: `linear-gradient(135deg,${gradientFrom},${gradientTo})` }}
-            >
-              {lookupBusy ? 'Searching…' : 'Search'}
-            </button>
-          </div>
-          {lookupErr && <div className="text-[11px] text-rose-300 mt-2">{lookupErr}</div>}
-          {candidates.length > 0 && (
-            <div className="mt-3 space-y-1.5">
-              <div className="text-[10px] uppercase tracking-wider font-bold text-white/45">
-                Pick the correct profile ({candidates.length} match{candidates.length === 1 ? '' : 'es'})
-              </div>
-              {candidates.map((c) => (
-                <button
-                  key={c.placeId}
-                  onClick={() => choosePlace(c)}
-                  className="w-full text-left rounded-lg p-2.5 transition hover:bg-white/10 flex items-start justify-between gap-3"
-                  style={{ background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.1)' }}
-                >
-                  <div className="min-w-0 flex-1">
-                    <div className="text-[12px] font-bold text-white">{c.name}</div>
-                    <div className="text-[11px] text-white/60 truncate">{c.address}</div>
-                    {c.type && <div className="text-[10px] text-white/40 mt-0.5">{c.type}</div>}
-                  </div>
-                  <div className="text-right shrink-0">
-                    <div className="flex items-center gap-1">
-                      <Stars rating={Math.round(c.rating || 0)} size={12} />
-                    </div>
-                    <div className="text-[10px] text-white/55 mt-0.5">{c.total} reviews</div>
-                  </div>
-                </button>
-              ))}
+          {/* Paste Place ID directly — fastest path, no API search required */}
+          <div>
+            <div className="text-[11px] font-bold uppercase tracking-wider text-white/55 mb-2">
+              Paste the Place ID directly
             </div>
-          )}
+            <div className="flex gap-2">
+              <input
+                type="text"
+                placeholder="ChIJ…"
+                value={lookupQuery}
+                onChange={(e) => setLookupQuery(e.target.value)}
+                onKeyDown={(e) => { if (e.key === 'Enter' && lookupQuery.startsWith('ChIJ')) savePastedId(lookupQuery); }}
+                className="flex-1 px-3 py-2 rounded-lg border text-white text-[13px] placeholder:text-white/55 focus:outline-none font-mono"
+                style={{ background: 'rgba(0,0,0,0.45)', borderColor: 'rgba(255,255,255,0.25)' }}
+              />
+              <button
+                onClick={() => savePastedId(lookupQuery)}
+                disabled={!lookupQuery.trim()}
+                className="text-[12px] font-bold px-4 py-2 rounded-lg text-white disabled:opacity-50"
+                style={{ background: `linear-gradient(135deg,${gradientFrom},${gradientTo})` }}
+              >
+                Save
+              </button>
+            </div>
+            <a
+              href="https://developers.google.com/maps/documentation/places/web-service/place-id"
+              target="_blank" rel="noreferrer"
+              className="text-[10px] text-white/60 hover:text-white mt-2 inline-flex items-center gap-1"
+            >
+              <span className="material-symbols-outlined" style={{ fontSize: 12 }}>open_in_new</span>
+              Open Google's Place ID Finder (paste the Niceville address, copy the ID that pops up)
+            </a>
+          </div>
+
+          {/* Divider */}
+          <div className="relative text-center">
+            <span className="text-[10px] uppercase tracking-[0.2em] text-white/40 px-2" style={{ background: 'rgba(0,0,0,0.35)', position: 'relative', zIndex: 1 }}>or</span>
+            <div className="absolute top-1/2 left-0 right-0 border-t border-white/10" style={{ zIndex: 0 }} />
+          </div>
+
+          {/* Search by name (needs Places API New enabled + billing) */}
+          <div>
+            <div className="text-[11px] font-bold uppercase tracking-wider text-white/55 mb-2">
+              Search by name
+            </div>
+            <div className="flex gap-2">
+              <input
+                type="text"
+                placeholder="Prime IV Niceville FL"
+                onChange={(e) => setLookupQuery(e.target.value)}
+                onKeyDown={(e) => { if (e.key === 'Enter') searchPlaces(); }}
+                className="flex-1 px-3 py-2 rounded-lg border text-white text-[13px] placeholder:text-white/55 focus:outline-none"
+                style={{ background: 'rgba(0,0,0,0.45)', borderColor: 'rgba(255,255,255,0.25)' }}
+              />
+              <button
+                onClick={searchPlaces}
+                disabled={lookupBusy || !lookupQuery.trim()}
+                className="text-[12px] font-bold px-4 py-2 rounded-lg text-white disabled:opacity-50"
+                style={{ background: 'rgba(255,255,255,0.08)' }}
+              >
+                {lookupBusy ? 'Searching…' : 'Search'}
+              </button>
+            </div>
+            {lookupErr && (
+              <div className="text-[11px] text-rose-300 mt-2 leading-relaxed">
+                {lookupErr}
+                <div className="text-[10px] text-white/55 mt-1">
+                  If this keeps failing, use the paste option above. Common fixes: enable billing on your Google Cloud project, or turn on the <span className="text-white">Places API (New)</span> specifically (not the legacy "Places API").
+                </div>
+              </div>
+            )}
+            {candidates.length > 0 && (
+              <div className="mt-3 space-y-1.5">
+                <div className="text-[10px] uppercase tracking-wider font-bold text-white/45">
+                  Pick the correct profile ({candidates.length} match{candidates.length === 1 ? '' : 'es'})
+                </div>
+                {candidates.map((c) => (
+                  <button
+                    key={c.placeId}
+                    onClick={() => choosePlace(c)}
+                    className="w-full text-left rounded-lg p-2.5 transition hover:bg-white/10 flex items-start justify-between gap-3"
+                    style={{ background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.1)' }}
+                  >
+                    <div className="min-w-0 flex-1">
+                      <div className="text-[12px] font-bold text-white">{c.name}</div>
+                      <div className="text-[11px] text-white/60 truncate">{c.address}</div>
+                      {c.type && <div className="text-[10px] text-white/40 mt-0.5">{c.type}</div>}
+                    </div>
+                    <div className="text-right shrink-0">
+                      <div className="flex items-center gap-1">
+                        <Stars rating={Math.round(c.rating || 0)} size={12} />
+                      </div>
+                      <div className="text-[10px] text-white/55 mt-0.5">{c.total} reviews</div>
+                    </div>
+                  </button>
+                ))}
+              </div>
+            )}
+          </div>
         </div>
       )}
 
