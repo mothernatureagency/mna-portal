@@ -34,7 +34,8 @@
       "Bash(python3 -c \"from PIL import Image; print\\('PIL available'\\)\")",
       "Bash(python3 -m pip install --quiet --user Pillow)",
       "Bash(python3 -c \"from PIL import Image; print\\('OK'\\)\")",
-      "Bash(python3)"
+      "Bash(python3)",
+      "Bash(mdls -name kMDItemNumberOfPages \"/Users/alexuswilliams/Downloads/Membership Pamphlets.pdf\")"
     ]
   }
 }

@@ -22,6 +22,7 @@ import UserBanner from './UserBanner';
 import MonthlyContentCalendar from './MonthlyContentCalendar';
 import LeadSourceSplitEditor from './LeadSourceSplitEditor';
 import CompetitorBenchmark from './CompetitorBenchmark';
+import PrimeIVMembershipCard from './PrimeIVMembershipCard';
 
 // ─── REAL DATA ────────────────────────────────────────────────────────────
 // Source: client provided directly on 2026-04-08
@@ -152,6 +153,12 @@ export default function NicevilleDashboard({ client }: { client: Client }) {
       <div>
         <SectionLabel>Content Calendar</SectionLabel>
         <MonthlyContentCalendar clientName={client.name} gradientFrom={gradientFrom} gradientTo={gradientTo} />
+      </div>
+
+      {/* ── MEMBERSHIP TIERS (pamphlet reference) ── */}
+      <div>
+        <SectionLabel>Prime IV Memberships · Pamphlet Reference</SectionLabel>
+        <PrimeIVMembershipCard gradientFrom={gradientFrom} gradientTo={gradientTo} />
       </div>
 
       {/* ── COMPETITOR BENCHMARK (Meta + Google Reviews) ── */}
