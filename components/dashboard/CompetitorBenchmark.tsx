@@ -22,6 +22,19 @@ type Competitor = {
   publishedContent: number;
 };
 
+// Shared type for live Google data per competitor (kept loose because it
+// comes straight from /api/google-places which normalizes either new or
+// legacy responses)
+type GoogleComp = {
+  placeId: string;
+  name: string;
+  address: string;
+  rating: number;
+  total: number;
+  mapsUrl: string;
+  reviews: any[];
+};
+
 // ─── DATA ────────────────────────────────────────────────────────────
 // Source: Meta Business Suite Benchmarking, Mar 19 – Apr 15, 2026 (28d)
 const COMPETITORS_28D: Competitor[] = [
@@ -56,12 +69,88 @@ export default function CompetitorBenchmark({
   clientId?: string;
 }) {
   const [tab, setTab] = useState<Tab>('meta');
-  const [gReviews, setGReviews] = useState<any>(null);
+  // Google place IDs per competitor slot — stored in client_kv so both
+  // staff + client portal can see them. Keyed by competitor id.
+  const [placeIds, setPlaceIds] = useState<Record<string, string>>({});
+  const [liveGoogle, setLiveGoogle] = useState<Record<string, GoogleComp>>({});
+  const [loadingIds, setLoadingIds] = useState<string[]>([]);
+  const [editingId, setEditingId] = useState<string | null>(null);
+  const [pasteBuf, setPasteBuf] = useState('');
+
+  // Load saved place IDs for each competitor + the client's own
   useEffect(() => {
     if (tab !== 'google' || !clientId) return;
-    fetch(`/api/google-reviews-sync?clientId=${encodeURIComponent(clientId)}&limit=5`)
-      .then((r) => r.json()).then(setGReviews).catch(() => {});
+    (async () => {
+      const [comps, clientOwn] = await Promise.all([
+        fetch(`/api/client-kv?clientId=${encodeURIComponent(clientId)}&key=google_competitor_place_ids`)
+          .then((r) => r.json()).then((d) => (d.value && typeof d.value === 'object') ? d.value : {}).catch(() => ({})),
+        fetch(`/api/client-kv?clientId=${encodeURIComponent(clientId)}&key=google_place_id`)
+          .then((r) => r.json()).then((d) => d.value || '').catch(() => ''),
+      ]);
+      // Seed the client's own place id from the main reviews card
+      const next = { ...comps };
+      if (clientOwn) next.niceville = clientOwn;
+      setPlaceIds(next);
+
+      // Fetch live data for any we have
+      for (const [compId, pid] of Object.entries(next)) {
+        if (!pid) continue;
+        setLoadingIds((l) => [...l, compId]);
+        fetch(`/api/google-places?placeId=${encodeURIComponent(pid as string)}`)
+          .then((r) => r.json())
+          .then((data) => {
+            if (data && !data.error) {
+              setLiveGoogle((prev) => ({ ...prev, [compId]: data }));
+            }
+          })
+          .catch(() => {})
+          .finally(() => setLoadingIds((l) => l.filter((x) => x !== compId)));
+      }
+    })();
   }, [tab, clientId]);
+
+  async function savePlaceId(compId: string, rawId: string) {
+    const id = rawId.trim();
+    if (!id) return;
+    const next = { ...placeIds, [compId]: id };
+    setPlaceIds(next);
+    // Persist — client's own place id also written to the main key so the
+    // primary GoogleReviewsCard stays in sync.
+    await fetch('/api/client-kv', {
+      method: 'PUT', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ clientId, key: 'google_competitor_place_ids', value: next }),
+    }).catch(() => {});
+    if (compId === 'niceville') {
+      await fetch('/api/client-kv', {
+        method: 'PUT', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ clientId, key: 'google_place_id', value: id }),
+      }).catch(() => {});
+    }
+    // Fetch live data for it
+    setLoadingIds((l) => [...l, compId]);
+    try {
+      const r = await fetch(`/api/google-places?placeId=${encodeURIComponent(id)}`);
+      const data = await r.json();
+      if (data && !data.error) setLiveGoogle((prev) => ({ ...prev, [compId]: data }));
+    } finally {
+      setLoadingIds((l) => l.filter((x) => x !== compId));
+    }
+    setEditingId(null);
+    setPasteBuf('');
+  }
+
+  async function clearPlaceId(compId: string) {
+    const next = { ...placeIds };
+    delete next[compId];
+    setPlaceIds(next);
+    await fetch('/api/client-kv', {
+      method: 'PUT', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ clientId, key: 'google_competitor_place_ids', value: next }),
+    }).catch(() => {});
+    setLiveGoogle((prev) => {
+      const n = { ...prev }; delete n[compId]; return n;
+    });
+  }
 
   const data = COMPETITORS_28D;
   const client = data.find((c) => c.isClient)!;
@@ -183,9 +272,20 @@ export default function CompetitorBenchmark({
       )}
 
       {tab === 'google' && (
-        gReviews && gReviews.summary && Number(gReviews.summary.total) > 0
-          ? <GoogleReviewsLive data={gReviews} gradientFrom={gradientFrom} gradientTo={gradientTo} />
-          : <GoogleReviewsPlaceholder gradientFrom={gradientFrom} gradientTo={gradientTo} />
+        <GoogleCompetitorGrid
+          competitors={data}
+          placeIds={placeIds}
+          liveGoogle={liveGoogle}
+          loadingIds={loadingIds}
+          editingId={editingId}
+          pasteBuf={pasteBuf}
+          setEditingId={setEditingId}
+          setPasteBuf={setPasteBuf}
+          savePlaceId={savePlaceId}
+          clearPlaceId={clearPlaceId}
+          gradientFrom={gradientFrom}
+          gradientTo={gradientTo}
+        />
       )}
     </div>
   );
@@ -277,6 +377,212 @@ function BarColumn({
         })}
       </div>
     </div>
+  );
+}
+
+function GoogleCompetitorGrid({
+  competitors,
+  placeIds,
+  liveGoogle,
+  loadingIds,
+  editingId,
+  pasteBuf,
+  setEditingId,
+  setPasteBuf,
+  savePlaceId,
+  clearPlaceId,
+  gradientFrom,
+  gradientTo,
+}: {
+  competitors: Competitor[];
+  placeIds: Record<string, string>;
+  liveGoogle: Record<string, GoogleComp>;
+  loadingIds: string[];
+  editingId: string | null;
+  pasteBuf: string;
+  setEditingId: (id: string | null) => void;
+  setPasteBuf: (s: string) => void;
+  savePlaceId: (id: string, val: string) => void;
+  clearPlaceId: (id: string) => void;
+  gradientFrom: string;
+  gradientTo: string;
+}) {
+  // Who has Google data right now → generate an insight
+  const withData = competitors
+    .map((c) => ({ c, g: liveGoogle[c.id] }))
+    .filter((x): x is { c: Competitor; g: GoogleComp } => !!x.g);
+
+  const client = competitors.find((c) => c.isClient);
+  const clientLive = client ? liveGoogle[client.id] : null;
+  const ratingLeader = withData.slice().sort((a, b) => b.g.rating - a.g.rating)[0];
+  const volumeLeader = withData.slice().sort((a, b) => b.g.total - a.g.total)[0];
+
+  return (
+    <div className="space-y-4">
+      {/* Insight callout — only when we have 2+ data points to compare */}
+      {withData.length >= 2 && (
+        <div
+          className="rounded-xl p-4"
+          style={{ background: `linear-gradient(135deg, ${gradientFrom}22, ${gradientTo}11)`, border: `1px solid ${gradientFrom}55` }}
+        >
+          <div className="text-[10px] font-bold uppercase tracking-wider text-emerald-300 mb-1.5">
+            ✦ Google Local Position
+          </div>
+          <div className="text-white text-[13px] leading-relaxed">
+            {clientLive && (
+              <>
+                {client?.name} averages <span className="font-bold">{clientLive.rating.toFixed(1)}★ across {clientLive.total} reviews</span>.{' '}
+              </>
+            )}
+            {ratingLeader && (
+              <>Highest rated: <span className="font-bold">{ratingLeader.c.name} ({ratingLeader.g.rating.toFixed(1)}★)</span>. </>
+            )}
+            {volumeLeader && (
+              <>Most reviewed: <span className="font-bold">{volumeLeader.c.name} ({volumeLeader.g.total.toLocaleString()})</span>.</>
+            )}
+          </div>
+        </div>
+      )}
+
+      {/* 3-card grid */}
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+        {competitors.map((c) => {
+          const live = liveGoogle[c.id];
+          const placeId = placeIds[c.id];
+          const loading = loadingIds.includes(c.id);
+          const isEditing = editingId === c.id;
+          return (
+            <div
+              key={c.id}
+              className="rounded-xl p-4"
+              style={{
+                background: 'rgba(255,255,255,0.04)',
+                border: `1px solid ${c.isClient ? gradientFrom + '55' : 'rgba(255,255,255,0.1)'}`,
+                borderLeft: `3px solid ${c.isClient ? gradientFrom : '#94a3b8'}`,
+              }}
+            >
+              <div className="flex items-center justify-between mb-2">
+                <div className="min-w-0">
+                  <div className="text-[10px] font-bold uppercase tracking-wider text-white/50">
+                    {c.isClient ? '★ Your location' : 'Competitor'}
+                  </div>
+                  <div className="text-[13px] font-bold text-white truncate">{c.name}</div>
+                </div>
+              </div>
+
+              {loading ? (
+                <div className="text-[11px] text-white/55 py-6 text-center">Loading…</div>
+              ) : live ? (
+                <>
+                  {/* Rating + total */}
+                  <div className="flex items-baseline gap-2 mb-2">
+                    <div className="text-[28px] font-black text-white leading-none">{live.rating.toFixed(1)}</div>
+                    <div className="text-[11px] text-white/55">★ · {live.total.toLocaleString()} reviews</div>
+                  </div>
+                  <GStars rating={Math.round(live.rating)} />
+
+                  {/* Newest review preview — keeps card scannable */}
+                  {live.reviews && live.reviews[0] && (
+                    <div className="mt-3 rounded-lg p-2.5" style={{ background: 'rgba(0,0,0,0.25)', border: '1px solid rgba(255,255,255,0.07)' }}>
+                      <div className="flex items-center gap-1.5 mb-1">
+                        <GStars rating={live.reviews[0].rating || 0} size={11} />
+                        <span className="text-[9px] text-white/50">
+                          {live.reviews[0].author_name || 'Reviewer'}
+                        </span>
+                      </div>
+                      <div className="text-[11px] text-white/70 leading-snug line-clamp-3">
+                        {live.reviews[0].review_text || <span className="italic text-white/35">No review text</span>}
+                      </div>
+                    </div>
+                  )}
+
+                  <div className="flex items-center justify-between mt-3 gap-2">
+                    {live.mapsUrl && (
+                      <a href={live.mapsUrl} target="_blank" rel="noreferrer"
+                         className="text-[10px] text-white/55 hover:text-white flex items-center gap-1">
+                        <span className="material-symbols-outlined" style={{ fontSize: 11 }}>open_in_new</span>
+                        View on Maps
+                      </a>
+                    )}
+                    <button
+                      onClick={() => { setEditingId(c.id); setPasteBuf(placeId || ''); }}
+                      className="text-[10px] text-white/45 hover:text-white/80"
+                    >
+                      Change
+                    </button>
+                  </div>
+                </>
+              ) : isEditing || !placeId ? (
+                <div className="mt-2">
+                  <div className="text-[11px] text-white/65 mb-2 leading-snug">
+                    Paste {c.name}'s Google Place ID (starts with <code className="text-white/80">ChIJ</code>)
+                  </div>
+                  <input
+                    type="text"
+                    autoFocus={isEditing}
+                    placeholder="ChIJ…"
+                    value={isEditing ? pasteBuf : ''}
+                    onChange={(e) => { setEditingId(c.id); setPasteBuf(e.target.value); }}
+                    onKeyDown={(e) => { if (e.key === 'Enter') savePlaceId(c.id, pasteBuf); }}
+                    className="w-full px-2.5 py-2 rounded-lg border text-white text-[12px] placeholder:text-white/40 focus:outline-none font-mono"
+                    style={{ background: 'rgba(0,0,0,0.35)', borderColor: 'rgba(255,255,255,0.2)' }}
+                  />
+                  <div className="flex gap-1.5 mt-2">
+                    <button
+                      onClick={() => savePlaceId(c.id, isEditing ? pasteBuf : '')}
+                      disabled={!(isEditing ? pasteBuf.trim() : false)}
+                      className="text-[10px] font-bold px-3 py-1.5 rounded-lg text-white disabled:opacity-40 flex-1"
+                      style={{ background: `linear-gradient(135deg,${gradientFrom},${gradientTo})` }}
+                    >
+                      Save
+                    </button>
+                    {isEditing && (
+                      <button
+                        onClick={() => { setEditingId(null); setPasteBuf(''); }}
+                        className="text-[10px] font-semibold px-2.5 py-1.5 rounded-lg bg-white/10 text-white hover:bg-white/20"
+                      >
+                        Cancel
+                      </button>
+                    )}
+                  </div>
+                  <a
+                    href="https://developers.google.com/maps/documentation/places/web-service/place-id"
+                    target="_blank" rel="noreferrer"
+                    className="text-[9px] text-white/50 hover:text-white mt-2 inline-flex items-center gap-1"
+                  >
+                    <span className="material-symbols-outlined" style={{ fontSize: 10 }}>open_in_new</span>
+                    Open Place ID Finder
+                  </a>
+                </div>
+              ) : (
+                <div className="text-[11px] text-white/55 py-4 text-center">
+                  Place ID saved but no data yet —{' '}
+                  <button onClick={() => clearPlaceId(c.id)} className="text-rose-300 hover:text-rose-200">clear</button> and re-paste.
+                </div>
+              )}
+            </div>
+          );
+        })}
+      </div>
+
+      <div className="text-[10px] text-white/40">
+        Reviews + ratings pulled live from Google Places API. Only the newest review is shown per card to keep the comparison scannable.
+      </div>
+    </div>
+  );
+}
+
+function GStars({ rating, size = 13 }: { rating: number; size?: number }) {
+  return (
+    <span className="inline-flex gap-0.5 items-center">
+      {[1, 2, 3, 4, 5].map((n) => (
+        <span key={n} className="material-symbols-outlined" style={{
+          fontSize: size,
+          color: n <= rating ? '#fbbf24' : 'rgba(255,255,255,0.15)',
+          fontVariationSettings: n <= rating ? '"FILL" 1' : '"FILL" 0',
+        }}>star</span>
+      ))}
+    </span>
   );
 }
 
