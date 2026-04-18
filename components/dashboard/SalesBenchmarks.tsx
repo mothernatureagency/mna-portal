@@ -80,11 +80,17 @@ export default function SalesBenchmarks({
       .finally(() => setLoading(false));
   }, [clientId]);
 
-  // Index by key/metric for fast lookup
+  // Index by key/metric for fast lookup.
+  // Coerce value to Number here — Postgres returns `numeric` columns as
+  // strings via the pg driver, and later .toFixed() / .toLocaleString()
+  // calls on a string crash with "is not a function".
   const byKey = useMemo(() => {
     const map: Record<string, Entry> = {};
     for (const e of entries) {
-      map[`${e.competitor_key}|${e.metric}|${e.year_month}`] = e;
+      map[`${e.competitor_key}|${e.metric}|${e.year_month}`] = {
+        ...e,
+        value: Number(e.value) || 0,
+      };
     }
     return map;
   }, [entries]);
