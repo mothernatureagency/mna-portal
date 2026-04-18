@@ -24,6 +24,7 @@ import LeadSourceSplitEditor from './LeadSourceSplitEditor';
 import CompetitorBenchmark from './CompetitorBenchmark';
 import PrimeIVMembershipCard from './PrimeIVMembershipCard';
 import GoogleReviewsCard from './GoogleReviewsCard';
+import SalesBenchmarks from './SalesBenchmarks';
 
 // ─── REAL DATA ────────────────────────────────────────────────────────────
 // Source: client provided directly on 2026-04-08
@@ -175,6 +176,12 @@ export default function NicevilleDashboard({ client }: { client: Client }) {
       <div>
         <SectionLabel>Competitive Position</SectionLabel>
         <CompetitorBenchmark gradientFrom={gradientFrom} gradientTo={gradientTo} clientId={client.id} />
+      </div>
+
+      {/* ── SALES BENCHMARKS (manual entry: Niceville vs Destin vs Corporate) ── */}
+      <div>
+        <SectionLabel>Sales Benchmarks</SectionLabel>
+        <SalesBenchmarks clientId={client.id} gradientFrom={gradientFrom} gradientTo={gradientTo} />
       </div>
 
       {/* ── KEY METRICS (honest — only values we actually have) ── */}

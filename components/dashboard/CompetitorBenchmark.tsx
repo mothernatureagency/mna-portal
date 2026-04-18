@@ -73,9 +73,30 @@ export default function CompetitorBenchmark({
   // staff + client portal can see them. Keyed by competitor id.
   const [placeIds, setPlaceIds] = useState<Record<string, string>>({});
   const [liveGoogle, setLiveGoogle] = useState<Record<string, GoogleComp>>({});
+  const [velocity, setVelocity] = useState<Record<string, { current: number; rating: number; d7: number; d30: number; d90: number; since: string | null }>>({});
   const [loadingIds, setLoadingIds] = useState<string[]>([]);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [pasteBuf, setPasteBuf] = useState('');
+
+  async function snapshot(compId: string, placeId: string, live: GoogleComp) {
+    if (!clientId) return;
+    await fetch('/api/google-places/snapshot', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        clientId, competitorKey: compId, placeId,
+        rating: live.rating, totalReviews: live.total,
+      }),
+    }).catch(() => {});
+  }
+
+  async function refreshVelocity() {
+    if (!clientId) return;
+    try {
+      const r = await fetch(`/api/google-places/snapshot?clientId=${encodeURIComponent(clientId)}`);
+      const d = await r.json();
+      setVelocity(d.velocity || {});
+    } catch {}
+  }
 
   // Load saved place IDs for each competitor + the client's own
   useEffect(() => {
@@ -92,7 +113,7 @@ export default function CompetitorBenchmark({
       if (clientOwn) next.niceville = clientOwn;
       setPlaceIds(next);
 
-      // Fetch live data for any we have
+      // Fetch live data + snapshot each
       for (const [compId, pid] of Object.entries(next)) {
         if (!pid) continue;
         setLoadingIds((l) => [...l, compId]);
@@ -101,11 +122,16 @@ export default function CompetitorBenchmark({
           .then((data) => {
             if (data && !data.error) {
               setLiveGoogle((prev) => ({ ...prev, [compId]: data }));
+              // Capture today's snapshot so we can compute growth over time
+              snapshot(compId, pid as string, data);
             }
           })
           .catch(() => {})
           .finally(() => setLoadingIds((l) => l.filter((x) => x !== compId)));
       }
+
+      // Pull existing velocity history
+      refreshVelocity();
     })();
   }, [tab, clientId]);
 
@@ -276,6 +302,7 @@ export default function CompetitorBenchmark({
           competitors={data}
           placeIds={placeIds}
           liveGoogle={liveGoogle}
+          velocity={velocity}
           loadingIds={loadingIds}
           editingId={editingId}
           pasteBuf={pasteBuf}
@@ -380,10 +407,13 @@ function BarColumn({
   );
 }
 
+type Velocity = { current: number; rating: number; d7: number; d30: number; d90: number; since: string | null };
+
 function GoogleCompetitorGrid({
   competitors,
   placeIds,
   liveGoogle,
+  velocity,
   loadingIds,
   editingId,
   pasteBuf,
@@ -397,6 +427,7 @@ function GoogleCompetitorGrid({
   competitors: Competitor[];
   placeIds: Record<string, string>;
   liveGoogle: Record<string, GoogleComp>;
+  velocity: Record<string, Velocity>;
   loadingIds: string[];
   editingId: string | null;
   pasteBuf: string;
@@ -416,6 +447,20 @@ function GoogleCompetitorGrid({
   const clientLive = client ? liveGoogle[client.id] : null;
   const ratingLeader = withData.slice().sort((a, b) => b.g.rating - a.g.rating)[0];
   const volumeLeader = withData.slice().sort((a, b) => b.g.total - a.g.total)[0];
+
+  // Growth leader: who gained the MOST reviews over 30 days
+  const withVelocity = competitors
+    .map((c) => ({ c, v: velocity[c.id] }))
+    .filter((x): x is { c: Competitor; v: Velocity } => !!x.v && x.v.d30 > 0);
+  const growthLeader30 = withVelocity.slice().sort((a, b) => b.v.d30 - a.v.d30)[0];
+  const clientVelocity = client ? velocity[client.id] : null;
+  const competitorVelocities = withVelocity.filter((x) => !x.c.isClient);
+  const avgCompD30 = competitorVelocities.length
+    ? competitorVelocities.reduce((n, x) => n + x.v.d30, 0) / competitorVelocities.length
+    : 0;
+  const paceMultiple = clientVelocity && avgCompD30 > 0
+    ? (clientVelocity.d30 / avgCompD30)
+    : null;
 
   return (
     <div className="space-y-4">
@@ -440,6 +485,40 @@ function GoogleCompetitorGrid({
             {volumeLeader && (
               <>Most reviewed: <span className="font-bold">{volumeLeader.c.name} ({volumeLeader.g.total.toLocaleString()})</span>.</>
             )}
+          </div>
+        </div>
+      )}
+
+      {/* Growth callout — only once we have velocity data (need at least one
+          prior snapshot, so this unlocks on day 2+ of tracking) */}
+      {withVelocity.length >= 1 && growthLeader30 && (
+        <div
+          className="rounded-xl p-4"
+          style={{ background: 'rgba(16,185,129,0.08)', border: '1px solid rgba(52,211,153,0.35)' }}
+        >
+          <div className="text-[10px] font-bold uppercase tracking-wider text-emerald-300 mb-1.5">
+            ✦ Review Growth · Last 30 Days
+          </div>
+          <div className="text-white text-[13px] leading-relaxed">
+            {clientVelocity && clientVelocity.d30 > 0 && (
+              <>
+                {client?.name} added <span className="font-bold text-emerald-300">+{clientVelocity.d30}</span> review{clientVelocity.d30 === 1 ? '' : 's'} in the last 30 days.
+                {paceMultiple && paceMultiple >= 1 && (
+                  <> That's <span className="font-bold text-emerald-300">{paceMultiple.toFixed(1)}× the average competitor pace</span> ({avgCompD30.toFixed(1)}/mo).</>
+                )}
+                {paceMultiple && paceMultiple < 1 && (
+                  <> Competitors are gaining <span className="font-bold text-amber-300">{(1 / paceMultiple).toFixed(1)}× faster</span> — room to push.</>
+                )}
+                {' '}
+              </>
+            )}
+            {growthLeader30 && (
+              <>Fastest-growing overall: <span className="font-bold">{growthLeader30.c.name} (+{growthLeader30.v.d30})</span>.</>
+            )}
+          </div>
+          <div className="text-[10px] text-white/45 mt-2">
+            Tracking started {withVelocity[0]?.v.since ? new Date(`${withVelocity[0]!.v.since}T12:00:00`).toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' }) : 'today'}.
+            Each dashboard view snapshots the current review counts so this gets more accurate over time.
           </div>
         </div>
       )}
@@ -480,6 +559,18 @@ function GoogleCompetitorGrid({
                     <div className="text-[11px] text-white/55">★ · {live.total.toLocaleString()} reviews</div>
                   </div>
                   <GStars rating={Math.round(live.rating)} />
+
+                  {/* Growth velocity — appears after a second snapshot exists */}
+                  {velocity[c.id] && (velocity[c.id].d7 > 0 || velocity[c.id].d30 > 0) && (
+                    <div className="flex gap-2 mt-3 text-[10px]">
+                      <span className="px-2 py-1 rounded-full font-bold" style={{ background: 'rgba(16,185,129,0.15)', color: '#34d399' }}>
+                        +{velocity[c.id].d7} / 7d
+                      </span>
+                      <span className="px-2 py-1 rounded-full font-bold" style={{ background: 'rgba(16,185,129,0.12)', color: '#6ee7b7' }}>
+                        +{velocity[c.id].d30} / 30d
+                      </span>
+                    </div>
+                  )}
 
                   {/* Newest review preview — keeps card scannable */}
                   {live.reviews && live.reviews[0] && (

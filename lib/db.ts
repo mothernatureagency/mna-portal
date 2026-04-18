@@ -147,6 +147,34 @@ async function initSchema() {
                         synced_at timestamptz not null default now(),
                         unique (client_id, google_review_id)
                   )`,
+                  // Daily snapshots of Google Places metrics per competitor.
+                  // One row per (client_id, competitor_key, snapshot_date).
+                  // Velocity = latest total - total N days ago.
+                  `create table if not exists google_review_snapshots (
+                        id uuid primary key default uuid_generate_v4(),
+                        client_id text not null,
+                        competitor_key text not null,
+                        place_id text not null,
+                        snapshot_date date not null,
+                        rating numeric(3,2),
+                        total_reviews integer not null default 0,
+                        captured_at timestamptz not null default now(),
+                        unique (client_id, competitor_key, snapshot_date)
+                  )`,
+                  // Manual sales benchmark entries — Niceville vs area
+                  // developer (Destin) vs corporate average. One row per
+                  // (client_id, competitor_key, metric, year_month).
+                  `create table if not exists sales_benchmarks (
+                        id uuid primary key default uuid_generate_v4(),
+                        client_id text not null,
+                        competitor_key text not null,
+                        metric text not null,
+                        year_month text not null,
+                        value numeric(14,2) not null,
+                        note text,
+                        updated_at timestamptz not null default now(),
+                        unique (client_id, competitor_key, metric, year_month)
+                  )`,
                   // STR reviews synced from platforms
                   `create table if not exists str_reviews (
                         id uuid primary key default uuid_generate_v4(),
