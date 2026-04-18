@@ -188,15 +188,22 @@ export async function POST(req: NextRequest) {
     const pb = getPlaybook(body.playbookId);
     if (!pb) return NextResponse.json({ error: 'Unknown playbook' }, { status: 404 });
     const startDate: string = body?.startDate || new Date().toISOString().slice(0, 10);
-    items = pb.items.map((it) => ({
-      post_date: dayOffsetDate(startDate, it.day),
-      platform: it.platform,
-      content_type: it.content_type,
-      title: `[${it.phase}] ${it.title} — Hook: ${it.hook} | CTA: ${it.cta}`,
-      status: 'Draft',
-      assigned_role: 'Social Media Manager',
-      caption: it.caption, // pre written caption goes straight into content_calendar.caption
-    }));
+    items = pb.items.map((it) => {
+      // PDM brand cascade posts are informational only — they don't need
+      // MNA review/approval because PDM already posts them from the brand
+      // corporate page. Flag the assignee so the calendar styles them
+      // dark blue and the insert logic auto-approves.
+      const isPDM = typeof it.phase === 'string' && /^PDM\b/i.test(it.phase);
+      return {
+        post_date: dayOffsetDate(startDate, it.day),
+        platform: it.platform,
+        content_type: it.content_type,
+        title: `[${it.phase}] ${it.title} — Hook: ${it.hook} | CTA: ${it.cta}`,
+        status: isPDM ? 'Reference' : 'Draft',
+        assigned_role: isPDM ? 'PDM (Brand)' : 'Social Media Manager',
+        caption: it.caption,
+      };
+    });
   } else if (Array.isArray(body?.items)) {
     items = body.items;
   } else {
@@ -219,8 +226,11 @@ export async function POST(req: NextRequest) {
         it.status || 'Draft',
         it.assigned_role || null,
         it.caption || null,
-        // If caption is pre written, it is ready for client review. Otherwise pending MNA draft.
-        it.caption ? 'pending_review' : 'drafting',
+        // PDM reference posts don't go through approval; mark approved.
+        // Otherwise: pre-written caption → pending_review; else drafting.
+        it.assigned_role === 'PDM (Brand)'
+          ? 'approved'
+          : it.caption ? 'pending_review' : 'drafting',
       ]
     );
     inserted.push(rows[0]);
