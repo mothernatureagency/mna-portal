@@ -359,9 +359,9 @@ function InsightRow({ color, title, body }: { color: string; title: string; body
   );
 }
 
-// Quick-seed for the Prime IV April 2026 corporate cascade playbook.
-// One click populates the content calendar with the real corporate posts
-// so MNA can see what the brand is pushing and plan around it.
+// Quick-seed for PDM's April 2026 content calendar.
+// One click populates the content calendar with PDM's actual cascading
+// and local posts so MNA can see what PDM is pushing and plan around it.
 function CorporateSeedButton({ clientName, gradientFrom, gradientTo }: { clientName: string; gradientFrom: string; gradientTo: string }) {
   const [loading, setLoading] = useState(false);
   const [msg, setMsg] = useState<string>('');
@@ -374,13 +374,13 @@ function CorporateSeedButton({ clientName, gradientFrom, gradientTo }: { clientN
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           clientName,
-          playbookId: 'prime-iv-corp-apr-2026',
+          playbookId: 'prime-iv-pdm-apr-2026',
           startDate: '2026-04-01',
         }),
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || 'Seed failed');
-      setMsg(`Loaded ${data.count} corporate posts into April. Reload the calendar.`);
+      setMsg(`Loaded ${data.count} PDM posts into April. Reload the calendar.`);
     } catch (e: any) {
       setMsg(`Error: ${e.message}`);
     } finally {
@@ -396,7 +396,7 @@ function CorporateSeedButton({ clientName, gradientFrom, gradientTo }: { clientN
         className="text-[11px] font-bold px-3 py-1.5 rounded-lg text-white disabled:opacity-50"
         style={{ background: `linear-gradient(135deg, ${gradientFrom}, ${gradientTo})` }}
       >
-        {loading ? 'Loading…' : 'Load April 2026 Corporate Cascade'}
+        {loading ? 'Loading…' : 'Load PDM April 2026 Calendar'}
       </button>
     </div>
   );
