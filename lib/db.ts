@@ -128,6 +128,25 @@ async function initSchema() {
                         synced_at timestamptz not null default now(),
                         primary key (client_id, metric_date)
                   )`,
+                  // Google Business Profile reviews — synced via Make.com daily.
+                  // Keyed by google_review_id so re-syncs upsert cleanly.
+                  `create table if not exists google_reviews (
+                        id uuid primary key default uuid_generate_v4(),
+                        client_id text not null,
+                        google_review_id text not null,
+                        author_name text,
+                        author_photo_url text,
+                        rating integer not null,
+                        review_text text,
+                        review_language text,
+                        review_date timestamptz,
+                        reply_text text,
+                        reply_date timestamptz,
+                        location_name text,
+                        place_id text,
+                        synced_at timestamptz not null default now(),
+                        unique (client_id, google_review_id)
+                  )`,
                   // STR reviews synced from platforms
                   `create table if not exists str_reviews (
                         id uuid primary key default uuid_generate_v4(),
