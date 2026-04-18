@@ -742,63 +742,92 @@ export const SUMMER_WEEKLY_THEMES: { theme: string; ideas: { who: 'marissa' | 'k
   ]},
 ];
 
-// ── CUSTODY / PARENTING SCHEDULE ────────────────────────────────────
-// 2026 custody periods. Edit the ranges here any time the plan changes.
-// All dates are inclusive (start <= date <= end).
+// ── PARENTING CALENDAR ──────────────────────────────────────────────
+// Rules (school-year):
+//   - Weekdays (Mon–Thu)     → with Mom
+//   - Weekends Fri–Sun       → with Dad, EXCEPT 3rd and 5th weekends
+//                              of each month (those stay with Mom)
+// Rules (summer, Jun 6 → Aug 14):
+//   - Jun 6 → Jun 19 (2 weeks) → with Dad
+//   - Jun 19 → Aug 14 alternating Fri-to-Fri, Mom first
+//
+// A "weekend" is indexed by its Friday: the first Friday of the month
+// starts weekend #1.
 
-export type CustodyPeriod = {
-  start: string;    // YYYY-MM-DD
-  end: string;      // YYYY-MM-DD
+export type ParentingPeriod = {
   who: 'mom' | 'dad';
-  label?: string;   // optional descriptor, e.g. "Dad's 2-week block"
+  label?: string;
 };
-
-export const CUSTODY_SCHEDULE: CustodyPeriod[] = [
-  // Near-term: mom has them now, small dad handoff, then mom through 6/5
-  { start: '2026-04-18', end: '2026-04-24', who: 'mom', label: 'Weekday block' },
-  { start: '2026-04-25', end: '2026-04-25', who: 'dad', label: 'Saturday with dad' },
-  { start: '2026-04-26', end: '2026-06-05', who: 'mom', label: 'Long block through 6/5' },
-
-  // Dad's 2-week summer block
-  { start: '2026-06-06', end: '2026-06-19', who: 'dad', label: 'Dad · 2-week block' },
-
-  // Alternating weekly Friday-to-Friday through mid August
-  { start: '2026-06-19', end: '2026-06-26', who: 'mom' },
-  { start: '2026-06-26', end: '2026-07-03', who: 'dad' },
-  { start: '2026-07-03', end: '2026-07-10', who: 'mom' },
-  { start: '2026-07-10', end: '2026-07-17', who: 'dad' },
-  { start: '2026-07-17', end: '2026-07-24', who: 'mom' },
-  { start: '2026-07-24', end: '2026-07-31', who: 'dad' },
-  { start: '2026-07-31', end: '2026-08-07', who: 'mom' },
-  { start: '2026-08-07', end: '2026-08-14', who: 'dad' },
-];
 
 function isoDate(d: Date): string {
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
 }
 
-/** Return the custody period covering a given date (last match wins when
- *  boundaries overlap, since alternating transitions share Fridays). */
-export function getCustodyForDate(date: Date = new Date()): CustodyPeriod | null {
-  const iso = isoDate(date);
-  const matches = CUSTODY_SCHEDULE.filter((p) => iso >= p.start && iso <= p.end);
-  return matches[matches.length - 1] || null;
+const SUMMER_DAD_START = '2026-06-06';
+const SUMMER_DAD_END   = '2026-06-19';
+const ALT_START        = '2026-06-19';
+const ALT_END          = '2026-08-14';
+
+function weekendNumberForFriday(fri: Date): number {
+  const firstOfMonth = new Date(fri.getFullYear(), fri.getMonth(), 1);
+  let firstFri = new Date(firstOfMonth);
+  while (firstFri.getDay() !== 5) firstFri.setDate(firstFri.getDate() + 1);
+  return Math.floor((fri.getDate() - firstFri.getDate()) / 7) + 1;
 }
 
-/** Upcoming handoffs starting from a given date, up to `limit` ahead. */
-export function getUpcomingHandoffs(date: Date = new Date(), limit: number = 5): CustodyPeriod[] {
+export function getParentForDate(date: Date = new Date()): ParentingPeriod {
   const iso = isoDate(date);
-  return CUSTODY_SCHEDULE.filter((p) => p.start > iso).slice(0, limit);
+
+  // Dad's 2-week summer block
+  if (iso >= SUMMER_DAD_START && iso <= SUMMER_DAD_END) {
+    return { who: 'dad', label: 'Summer · 2-week block' };
+  }
+  // Summer alternating — Mom week first starting 6/19
+  if (iso >= ALT_START && iso <= ALT_END) {
+    const start = new Date(`${ALT_START}T12:00:00`);
+    const weeks = Math.floor((date.getTime() - start.getTime()) / (7 * 86400000));
+    return { who: weeks % 2 === 0 ? 'mom' : 'dad', label: 'Summer · alternating' };
+  }
+
+  // School-year pattern
+  const dow = date.getDay();  // 0=Sun, 5=Fri, 6=Sat
+  if (dow === 5 || dow === 6 || dow === 0) {
+    // Find the Friday anchoring this weekend
+    const fri = new Date(date);
+    if (dow === 6) fri.setDate(date.getDate() - 1);
+    else if (dow === 0) fri.setDate(date.getDate() - 2);
+    const wknd = weekendNumberForFriday(fri);
+    if (wknd === 3 || wknd === 5) return { who: 'mom', label: `${wknd === 3 ? '3rd' : '5th'} weekend with Mom` };
+    const ordinal = wknd === 1 ? '1st' : wknd === 2 ? '2nd' : '4th';
+    return { who: 'dad', label: `${ordinal} weekend with Dad` };
+  }
+
+  // Weekdays = Mom
+  return { who: 'mom', label: 'Weekday with Mom' };
+}
+
+/** Next date the parent changes from today's parent. */
+export function getNextHandoff(date: Date = new Date()): { date: string; who: 'mom' | 'dad' } | null {
+  const today = getParentForDate(date);
+  for (let i = 1; i <= 60; i++) {
+    const d = new Date(date.getTime() + i * 86400000);
+    const p = getParentForDate(d);
+    if (p.who !== today.who) return { date: isoDate(d), who: p.who };
+  }
+  return null;
 }
 
 function fmtShortDate(d: string) {
   return new Date(`${d}T12:00:00`).toLocaleDateString(undefined, { weekday: 'short', month: 'short', day: 'numeric' });
 }
 
-export function formatCustodyRange(p: CustodyPeriod): string {
-  if (p.start === p.end) return fmtShortDate(p.start);
-  return `${fmtShortDate(p.start)} – ${fmtShortDate(p.end)}`;
-}
+// Legacy exports for backwards compat with any older imports
+export const getCustodyForDate = getParentForDate;
+export const getUpcomingHandoffs = (date: Date = new Date(), _limit = 5) => {
+  const h = getNextHandoff(date);
+  return h ? [{ start: h.date, end: h.date, who: h.who }] : [];
+};
+export const formatCustodyRange = (p: any) => fmtShortDate(p.start || p);
 
 export function getSummerThemeForWeek(date: Date = new Date()) {
   const target = new Date(date.valueOf());

@@ -58,7 +58,7 @@ function LoginForm() {
         {/* Logo / Title */}
         <div className="flex flex-col items-center gap-3 mb-2">
           <img
-            src="/logos/mna-logo.png"
+            src="/logos/mna-icon-transparent.png"
             alt="Mother Nature Agency"
             className="h-20 w-auto"
           />

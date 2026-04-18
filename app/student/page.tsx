@@ -83,6 +83,26 @@ export default function StudentPortal() {
   // ── Google Calendar connection ──
   const [gcalConnected, setGcalConnected] = useState(false);
 
+  // ── Parent schedule overrides (tap-to-edit on calendar) ──
+  // Shared across students: stored under mn@ since Mom owns the schedule.
+  const [parentOverrides, setParentOverrides] = useState<Record<string, 'mom' | 'dad' | 'clear'>>({});
+  async function saveOverrides(next: Record<string, 'mom' | 'dad' | 'clear'>) {
+    setParentOverrides(next);
+    await fetch('/api/client-kv', {
+      method: 'PUT', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ clientId: 'mna', key: 'parent_overrides', value: next }),
+    }).catch(() => {});
+  }
+  function cycleOverride(iso: string) {
+    const cur = parentOverrides[iso];
+    const next: Record<string, 'mom' | 'dad' | 'clear'> = { ...parentOverrides };
+    if (!cur) next[iso] = 'mom';
+    else if (cur === 'mom') next[iso] = 'dad';
+    else if (cur === 'dad') next[iso] = 'clear';
+    else delete next[iso];
+    saveOverrides(next);
+  }
+
   // ── New-event quick form ──
   const [newEventOpen, setNewEventOpen] = useState(false);
   const todayIso = new Date().toISOString().slice(0, 10);
@@ -118,6 +138,8 @@ export default function StudentPortal() {
           .then((r) => r.json()).then((d) => setTasks(d.requests || d.items || [])).catch(() => {}),
         fetch(`/api/google/status?email=${encodeURIComponent(fetchEmail)}`)
           .then((r) => r.json()).then((d) => setGcalConnected(!!d.connected)).catch(() => {}),
+        fetch(`/api/client-kv?clientId=mna&key=parent_overrides`)
+          .then((r) => r.json()).then((d) => setParentOverrides(d.value && typeof d.value === 'object' ? d.value : {})).catch(() => {}),
       ]);
       // After loading, also pull any Google Calendar events into the same array
       if (fetchEmail) {
@@ -787,13 +809,20 @@ export default function StudentPortal() {
                     if (!c.day) return <div key={i} className="aspect-square rounded-md" style={{ background: 'rgba(255,255,255,0.02)' }} />;
                     const dayEvents = c.iso ? eventsByDay[c.iso] || [] : [];
                     const isToday = c.iso === todayIso;
-                    // Custody overlay — left border stripe color-coded by parent
-                    const custody = c.iso ? getCustodyForDate(new Date(`${c.iso}T12:00:00`)) : null;
+                    // Parent overlay — override wins, else rule-based default
+                    const override = c.iso ? parentOverrides[c.iso] : undefined;
+                    let custody: { who: 'mom' | 'dad' } | null = null;
+                    if (override === 'mom' || override === 'dad') custody = { who: override };
+                    else if (override !== 'clear' && c.iso) custody = getCustodyForDate(new Date(`${c.iso}T12:00:00`)) as any;
                     const custodyColor = custody?.who === 'mom' ? theme.gradientFrom : custody?.who === 'dad' ? '#0ea5e9' : 'transparent';
+                    const isOverridden = !!override;
                     return (
-                      <div
+                      <button
+                        type="button"
                         key={i}
-                        className="aspect-square rounded-md p-1.5 flex flex-col gap-0.5 overflow-hidden relative"
+                        onClick={() => c.iso && cycleOverride(c.iso)}
+                        title={custody ? (custody.who === 'mom' ? 'With Mom (tap to change)' : 'With Dad (tap to change)') : 'Tap to set Mom/Dad'}
+                        className="aspect-square rounded-md p-1.5 flex flex-col gap-0.5 overflow-hidden relative text-left cursor-pointer hover:ring-1 hover:ring-white/30"
                         style={{
                           background: isToday
                             ? `linear-gradient(135deg,${theme.gradientFrom}33,${theme.gradientTo}22)`
@@ -805,7 +834,7 @@ export default function StudentPortal() {
                           border: isToday ? `1px solid ${theme.gradientTo}` : '1px solid rgba(255,255,255,0.06)',
                           borderLeft: custody ? `3px solid ${custodyColor}` : '1px solid rgba(255,255,255,0.06)',
                         }}
-                        title={custody ? `${custody.who === 'mom' ? 'With Mom' : 'With Dad'}${custody.label ? ' · ' + custody.label : ''}` : ''}
+                        title={custody ? (custody.who === 'mom' ? 'With Mom' : 'With Dad') : ''}
                       >
                         <div className="flex items-center justify-between">
                           <div className={`text-[10px] font-bold ${isToday ? 'text-white' : 'text-white/65'}`}>{c.day}</div>
@@ -832,14 +861,20 @@ export default function StudentPortal() {
                           </div>
                         ))}
                         {dayEvents.length > 2 && <div className="text-[7px] text-white/45">+{dayEvents.length - 2}</div>}
-                      </div>
+                        {isOverridden && (
+                          <span
+                            className="absolute top-0.5 right-0.5 w-1.5 h-1.5 rounded-full"
+                            style={{ background: theme.accent }}
+                            title="Custom override"
+                          />
+                        )}
+                      </button>
                     );
                   })}
                 </div>
 
-                {/* Custody legend */}
+                {/* Parent legend — neutral language */}
                 <div className="flex items-center gap-3 mt-3 flex-wrap text-[10px] text-white/65">
-                  <span className="uppercase tracking-wider font-bold text-white/45">Custody:</span>
                   <span className="flex items-center gap-1.5">
                     <span className="w-3 h-3 rounded" style={{ background: theme.gradientFrom }} />
                     With Mom
@@ -860,12 +895,15 @@ export default function StudentPortal() {
                         )}
                         {next && (
                           <span className="text-white/50">
-                            Next: {next.who === 'mom' ? 'Mom' : 'Dad'} on {formatCustodyRange(next).split(' – ')[0]}
+                            Switch: {next.who === 'mom' ? 'Mom' : 'Dad'} on {new Date(`${(next as any).start}T12:00:00`).toLocaleDateString(undefined, { weekday: 'short', month: 'short', day: 'numeric' })}
                           </span>
                         )}
                       </>
                     );
                   })()}
+                </div>
+                <div className="text-[10px] text-white/40 mt-1 text-right">
+                  Tap any day to change: Mom → Dad → Default
                 </div>
               </>
             );
