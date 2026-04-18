@@ -64,6 +64,8 @@ export default function GoogleReviewsCard({
   const [loading, setLoading] = useState(true);
   const [placeName, setPlaceName] = useState<string>('');
   const [mapsUrl, setMapsUrl] = useState<string>('');
+  const [savedPlaceId, setSavedPlaceId] = useState<string>('');
+  const [liveError, setLiveError] = useState<string>('');
   const [lookupOpen, setLookupOpen] = useState(false);
   const [lookupQuery, setLookupQuery] = useState<string>('');
   const [candidates, setCandidates] = useState<any[]>([]);
@@ -74,33 +76,43 @@ export default function GoogleReviewsCard({
   useEffect(() => {
     (async () => {
       setLoading(true);
+      setLiveError('');
       const kv = await fetch(`/api/client-kv?clientId=${encodeURIComponent(clientId)}&key=google_place_id`).then((r) => r.json()).catch(() => null);
       const placeId: string | null = kv?.value || null;
+      if (placeId) setSavedPlaceId(placeId);
 
       if (placeId) {
         // Live path — pull directly from Google
-        const live = await fetch(`/api/google-places?placeId=${encodeURIComponent(placeId)}`).then((r) => r.json()).catch(() => null);
-        if (live && !live.error) {
-          setPlaceName(live.name || '');
-          setMapsUrl(live.mapsUrl || '');
-          setReviews((live.reviews || []).map((r: any) => ({
-            google_review_id: r.google_review_id || `${r.author_name || ''}-${r.review_date || ''}`,
-            author_name: r.author_name,
-            author_photo_url: r.author_photo_url,
-            rating: r.rating,
-            review_text: r.review_text,
-            review_date: r.review_date,
-            reply_text: null,
-            reply_date: null,
-          })));
-          setSummary({
-            total: live.total || 0,
-            avg_rating: live.rating || 0,
-            last_7d: 0, last_30d: 0,  // Places API doesn't break down by recency
-            five_star: 0, four_star: 0, three_star: 0, two_star: 0, one_star: 0,
-          });
-          setLoading(false);
-          return;
+        try {
+          const r = await fetch(`/api/google-places?placeId=${encodeURIComponent(placeId)}`);
+          const live = await r.json();
+          if (!r.ok || live?.error) {
+            // Surface the real error so the user can diagnose
+            setLiveError(live?.error || `Places API returned ${r.status}`);
+          } else {
+            setPlaceName(live.name || '');
+            setMapsUrl(live.mapsUrl || '');
+            setReviews((live.reviews || []).map((r: any) => ({
+              google_review_id: r.google_review_id || `${r.author_name || ''}-${r.review_date || ''}`,
+              author_name: r.author_name,
+              author_photo_url: r.author_photo_url,
+              rating: r.rating,
+              review_text: r.review_text,
+              review_date: r.review_date,
+              reply_text: null,
+              reply_date: null,
+            })));
+            setSummary({
+              total: live.total || 0,
+              avg_rating: live.rating || 0,
+              last_7d: 0, last_30d: 0,
+              five_star: 0, four_star: 0, three_star: 0, two_star: 0, one_star: 0,
+            });
+            setLoading(false);
+            return;
+          }
+        } catch (e: any) {
+          setLiveError(e?.message || 'Network error reaching Places API');
         }
       }
 
@@ -207,6 +219,40 @@ export default function GoogleReviewsCard({
           </button>
         </div>
       </div>
+
+      {/* Saved Place ID + live error diagnostics */}
+      {(savedPlaceId || liveError) && !lookupOpen && (
+        <div className="rounded-xl p-3 mb-4" style={{ background: 'rgba(0,0,0,0.25)', border: '1px solid rgba(255,255,255,0.1)' }}>
+          {savedPlaceId && (
+            <div className="text-[11px] text-white/70 flex items-center gap-2 flex-wrap">
+              <span className="uppercase tracking-wider font-bold text-white/45 text-[9px]">Saved Place ID:</span>
+              <code className="text-white font-mono text-[11px] break-all">{savedPlaceId}</code>
+              <button
+                onClick={async () => {
+                  await fetch('/api/client-kv', {
+                    method: 'PUT', headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ clientId, key: 'google_place_id', value: null }),
+                  }).catch(() => {});
+                  window.location.reload();
+                }}
+                className="text-[10px] text-rose-300 hover:text-rose-200"
+              >Clear</button>
+            </div>
+          )}
+          {liveError && (
+            <div className="text-[11px] text-rose-300 mt-2 leading-relaxed">
+              <span className="font-bold">Google Places error:</span> {liveError}
+              <div className="text-[10px] text-white/55 mt-1 space-y-0.5">
+                <div>→ Check <code className="text-white/80">GOOGLE_PLACES_API_KEY</code> is set in Vercel env vars (and redeployed after adding).</div>
+                <div>→ API key must NOT have an HTTP referrer restriction — our server calls Google without a referrer. Use "None" or "IP addresses" instead.</div>
+                <div>→ Enable <span className="text-white">Places API (New)</span> in Google Cloud, not the legacy "Places API".</div>
+                <div>→ Billing must be attached to the Cloud project.</div>
+                <div>→ Place ID should start with <code className="text-white/80">ChIJ</code>.</div>
+              </div>
+            </div>
+          )}
+        </div>
+      )}
 
       {/* Place ID picker */}
       {lookupOpen && (
