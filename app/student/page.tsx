@@ -26,6 +26,9 @@ import {
   getBlocksForChild,
   isSummerBreak,
   getSummerThemeForWeek,
+  getCustodyForDate,
+  getUpcomingHandoffs,
+  formatCustodyRange,
   type Student,
 } from '@/lib/students';
 import { isMNAStaff } from '@/lib/staff';
@@ -784,16 +787,40 @@ export default function StudentPortal() {
                     if (!c.day) return <div key={i} className="aspect-square rounded-md" style={{ background: 'rgba(255,255,255,0.02)' }} />;
                     const dayEvents = c.iso ? eventsByDay[c.iso] || [] : [];
                     const isToday = c.iso === todayIso;
+                    // Custody overlay — left border stripe color-coded by parent
+                    const custody = c.iso ? getCustodyForDate(new Date(`${c.iso}T12:00:00`)) : null;
+                    const custodyColor = custody?.who === 'mom' ? theme.gradientFrom : custody?.who === 'dad' ? '#0ea5e9' : 'transparent';
                     return (
                       <div
                         key={i}
-                        className="aspect-square rounded-md p-1.5 flex flex-col gap-0.5 overflow-hidden"
+                        className="aspect-square rounded-md p-1.5 flex flex-col gap-0.5 overflow-hidden relative"
                         style={{
-                          background: isToday ? `linear-gradient(135deg,${theme.gradientFrom}33,${theme.gradientTo}22)` : 'rgba(255,255,255,0.04)',
+                          background: isToday
+                            ? `linear-gradient(135deg,${theme.gradientFrom}33,${theme.gradientTo}22)`
+                            : custody?.who === 'mom'
+                              ? `${theme.gradientFrom}18`
+                              : custody?.who === 'dad'
+                                ? 'rgba(14,165,233,0.14)'
+                                : 'rgba(255,255,255,0.04)',
                           border: isToday ? `1px solid ${theme.gradientTo}` : '1px solid rgba(255,255,255,0.06)',
+                          borderLeft: custody ? `3px solid ${custodyColor}` : '1px solid rgba(255,255,255,0.06)',
                         }}
+                        title={custody ? `${custody.who === 'mom' ? 'With Mom' : 'With Dad'}${custody.label ? ' · ' + custody.label : ''}` : ''}
                       >
-                        <div className={`text-[10px] font-bold ${isToday ? 'text-white' : 'text-white/65'}`}>{c.day}</div>
+                        <div className="flex items-center justify-between">
+                          <div className={`text-[10px] font-bold ${isToday ? 'text-white' : 'text-white/65'}`}>{c.day}</div>
+                          {custody && (
+                            <span
+                              className="text-[7px] font-extrabold uppercase leading-none px-1 py-0.5 rounded"
+                              style={{
+                                background: `${custodyColor}33`,
+                                color: custody.who === 'mom' ? theme.accent : '#7dd3fc',
+                              }}
+                            >
+                              {custody.who === 'mom' ? 'M' : 'D'}
+                            </span>
+                          )}
+                        </div>
                         {dayEvents.slice(0, 2).map((ev) => (
                           <div
                             key={ev.id}
@@ -808,6 +835,37 @@ export default function StudentPortal() {
                       </div>
                     );
                   })}
+                </div>
+
+                {/* Custody legend */}
+                <div className="flex items-center gap-3 mt-3 flex-wrap text-[10px] text-white/65">
+                  <span className="uppercase tracking-wider font-bold text-white/45">Custody:</span>
+                  <span className="flex items-center gap-1.5">
+                    <span className="w-3 h-3 rounded" style={{ background: theme.gradientFrom }} />
+                    With Mom
+                  </span>
+                  <span className="flex items-center gap-1.5">
+                    <span className="w-3 h-3 rounded" style={{ background: '#0ea5e9' }} />
+                    With Dad
+                  </span>
+                  {(() => {
+                    const today = getCustodyForDate();
+                    const next = getUpcomingHandoffs(new Date(), 1)[0];
+                    return (
+                      <>
+                        {today && (
+                          <span className="ml-auto font-bold" style={{ color: today.who === 'mom' ? theme.accent : '#7dd3fc' }}>
+                            Today: {today.who === 'mom' ? 'With Mom' : 'With Dad'}
+                          </span>
+                        )}
+                        {next && (
+                          <span className="text-white/50">
+                            Next: {next.who === 'mom' ? 'Mom' : 'Dad'} on {formatCustodyRange(next).split(' – ')[0]}
+                          </span>
+                        )}
+                      </>
+                    );
+                  })()}
                 </div>
               </>
             );
