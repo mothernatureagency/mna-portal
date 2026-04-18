@@ -24,8 +24,16 @@ type ContentItem = {
   content_type: string | null;
   title: string | null;
   caption: string | null;
+  assigned_role: string | null;
   client_approval_status: ApprovalStatus | null;
 };
+
+// PDM brand cascade posts are auto-approved reference items — styled dark
+// blue so MNA sees them at a glance but doesn't confuse them for our own
+// work that needs approval.
+function isPdmItem(item: ContentItem): boolean {
+  return item.assigned_role === 'PDM (Brand)';
+}
 
 const STATUS_DOT: Record<ApprovalStatus, string> = {
   drafting:          '#9ca3af',
@@ -209,6 +217,10 @@ export default function MonthlyContentCalendar({
                 <span>{label} {countByStatus[s] ? `· ${countByStatus[s]}` : ''}</span>
               </div>
             ))}
+            <div className="flex items-center gap-1.5">
+              <span className="w-2 h-2 rounded-sm" style={{ background: '#0b2547', border: '1px solid #1e3a8a' }} />
+              <span className="text-blue-200">PDM · Brand Cascade (reference)</span>
+            </div>
           </div>
 
           {/* Calendar grid */}
@@ -238,10 +250,23 @@ export default function MonthlyContentCalendar({
                   </div>
                   {posts.slice(0, 3).map((p) => {
                     const status = (p.client_approval_status || 'pending_review') as ApprovalStatus;
+                    const pdm = isPdmItem(p);
                     return (
-                      <div key={p.id} className="flex items-start gap-1">
-                        <span className="w-1.5 h-1.5 rounded-full mt-0.5 shrink-0" style={{ background: STATUS_DOT[status] }} />
-                        <span className="text-[8px] leading-tight text-white/80 line-clamp-2">
+                      <div
+                        key={p.id}
+                        className="flex items-start gap-1 rounded px-1 py-0.5"
+                        style={pdm ? {
+                          background: '#0b2547',
+                          border: '1px solid #1e3a8a',
+                        } : undefined}
+                        title={pdm ? 'PDM · Brand Cascade (reference only, no approval)' : undefined}
+                      >
+                        <span
+                          className="w-1.5 h-1.5 rounded-full mt-0.5 shrink-0"
+                          style={{ background: pdm ? '#60a5fa' : STATUS_DOT[status] }}
+                        />
+                        <span className={`text-[8px] leading-tight line-clamp-2 ${pdm ? 'text-blue-100 font-semibold' : 'text-white/80'}`}>
+                          {pdm && <span className="text-blue-300 font-bold">PDM · </span>}
                           {PLATFORM_EMOJI[p.platform] || ''} {parseTitle(p.title)}
                         </span>
                       </div>
