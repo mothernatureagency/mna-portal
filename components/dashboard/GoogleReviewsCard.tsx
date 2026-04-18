@@ -445,11 +445,11 @@ export default function GoogleReviewsCard({
             );
           })()}
 
-          {/* Recent reviews */}
+          {/* Newest review only — client wants the freshest one, not a list */}
           <div>
-            <div className="text-[10px] uppercase tracking-wider font-bold text-white/55 mb-2">Recent Reviews</div>
+            <div className="text-[10px] uppercase tracking-wider font-bold text-white/55 mb-2">Latest Review</div>
             <div className="space-y-2">
-              {reviews.slice(0, 5).map((r) => (
+              {reviews.slice(0, 1).map((r) => (
                 <div key={r.google_review_id} className="rounded-xl p-3"
                      style={{ background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.08)' }}>
                   <div className="flex items-start justify-between gap-3">
