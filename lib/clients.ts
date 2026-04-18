@@ -70,8 +70,8 @@ export const clients: Client[] = [
       mode: 'light',
       logoText: 'Mother Nature Agency',
       // MNA gradient logo (PNG) — used in sidebar, header, login, etc.
-      logoUrl: '/logos/mna-logo.png',
-      iconUrl: '/logos/mna-logo.png',
+      logoUrl: '/logos/mna-icon-transparent.png',
+      iconUrl: '/logos/mna-icon-transparent.png',
     },
     kpiTargets: {
       leads: 500,

@@ -34,7 +34,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
             >
               <span className="material-symbols-outlined" style={{ fontSize: 20 }}>menu</span>
             </button>
-            <img src="/logos/mna-logo.png" alt="MNA" style={{ height: 28, width: 'auto', flexShrink: 0, borderRadius: 6 }} />
+            <img src="/logos/mna-icon-transparent.png" alt="MNA" style={{ height: 28, width: 'auto', flexShrink: 0, borderRadius: 6 }} />
             <div style={{ fontSize: 13, fontWeight: 700, color: '#fff' }}>Mother Nature</div>
           </div>
           {/* Desktop header */}

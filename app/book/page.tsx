@@ -80,7 +80,7 @@ export default function PublicBookingPage() {
       <div className="max-w-xl mx-auto px-5 py-12">
         {/* Header */}
         <div className="text-center mb-8">
-          <img src="/logos/mna-logo.png" alt="Mother Nature Agency" className="h-16 w-auto mx-auto mb-4" />
+          <img src="/logos/mna-icon-transparent.png" alt="Mother Nature Agency" className="h-16 w-auto mx-auto mb-4" />
           <h1 className="text-2xl font-bold text-white">Book a Meeting</h1>
           <p className="text-white/40 text-sm mt-1">Schedule a time with Mother Nature Agency</p>
         </div>

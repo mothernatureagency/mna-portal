@@ -26,7 +26,15 @@
       "Bash(curl -sL -o \"/Users/alexuswilliams/MNA Code/.claude/worktrees/tender-davinci/public/ai/earth.jpg\" \"https://upload.wikimedia.org/wikipedia/commons/thumb/9/97/The_Earth_seen_from_Apollo_17.jpg/512px-The_Earth_seen_from_Apollo_17.jpg\")",
       "Bash(curl -sL -o \"/Users/alexuswilliams/MNA Code/.claude/worktrees/tender-davinci/public/ai/earth.jpg\" \"https://eoimages.gsfc.nasa.gov/images/imagerecords/73000/73909/world.topo.bathy.200412.3x5400x2700.jpg\" --max-time 30)",
       "Bash(sips -Z 256 \"/Users/alexuswilliams/MNA Code/.claude/worktrees/tender-davinci/public/ai/earth.jpg\" --out \"/Users/alexuswilliams/MNA Code/.claude/worktrees/tender-davinci/public/ai/earth.jpg\")",
-      "Bash(grep -l \"service_role\\\\|SUPABASE_SERVICE\" \"/Users/alexuswilliams/MNA Code/.claude/worktrees/tender-davinci/lib/supabase/\"*.ts)"
+      "Bash(grep -l \"service_role\\\\|SUPABASE_SERVICE\" \"/Users/alexuswilliams/MNA Code/.claude/worktrees/tender-davinci/lib/supabase/\"*.ts)",
+      "Bash(cp \"/Users/alexuswilliams/Downloads/MNA Icon.svg\" \"/Users/alexuswilliams/MNA Code/.claude/worktrees/tender-davinci/app/icon.svg\")",
+      "Bash(cp \"/Users/alexuswilliams/Downloads/MNA Icon.svg\" \"/Users/alexuswilliams/MNA Code/.claude/worktrees/tender-davinci/public/logos/mna-icon.svg\")",
+      "Bash(sips -Z 512 -s format png \"/Users/alexuswilliams/MNA Code/.claude/worktrees/tender-davinci/app/icon.svg\" --out \"/Users/alexuswilliams/MNA Code/.claude/worktrees/tender-davinci/app/apple-icon.png\")",
+      "Bash(ls -la \"/Users/alexuswilliams/MNA Code/.claude/worktrees/tender-davinci/app/\"*.png)",
+      "Bash(python3 -c \"from PIL import Image; print\\('PIL available'\\)\")",
+      "Bash(python3 -m pip install --quiet --user Pillow)",
+      "Bash(python3 -c \"from PIL import Image; print\\('OK'\\)\")",
+      "Bash(python3)"
     ]
   }
 }
