@@ -834,7 +834,6 @@ export default function StudentPortal() {
                           border: isToday ? `1px solid ${theme.gradientTo}` : '1px solid rgba(255,255,255,0.06)',
                           borderLeft: custody ? `3px solid ${custodyColor}` : '1px solid rgba(255,255,255,0.06)',
                         }}
-                        title={custody ? (custody.who === 'mom' ? 'With Mom' : 'With Dad') : ''}
                       >
                         <div className="flex items-center justify-between">
                           <div className={`text-[10px] font-bold ${isToday ? 'text-white' : 'text-white/65'}`}>{c.day}</div>
