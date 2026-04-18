@@ -30,9 +30,13 @@ type ContentItem = {
 
 // PDM brand cascade posts are auto-approved reference items — styled dark
 // blue so MNA sees them at a glance but doesn't confuse them for our own
-// work that needs approval.
+// work that needs approval. We detect via either the assigned_role flag
+// (new posts from the seed route) OR the title prefix [PDM ...] (works
+// retroactively on posts seeded before the flag existed).
 function isPdmItem(item: ContentItem): boolean {
-  return item.assigned_role === 'PDM (Brand)';
+  if (item.assigned_role === 'PDM (Brand)') return true;
+  const t = item.title || '';
+  return /^\[\s*PDM\b/i.test(t);
 }
 
 const STATUS_DOT: Record<ApprovalStatus, string> = {
@@ -70,6 +74,67 @@ export default function MonthlyContentCalendar({
   const [items, setItems] = useState<ContentItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [monthOffset, setMonthOffset] = useState(0); // 0 = current month
+
+  // Drag-to-reschedule: track the post being dragged and the day being hovered
+  const [draggingId, setDraggingId] = useState<string | null>(null);
+  const [dragOverIso, setDragOverIso] = useState<string | null>(null);
+
+  // Multi-day selection → "Generate Posts" for those days
+  const [selectedDays, setSelectedDays] = useState<Set<string>>(new Set());
+  const [generatorOpen, setGeneratorOpen] = useState(false);
+  const [genTopic, setGenTopic] = useState('');
+  const [genPlatform, setGenPlatform] = useState('Instagram');
+  const [genBusy, setGenBusy] = useState(false);
+  const [genMsg, setGenMsg] = useState('');
+
+  function toggleDay(iso: string) {
+    setSelectedDays((prev) => {
+      const next = new Set(prev);
+      if (next.has(iso)) next.delete(iso);
+      else next.add(iso);
+      return next;
+    });
+  }
+  function clearSelection() { setSelectedDays(new Set()); }
+
+  async function movePost(postId: string, toIso: string) {
+    // Optimistic update
+    setItems((prev) => prev.map((p) => p.id === postId ? { ...p, post_date: toIso } : p));
+    await fetch('/api/content-calendar', {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ id: postId, post_date: toIso }),
+    }).catch(() => {});
+  }
+
+  async function generatePosts() {
+    const days = Array.from(selectedDays).sort();
+    if (days.length === 0 || !genTopic.trim()) return;
+    setGenBusy(true); setGenMsg('');
+    try {
+      const res = await fetch('/api/content-calendar/generate', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          clientName,
+          days,
+          topic: genTopic.trim(),
+          platform: genPlatform,
+        }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || 'Generate failed');
+      setItems((prev) => [...prev, ...(data.posts || [])]);
+      setGenMsg(`Generated ${data.posts?.length || 0} posts.`);
+      clearSelection();
+      setGenTopic('');
+      setTimeout(() => { setGeneratorOpen(false); setGenMsg(''); }, 1400);
+    } catch (e: any) {
+      setGenMsg(`Error: ${e.message}`);
+    } finally {
+      setGenBusy(false);
+    }
+  }
 
   useEffect(() => {
     let cancelled = false;
@@ -171,13 +236,96 @@ export default function MonthlyContentCalendar({
             </button>
           )}
         </div>
-        <Link
-          href="/content"
-          className="text-[11px] font-semibold px-3 py-1.5 rounded-lg bg-white/10 text-white hover:bg-white/20"
-        >
-          Open Content Tracker →
-        </Link>
+        <div className="flex items-center gap-2">
+          {selectedDays.size > 0 && (
+            <>
+              <span className="text-[10px] text-white/60">{selectedDays.size} day{selectedDays.size === 1 ? '' : 's'} selected</span>
+              <button
+                onClick={clearSelection}
+                className="text-[11px] font-semibold px-2.5 py-1.5 rounded-lg bg-white/10 text-white hover:bg-white/20"
+              >
+                Clear
+              </button>
+              <button
+                onClick={() => setGeneratorOpen(true)}
+                className="text-[11px] font-bold px-3 py-1.5 rounded-lg text-white"
+                style={{ background: `linear-gradient(135deg,${gradientFrom},${gradientTo})` }}
+              >
+                ✨ Generate Posts
+              </button>
+            </>
+          )}
+          <Link
+            href="/content"
+            className="text-[11px] font-semibold px-3 py-1.5 rounded-lg bg-white/10 text-white hover:bg-white/20"
+          >
+            Open Content Tracker →
+          </Link>
+        </div>
       </div>
+
+      {/* Tip when nothing is selected */}
+      {selectedDays.size === 0 && !loading && items.length > 0 && (
+        <div className="text-[10px] text-white/45 mb-3">
+          Tip · Click a day to select it, drag a post to move it, or click "Generate Posts" after selecting days.
+        </div>
+      )}
+
+      {/* Generator dialog */}
+      {generatorOpen && (
+        <div className="fixed inset-0 bg-black/60 flex items-center justify-center p-4 z-50" onClick={() => !genBusy && setGeneratorOpen(false)}>
+          <div
+            className="max-w-md w-full rounded-2xl p-5"
+            style={{ background: 'rgba(15,31,46,0.97)', border: '1px solid rgba(255,255,255,0.15)', backdropFilter: 'blur(24px)' }}
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="text-white font-bold mb-3">Generate Posts for {selectedDays.size} day{selectedDays.size === 1 ? '' : 's'}</div>
+            <div className="text-[11px] text-white/55 mb-3">
+              AI will draft a post for each selected day based on the topic you give it. You can edit each one afterward.
+            </div>
+            <div className="space-y-2">
+              <input
+                autoFocus
+                type="text"
+                placeholder="Topic / angle (e.g. spring detox, new member offer)"
+                value={genTopic}
+                onChange={(e) => setGenTopic(e.target.value)}
+                className="w-full px-3 py-2 rounded-lg border text-white text-[13px] placeholder:text-white/55 focus:outline-none"
+                style={{ background: 'rgba(0,0,0,0.45)', borderColor: 'rgba(255,255,255,0.25)' }}
+              />
+              <select
+                value={genPlatform}
+                onChange={(e) => setGenPlatform(e.target.value)}
+                className="w-full px-3 py-2 rounded-lg border text-white text-[13px] focus:outline-none"
+                style={{ background: 'rgba(0,0,0,0.45)', borderColor: 'rgba(255,255,255,0.25)' }}
+              >
+                <option className="bg-slate-900">Instagram</option>
+                <option className="bg-slate-900">TikTok</option>
+                <option className="bg-slate-900">Facebook</option>
+                <option className="bg-slate-900">LinkedIn</option>
+              </select>
+            </div>
+            {genMsg && <div className="text-[11px] text-white/75 mt-2">{genMsg}</div>}
+            <div className="flex justify-end gap-2 mt-4">
+              <button
+                onClick={() => setGeneratorOpen(false)}
+                disabled={genBusy}
+                className="text-[11px] font-semibold px-3 py-1.5 rounded-lg bg-white/10 hover:bg-white/20 text-white disabled:opacity-50"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={generatePosts}
+                disabled={genBusy || !genTopic.trim()}
+                className="text-[11px] font-bold px-4 py-1.5 rounded-lg text-white disabled:opacity-50"
+                style={{ background: `linear-gradient(135deg,${gradientFrom},${gradientTo})` }}
+              >
+                {genBusy ? 'Generating…' : `✨ Generate ${selectedDays.size} post${selectedDays.size === 1 ? '' : 's'}`}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {loading && (
         <div className="text-center text-white/50 py-10 text-sm">Loading calendar...</div>
@@ -234,19 +382,46 @@ export default function MonthlyContentCalendar({
               const isToday = iso === todayStr;
               const isCurrentMonth = day.getMonth() === month;
 
+              const isSelected = selectedDays.has(iso);
+              const isDragTarget = dragOverIso === iso;
               return (
                 <div
                   key={iso}
-                  className={`min-h-[72px] rounded-lg border p-1.5 flex flex-col gap-1 transition-colors ${
+                  onClick={() => { if (isCurrentMonth) toggleDay(iso); }}
+                  onDragOver={(e) => { if (draggingId) { e.preventDefault(); setDragOverIso(iso); } }}
+                  onDragLeave={() => setDragOverIso((cur) => cur === iso ? null : cur)}
+                  onDrop={(e) => {
+                    e.preventDefault();
+                    if (draggingId) {
+                      movePost(draggingId, iso);
+                      setDraggingId(null);
+                      setDragOverIso(null);
+                    }
+                  }}
+                  className={`min-h-[72px] rounded-lg border p-1.5 flex flex-col gap-1 cursor-pointer transition-all ${
                     isToday
                       ? 'border-white bg-white/15'
                       : isCurrentMonth
-                      ? 'border-white/10 bg-white/5'
+                      ? 'border-white/10 bg-white/5 hover:bg-white/10'
                       : 'border-white/5 bg-white/[0.02]'
                   }`}
+                  style={
+                    isDragTarget
+                      ? { outline: `2px dashed ${gradientTo}`, outlineOffset: 2 }
+                      : isSelected
+                      ? { background: `linear-gradient(135deg,${gradientFrom}33,${gradientTo}22)`, borderColor: gradientTo, borderWidth: 2 }
+                      : undefined
+                  }
                 >
-                  <div className={`text-[9px] font-bold ${isCurrentMonth ? 'text-white/50' : 'text-white/25'}`}>
-                    {day.getDate()}
+                  <div className="flex items-center justify-between">
+                    <div className={`text-[9px] font-bold ${isCurrentMonth ? 'text-white/50' : 'text-white/25'}`}>
+                      {day.getDate()}
+                    </div>
+                    {isSelected && (
+                      <span className="material-symbols-outlined" style={{ fontSize: 12, color: gradientTo }}>
+                        check_circle
+                      </span>
+                    )}
                   </div>
                   {posts.slice(0, 3).map((p) => {
                     const status = (p.client_approval_status || 'pending_review') as ApprovalStatus;
@@ -254,12 +429,16 @@ export default function MonthlyContentCalendar({
                     return (
                       <div
                         key={p.id}
-                        className="flex items-start gap-1 rounded px-1 py-0.5"
-                        style={pdm ? {
-                          background: '#0b2547',
-                          border: '1px solid #1e3a8a',
-                        } : undefined}
-                        title={pdm ? 'PDM · Brand Cascade (reference only, no approval)' : undefined}
+                        draggable
+                        onDragStart={(e) => { setDraggingId(p.id); e.dataTransfer.effectAllowed = 'move'; }}
+                        onDragEnd={() => { setDraggingId(null); setDragOverIso(null); }}
+                        onClick={(e) => e.stopPropagation()}
+                        className="flex items-start gap-1 rounded px-1 py-0.5 cursor-grab active:cursor-grabbing"
+                        style={{
+                          ...(pdm ? { background: '#0b2547', border: '1px solid #1e3a8a' } : {}),
+                          opacity: draggingId === p.id ? 0.4 : 1,
+                        }}
+                        title={pdm ? 'PDM · Brand Cascade · drag to reschedule' : 'Drag to reschedule'}
                       >
                         <span
                           className="w-1.5 h-1.5 rounded-full mt-0.5 shrink-0"
