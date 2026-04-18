@@ -11,7 +11,7 @@
  * swap the COMPETITORS_28D constant for an API pull when ready.
  */
 
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 
 type Competitor = {
   id: string;
@@ -49,11 +49,19 @@ type Tab = 'meta' | 'google';
 export default function CompetitorBenchmark({
   gradientFrom,
   gradientTo,
+  clientId,
 }: {
   gradientFrom: string;
   gradientTo: string;
+  clientId?: string;
 }) {
   const [tab, setTab] = useState<Tab>('meta');
+  const [gReviews, setGReviews] = useState<any>(null);
+  useEffect(() => {
+    if (tab !== 'google' || !clientId) return;
+    fetch(`/api/google-reviews-sync?clientId=${encodeURIComponent(clientId)}&limit=5`)
+      .then((r) => r.json()).then(setGReviews).catch(() => {});
+  }, [tab, clientId]);
 
   const data = COMPETITORS_28D;
   const client = data.find((c) => c.isClient)!;
@@ -174,7 +182,11 @@ export default function CompetitorBenchmark({
         </>
       )}
 
-      {tab === 'google' && <GoogleReviewsPlaceholder gradientFrom={gradientFrom} gradientTo={gradientTo} />}
+      {tab === 'google' && (
+        gReviews && gReviews.summary && Number(gReviews.summary.total) > 0
+          ? <GoogleReviewsLive data={gReviews} gradientFrom={gradientFrom} gradientTo={gradientTo} />
+          : <GoogleReviewsPlaceholder gradientFrom={gradientFrom} gradientTo={gradientTo} />
+      )}
     </div>
   );
 }
@@ -263,6 +275,33 @@ function BarColumn({
             </div>
           );
         })}
+      </div>
+    </div>
+  );
+}
+
+function GoogleReviewsLive({ data, gradientFrom, gradientTo }: { data: any; gradientFrom: string; gradientTo: string }) {
+  const s = data.summary;
+  const avg = Number(s.avg_rating) || 0;
+  const total = Number(s.total) || 0;
+  const last7 = Number(s.last_7d) || 0;
+  const last30 = Number(s.last_30d) || 0;
+  return (
+    <div className="space-y-4">
+      <div className="rounded-xl p-4" style={{ background: `linear-gradient(135deg, ${gradientFrom}22, ${gradientTo}11)`, border: `1px solid ${gradientFrom}55` }}>
+        <div className="text-[10px] font-bold uppercase tracking-wider text-emerald-300 mb-1.5">
+          ✦ Live Google Reviews
+        </div>
+        <div className="text-white text-[13px] leading-relaxed">
+          Averaging <span className="font-bold">{avg.toFixed(1)} ★</span> across <span className="font-bold">{total}</span> total reviews.{' '}
+          {last7 > 0 && <>Added <span className="font-bold">{last7}</span> new this week. </>}
+          {last30 > 0 && <>{last30} in the last 30 days.</>}
+        </div>
+      </div>
+      <div className="text-[11px] text-white/55">
+        Competitor-side Google data needs each competitor's Place ID wired in. Ask Make to pull
+        Destin + Aqua Vitae via Outscraper / Google Places and POST to the same sync endpoint
+        (swap clientId) — this card will auto-populate a side-by-side.
       </div>
     </div>
   );
