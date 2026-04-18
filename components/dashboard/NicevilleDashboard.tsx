@@ -16,7 +16,7 @@
  * No fabricated metrics.
  */
 
-import React from 'react';
+import React, { useState } from 'react';
 import type { Client } from '@/lib/clients';
 import UserBanner from './UserBanner';
 import MonthlyContentCalendar from './MonthlyContentCalendar';
@@ -151,7 +151,10 @@ export default function NicevilleDashboard({ client }: { client: Client }) {
 
       {/* ── CONTENT CALENDAR (moved to top per client request) ── */}
       <div>
-        <SectionLabel>Content Calendar</SectionLabel>
+        <div className="flex items-center justify-between mb-2 flex-wrap gap-2">
+          <SectionLabel>Content Calendar</SectionLabel>
+          <CorporateSeedButton clientName={client.name} gradientFrom={gradientFrom} gradientTo={gradientTo} />
+        </div>
         <MonthlyContentCalendar clientName={client.name} gradientFrom={gradientFrom} gradientTo={gradientTo} />
       </div>
 
@@ -352,6 +355,49 @@ function InsightRow({ color, title, body }: { color: string; title: string; body
         <div className="text-[13px] font-bold text-white">{title}</div>
         <div className="text-[12px] text-white/80 leading-relaxed mt-1">{body}</div>
       </div>
+    </div>
+  );
+}
+
+// Quick-seed for the Prime IV April 2026 corporate cascade playbook.
+// One click populates the content calendar with the real corporate posts
+// so MNA can see what the brand is pushing and plan around it.
+function CorporateSeedButton({ clientName, gradientFrom, gradientTo }: { clientName: string; gradientFrom: string; gradientTo: string }) {
+  const [loading, setLoading] = useState(false);
+  const [msg, setMsg] = useState<string>('');
+  async function seed() {
+    setLoading(true);
+    setMsg('');
+    try {
+      const res = await fetch('/api/content-calendar', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          clientName,
+          playbookId: 'prime-iv-corp-apr-2026',
+          startDate: '2026-04-01',
+        }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || 'Seed failed');
+      setMsg(`Loaded ${data.count} corporate posts into April. Reload the calendar.`);
+    } catch (e: any) {
+      setMsg(`Error: ${e.message}`);
+    } finally {
+      setLoading(false);
+    }
+  }
+  return (
+    <div className="flex items-center gap-2">
+      {msg && <span className="text-[10px] text-white/70">{msg}</span>}
+      <button
+        onClick={seed}
+        disabled={loading}
+        className="text-[11px] font-bold px-3 py-1.5 rounded-lg text-white disabled:opacity-50"
+        style={{ background: `linear-gradient(135deg, ${gradientFrom}, ${gradientTo})` }}
+      >
+        {loading ? 'Loading…' : 'Load April 2026 Corporate Cascade'}
+      </button>
     </div>
   );
 }

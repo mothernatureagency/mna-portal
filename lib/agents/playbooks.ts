@@ -937,11 +937,110 @@ Follow along. The best is just getting started.
   ],
 };
 
-// ─── PRIME IV MEMBERSHIPS — 30-day tier-by-tier push ────────────────
-// Source: "Membership Pamphlets.pdf" (4 tiers: Select / Essentials /
-// Transformation / Enlightenment). Works for either Prime IV location.
-// MNA posts these ALONGSIDE whatever the corporate page is pushing so the
-// local social feed is always framing the membership story.
+// ─── PRIME IV — APRIL 2026 CORPORATE CASCADE ─────────────────────────
+// Mirrors the actual April 2026 tab from "Social Content Calendar.xlsx"
+// (corporate schedule). "Yes" in the cascading column = corporate posts
+// across all locations (we see it, we don't overlap). "No" = local reel
+// the location posts on its own page with the linked MP4 + audio.
+//
+// Load with startDate=2026-04-01 to place posts on their actual spring
+// dates. Captions are verbatim from the corporate sheet so Niceville's
+// page matches what Prime IV corporate is pushing.
+export const PRIME_IV_CORP_APR_2026: Playbook = {
+  id: 'prime-iv-corp-apr-2026',
+  name: 'Prime IV — April 2026 Corporate Cascade',
+  description:
+    'Actual April 2026 corporate content schedule from Prime IV\'s Social Content Calendar. Spring Momentum + Stress Support theme. Load this into Niceville\'s calendar so MNA can see what corporate is posting and plan complementary local content around it. Includes 2 local reels (non-cascading) the location is expected to post from its own page.',
+  items: [
+    // Wk 4/1
+    { day: 1, platform: 'Instagram', content_type: 'Post', phase: 'Corporate Cascade',
+      title: 'National Stress Awareness Month',
+      hook: 'Stress Awareness Month reminder — check in with yourself.',
+      cta: 'Book a wellness appointment',
+      caption: `Stress doesn't just affect your mood. It can show up as low energy, tension, poor sleep, brain fog, irritability, and feeling like your body is constantly trying to catch up. 😮‍💨 During Stress Awareness Month, it's a good reminder to check in with yourself and build in support where you can — more rest, better boundaries, movement, hydration, and wellness routines that help you feel more balanced. Prime IV is here to support the days when life feels like a lot. 💙 #PrimeIV #StressAwarenessMonth #IVTherapy #WellnessSupport #HealthyHabits #FeelYourBest #GetPrimed` },
+
+    // Wk 4/5 (3 cascading posts spread across the week)
+    { day: 6, platform: 'Instagram', content_type: 'Post', phase: 'Corporate Cascade',
+      title: 'Zinc / Seasonal Immune Support',
+      hook: 'Spring can be beautiful and brutal all at once.',
+      cta: 'Book immunity-focused IV',
+      caption: `Spring can be beautiful and brutal all at once. 🌷🤧 Seasonal changes, allergies, busy schedules, and more time on the go can all put extra stress on the body. Zinc is an important nutrient for immune support, healing, and overall resilience, which is one reason it is especially relevant this time of year. 🛡️ When your schedule fills up, staying well becomes part of the plan. #PrimeIV #IVTherapy #ZincSupport #ImmuneHealth #SpringWellness #SeasonalSupport #GetPrimed` },
+    { day: 8, platform: 'Instagram', content_type: 'Post', phase: 'Corporate Cascade',
+      title: 'Testimonial Highlight',
+      hook: 'No one-size-fits-all — personalized wellness.',
+      cta: 'Share your story',
+      caption: `One of the most rewarding parts of what we do is hearing from people who feel more energized, more refreshed, more confident, and more supported in their wellness journey. 🙌 There is no one-size-fits-all path to feeling your best, which is why personalized wellness support can make such a meaningful difference. Your goals are your own and we're here to help support them. 🫶 #PrimeIV #IVTherapy #TestimonialHighlight #PersonalizedWellness #WellnessJourney #FeelYourBest #GetPrimed` },
+    { day: 10, platform: 'Instagram', content_type: 'Post', phase: 'Corporate Cascade',
+      title: 'NAD+ Highlight',
+      hook: 'Energy off, focus dragging — go deeper with NAD+.',
+      cta: 'Ask about NAD+',
+      caption: `When your energy feels off, your focus is dragging, and you just do not feel like yourself, it may be time to support your body on a deeper level. 🧬 NAD+ therapy is a popular option for those looking to support cellular energy, mental clarity, recovery, and healthy aging. 🧠✨ Because feeling your best is not just about getting through the day — it's about having the energy to fully live it. #PrimeIV #NADTherapy #HealthyAging #MentalClarity #EnergySupport #WellnessJourney #GetPrimed` },
+
+    // Non-cascading local Reel #1
+    { day: 11, platform: 'Instagram', content_type: 'Reel', phase: 'Local Reel · post from our page',
+      title: '[LOCAL REEL] Which IV would you choose?',
+      hook: 'Different goals, different IVs.',
+      cta: 'Comment your pick',
+      caption: `Different goals call for different kinds of support. Whether you're focused on energy, immunity, glow, recovery, or feeling your best on the go, Prime IV offers personalized IV therapy options designed to meet you where you are. Which one would you choose? #PrimeIV #IVTherapy #WellnessSupport #EnergySupport #RecoverySupport #ImmuneSupport #GlowFromWithin #GetPrimed\n\nAsset: AprilReel-1-PrimeIV.mp4 · Audio: https://www.instagram.com/reels/audio/1440082083677247` },
+
+    // Wk 4/12
+    { day: 13, platform: 'Instagram', content_type: 'Post', phase: 'Corporate Cascade',
+      title: 'Prep for Summer',
+      hook: 'Feel healthy, energized, confident heading into summer.',
+      cta: 'Start building momentum',
+      caption: `This time of year, many people start thinking ahead to summer vacations, warmer weather, and spending more time outside. 🌞 Not because you need to change who you are, but because feeling healthy, confident, energized, and comfortable in your own skin feels good. 💁‍♀️ Building healthy momentum now can help you head into summer feeling stronger, brighter, and more like yourself. ✨ #PrimeIV #IVTherapy #SummerPrep #FeelYourBest #HealthyMomentum #ConfidenceStartsWithin #GetPrimed` },
+    { day: 15, platform: 'Instagram', content_type: 'Post', phase: 'Corporate Cascade',
+      title: 'Amino Acid Blend Highlight',
+      hook: 'Workouts pick up — recovery is part of feeling your best.',
+      cta: 'Book recovery IV',
+      caption: `As your workouts, walks, and weekend plans pick back up, recovery becomes part of feeling your best. 🧘‍♀️ Amino acids help support muscle recovery, tissue repair, energy, and lean muscle maintenance, making them a great fit for spring routines and active lifestyles. 💪 Looking and feeling stronger usually starts with taking better care of your body behind the scenes. #PrimeIV #AminoAcids #IVTherapy #RecoverySupport #WellnessRoutine #SpringFitness #FeelYourBest #GetPrimed` },
+    { day: 17, platform: 'Instagram', content_type: 'Post', phase: 'Corporate Cascade',
+      title: 'Healthier Habits, Real Life',
+      hook: 'Wellness does not have to be perfect.',
+      cta: 'Take the next step',
+      caption: `Wellness does not have to mean doing everything perfectly. It can look like getting outside more, making better food choices, prioritizing sleep, managing stress, staying consistent with movement, and giving your body extra support when needed. 🛌 Real life is busy. Healthy habits still matter. Prime IV is here to support the goals you are working toward, one step at a time. 🧡 #PrimeIV #HealthyHabits #WellnessJourney #FeelYourBest #EverydayWellness #GetPrimed #IVTherapy` },
+
+    // Wk 4/19
+    { day: 20, platform: 'Instagram', content_type: 'Post', phase: 'Corporate Cascade',
+      title: 'Magnesium / Stress + Recovery',
+      hook: 'Tense? Overstimulated? Magnesium matters.',
+      cta: 'Ask about Magnesium adds',
+      caption: `If you've been feeling tense, overstimulated, or like your body cannot fully unwind, you're not alone. Magnesium is a key nutrient involved in relaxation, nerve function, and recovery, which is why it is often top of mind during stressful seasons. 🌙🫧 Supporting your body is not a luxury — it's part of functioning well in everyday life. #PrimeIV #IVTherapy #MagnesiumSupport #StressSupport #RecoverySupport #WellnessRoutine #GetPrimed` },
+
+    // Non-cascading local Reel #2
+    { day: 22, platform: 'Instagram', content_type: 'Reel', phase: 'Local Reel · post from our page',
+      title: '[LOCAL REEL] POV: you finally booked the wellness appointment',
+      hook: 'Finally taking the time to support yourself.',
+      cta: 'Book your first IV',
+      caption: `Sometimes the best feeling is finally taking the time to support yourself. Whether you've been feeling run down, depleted, off your routine, or just in need of a reset, wellness support can go a long way. Prime IV is here to help you recharge, recover, and feel more like yourself again. #PrimeIV #IVTherapy #WellnessReset #RecoverySupport #HydrationSupport #FeelYourBest #GetPrimed\n\nAsset: AprilReel-2-PrimeIV.mp4 · Audio: https://www.instagram.com/reels/audio/2384967038669966` },
+
+    { day: 23, platform: 'Instagram', content_type: 'Post', phase: 'Corporate Cascade',
+      title: 'Feel Good in Your Skin',
+      hook: 'More sunshine, more plans, more reasons to feel refreshed.',
+      cta: 'Start your glow plan',
+      caption: `There's something motivating about this season. More sunshine, more plans, more reasons to want to feel refreshed, energized, and confident. 💫 Whether your goals are better recovery, more glow, stronger immunity, healthier habits, or simply feeling better in your own skin, this is a great time to start. Small steps now can help you feel your best heading into summer. 🔄 #PrimeIV #IVTherapy #FeelYourBest #SummerWellness #GlowFromWithin #HealthyMomentum #GetPrimed` },
+    { day: 24, platform: 'Instagram', content_type: 'Post', phase: 'Corporate Cascade',
+      title: 'B-Complex & B-5 Highlight',
+      hook: 'Nonstop life? Your body feels it.',
+      cta: 'Ask about B-Complex',
+      caption: `When life feels nonstop, your body feels it too. B-Complex helps support energy, mood, and stress resilience, while Vitamin B-5 supports energy metabolism and stress hormone balance. 🌿 Together, they're a smart pairing for busy days when you want to feel more balanced, more energized, and better equipped to handle what's on your plate. #PrimeIV #IVTherapy #BComplex #VitaminB5 #EnergySupport #StressSupport #WellnessSupport #FeelYourBest #GetPrimed` },
+
+    // Wk 4/26
+    { day: 27, platform: 'Instagram', content_type: 'Post', phase: 'Corporate Cascade',
+      title: 'Memberships Feature',
+      hook: 'Feeling your best is about consistency.',
+      cta: 'Explore memberships',
+      caption: `Feeling your best is not about one healthy choice — it's about consistency. 🗓️ That's why so many people find that having a wellness routine makes all the difference. Prime IV memberships are designed to help you stay committed to your goals, whether you're focused on energy, recovery, immunity, beauty, or overall well-being. 💧 Because when wellness becomes part of your lifestyle, it is easier to keep showing up for yourself. 🩵 #PrimeIV #IVTherapy #PrimeIVMembership #WellnessRoutine #HealthyHabits #FeelYourBest` },
+    { day: 29, platform: 'Instagram', content_type: 'Post', phase: 'Corporate Cascade',
+      title: 'Zinc & Amino Acid Blend Highlight',
+      hook: 'Two featured nutrients of the month.',
+      cta: 'Add Zinc + Amino Acids',
+      caption: `Looking and feeling your best starts with supporting your body well. Zinc helps support immune health, healing, and overall resilience, while Amino Acid Blend supports recovery, energy, lean muscle maintenance, and collagen synthesis for healthy skin. 🛡️🏋️‍♀️ It's a powerful combination for staying consistent with your wellness goals and feeling stronger, brighter, and more supported from the inside out. 🌟 #PrimeIV #IVTherapy #ZincSupport #AminoAcids #FeelYourBest #WellnessSupport #GlowFromWithin #HealthyMomentum #GetPrimed` },
+  ],
+};
+
+// Keep the pamphlet-derived membership playbook too — MNA can layer it in
+// between corporate cascades for stronger membership framing.
 export const PRIME_IV_MEMBERSHIPS: Playbook = {
   id: 'prime-iv-memberships',
   name: 'Prime IV — Membership Push (Pamphlet)',
@@ -1052,7 +1151,13 @@ export const PRIME_IV_MEMBERSHIPS: Playbook = {
   ],
 };
 
-export const PLAYBOOKS: Playbook[] = [PINECREST_REOPENING, NICEVILLE_SPRING_RESET, SERENITY_VRBO_LAUNCH, PRIME_IV_MEMBERSHIPS];
+export const PLAYBOOKS: Playbook[] = [
+  PRIME_IV_CORP_APR_2026,
+  PINECREST_REOPENING,
+  NICEVILLE_SPRING_RESET,
+  SERENITY_VRBO_LAUNCH,
+  PRIME_IV_MEMBERSHIPS,
+];
 
 export function getPlaybook(id: string): Playbook | undefined {
   return PLAYBOOKS.find((p) => p.id === id);
@@ -1064,8 +1169,9 @@ export function getPlaybook(id: string): Playbook | undefined {
  * as one-click load buttons.
  */
 export const CLIENT_PLAYBOOKS: Record<string, string[]> = {
-  'prime-iv':           ['niceville-spring-reset', 'prime-iv-memberships'],
-  'prime-iv-pinecrest': ['pinecrest-reopening',    'prime-iv-memberships'],
+  // Corporate cascade first so it's the top one-click load each month
+  'prime-iv':           ['prime-iv-corp-apr-2026', 'niceville-spring-reset', 'prime-iv-memberships'],
+  'prime-iv-pinecrest': ['prime-iv-corp-apr-2026', 'pinecrest-reopening',    'prime-iv-memberships'],
   'serenity-bayfront':  ['serenity-vrbo-launch'],
 };
 
