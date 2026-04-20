@@ -17,14 +17,18 @@ type Tier = {
   id: 'select' | 'essentials' | 'transformation' | 'enlightenment';
   name: string;
   price: number;
-  value: number;
+  value?: number;          // optional — only shown when this is a "value" tier
   tagline: string;
   description: string;
   perks: string[];
   accent: string;
 };
 
-const TIERS: Tier[] = [
+export type PricingTier = 'tier2' | 'tier3';
+
+// Tier 3 — Pinecrest. Includes SELECT $110 entry tier + the savings
+// callouts since corporate markets the "$X value" framing for this tier.
+const TIERS_TIER3: Tier[] = [
   {
     id: 'select',
     name: 'SELECT',
@@ -95,7 +99,75 @@ const TIERS: Tier[] = [
   },
 ];
 
-export default function PrimeIVMembershipCard({ gradientFrom, gradientTo }: { gradientFrom: string; gradientTo: string }) {
+// Tier 2 — Niceville. Three tiers, NO "savings" / value framing
+// (corporate doesn't market $X-value for tier 2 pricing).
+const TIERS_TIER2: Tier[] = [
+  {
+    id: 'essentials',
+    name: 'ESSENTIALS',
+    price: 159,
+    tagline: 'The sweet spot',
+    description: 'More comprehensive support with flexible options. Great for those who benefit from a holistic approach to hydration + vitamin therapy.',
+    perks: [
+      'ANY 1 IV Drip of your choice',
+      '2 B-12 or Lipolean Injections',
+      'VIP Status + Massage Chair Access',
+      '15% OFF any Additional IV Drips & Injections',
+      '50% OFF Additional IV Drip Additives',
+      'Oxygen Treatment',
+    ],
+    accent: '#7aafd4',
+  },
+  {
+    id: 'transformation',
+    name: 'TRANSFORMATION',
+    price: 299,
+    tagline: 'The committed',
+    description: 'Tailored for those on a real wellness journey. Maximizes health potential with multiple IV drips and a wider selection of injections.',
+    perks: [
+      'ANY 2 IV Drips of your choice',
+      '3 Injections of your choice',
+      'VIP Status + Massage Chair Access',
+      '20% OFF any Additional IV Drips & Injections',
+      '50% OFF Additional IV Drip Additives',
+      'Oxygen Treatment',
+    ],
+    accent: '#3a7ab5',
+  },
+  {
+    id: 'enlightenment',
+    name: 'ENLIGHTENMENT',
+    price: 549,
+    tagline: 'The all-in',
+    description: 'Ultimate flexibility + comprehensive support. Perfect for individuals OR households looking to maximize wellness with a wider treatment range.',
+    perks: [
+      'ANY 4 IV Drips of your choice',
+      'ANY 5 Injections (including Vitamin D)',
+      'VIP Status + Massage Chair Access',
+      '25% OFF any Additional IV Drips & Injections',
+      '50% OFF Additional IV Drip Additives',
+      'Shareable Among 2 Household Members',
+      'Oxygen Treatment',
+    ],
+    accent: '#1c3d6e',
+  },
+];
+
+const TIERS_BY_PRICING: Record<PricingTier, Tier[]> = {
+  tier2: TIERS_TIER2,
+  tier3: TIERS_TIER3,
+};
+
+export default function PrimeIVMembershipCard({
+  gradientFrom,
+  gradientTo,
+  pricingTier = 'tier3',
+}: {
+  gradientFrom: string;
+  gradientTo: string;
+  pricingTier?: PricingTier;
+}) {
+  const TIERS = TIERS_BY_PRICING[pricingTier];
   const [openId, setOpenId] = useState<Tier['id'] | null>(null);
 
   return (
@@ -119,11 +191,12 @@ export default function PrimeIVMembershipCard({ gradientFrom, gradientTo }: { gr
         </Link>
       </div>
 
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
+      <div className={`grid grid-cols-1 sm:grid-cols-2 ${TIERS.length >= 4 ? 'lg:grid-cols-4' : 'lg:grid-cols-3'} gap-3`}>
         {TIERS.map((t) => {
           const isOpen = openId === t.id;
-          const savings = t.value - t.price;
-          const savingsPct = Math.round(((t.value - t.price) / t.value) * 100);
+          const hasSavings = typeof t.value === 'number' && t.value > t.price;
+          const savings = hasSavings ? t.value! - t.price : 0;
+          const savingsPct = hasSavings ? Math.round(((t.value! - t.price) / t.value!) * 100) : 0;
           return (
             <button
               key={t.id}
@@ -141,10 +214,12 @@ export default function PrimeIVMembershipCard({ gradientFrom, gradientTo }: { gr
                 <span className="text-[22px] font-black text-white leading-none">${t.price}</span>
                 <span className="text-[10px] text-white/55">/ mo</span>
               </div>
-              <div className="text-[10px] text-white/55 mt-0.5">
-                <span className="line-through">${t.value}</span>
-                <span className="ml-1.5 font-bold" style={{ color: t.accent }}>Save ${savings} ({savingsPct}%)</span>
-              </div>
+              {hasSavings && (
+                <div className="text-[10px] text-white/55 mt-0.5">
+                  <span className="line-through">${t.value}</span>
+                  <span className="ml-1.5 font-bold" style={{ color: t.accent }}>Save ${savings} ({savingsPct}%)</span>
+                </div>
+              )}
 
               {isOpen ? (
                 <>
