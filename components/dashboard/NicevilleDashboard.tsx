@@ -23,7 +23,6 @@ import MonthlyContentCalendar from './MonthlyContentCalendar';
 import LeadSourceSplitEditor from './LeadSourceSplitEditor';
 import CompetitorBenchmark from './CompetitorBenchmark';
 import PrimeIVMembershipCard from './PrimeIVMembershipCard';
-import GoogleReviewsCard from './GoogleReviewsCard';
 import SalesBenchmarks from './SalesBenchmarks';
 import ConceptsPanel from './ConceptsPanel';
 
@@ -168,12 +167,6 @@ export default function NicevilleDashboard({ client }: { client: Client }) {
       <div>
         <SectionLabel>Prime IV Memberships · Pamphlet Reference</SectionLabel>
         <PrimeIVMembershipCard gradientFrom={gradientFrom} gradientTo={gradientTo} />
-      </div>
-
-      {/* ── GOOGLE REVIEWS ── */}
-      <div>
-        <SectionLabel>Google Reviews · Niceville</SectionLabel>
-        <GoogleReviewsCard clientId={client.id} gradientFrom={gradientFrom} gradientTo={gradientTo} />
       </div>
 
       {/* ── COMPETITOR BENCHMARK (Meta + Google Reviews) ── */}
