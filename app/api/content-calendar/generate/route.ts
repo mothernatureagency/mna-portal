@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import Anthropic from '@anthropic-ai/sdk';
 import { ensureSchema, query } from '@/lib/db';
+import { clients } from '@/lib/clients';
 
 export const runtime = 'nodejs';
 
@@ -41,13 +42,51 @@ export async function POST(req: NextRequest) {
 
   const client = new Anthropic({ apiKey });
 
+  // Pull the client's saved Concepts so the generator can ground itself
+  // in real angles/themes/holidays MNA has noted. Map the ClientName
+  // (e.g. "Prime IV — Niceville") back to the lib/clients id so we can
+  // query content_concepts.
+  const matchedClient = clients.find((c) => c.name === clientName || c.shortName === clientName);
+  const conceptsClientId = matchedClient?.id || clientName;
+  let conceptsBlock = '';
+  try {
+    const { rows } = await query<{
+      title: string;
+      body: string | null;
+      suggested_date: string | null;
+      tags: string | null;
+    }>(
+      `select title, body, suggested_date, tags
+         from content_concepts
+        where client_id = $1
+          and (suggested_date is null
+               or suggested_date >= (current_date - interval '7 days'))
+        order by suggested_date asc nulls last, created_at desc
+        limit 30`,
+      [conceptsClientId],
+    );
+    if (rows.length) {
+      conceptsBlock =
+        '\n\nCONCEPT BANK (lean on these for tone, hooks, angles, and any tied dates):\n' +
+        rows.map((c, i) => {
+          const dateNote = c.suggested_date ? ` [${c.suggested_date}]` : '';
+          const tagNote  = c.tags ? ` (${c.tags})` : '';
+          const bodyNote = c.body ? `\n      ${c.body.replace(/\s+/g, ' ').slice(0, 300)}` : '';
+          return `  ${i + 1}. ${c.title}${dateNote}${tagNote}${bodyNote}`;
+        }).join('\n');
+    }
+  } catch (e) {
+    // Don't fail generation if concepts lookup blows up — just proceed without
+    console.error('[generate] concepts lookup failed', e);
+  }
+
   // Single prompt producing JSON with one post per requested date
   const prompt = `You are a social media content writer for ${clientName}.
 Draft ${days.length} post${days.length === 1 ? '' : 's'} for ${platform || 'Instagram'}, one per date below.
 Topic / angle: ${topic}
 
 Dates:
-${days.map((d: string, i: number) => `${i + 1}. ${d}`).join('\n')}
+${days.map((d: string, i: number) => `${i + 1}. ${d}`).join('\n')}${conceptsBlock}
 
 Return STRICT JSON only, no commentary:
 [
@@ -63,6 +102,7 @@ Return STRICT JSON only, no commentary:
 
 Rules:
 - Each post MUST have a DIFFERENT angle / hook so the posts don't feel templated when read back to back
+- When a concept above ties to a specific date in the dates list, prefer that concept for that date
 - No asterisks, no markdown, no emojis read-aloud as text
 - Written in the client's voice, like a real social manager wrote it
 - Captions should be tight — no fluff`;
