@@ -49,6 +49,20 @@ const APPROVAL_STYLES: Record<ApprovalStatus, { label: string; bg: string; text:
   scheduled:          { label: 'Scheduled',         bg: 'bg-sky-400/20',       text: 'text-sky-200', strike: true },
 };
 
+// PDM = brand-cascade reference posts. They don't need MNA review and
+// should visually stand out so the team knows they're NOT their own work.
+function isPdmItem(i: ContentItem): boolean {
+  if (i.assigned_role === 'PDM (Brand)') return true;
+  return /^\[\s*PDM\b/i.test(i.title || '');
+}
+const PDM_STYLE = {
+  label: 'PDM · Brand',
+  chipBg: '#0b2547',
+  chipBorder: '#1e3a8a',
+  chipText: 'text-blue-100',
+  accent: '#60a5fa',
+};
+
 function parseTitle(raw: string | null) {
   if (!raw) return { phase: '', title: '', hook: '', cta: '' };
   const phaseMatch = raw.match(/^\[([^\]]+)\]\s*/);
@@ -277,22 +291,44 @@ export default function ContentPage() {
     setLoading(true);
     fetch(`/api/content-calendar?client=${encodeURIComponent(activeClient.name)}`)
       .then((r) => r.json())
-      .then((d) => setItems(d.items || []))
+      .then(async (d) => {
+        let nextItems: ContentItem[] = d.items || [];
+        // One-shot idempotent migration: if any items were seeded as
+        // "pending_review" before the PDM auto-approve fix, flip them to
+        // approved + 'PDM (Brand)' so they render correctly everywhere.
+        const needsMigrate = nextItems.some((i) =>
+          /^\[\s*PDM\b/i.test(i.title || '') &&
+          ((i.client_approval_status || 'pending_review') !== 'approved' || i.assigned_role !== 'PDM (Brand)'),
+        );
+        if (needsMigrate) {
+          try {
+            await fetch('/api/content-calendar/migrate-pdm', { method: 'POST' });
+            // Reload fresh rows after migration
+            const r = await fetch(`/api/content-calendar?client=${encodeURIComponent(activeClient!.name)}`);
+            const fresh = await r.json();
+            nextItems = fresh.items || nextItems;
+          } catch {}
+        }
+        setItems(nextItems);
+      })
       .finally(() => setLoading(false));
   }, [activeClient?.name]);
 
   const platforms = Array.from(new Set(items.map((i) => i.platform)));
+  // Approval counts exclude PDM reference posts — they aren't part of
+  // MNA's approval queue.
   const byApproval: Record<ApprovalStatus, number> = {
     drafting: 0, pending_review: 0, approved: 0, changes_requested: 0, scheduled: 0,
   };
   items.forEach((i) => {
+    if (isPdmItem(i)) return;
     const s = (i.client_approval_status || 'pending_review') as ApprovalStatus;
     if (byApproval[s] !== undefined) byApproval[s]++;
   });
   const platformFiltered = filter === 'all' ? items : items.filter((i) => i.platform === filter);
   const filtered = approvalFilter === 'all'
     ? platformFiltered
-    : platformFiltered.filter((i) => (i.client_approval_status || 'pending_review') === approvalFilter);
+    : platformFiltered.filter((i) => !isPdmItem(i) && (i.client_approval_status || 'pending_review') === approvalFilter);
   const shown = [...filtered].sort((a, b) => {
     const cmp = a.post_date.localeCompare(b.post_date);
     return sortAsc ? cmp : -cmp;
@@ -606,19 +642,37 @@ export default function ContentPage() {
                     <div className={`text-[10px] font-bold ${isToday ? 'text-sky-300' : 'text-white/40'}`}>{day}</div>
                     {posts.map((p) => {
                       const parsed = parseTitle(p.title);
+                      const pdm = isPdmItem(p);
                       const status = (p.client_approval_status || 'pending_review') as ApprovalStatus;
                       const astyle = APPROVAL_STYLES[status];
                       return (
                         <button
                           key={p.id}
                           onClick={() => setActiveId(p.id)}
-                          className="group relative text-left rounded-lg overflow-hidden border border-white/10 hover:ring-2 hover:ring-white/20 transition"
-                          style={{ background: 'rgba(255,255,255,0.06)' }}
+                          className={`group relative text-left rounded-lg overflow-hidden hover:ring-2 hover:ring-white/20 transition ${pdm ? '' : 'border border-white/10'}`}
+                          style={pdm
+                            ? { background: PDM_STYLE.chipBg, border: `1px solid ${PDM_STYLE.chipBorder}` }
+                            : { background: 'rgba(255,255,255,0.06)' }}
+                          title={pdm ? 'PDM · Brand Cascade (reference only, no approval)' : undefined}
                         >
                           <DriveThumb url={p.photo_drive_url} className="w-full h-[48px] object-cover opacity-70 group-hover:opacity-90 transition-opacity" />
                           <div className="px-1.5 py-1">
-                            <div className="text-[9px] font-bold text-white/80 truncate">{parsed.title || p.platform}</div>
-                            <span className={`${astyle.bg} ${astyle.text} px-1 py-0.5 rounded text-[7px] font-bold mt-0.5 inline-block`}>{astyle.label}</span>
+                            <div className={`text-[9px] font-bold truncate ${pdm ? 'text-blue-100' : 'text-white/80'}`}>
+                              {pdm && <span className="text-blue-300 font-bold">PDM · </span>}
+                              {parsed.title || p.platform}
+                            </div>
+                            {pdm ? (
+                              <span
+                                className="px-1 py-0.5 rounded text-[7px] font-bold mt-0.5 inline-block"
+                                style={{ background: 'rgba(96,165,250,0.2)', color: '#93c5fd' }}
+                              >
+                                {PDM_STYLE.label}
+                              </span>
+                            ) : (
+                              <span className={`${astyle.bg} ${astyle.text} px-1 py-0.5 rounded text-[7px] font-bold mt-0.5 inline-block`}>
+                                {astyle.label}
+                              </span>
+                            )}
                           </div>
                         </button>
                       );
@@ -645,6 +699,7 @@ export default function ContentPage() {
           >
             {(() => {
               const parsed = parseTitle(activeItem.title);
+              const pdm = isPdmItem(activeItem);
               const status = (activeItem.client_approval_status || 'pending_review') as ApprovalStatus;
               const astyle = APPROVAL_STYLES[status];
               const driveLink = driveViewUrl(activeItem.photo_drive_url);
@@ -654,6 +709,19 @@ export default function ContentPage() {
                     <a href={driveLink!} target="_blank" rel="noreferrer" className="block bg-black rounded-t-2xl overflow-hidden">
                       <DriveThumb url={activeItem.photo_drive_url} className="w-full max-h-80 object-contain" />
                     </a>
+                  )}
+                  {pdm && (
+                    <div className="px-6 pt-5">
+                      <div className="rounded-xl p-3 flex items-center gap-2"
+                           style={{ background: PDM_STYLE.chipBg, border: `1px solid ${PDM_STYLE.chipBorder}` }}>
+                        <span className="material-symbols-outlined" style={{ fontSize: 18, color: PDM_STYLE.accent }}>info</span>
+                        <div className="text-[12px] text-blue-100 leading-snug">
+                          <span className="font-bold">PDM · Brand Cascade.</span> Reference only — Prime IV
+                          corporate posts this from the brand page, so MNA doesn't need to approve or
+                          publish it. Use it to plan local content around.
+                        </div>
+                      </div>
+                    </div>
                   )}
                   <div className="p-6 space-y-4">
                     <div className="flex items-center justify-between">
@@ -665,11 +733,28 @@ export default function ContentPage() {
                       </button>
                     </div>
                     {parsed.phase && (
-                      <span className="inline-block text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded bg-white/10 text-white/60">{parsed.phase}</span>
+                      <span
+                        className="inline-block text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded"
+                        style={pdm
+                          ? { background: 'rgba(96,165,250,0.2)', color: '#93c5fd' }
+                          : undefined}
+                      >
+                        {!pdm && <span className="bg-white/10 text-white/60 rounded px-2 py-0.5">{parsed.phase}</span>}
+                        {pdm && parsed.phase}
+                      </span>
                     )}
                     <div className="text-[20px] font-bold text-white leading-tight">{parsed.title}</div>
                     <div className="flex items-center gap-2 flex-wrap">
-                      <span className={`text-[11px] font-bold px-2 py-1 rounded ${astyle.bg} ${astyle.text}`}>{astyle.label}</span>
+                      {pdm ? (
+                        <span
+                          className="text-[11px] font-bold px-2 py-1 rounded"
+                          style={{ background: PDM_STYLE.chipBg, color: '#93c5fd', border: `1px solid ${PDM_STYLE.chipBorder}` }}
+                        >
+                          {PDM_STYLE.label}
+                        </span>
+                      ) : (
+                        <span className={`text-[11px] font-bold px-2 py-1 rounded ${astyle.bg} ${astyle.text}`}>{astyle.label}</span>
+                      )}
                       {activeItem.client_visible && (
                         <span className="text-[9px] font-bold px-2 py-0.5 rounded-full bg-emerald-500/20 text-emerald-300">Live to client</span>
                       )}
@@ -712,8 +797,8 @@ export default function ContentPage() {
                         <div className="text-sky-300 whitespace-pre-wrap">{activeItem.mna_comments}</div>
                       </div>
                     )}
-                    {/* Staff quick actions */}
-                    {isStaff && status !== 'scheduled' && (
+                    {/* Staff quick actions — hidden for PDM reference posts */}
+                    {isStaff && !pdm && status !== 'scheduled' && (
                       <div className="pt-4 border-t border-white/10 flex gap-2 flex-wrap">
                         {(status === 'approved' || status === 'changes_requested') && (
                           <button
@@ -760,12 +845,17 @@ export default function ContentPage() {
         <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
           {shown.map((it) => {
             const parsed = parseTitle(it.title);
+            const pdm = isPdmItem(it);
             const approval = (it.client_approval_status || 'pending_review') as ApprovalStatus;
             const style = APPROVAL_STYLES[approval];
             const isEditing = editingId === it.id;
 
             return (
-              <div key={it.id} className="glass-card p-5 flex flex-col gap-3 group">
+              <div
+                key={it.id}
+                className="glass-card p-5 flex flex-col gap-3 group"
+                style={pdm ? { borderLeft: `3px solid ${PDM_STYLE.chipBorder}` } : undefined}
+              >
                 {/* Edit mode (staff only) */}
                 {isStaff && isEditing ? (
                   <div className="flex flex-col gap-2">
@@ -840,8 +930,17 @@ export default function ContentPage() {
                     <div className="flex items-center gap-2 flex-wrap">
                       <span className="text-xs px-2 py-0.5 rounded-md bg-white/10 text-white/80">{it.platform}</span>
                       {it.content_type && <span className="text-xs px-2 py-0.5 rounded-md bg-white/10 text-white/80">{it.content_type}</span>}
-                      <span className={`text-xs px-2 py-0.5 rounded-md ${style.bg} ${style.text}`}>{style.label}</span>
-                      {isStaff && (
+                      {pdm ? (
+                        <span
+                          className="text-xs px-2 py-0.5 rounded-md font-bold"
+                          style={{ background: PDM_STYLE.chipBg, color: '#93c5fd', border: `1px solid ${PDM_STYLE.chipBorder}` }}
+                        >
+                          {PDM_STYLE.label}
+                        </span>
+                      ) : (
+                        <span className={`text-xs px-2 py-0.5 rounded-md ${style.bg} ${style.text}`}>{style.label}</span>
+                      )}
+                      {isStaff && !pdm && (
                         it.client_visible ? (
                           <span className="text-[10px] px-2 py-0.5 rounded-md bg-emerald-500/15 text-emerald-300 font-semibold flex items-center gap-1">
                             <span className="material-symbols-outlined" style={{ fontSize: 12 }}>visibility</span>
