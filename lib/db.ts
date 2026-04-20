@@ -147,6 +147,20 @@ async function initSchema() {
                         synced_at timestamptz not null default now(),
                         unique (client_id, google_review_id)
                   )`,
+                  // Kids' journal entries. owner_email = the kid's email
+                  // (marissa@... / kyle@...). author = 'kid' or 'mom'.
+                  // shared = none | mom | ai | both — what's allowed to read it.
+                  `create table if not exists journal_entries (
+                        id uuid primary key default uuid_generate_v4(),
+                        owner_email text not null,
+                        author text not null default 'kid',
+                        title text,
+                        body text not null,
+                        mood text,
+                        shared text not null default 'none',
+                        created_at timestamptz not null default now(),
+                        updated_at timestamptz not null default now()
+                  )`,
                   // Per-client content concepts — a bucket of themes / ideas /
                   // angles MNA jots down. The AI Generate-Posts endpoint reads
                   // these and uses them as inspiration so generated copy stays

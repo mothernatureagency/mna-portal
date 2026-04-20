@@ -528,6 +528,13 @@ export default function StudentPortal() {
               >
                 📚 Study & Flashcards
               </Link>
+              <Link
+                href="/student/journal"
+                className="text-[11px] font-bold px-3 py-1.5 rounded-lg text-white"
+                style={{ background: `linear-gradient(135deg,${theme.gradientFrom},${theme.gradientTo})` }}
+              >
+                📖 Journal
+              </Link>
             </div>
           </div>
 
