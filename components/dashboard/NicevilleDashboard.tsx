@@ -25,6 +25,7 @@ import CompetitorBenchmark from './CompetitorBenchmark';
 import PrimeIVMembershipCard from './PrimeIVMembershipCard';
 import GoogleReviewsCard from './GoogleReviewsCard';
 import SalesBenchmarks from './SalesBenchmarks';
+import ConceptsPanel from './ConceptsPanel';
 
 // ─── REAL DATA ────────────────────────────────────────────────────────────
 // Source: client provided directly on 2026-04-08
@@ -158,6 +159,9 @@ export default function NicevilleDashboard({ client }: { client: Client }) {
           <CorporateSeedButton clientName={client.name} gradientFrom={gradientFrom} gradientTo={gradientTo} />
         </div>
         <MonthlyContentCalendar clientName={client.name} gradientFrom={gradientFrom} gradientTo={gradientTo} />
+        <div className="mt-3">
+          <ConceptsPanel clientId={client.id} gradientFrom={gradientFrom} gradientTo={gradientTo} />
+        </div>
       </div>
 
       {/* ── MEMBERSHIP TIERS (pamphlet reference) ── */}

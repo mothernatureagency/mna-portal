@@ -147,6 +147,21 @@ async function initSchema() {
                         synced_at timestamptz not null default now(),
                         unique (client_id, google_review_id)
                   )`,
+                  // Per-client content concepts — a bucket of themes / ideas /
+                  // angles MNA jots down. The AI Generate-Posts endpoint reads
+                  // these and uses them as inspiration so generated copy stays
+                  // on-brand and grounded in known angles. Optional suggested
+                  // date when the concept is tied to a holiday / launch / event.
+                  `create table if not exists content_concepts (
+                        id uuid primary key default uuid_generate_v4(),
+                        client_id text not null,
+                        title text not null,
+                        body text,
+                        suggested_date date,
+                        tags text,
+                        used_at timestamptz,
+                        created_at timestamptz not null default now()
+                  )`,
                   // Daily snapshots of Google Places metrics per competitor.
                   // One row per (client_id, competitor_key, snapshot_date).
                   // Velocity = latest total - total N days ago.
