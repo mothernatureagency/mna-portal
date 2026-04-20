@@ -166,7 +166,7 @@ export default function NicevilleDashboard({ client }: { client: Client }) {
       {/* ── MEMBERSHIP TIERS (pamphlet reference) ── */}
       <div>
         <SectionLabel>Prime IV Memberships · Pamphlet Reference</SectionLabel>
-        <PrimeIVMembershipCard gradientFrom={gradientFrom} gradientTo={gradientTo} />
+        <PrimeIVMembershipCard gradientFrom={gradientFrom} gradientTo={gradientTo} pricingTier="tier2" />
       </div>
 
       {/* ── COMPETITOR BENCHMARK (Meta + Google Reviews) ── */}
