@@ -214,9 +214,10 @@ export async function POST(req: NextRequest) {
   const inserted: any[] = [];
   for (const it of items) {
     if (!it.post_date || !it.platform) continue;
+    const isPDM = it.assigned_role === 'PDM (Brand)';
     const { rows } = await query(
-      `insert into content_calendar (project_id, post_date, platform, content_type, title, status, assigned_role, caption, client_approval_status)
-       values ($1,$2,$3,$4,$5,$6,$7,$8,$9) returning *`,
+      `insert into content_calendar (project_id, post_date, platform, content_type, title, status, assigned_role, caption, client_approval_status, client_visible)
+       values ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10) returning *`,
       [
         projectId,
         it.post_date,
@@ -228,9 +229,12 @@ export async function POST(req: NextRequest) {
         it.caption || null,
         // PDM reference posts don't go through approval; mark approved.
         // Otherwise: pre-written caption → pending_review; else drafting.
-        it.assigned_role === 'PDM (Brand)'
+        isPDM
           ? 'approved'
           : it.caption ? 'pending_review' : 'drafting',
+        // PDM posts are visible to the client too — they fill the client's
+        // calendar so it doesn't look empty, even though MNA didn't write them.
+        isPDM,
       ]
     );
     inserted.push(rows[0]);
