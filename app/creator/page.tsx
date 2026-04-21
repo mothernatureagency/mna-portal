@@ -41,6 +41,7 @@ import {
 } from '@/lib/creators';
 import { isMNAStaff } from '@/lib/staff';
 import JarvisFab from '@/components/ai/JarvisFab';
+import TikTokAnalytics from '@/components/dashboard/TikTokAnalytics';
 
 type Tab = 'overview' | 'trends' | 'calendar' | 'deals' | 'shop' | 'live' | 'connections' | 'tasks';
 
@@ -170,7 +171,7 @@ export default function CreatorPortal() {
         {tab === 'overview' && (
           <OverviewTab theme={theme} creator={creator} connections={connections} deals={deals} products={products} lives={lives} tasks={tasks} />
         )}
-        {tab === 'trends' && <TrendsTab theme={theme} />}
+        {tab === 'trends' && <TrendsTab theme={theme} creator={creator} />}
         {tab === 'calendar' && (
           <CalendarTab
             theme={theme} events={events}
@@ -282,15 +283,17 @@ function OverviewTab({ theme, creator, connections, deals, products, lives, task
   );
 }
 
-function TrendsTab({ theme }: { theme: Theme }) {
+function TrendsTab({ theme, creator }: { theme: Theme; creator: any }) {
   return (
     <div className="space-y-4">
-      <div className="glass-card p-5">
-        <div className="text-[14px] font-bold mb-2">Trending Audio + Topics</div>
-        <p className="text-[12px] text-white/60 leading-relaxed">
-          Live trend feeds need a TikTok / IG API integration. In the meantime, tap the <Link href="/creator/agent/trend-spotter" className="font-bold underline" style={{ color: theme.accent }}>Trend Spotter</Link> agent below to ask "what's trending right now in lifestyle / wellness / real estate" and get fresh angles tuned for {`@alexusaura`}.
-        </p>
-      </div>
+      <TikTokAnalytics
+        ownerKey={creator.email}
+        kvClientId={creator.email}
+        label={creator.handle}
+        niche={creator.niche?.join?.(' / ') || 'lifestyle + creator'}
+        gradientFrom={theme.gradientFrom}
+        gradientTo={theme.gradientTo}
+      />
       <div className="glass-card p-5">
         <div className="text-[14px] font-bold mb-2">Suggested Workflows</div>
         <ul className="space-y-2 text-[12px] text-white/75">

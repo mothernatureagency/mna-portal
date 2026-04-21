@@ -147,6 +147,24 @@ async function initSchema() {
                         synced_at timestamptz not null default now(),
                         unique (client_id, google_review_id)
                   )`,
+                  // TikTok profile snapshots — one row per (owner_key, date).
+                  // owner_key is a client_id (e.g. 'prime-iv') or creator email.
+                  // Lets us track follower growth + aggregate view velocity over
+                  // time even when the API only gives us current totals.
+                  `create table if not exists tiktok_snapshots (
+                        id uuid primary key default uuid_generate_v4(),
+                        owner_key text not null,
+                        handle text not null,
+                        snapshot_date date not null,
+                        followers integer default 0,
+                        following integer default 0,
+                        total_likes bigint default 0,
+                        videos_count integer default 0,
+                        top_videos jsonb default '[]',
+                        raw jsonb,
+                        captured_at timestamptz not null default now(),
+                        unique (owner_key, snapshot_date)
+                  )`,
                   // Video Lab projects — TikTok / YouTube videos MNA is
                   // producing. Script, voiceover, shot list, clip library,
                   // reference inspiration all stored here. Clip / voiceover
