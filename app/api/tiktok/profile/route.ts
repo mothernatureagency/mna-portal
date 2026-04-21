@@ -16,7 +16,9 @@ export const dynamic = 'force-dynamic';
  * covers ~100 profile scrapes/month.
  */
 
-const APIFY_TOKEN = process.env.APIFY_TOKEN;
+// Accept either env var name so users who set APIFY_KEY or APIFY_TOKEN
+// both work without re-renaming in Vercel.
+const APIFY_TOKEN = process.env.APIFY_TOKEN || process.env.APIFY_KEY;
 
 function normalizeHandle(input: string): string {
   return input.replace(/^.*@?/, '').replace(/\/.*$/, '').trim().replace(/^@/, '');
