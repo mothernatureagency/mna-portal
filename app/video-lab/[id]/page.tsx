@@ -28,14 +28,15 @@ type Project = {
   status: string;
 };
 
-type Tab = 'script' | 'voiceover' | 'shotlist' | 'clips' | 'refs';
+type Tab = 'script' | 'voiceover' | 'avatar' | 'shotlist' | 'clips' | 'refs';
 
 const TABS: { id: Tab; label: string; icon: string }[] = [
-  { id: 'script',    label: 'Script',     icon: 'edit_note' },
-  { id: 'voiceover', label: 'Voiceover',  icon: 'record_voice_over' },
-  { id: 'shotlist',  label: 'Shot List',  icon: 'shutter_speed' },
-  { id: 'clips',     label: 'Footage',    icon: 'video_library' },
-  { id: 'refs',      label: 'References', icon: 'bookmark' },
+  { id: 'script',    label: 'Script',        icon: 'edit_note' },
+  { id: 'voiceover', label: 'Voiceover',     icon: 'record_voice_over' },
+  { id: 'avatar',    label: 'AI Avatar',     icon: 'smart_toy' },
+  { id: 'shotlist',  label: 'Shot List',     icon: 'shutter_speed' },
+  { id: 'clips',     label: 'Footage',       icon: 'video_library' },
+  { id: 'refs',      label: 'References',    icon: 'bookmark' },
 ];
 
 function uid() { return `${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 8)}`; }
@@ -171,6 +172,7 @@ export default function VideoLabProject() {
 
       {tab === 'script' && <ScriptTab project={project} save={save} setProject={setProject} />}
       {tab === 'voiceover' && <VoiceoverTab project={project} save={save} setProject={setProject} />}
+      {tab === 'avatar' && <AvatarTab project={project} save={save} setProject={setProject} />}
       {tab === 'shotlist' && <ShotListTab project={project} save={save} setProject={setProject} />}
       {tab === 'clips' && <ClipsTab project={project} save={save} setProject={setProject} />}
       {tab === 'refs' && <RefsTab project={project} save={save} setProject={setProject} />}
@@ -652,6 +654,272 @@ function Bit({ label, val }: { label: string; val: string }) {
     <div>
       <span className="text-[9px] uppercase tracking-wider font-bold text-white/45">{label}: </span>
       <span className="text-[11px] text-white/75">{val}</span>
+    </div>
+  );
+}
+
+// ─── AI Avatar tab — HeyGen talking avatar over a real background ──
+// Mirrors the St. Augustine Prime IV Shorts pattern: static/short-loop
+// real-location background with a friendly AI avatar voiceover.
+function AvatarTab({ project, save, setProject }: { project: Project; save: (p: Partial<Project>) => void; setProject: (p: Project) => void }) {
+  const [avatars, setAvatars] = useState<any[]>([]);
+  const [voices, setVoices] = useState<any[]>([]);
+  const [avatarId, setAvatarId] = useState<string>('');
+  const [isTalkingPhoto, setIsTalkingPhoto] = useState(false);
+  const [voiceId, setVoiceId] = useState<string>('');
+  const [bgUrl, setBgUrl] = useState<string>('');
+  const [bgType, setBgType] = useState<'image' | 'video'>('video');
+  const [keyMissing, setKeyMissing] = useState(false);
+  const [keyError, setKeyError] = useState('');
+  const [busy, setBusy] = useState(false);
+  const [videoId, setVideoId] = useState<string | null>(null);
+  const [status, setStatus] = useState<string>('');
+  const [videoUrl, setVideoUrl] = useState<string | null>(null);
+  const [thumbUrl, setThumbUrl] = useState<string | null>(null);
+  const [err, setErr] = useState('');
+  const pollRef = useRef<any>(null);
+
+  // Load avatars + voices from HeyGen
+  useEffect(() => {
+    (async () => {
+      const ar = await fetch('/api/video-projects/avatar?mode=avatars').then((r) => r.json()).catch(() => null);
+      if (ar?.error) { setKeyMissing(true); setKeyError(ar.error); return; }
+      const vr = await fetch('/api/video-projects/avatar?mode=voices').then((r) => r.json()).catch(() => null);
+      if (vr?.error) { setKeyMissing(true); setKeyError(vr.error); return; }
+      const avs = ar?.avatars || [];
+      const vs = vr?.voices || [];
+      setAvatars(avs);
+      setVoices(vs);
+      if (avs[0]) { setAvatarId(avs[0].avatar_id); setIsTalkingPhoto(!!avs[0].talking_photo); }
+      // Prefer an English female voice if available
+      const preferred = vs.find((v: any) => /english|en/i.test(v.language || '') && /female/i.test(v.gender || '')) || vs[0];
+      if (preferred) setVoiceId(preferred.voice_id);
+    })();
+  }, []);
+
+  // Autopick one of the saved clips if the user hasn't set a background yet
+  const savedClips = (project.clips || []).filter((c) => c.url);
+
+  async function generate() {
+    if (!project.script?.trim()) { setErr('Write or generate a script first on the Script tab.'); return; }
+    if (!avatarId || !voiceId) { setErr('Pick an avatar + a voice.'); return; }
+    setBusy(true); setErr(''); setVideoUrl(null); setStatus('submitting…');
+    try {
+      const r = await fetch('/api/video-projects/avatar', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          script: project.script,
+          avatarId,
+          voiceId,
+          backgroundUrl: bgUrl || undefined,
+          backgroundType: bgType,
+          talkingPhoto: isTalkingPhoto,
+        }),
+      });
+      const d = await r.json();
+      if (!r.ok) throw new Error(d.error || 'Avatar generation failed');
+      setVideoId(d.videoId);
+      setStatus('processing…');
+      poll(d.videoId);
+    } catch (e: any) {
+      setErr(e.message);
+      setStatus('');
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  function poll(id: string) {
+    if (pollRef.current) clearInterval(pollRef.current);
+    pollRef.current = setInterval(async () => {
+      try {
+        const r = await fetch(`/api/video-projects/avatar?mode=status&videoId=${encodeURIComponent(id)}`);
+        const d = await r.json();
+        if (d.status) setStatus(d.status);
+        if (d.status === 'completed' && d.video_url) {
+          setVideoUrl(d.video_url);
+          setThumbUrl(d.thumbnail_url);
+          save({ voiceover_url: d.video_url });
+          setProject({ ...project, voiceover_url: d.video_url });
+          clearInterval(pollRef.current);
+        } else if (d.status === 'failed') {
+          setErr(d.error || 'HeyGen reported failure');
+          clearInterval(pollRef.current);
+        }
+      } catch {}
+    }, 5000);
+  }
+
+  useEffect(() => () => { if (pollRef.current) clearInterval(pollRef.current); }, []);
+
+  return (
+    <div className="glass-card p-5 space-y-4">
+      <div>
+        <div className="text-[14px] font-bold flex items-center gap-2">
+          <span className="material-symbols-outlined" style={{ fontSize: 18 }}>smart_toy</span>
+          AI Avatar Video
+        </div>
+        <div className="text-[11px] text-white/55 mt-0.5">
+          HeyGen avatar talks your script over a real beach / location background. The exact pattern
+          St. Augustine Prime IV uses for their Shorts.
+        </div>
+      </div>
+
+      {keyMissing && (
+        <div className="rounded-xl p-3 text-[11px]" style={{ background: 'rgba(245,158,11,0.12)', border: '1px solid rgba(245,158,11,0.35)' }}>
+          <span className="font-bold text-amber-200">HeyGen not connected.</span>
+          <span className="text-white/70"> {keyError}. Add <code className="text-white">HEYGEN_API_KEY</code> in Vercel env vars (create one at heygen.com → Settings → API). Starter plan ($29/mo) gives 30 credits ≈ 30 min of rendered video.</span>
+        </div>
+      )}
+
+      {!keyMissing && (
+        <>
+          {/* Avatar picker */}
+          <div>
+            <div className="text-[10px] uppercase tracking-wider font-bold text-white/45 mb-2">
+              Pick an Avatar ({avatars.length})
+            </div>
+            <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-2 max-h-80 overflow-y-auto">
+              {avatars.map((a) => {
+                const selected = a.avatar_id === avatarId;
+                return (
+                  <button
+                    key={a.avatar_id}
+                    onClick={() => { setAvatarId(a.avatar_id); setIsTalkingPhoto(!!a.talking_photo); }}
+                    className="rounded-lg overflow-hidden transition text-left"
+                    style={{
+                      border: selected ? '2px solid #4ab8ce' : '1px solid rgba(255,255,255,0.1)',
+                      background: 'rgba(0,0,0,0.3)',
+                      boxShadow: selected ? '0 0 0 2px rgba(74,184,206,0.3)' : 'none',
+                    }}
+                  >
+                    {a.preview_image_url
+                      ? <img src={a.preview_image_url} alt={a.avatar_name} className="w-full h-24 object-cover" />
+                      : <div className="w-full h-24 bg-white/5 flex items-center justify-center text-white/40 text-[11px]">No preview</div>
+                    }
+                    <div className="px-1.5 py-1">
+                      <div className="text-[10px] font-bold text-white truncate">{a.avatar_name}</div>
+                      <div className="text-[9px] text-white/45">
+                        {a.talking_photo ? 'Talking Photo' : a.gender || 'Avatar'}
+                      </div>
+                    </div>
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+
+          {/* Voice picker */}
+          <div>
+            <div className="text-[10px] uppercase tracking-wider font-bold text-white/45 mb-1">Voice</div>
+            <select
+              value={voiceId}
+              onChange={(e) => setVoiceId(e.target.value)}
+              className="w-full px-3 py-2 rounded-lg border text-white text-[13px] focus:outline-none"
+              style={{ background: 'rgba(0,0,0,0.45)', borderColor: 'rgba(255,255,255,0.25)' }}
+            >
+              {voices.map((v) => (
+                <option key={v.voice_id} value={v.voice_id} className="bg-slate-900">
+                  {v.name} · {v.language} {v.gender ? `· ${v.gender}` : ''}
+                </option>
+              ))}
+            </select>
+          </div>
+
+          {/* Background picker */}
+          <div>
+            <div className="text-[10px] uppercase tracking-wider font-bold text-white/45 mb-1">Real Background</div>
+            <div className="grid grid-cols-2 gap-2 mb-2">
+              <select
+                value={bgType}
+                onChange={(e) => setBgType(e.target.value as any)}
+                className="px-3 py-2 rounded-lg border text-white text-[13px] focus:outline-none"
+                style={{ background: 'rgba(0,0,0,0.45)', borderColor: 'rgba(255,255,255,0.25)' }}
+              >
+                <option value="video" className="bg-slate-900">Video loop</option>
+                <option value="image" className="bg-slate-900">Static image</option>
+              </select>
+              <input
+                type="url"
+                placeholder="https://... public URL to image/video"
+                value={bgUrl}
+                onChange={(e) => setBgUrl(e.target.value)}
+                className="px-3 py-2 rounded-lg border text-white text-[13px] placeholder:text-white/40 focus:outline-none"
+                style={{ background: 'rgba(0,0,0,0.45)', borderColor: 'rgba(255,255,255,0.25)' }}
+              />
+            </div>
+            {savedClips.length > 0 && (
+              <div className="space-y-1.5">
+                <div className="text-[10px] text-white/45">Or pick from your Footage library:</div>
+                <div className="flex flex-wrap gap-1">
+                  {savedClips.slice(0, 10).map((c) => (
+                    <button
+                      key={c.id}
+                      onClick={() => { setBgUrl(c.url); setBgType('video'); }}
+                      className="text-[10px] font-semibold px-2 py-1 rounded-md text-white/75 hover:text-white hover:bg-white/10"
+                      style={{ background: bgUrl === c.url ? 'rgba(74,184,206,0.25)' : 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.1)' }}
+                    >
+                      {c.name || c.url.slice(-30)}
+                    </button>
+                  ))}
+                </div>
+              </div>
+            )}
+            <div className="text-[10px] text-white/40 mt-1">
+              Background must be a publicly accessible URL (HeyGen fetches it server-side). If your beach
+              clips are on Drive, make them "Anyone with link" and paste the direct video URL.
+            </div>
+          </div>
+
+          {/* Generate button + progress */}
+          <div className="flex items-center gap-2 flex-wrap">
+            <button
+              onClick={generate}
+              disabled={busy || !project.script || !avatarId || !voiceId}
+              className="text-[12px] font-bold px-4 py-2 rounded-lg text-white disabled:opacity-50"
+              style={{ background: 'linear-gradient(135deg,#0c6da4,#4ab8ce)' }}
+            >
+              {busy ? 'Submitting…' : '🎬 Generate Avatar Video'}
+            </button>
+            {status && <span className="text-[11px] text-white/65">Status: {status}</span>}
+          </div>
+          {err && <div className="text-[11px] text-rose-300">{err}</div>}
+
+          {/* Rendered video */}
+          {videoUrl && (
+            <div className="space-y-2 pt-2 border-t border-white/10">
+              <div className="text-[11px] font-bold text-emerald-300">✓ Rendered</div>
+              <video
+                src={videoUrl}
+                controls
+                poster={thumbUrl || undefined}
+                className="w-full rounded-xl"
+                style={{ maxHeight: 500 }}
+              />
+              <div className="flex gap-2">
+                <a href={videoUrl} download={`${project.title.replace(/[^\w]+/g, '-').toLowerCase()}.mp4`}
+                   className="text-[12px] font-bold px-4 py-2 rounded-lg text-white"
+                   style={{ background: 'rgba(16,185,129,0.2)', border: '1px solid rgba(52,211,153,0.4)' }}>
+                  ⬇️ Download MP4
+                </a>
+                <button
+                  onClick={() => navigator.clipboard?.writeText(videoUrl)}
+                  className="text-[12px] font-bold px-3 py-2 rounded-lg text-white/80 hover:text-white"
+                  style={{ background: 'rgba(255,255,255,0.08)' }}
+                >
+                  Copy URL
+                </button>
+              </div>
+            </div>
+          )}
+
+          <div className="text-[10px] text-white/40 leading-relaxed pt-2 border-t border-white/10">
+            Tip: For the St. Augustine-style look — use a static beach image OR a slow-drifting
+            background video (5-10 sec loop works great), pick a warm female voice, and keep the script
+            under 60 seconds so you stay in Shorts / Reels sweet spot.
+          </div>
+        </>
+      )}
     </div>
   );
 }
