@@ -58,7 +58,12 @@ function fmt(n: number) {
 }
 
 function cleanHandle(raw: string): string {
-  return raw.replace(/^.*(tiktok\.com\/)?@?/i, '').replace(/[/?].*$/, '').trim().replace(/^@/, '');
+  let s = (raw || '').trim();
+  // If it's a full TikTok URL, extract the handle after the last @/ segment.
+  const urlMatch = s.match(/tiktok\.com\/@?([A-Za-z0-9_.]+)/i);
+  if (urlMatch) return urlMatch[1];
+  // Otherwise strip a leading @ and any trailing slashes / query params.
+  return s.replace(/^@/, '').replace(/[/?].*$/, '');
 }
 
 export default function TikTokAnalytics({
