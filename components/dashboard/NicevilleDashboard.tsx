@@ -25,6 +25,7 @@ import CompetitorBenchmark from './CompetitorBenchmark';
 import PrimeIVMembershipCard from './PrimeIVMembershipCard';
 import SalesBenchmarks from './SalesBenchmarks';
 import ConceptsPanel from './ConceptsPanel';
+import TikTokAnalytics from './TikTokAnalytics';
 
 // ─── REAL DATA ────────────────────────────────────────────────────────────
 // Source: client provided directly on 2026-04-08
@@ -173,6 +174,19 @@ export default function NicevilleDashboard({ client }: { client: Client }) {
       <div>
         <SectionLabel>Competitive Position</SectionLabel>
         <CompetitorBenchmark gradientFrom={gradientFrom} gradientTo={gradientTo} clientId={client.id} />
+      </div>
+
+      {/* ── TIKTOK ANALYTICS ── */}
+      <div>
+        <SectionLabel>TikTok · Niceville</SectionLabel>
+        <TikTokAnalytics
+          ownerKey={client.id}
+          kvClientId={client.id}
+          label="Prime IV Niceville"
+          niche="IV therapy / wellness / local Niceville FL"
+          gradientFrom={gradientFrom}
+          gradientTo={gradientTo}
+        />
       </div>
 
       {/* ── SALES BENCHMARKS (manual entry: Niceville vs Destin vs Corporate) ── */}
