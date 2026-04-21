@@ -88,6 +88,15 @@ export default function TikTokAnalytics({
   const [err, setErr] = useState<string>('');
   const [ideas, setIdeas] = useState<Ideas | null>(null);
   const [ideasBusy, setIdeasBusy] = useState(false);
+  // Upfront setup check — is APIFY_TOKEN present in Vercel env?
+  const [setupOk, setSetupOk] = useState<boolean | null>(null);
+
+  useEffect(() => {
+    fetch('/api/tiktok/profile?check=1')
+      .then((r) => r.json())
+      .then((d) => setSetupOk(!!d.configured))
+      .catch(() => setSetupOk(false));
+  }, []);
 
   useEffect(() => {
     (async () => {
@@ -191,16 +200,30 @@ export default function TikTokAnalytics({
         </div>
       </div>
 
+      {setupOk === false && (
+        <div className="rounded-xl p-4 mb-3" style={{ background: 'rgba(245,158,11,0.12)', border: '1px solid rgba(245,158,11,0.4)' }}>
+          <div className="flex items-start gap-3">
+            <span className="material-symbols-outlined text-amber-300" style={{ fontSize: 22 }}>settings</span>
+            <div className="flex-1 min-w-0">
+              <div className="text-[13px] font-bold text-amber-100">TikTok needs one setup step</div>
+              <div className="text-[11px] text-white/75 mt-1 leading-relaxed">
+                Add <code className="text-white font-bold">APIFY_TOKEN</code> to Vercel env vars and redeploy, then come back — this card will flip to live mode automatically.
+              </div>
+              <ol className="text-[11px] text-white/70 mt-2 space-y-0.5 list-decimal ml-4">
+                <li>Get token: <a href="https://console.apify.com/settings/integrations" target="_blank" rel="noreferrer" className="underline text-sky-300">console.apify.com/settings/integrations</a></li>
+                <li>Add to Vercel: <a href="https://vercel.com/mothernatureagencys-projects/my-portal/settings/environment-variables" target="_blank" rel="noreferrer" className="underline text-sky-300">env vars</a> (check all 3 environments)</li>
+                <li>Deployments → latest → ⋮ → Redeploy</li>
+              </ol>
+              <div className="text-[10px] text-white/50 mt-2">
+                Until then, the <b>Connect</b> button below won't work — Apify rejects the request without a token.
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
       {err && (
         <div className="rounded-xl p-3 mb-3 text-[11px]" style={{ background: 'rgba(244,63,94,0.1)', border: '1px solid rgba(244,63,94,0.3)' }}>
           <span className="font-bold text-rose-300">Error: </span><span className="text-white/75">{err}</span>
-          {err.includes('APIFY_TOKEN') && (
-            <div className="text-[10px] text-white/55 mt-2 leading-relaxed">
-              → Go to <a href="https://apify.com" target="_blank" rel="noreferrer" className="underline text-white/80">apify.com</a>, sign up (free), Settings → Integrations → API tokens → copy.
-              Then add <code className="text-white">APIFY_TOKEN</code> in Vercel env vars and redeploy.
-              Free tier handles ~100 profile pulls per month.
-            </div>
-          )}
         </div>
       )}
 
