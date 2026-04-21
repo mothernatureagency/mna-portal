@@ -147,6 +147,28 @@ async function initSchema() {
                         synced_at timestamptz not null default now(),
                         unique (client_id, google_review_id)
                   )`,
+                  // Video Lab projects — TikTok / YouTube videos MNA is
+                  // producing. Script, voiceover, shot list, clip library,
+                  // reference inspiration all stored here. Clip / voiceover
+                  // binary assets live externally (Cloudinary / Drive / R2);
+                  // we track URLs + metadata only.
+                  `create table if not exists video_projects (
+                        id uuid primary key default uuid_generate_v4(),
+                        client_id text not null,
+                        title text not null,
+                        platform text not null default 'tiktok',
+                        duration_sec integer default 30,
+                        topic text,
+                        script text,
+                        shot_list jsonb default '[]',
+                        clips jsonb default '[]',
+                        references_list jsonb default '[]',
+                        voiceover_url text,
+                        voiceover_voice text,
+                        status text not null default 'drafting',
+                        created_at timestamptz not null default now(),
+                        updated_at timestamptz not null default now()
+                  )`,
                   // Kids' journal entries. owner_email = the kid's email
                   // (marissa@... / kyle@...). author = 'kid' or 'mom'.
                   // shared = none | mom | ai | both — what's allowed to read it.
