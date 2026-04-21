@@ -56,6 +56,14 @@ async function scrapeProfile(handle: string) {
 
 export async function GET(req: NextRequest) {
   await ensureSchema();
+  // Setup check — lets the UI tell the user upfront whether TikTok is
+  // ready to use vs needs an APIFY_TOKEN in Vercel env.
+  if (req.nextUrl.searchParams.get('check') === '1') {
+    return NextResponse.json({
+      configured: !!APIFY_TOKEN,
+      error: APIFY_TOKEN ? null : 'APIFY_TOKEN not set in Vercel env vars.',
+    });
+  }
   const handleRaw = req.nextUrl.searchParams.get('handle');
   const ownerKey = req.nextUrl.searchParams.get('ownerKey');
   if (!handleRaw || !ownerKey) return NextResponse.json({ error: 'handle + ownerKey required' }, { status: 400 });
