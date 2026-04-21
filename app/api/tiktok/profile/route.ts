@@ -63,14 +63,14 @@ export async function GET(req: NextRequest) {
   const handle = normalizeHandle(handleRaw);
 
   const scraped = await scrapeProfile(handle);
-  if (!scraped.ok) {
+  if (!scraped.ok || !scraped.items) {
     // Still return any existing snapshots so the UI can show historical data
     const { rows } = await query(
       `select snapshot_date, followers, total_likes, videos_count, top_videos
          from tiktok_snapshots where owner_key = $1 order by snapshot_date desc limit 30`,
       [ownerKey],
     );
-    return NextResponse.json({ error: scraped.error, history: rows }, { status: 500 });
+    return NextResponse.json({ error: scraped.error || 'scrape returned no items', history: rows }, { status: 500 });
   }
 
   // Each item is one video; the profile data is nested on authorMeta.
