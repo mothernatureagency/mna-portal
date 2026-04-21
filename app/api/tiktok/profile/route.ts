@@ -21,7 +21,10 @@ export const dynamic = 'force-dynamic';
 const APIFY_TOKEN = process.env.APIFY_TOKEN || process.env.APIFY_KEY;
 
 function normalizeHandle(input: string): string {
-  return input.replace(/^.*@?/, '').replace(/\/.*$/, '').trim().replace(/^@/, '');
+  let s = (input || '').trim();
+  const urlMatch = s.match(/tiktok\.com\/@?([A-Za-z0-9_.]+)/i);
+  if (urlMatch) return urlMatch[1];
+  return s.replace(/^@/, '').replace(/[/?].*$/, '');
 }
 
 async function scrapeProfile(handle: string) {
