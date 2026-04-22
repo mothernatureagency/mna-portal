@@ -42,6 +42,7 @@ import {
 import { isMNAStaff } from '@/lib/staff';
 import JarvisFab from '@/components/ai/JarvisFab';
 import TikTokAnalytics from '@/components/dashboard/TikTokAnalytics';
+import TikTokContentPlan from '@/components/dashboard/TikTokContentPlan';
 
 type Tab = 'overview' | 'trends' | 'calendar' | 'deals' | 'shop' | 'live' | 'connections' | 'tasks';
 
@@ -287,6 +288,14 @@ function TrendsTab({ theme, creator }: { theme: Theme; creator: any }) {
   return (
     <div className="space-y-4">
       <TikTokAnalytics
+        ownerKey={creator.email}
+        kvClientId={creator.email}
+        label={creator.handle}
+        niche={creator.niche?.join?.(' / ') || 'lifestyle + creator'}
+        gradientFrom={theme.gradientFrom}
+        gradientTo={theme.gradientTo}
+      />
+      <TikTokContentPlan
         ownerKey={creator.email}
         kvClientId={creator.email}
         label={creator.handle}
