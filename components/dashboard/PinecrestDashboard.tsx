@@ -16,6 +16,7 @@ import MonthlyContentCalendar from './MonthlyContentCalendar';
 import ConceptsPanel from './ConceptsPanel';
 import PrimeIVMembershipCard from './PrimeIVMembershipCard';
 import TikTokAnalytics from './TikTokAnalytics';
+import TikTokContentPlan from './TikTokContentPlan';
 
 function SectionLabel({ children }: { children: React.ReactNode }) {
   return (
@@ -70,6 +71,16 @@ export default function PinecrestDashboard({ client }: { client: Client }) {
           gradientFrom={gradientFrom}
           gradientTo={gradientTo}
         />
+        <div className="mt-3">
+          <TikTokContentPlan
+            ownerKey={client.id}
+            kvClientId={client.id}
+            label="Prime IV Pinecrest"
+            niche="IV therapy / wellness / Pinecrest FL"
+            gradientFrom={gradientFrom}
+            gradientTo={gradientTo}
+          />
+        </div>
       </div>
 
       {/* ── MEMBERSHIP TIERS (tier 3 pricing for Pinecrest) ── */}

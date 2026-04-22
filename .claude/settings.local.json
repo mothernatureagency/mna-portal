@@ -38,7 +38,8 @@
       "Bash(mdls -name kMDItemNumberOfPages \"/Users/alexuswilliams/Downloads/Membership Pamphlets.pdf\")",
       "Bash(vercel logs:*)",
       "Bash(vercel env:*)",
-      "Bash(vercel redeploy:*)"
+      "Bash(vercel redeploy:*)",
+      "Bash(npx tsc:*)"
     ]
   }
 }
