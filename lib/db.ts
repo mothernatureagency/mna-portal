@@ -165,6 +165,23 @@ async function initSchema() {
                         captured_at timestamptz not null default now(),
                         unique (owner_key, snapshot_date)
                   )`,
+                  // YouTube channel snapshots — same shape as TikTok so the
+                  // analytics UI can be near-identical. total_views replaces
+                  // total_likes (YouTube exposes lifetime views, not likes).
+                  `create table if not exists youtube_snapshots (
+                        id uuid primary key default uuid_generate_v4(),
+                        owner_key text not null,
+                        handle text not null,
+                        channel_id text not null,
+                        snapshot_date date not null,
+                        subscribers bigint default 0,
+                        total_views bigint default 0,
+                        videos_count integer default 0,
+                        top_videos jsonb default '[]',
+                        raw jsonb,
+                        captured_at timestamptz not null default now(),
+                        unique (owner_key, snapshot_date)
+                  )`,
                   // Video Lab projects — TikTok / YouTube videos MNA is
                   // producing. Script, voiceover, shot list, clip library,
                   // reference inspiration all stored here. Clip / voiceover

@@ -42,6 +42,7 @@ import {
 import { isMNAStaff } from '@/lib/staff';
 import JarvisFab from '@/components/ai/JarvisFab';
 import TikTokAnalytics from '@/components/dashboard/TikTokAnalytics';
+import YouTubeAnalytics from '@/components/dashboard/YouTubeAnalytics';
 import TikTokContentPlan from '@/components/dashboard/TikTokContentPlan';
 
 type Tab = 'overview' | 'trends' | 'calendar' | 'deals' | 'shop' | 'live' | 'connections' | 'tasks';
@@ -300,6 +301,13 @@ function TrendsTab({ theme, creator }: { theme: Theme; creator: any }) {
         kvClientId={creator.email}
         label={creator.handle}
         niche={creator.niche?.join?.(' / ') || 'lifestyle + creator'}
+        gradientFrom={theme.gradientFrom}
+        gradientTo={theme.gradientTo}
+      />
+      <YouTubeAnalytics
+        ownerKey={creator.email}
+        kvClientId={creator.email}
+        label={creator.handle}
         gradientFrom={theme.gradientFrom}
         gradientTo={theme.gradientTo}
       />

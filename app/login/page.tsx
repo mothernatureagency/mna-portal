@@ -9,8 +9,11 @@ function LoginForm() {
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
   const [loading, setLoading] = useState(false);
-  const [mode, setMode] = useState<'login' | 'forgot'>('login');
+  const [mode, setMode] = useState<'login' | 'forgot' | 'mfa'>('login');
   const [showPw, setShowPw] = useState(false);
+  const [mfaCode, setMfaCode] = useState('');
+  const [mfaFactorId, setMfaFactorId] = useState('');
+  const [mfaChallengeId, setMfaChallengeId] = useState('');
 
   const router = useRouter();
   const searchParams = useSearchParams();
@@ -35,12 +38,50 @@ function LoginForm() {
       return;
     }
 
+    if (mode === 'mfa') {
+      const { error: verErr } = await supabase.auth.mfa.verify({
+        factorId: mfaFactorId,
+        challengeId: mfaChallengeId,
+        code: mfaCode,
+      });
+      if (verErr) {
+        setError(verErr.message);
+        setLoading(false);
+        return;
+      }
+      const next = searchParams.get('next') ?? '/';
+      router.push(next);
+      router.refresh();
+      return;
+    }
+
     const { error } = await supabase.auth.signInWithPassword({ email, password });
 
     if (error) {
       setError(error.message);
       setLoading(false);
       return;
+    }
+
+    // Check if this user has MFA enrolled — if so, prompt for the 6-digit code.
+    const { data: aal } = await supabase.auth.mfa.getAuthenticatorAssuranceLevel();
+    if (aal && aal.currentLevel === 'aal1' && aal.nextLevel === 'aal2') {
+      const { data: list } = await supabase.auth.mfa.listFactors();
+      const factor = list?.totp?.find((f) => f.status === 'verified') || list?.totp?.[0];
+      if (factor) {
+        const { data: chal, error: chalErr } = await supabase.auth.mfa.challenge({ factorId: factor.id });
+        if (chalErr || !chal) {
+          setError(chalErr?.message || 'MFA challenge failed');
+          setLoading(false);
+          return;
+        }
+        setMfaFactorId(factor.id);
+        setMfaChallengeId(chal.id);
+        setMode('mfa');
+        setMfaCode('');
+        setLoading(false);
+        return;
+      }
     }
 
     // Refresh the page so middleware can detect the new session
@@ -66,27 +107,56 @@ function LoginForm() {
             Mother Nature Agency
           </h1>
           <p className="text-neutral-500 text-base">
-            {mode === 'login' ? 'Sign in to your portal' : 'Reset your password'}
+            {mode === 'login' ? 'Sign in to your portal' : mode === 'mfa' ? 'Enter your 6-digit code' : 'Reset your password'}
           </p>
         </div>
 
-        {/* Email */}
-        <div className="flex flex-col gap-2">
-          <label className="text-neutral-300 text-base font-medium" htmlFor="email">
-            Email
-          </label>
-          <input
-            id="email"
-            type="email"
-            value={email}
-            onChange={(e) => setEmail(e.target.value)}
-            placeholder="you@example.com"
-            required
-            autoComplete="email"
-            className="rounded-2xl px-5 py-4 bg-neutral-800/40 text-white text-base border border-neutral-700 focus:outline-none focus:ring-2 focus:border-transparent transition-all placeholder:text-neutral-500"
-            style={{ '--tw-ring-color': '#0c6da4' } as React.CSSProperties}
-          />
-        </div>
+        {/* Email — hidden during MFA step (user already authenticated) */}
+        {mode !== 'mfa' && (
+          <div className="flex flex-col gap-2">
+            <label className="text-neutral-300 text-base font-medium" htmlFor="email">
+              Email
+            </label>
+            <input
+              id="email"
+              type="email"
+              value={email}
+              onChange={(e) => setEmail(e.target.value)}
+              placeholder="you@example.com"
+              required
+              autoComplete="email"
+              className="rounded-2xl px-5 py-4 bg-neutral-800/40 text-white text-base border border-neutral-700 focus:outline-none focus:ring-2 focus:border-transparent transition-all placeholder:text-neutral-500"
+              style={{ '--tw-ring-color': '#0c6da4' } as React.CSSProperties}
+            />
+          </div>
+        )}
+
+        {/* MFA code */}
+        {mode === 'mfa' && (
+          <div className="flex flex-col gap-2">
+            <label className="text-neutral-300 text-base font-medium" htmlFor="mfa-code">
+              Authenticator code
+            </label>
+            <input
+              id="mfa-code"
+              type="text"
+              inputMode="numeric"
+              pattern="[0-9]*"
+              maxLength={6}
+              autoFocus
+              autoComplete="one-time-code"
+              value={mfaCode}
+              onChange={(e) => setMfaCode(e.target.value.replace(/\D/g, ''))}
+              placeholder="000000"
+              required
+              className="text-center text-2xl tracking-[0.4em] font-mono rounded-2xl px-5 py-4 bg-neutral-800/40 text-white border border-neutral-700 focus:outline-none focus:ring-2 focus:border-transparent transition-all placeholder:text-neutral-500"
+              style={{ '--tw-ring-color': '#0c6da4' } as React.CSSProperties}
+            />
+            <p className="text-neutral-500 text-xs">
+              Open your authenticator app and enter the current 6-digit code.
+            </p>
+          </div>
+        )}
 
         {/* Password (login only) */}
         {mode === 'login' && (
@@ -142,18 +212,34 @@ function LoginForm() {
           style={{ background: 'linear-gradient(135deg, #0c6da4, #4ab8ce)' }}
         >
           {loading
-            ? mode === 'login' ? 'Signing in...' : 'Sending...'
-            : mode === 'login' ? 'Sign In' : 'Send Reset Link'}
+            ? mode === 'login' ? 'Signing in...' : mode === 'mfa' ? 'Verifying...' : 'Sending...'
+            : mode === 'login' ? 'Sign In' : mode === 'mfa' ? 'Verify code' : 'Send Reset Link'}
         </button>
 
-        {/* Toggle forgot / back to login */}
-        <button
-          type="button"
-          onClick={() => { setMode(mode === 'login' ? 'forgot' : 'login'); setError(''); setSuccess(''); }}
-          className="text-sm text-neutral-400 hover:text-white transition-colors"
-        >
-          {mode === 'login' ? 'Forgot password?' : 'Back to sign in'}
-        </button>
+        {/* Toggle forgot / back to login / cancel MFA */}
+        {mode === 'mfa' ? (
+          <button
+            type="button"
+            onClick={async () => {
+              await supabase.auth.signOut();
+              setMode('login');
+              setMfaCode('');
+              setError('');
+              setPassword('');
+            }}
+            className="text-sm text-neutral-400 hover:text-white transition-colors"
+          >
+            Cancel
+          </button>
+        ) : (
+          <button
+            type="button"
+            onClick={() => { setMode(mode === 'login' ? 'forgot' : 'login'); setError(''); setSuccess(''); }}
+            className="text-sm text-neutral-400 hover:text-white transition-colors"
+          >
+            {mode === 'login' ? 'Forgot password?' : 'Back to sign in'}
+          </button>
+        )}
       </form>
     </main>
   );

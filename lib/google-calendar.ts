@@ -10,6 +10,9 @@ const REDIRECT_URI = process.env.NEXT_PUBLIC_SITE_URL
 const SCOPES = [
   'https://www.googleapis.com/auth/calendar',
   'https://www.googleapis.com/auth/calendar.events',
+  // Drive read-only — used by the content tracker's "Pick from Drive" picker.
+  // Adding this scope requires staff to reconnect Google so consent re-prompts.
+  'https://www.googleapis.com/auth/drive.readonly',
 ];
 
 /**
