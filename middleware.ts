@@ -73,25 +73,25 @@ export async function middleware(request: NextRequest) {
   // - role 'contractor' → locked to /contractor/*
   // - everything else (staff, owner, admin) → full app
   const role = (user.user_metadata as Record<string, unknown> | null)?.role as string | undefined;
-  if (role === 'client' && !pathname.startsWith('/client') && !pathname.startsWith('/api/')) {
+  if (role === 'client' && !pathname.startsWith('/client') && !pathname.startsWith('/api/') && !pathname.startsWith('/security')) {
     const url = request.nextUrl.clone();
     url.pathname = '/client';
     url.search = '';
     return NextResponse.redirect(url);
   }
-  if (role === 'contractor' && !pathname.startsWith('/contractor') && !pathname.startsWith('/api/')) {
+  if (role === 'contractor' && !pathname.startsWith('/contractor') && !pathname.startsWith('/api/') && !pathname.startsWith('/security')) {
     const url = request.nextUrl.clone();
     url.pathname = '/contractor';
     url.search = '';
     return NextResponse.redirect(url);
   }
-  if (role === 'student' && !pathname.startsWith('/student') && !pathname.startsWith('/api/')) {
+  if (role === 'student' && !pathname.startsWith('/student') && !pathname.startsWith('/api/') && !pathname.startsWith('/security')) {
     const url = request.nextUrl.clone();
     url.pathname = '/student';
     url.search = '';
     return NextResponse.redirect(url);
   }
-  if (role === 'creator' && !pathname.startsWith('/creator') && !pathname.startsWith('/api/')) {
+  if (role === 'creator' && !pathname.startsWith('/creator') && !pathname.startsWith('/api/') && !pathname.startsWith('/security')) {
     const url = request.nextUrl.clone();
     url.pathname = '/creator';
     url.search = '';

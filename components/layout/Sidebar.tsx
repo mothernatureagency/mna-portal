@@ -37,6 +37,7 @@ const NAV = [
     { label: 'AI Insights', href: '/reports', e: 'psychology' },
   ]},
   { sec: 'AGENTS', items: [
+    { label: 'Call Copilot', href: '/copilot', e: 'graphic_eq' },
     { label: 'MNA Assistant', href: '/assistant', e: 'smart_toy' },
     { label: 'AI Agents', href: '/agents/ai', e: 'robot_2' },
     { label: 'Team Roster', href: '/agents/team', e: 'groups' },

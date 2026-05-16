@@ -212,9 +212,24 @@ export async function POST(req: NextRequest) {
 
   const projectId = await getOrCreateProject(clientName);
   const inserted: any[] = [];
+  let skipped = 0;
   for (const it of items) {
     if (!it.post_date || !it.platform) continue;
     const isPDM = it.assigned_role === 'PDM (Brand)';
+    // Skip if an identical row already exists for this project. Stops
+    // duplicate playbook seeds / double-clicks from filling the calendar
+    // with copies of the same post.
+    const dupe = await query<{ id: string }>(
+      `select id from content_calendar
+        where project_id = $1
+          and post_date = $2
+          and platform = $3
+          and coalesce(title, '') = coalesce($4, '')
+        limit 1`,
+      [projectId, it.post_date, it.platform, it.title || null],
+    );
+    if (dupe.rows[0]) { skipped++; continue; }
+
     const { rows } = await query(
       `insert into content_calendar (project_id, post_date, platform, content_type, title, status, assigned_role, caption, client_approval_status, client_visible)
        values ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10) returning *`,
@@ -239,7 +254,7 @@ export async function POST(req: NextRequest) {
     );
     inserted.push(rows[0]);
   }
-  return NextResponse.json({ inserted, count: inserted.length });
+  return NextResponse.json({ inserted, count: inserted.length, skipped });
 }
 
 // DELETE — remove a content item (staff only)

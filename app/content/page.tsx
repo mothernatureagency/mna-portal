@@ -3,6 +3,7 @@ import React, { useEffect, useMemo, useState } from 'react';
 import { useClient } from '@/context/ClientContext';
 import { createClient } from '@/lib/supabase/client';
 import { driveThumbnailUrl, driveViewUrl } from '@/lib/drive';
+import { extractFolderId, type DriveFile } from '@/lib/google-drive';
 
 /** Image with graceful fallback — hides itself if Drive thumbnail fails */
 function DriveThumb({ url, className }: { url: string | null | undefined; className?: string }) {
@@ -149,11 +150,26 @@ export default function ContentPage() {
   const [showRedoInput, setShowRedoInput] = useState<Record<string, boolean>>({});
   const [redoGuidance, setRedoGuidance] = useState<Record<string, string>>({});
   const [showAddForm, setShowAddForm] = useState(false);
-  const [sortAsc, setSortAsc] = useState(true); // sort by date ascending by default
+  const [sortAsc, setSortAsc] = useState(false); // newest first by default
   const [newPostPlatforms, setNewPostPlatforms] = useState<string[]>(['Instagram']);
   const [editPlatforms, setEditPlatforms] = useState<string[]>([]);
   const [viewMode, setViewMode] = useState<'cards' | 'calendar'>('calendar');
   const [activeId, setActiveId] = useState<string | null>(null);
+  // Drag-to-reschedule on the calendar view
+  const [draggingId, setDraggingId] = useState<string | null>(null);
+  const [dragOverIso, setDragOverIso] = useState<string | null>(null);
+  // Inline date editing on cards / in the modal
+  const [editingDateId, setEditingDateId] = useState<string | null>(null);
+  // Google Drive picker — opens for a specific post ID to attach a file.
+  // The folder URL is set per-client and persisted to localStorage so staff
+  // only has to paste it once per browser.
+  const [driveFolderUrl, setDriveFolderUrl] = useState<string>('');
+  const [editingFolder, setEditingFolder] = useState(false);
+  const [pickerForId, setPickerForId] = useState<string | null>(null);
+  const [pickerFiles, setPickerFiles] = useState<DriveFile[]>([]);
+  const [pickerLoading, setPickerLoading] = useState(false);
+  const [pickerError, setPickerError] = useState<string | null>(null);
+  const [pickerQuery, setPickerQuery] = useState('');
   const [newPost, setNewPost] = useState({ post_date: '', platform: 'Instagram', content_type: 'Post', title: '', caption: '' });
 
   // Detect user role
@@ -181,6 +197,80 @@ export default function ContentPage() {
     const data = await res.json();
     if (!res.ok) throw new Error(data.error || 'Update failed');
     setItems((prev) => prev.map((it) => (it.id === id ? { ...it, ...data.item } : it)));
+  }
+
+  // Optimistic move for drag-to-reschedule in the calendar view.
+  async function movePost(postId: string, toIso: string) {
+    setItems((prev) => prev.map((p) => (p.id === postId ? { ...p, post_date: toIso } : p)));
+    try {
+      await fetch('/api/content-calendar', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ id: postId, post_date: toIso }),
+      });
+    } catch {}
+  }
+
+  async function saveDate(id: string, value: string) {
+    if (!value) return;
+    const clean = toDateOnly(value);
+    try { await patchItem(id, { post_date: clean }); }
+    catch (e: any) { alert(e.message); }
+  }
+
+  // Drive folder is stored per-client in localStorage. Survives reloads on the
+  // same browser. Persist to DB later if cross-device sync becomes a need.
+  function folderStorageKey(clientName: string) {
+    return `mna_drive_folder:${clientName}`;
+  }
+
+  useEffect(() => {
+    if (!activeClient?.name) return;
+    try {
+      const saved = localStorage.getItem(folderStorageKey(activeClient.name)) || '';
+      setDriveFolderUrl(saved);
+    } catch { setDriveFolderUrl(''); }
+  }, [activeClient?.name]);
+
+  function saveDriveFolderUrl(value: string) {
+    setDriveFolderUrl(value);
+    if (!activeClient?.name) return;
+    try {
+      if (value) localStorage.setItem(folderStorageKey(activeClient.name), value);
+      else localStorage.removeItem(folderStorageKey(activeClient.name));
+    } catch {}
+  }
+
+  async function openDrivePicker(postId: string) {
+    const folderId = extractFolderId(driveFolderUrl);
+    if (!folderId) {
+      setEditingFolder(true);
+      alert('Set the client Drive folder first (look for "Drive Library" at the top).');
+      return;
+    }
+    setPickerForId(postId);
+    setPickerError(null);
+    setPickerQuery('');
+    setPickerLoading(true);
+    setPickerFiles([]);
+    try {
+      const res = await fetch(`/api/drive/list?folderId=${encodeURIComponent(folderId)}`);
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || 'Drive list failed');
+      setPickerFiles(data.files || []);
+    } catch (e: any) {
+      setPickerError(e.message);
+    } finally {
+      setPickerLoading(false);
+    }
+  }
+
+  async function attachDriveFile(postId: string, file: DriveFile) {
+    const url = file.webViewLink || `https://drive.google.com/file/d/${file.id}/view`;
+    try {
+      await patchItem(postId, { photo_drive_url: url });
+      setPickerForId(null);
+    } catch (e: any) { alert(e.message); }
   }
 
   async function approve(id: string) {
@@ -257,6 +347,22 @@ export default function ContentPage() {
     if (!confirm('Delete this content item?')) return;
     await fetch(`/api/content-calendar?id=${id}`, { method: 'DELETE' });
     setItems((prev) => prev.filter((it) => it.id !== id));
+    if (activeId === id) setActiveId(null);
+  }
+
+  async function cleanupDuplicates() {
+    if (!activeClient?.name) return;
+    if (!confirm('Remove duplicate posts (same date + platform + title)? The oldest copy is kept.')) return;
+    try {
+      const res = await fetch(`/api/content-calendar/cleanup-duplicates?client=${encodeURIComponent(activeClient.name)}`, { method: 'POST' });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || 'Cleanup failed');
+      // Refetch so the UI reflects the cleaned state
+      const listRes = await fetch(`/api/content-calendar?client=${encodeURIComponent(activeClient.name)}`);
+      const listData = await listRes.json();
+      setItems(listData.items || []);
+      alert(`Removed ${data.removed} duplicate post${data.removed === 1 ? '' : 's'}.`);
+    } catch (e: any) { alert(e.message); }
   }
 
   async function addPost() {
@@ -378,13 +484,23 @@ export default function ContentPage() {
             </button>
           </div>
           {isStaff && (
-            <button
-              onClick={() => setShowAddForm(!showAddForm)}
-              className="text-[12px] font-bold px-4 py-2 rounded-xl text-white"
-              style={{ background: 'linear-gradient(135deg, #0c6da4, #4ab8ce)' }}
-            >
-              {showAddForm ? 'Cancel' : '+ Add Post'}
-            </button>
+            <>
+              <button
+                onClick={cleanupDuplicates}
+                className="text-[12px] font-semibold px-3 py-2 rounded-xl bg-white/5 text-white/70 hover:text-white border border-white/10 inline-flex items-center gap-1"
+                title="Remove duplicate posts (same date + platform + title)"
+              >
+                <span className="material-symbols-outlined" style={{ fontSize: 14 }}>cleaning_services</span>
+                Clean duplicates
+              </button>
+              <button
+                onClick={() => setShowAddForm(!showAddForm)}
+                className="text-[12px] font-bold px-4 py-2 rounded-xl text-white"
+                style={{ background: 'linear-gradient(135deg, #0c6da4, #4ab8ce)' }}
+              >
+                {showAddForm ? 'Cancel' : '+ Add Post'}
+              </button>
+            </>
           )}
         </div>
       </div>
@@ -508,6 +624,78 @@ export default function ContentPage() {
         </div>
       )}
 
+      {/* Drive Library — folder URL per client, persisted to localStorage */}
+      {isStaff && (
+        <div className="glass-card p-4">
+          <div className="flex items-center justify-between gap-4 flex-wrap">
+            <div className="flex items-center gap-2">
+              <span className="material-symbols-outlined text-white/80" style={{ fontSize: 18 }}>folder_shared</span>
+              <div>
+                <div className="text-white font-semibold text-sm">Drive Library</div>
+                <div className="text-white/55 text-xs">
+                  {extractFolderId(driveFolderUrl)
+                    ? 'Connected — "Pick from Drive" pulls from this folder.'
+                    : 'Paste the client’s Drive folder URL to enable "Pick from Drive" on each card.'}
+                </div>
+              </div>
+            </div>
+            {editingFolder || !extractFolderId(driveFolderUrl) ? (
+              <div className="flex gap-2 flex-1 max-w-xl">
+                <input
+                  type="text"
+                  value={driveFolderUrl}
+                  onChange={(e) => setDriveFolderUrl(e.target.value)}
+                  placeholder="https://drive.google.com/drive/folders/..."
+                  className="flex-1 text-[12px] px-3 py-2 rounded-lg bg-white/5 border border-white/15 text-white outline-none placeholder:text-white/30"
+                />
+                <button
+                  onClick={() => { saveDriveFolderUrl(driveFolderUrl); setEditingFolder(false); }}
+                  className="text-[12px] font-bold px-3 py-2 rounded-lg bg-emerald-500/80 text-white"
+                >
+                  Save
+                </button>
+                {extractFolderId(driveFolderUrl) && (
+                  <button
+                    onClick={() => setEditingFolder(false)}
+                    className="text-[12px] font-bold px-3 py-2 rounded-lg bg-white/10 text-white/80"
+                  >
+                    Cancel
+                  </button>
+                )}
+              </div>
+            ) : (
+              <div className="flex items-center gap-2">
+                <a
+                  href={driveFolderUrl}
+                  target="_blank"
+                  rel="noreferrer"
+                  className="text-[11px] font-semibold text-white/70 hover:text-white inline-flex items-center gap-1 px-3 py-1.5 rounded-lg bg-white/5 border border-white/10"
+                >
+                  <span className="material-symbols-outlined" style={{ fontSize: 14 }}>open_in_new</span>
+                  Open folder
+                </a>
+                <button
+                  onClick={() => setEditingFolder(true)}
+                  className="text-[11px] font-semibold text-white/60 hover:text-white inline-flex items-center gap-1 px-3 py-1.5 rounded-lg bg-white/5 border border-white/10"
+                >
+                  <span className="material-symbols-outlined" style={{ fontSize: 14 }}>edit</span>
+                  Change
+                </button>
+                <button
+                  onClick={() => { saveDriveFolderUrl(''); setEditingFolder(false); }}
+                  className="text-[11px] font-semibold text-white/40 hover:text-rose-300 inline-flex items-center gap-1 px-3 py-1.5 rounded-lg bg-white/5 border border-white/10"
+                >
+                  Clear
+                </button>
+              </div>
+            )}
+          </div>
+          <div className="text-white/40 text-[10px] mt-2">
+            Tip · If "Pick from Drive" says you’re not connected, reconnect Google on the <a href="/schedule" className="underline text-white/60">Schedule</a> page so Drive permissions can be granted.
+          </div>
+        </div>
+      )}
+
       {/* Push to client controls */}
       {isStaff && items.length > 0 && (
         <div className="glass-card p-4 flex items-center justify-between gap-4">
@@ -620,6 +808,11 @@ export default function ContentPage() {
               <div className="text-[16px] font-bold text-white">{formatMonth(key)}</div>
               <div className="text-[11px] text-white/40">{monthItems.length} posts</div>
             </div>
+            {isStaff && (
+              <div className="text-[10px] text-white/45 mb-3">
+                Tip · Drag a post to another day to reschedule it.
+              </div>
+            )}
             <div className="grid grid-cols-7 gap-2">
               {['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'].map((w) => (
                 <div key={w} className="text-[10px] font-bold uppercase tracking-wider text-white/40 text-center pb-2">{w}</div>
@@ -632,12 +825,25 @@ export default function ContentPage() {
                 const posts = byDay[day] || [];
                 const today = new Date();
                 const isToday = key === `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}` && day === today.getDate();
+                const iso = `${key}-${String(day).padStart(2, '0')}`;
+                const isDragTarget = dragOverIso === iso;
                 return (
                   <div
                     key={day}
+                    onDragOver={(e) => { if (isStaff && draggingId) { e.preventDefault(); setDragOverIso(iso); } }}
+                    onDragLeave={() => setDragOverIso((cur) => (cur === iso ? null : cur))}
+                    onDrop={(e) => {
+                      e.preventDefault();
+                      if (draggingId) {
+                        movePost(draggingId, iso);
+                        setDraggingId(null);
+                        setDragOverIso(null);
+                      }
+                    }}
                     className={`min-h-[100px] rounded-xl border p-1.5 flex flex-col gap-1 ${
                       isToday ? 'border-sky-400/40 bg-sky-500/10' : 'border-white/10 bg-white/5'
                     }`}
+                    style={isDragTarget ? { outline: '2px dashed #4ab8ce', outlineOffset: 2 } : undefined}
                   >
                     <div className={`text-[10px] font-bold ${isToday ? 'text-sky-300' : 'text-white/40'}`}>{day}</div>
                     {posts.map((p) => {
@@ -648,12 +854,18 @@ export default function ContentPage() {
                       return (
                         <button
                           key={p.id}
+                          draggable={isStaff}
+                          onDragStart={isStaff ? (e) => { setDraggingId(p.id); e.dataTransfer.effectAllowed = 'move'; } : undefined}
+                          onDragEnd={isStaff ? () => { setDraggingId(null); setDragOverIso(null); } : undefined}
                           onClick={() => setActiveId(p.id)}
-                          className={`group relative text-left rounded-lg overflow-hidden hover:ring-2 hover:ring-white/20 transition ${pdm ? '' : 'border border-white/10'}`}
-                          style={pdm
-                            ? { background: PDM_STYLE.chipBg, border: `1px solid ${PDM_STYLE.chipBorder}` }
-                            : { background: 'rgba(255,255,255,0.06)' }}
-                          title={pdm ? 'PDM · Brand Cascade (reference only, no approval)' : undefined}
+                          className={`group relative text-left rounded-lg overflow-hidden hover:ring-2 hover:ring-white/20 transition ${pdm ? '' : 'border border-white/10'} ${isStaff ? 'cursor-grab active:cursor-grabbing' : ''}`}
+                          style={{
+                            ...(pdm
+                              ? { background: PDM_STYLE.chipBg, border: `1px solid ${PDM_STYLE.chipBorder}` }
+                              : { background: 'rgba(255,255,255,0.06)' }),
+                            opacity: draggingId === p.id ? 0.4 : 1,
+                          }}
+                          title={pdm ? 'PDM · Brand Cascade (reference only, no approval)' : isStaff ? 'Click to open, drag to reschedule' : undefined}
                         >
                           <DriveThumb url={p.photo_drive_url} className="w-full h-[48px] object-cover opacity-70 group-hover:opacity-90 transition-opacity" />
                           <div className="px-1.5 py-1">
@@ -725,12 +937,48 @@ export default function ContentPage() {
                   )}
                   <div className="p-6 space-y-4">
                     <div className="flex items-center justify-between">
-                      <div className="text-[11px] font-bold uppercase tracking-wider text-white/40">
-                        {fmtDate(activeItem.post_date)} · {activeItem.platform} · {activeItem.content_type || 'Post'}
+                      <div className="text-[11px] font-bold uppercase tracking-wider text-white/40 flex items-center gap-1.5">
+                        {isStaff && editingDateId === activeItem.id ? (
+                          <input
+                            type="date"
+                            autoFocus
+                            defaultValue={activeItem.post_date}
+                            onBlur={async (e) => {
+                              const v = e.target.value;
+                              if (v && v !== activeItem.post_date) await saveDate(activeItem.id, v);
+                              setEditingDateId(null);
+                            }}
+                            onKeyDown={(e) => {
+                              if (e.key === 'Escape') setEditingDateId(null);
+                              else if (e.key === 'Enter') (e.target as HTMLInputElement).blur();
+                            }}
+                            className="text-[11px] font-bold uppercase tracking-wider px-2 py-1 rounded bg-white/10 border border-white/25 text-white outline-none"
+                          />
+                        ) : (
+                          <button
+                            onClick={() => isStaff && setEditingDateId(activeItem.id)}
+                            className={`text-[11px] font-bold uppercase tracking-wider text-white/40 ${isStaff ? 'hover:text-white' : ''}`}
+                            title={isStaff ? 'Click to edit date' : undefined}
+                          >
+                            {fmtDate(activeItem.post_date)}
+                          </button>
+                        )}
+                        <span>· {activeItem.platform} · {activeItem.content_type || 'Post'}</span>
                       </div>
-                      <button onClick={() => setActiveId(null)} className="text-white/40 hover:text-white">
-                        <span className="material-symbols-outlined">close</span>
-                      </button>
+                      <div className="flex items-center gap-1">
+                        {isStaff && (
+                          <button
+                            onClick={() => deleteItem(activeItem.id)}
+                            className="text-white/40 hover:text-rose-300 transition-colors p-1"
+                            title="Delete this post"
+                          >
+                            <span className="material-symbols-outlined">delete</span>
+                          </button>
+                        )}
+                        <button onClick={() => setActiveId(null)} className="text-white/40 hover:text-white p-1">
+                          <span className="material-symbols-outlined">close</span>
+                        </button>
+                      </div>
                     </div>
                     {parsed.phase && (
                       <span
@@ -840,6 +1088,90 @@ export default function ContentPage() {
         </div>
       )}
 
+      {/* Drive file picker modal */}
+      {pickerForId && (
+        <div className="fixed inset-0 bg-black/60 flex items-center justify-center p-4 z-50" onClick={() => setPickerForId(null)}>
+          <div
+            className="max-w-4xl w-full max-h-[85vh] flex flex-col rounded-2xl"
+            style={{ background: 'rgba(15,31,46,0.97)', border: '1px solid rgba(255,255,255,0.15)', backdropFilter: 'blur(24px)' }}
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="flex items-center justify-between p-4 border-b border-white/10">
+              <div className="flex items-center gap-2">
+                <span className="material-symbols-outlined text-white/80" style={{ fontSize: 20 }}>folder_open</span>
+                <div>
+                  <div className="text-white font-bold text-sm">Pick from Drive</div>
+                  <div className="text-white/50 text-[11px]">
+                    {pickerLoading ? 'Loading…' : `${pickerFiles.length} files in folder`}
+                  </div>
+                </div>
+              </div>
+              <button onClick={() => setPickerForId(null)} className="text-white/40 hover:text-white">
+                <span className="material-symbols-outlined">close</span>
+              </button>
+            </div>
+            <div className="p-3 border-b border-white/10">
+              <input
+                type="text"
+                value={pickerQuery}
+                onChange={(e) => setPickerQuery(e.target.value)}
+                placeholder="Filter by name…"
+                className="w-full text-[12px] px-3 py-2 rounded-lg bg-white/5 border border-white/15 text-white outline-none placeholder:text-white/30"
+              />
+            </div>
+            <div className="flex-1 overflow-y-auto p-4">
+              {pickerError && (
+                <div className="text-rose-300 text-sm bg-rose-500/10 border border-rose-500/30 rounded-lg p-3">
+                  {pickerError}
+                  <div className="text-rose-200/70 text-[11px] mt-1">
+                    If this says Google isn’t connected, go to <a href="/schedule" className="underline">Schedule</a> and reconnect (the new Drive scope needs re-consent).
+                  </div>
+                </div>
+              )}
+              {!pickerError && pickerLoading && (
+                <div className="text-white/50 text-center py-10 text-sm">Loading Drive files…</div>
+              )}
+              {!pickerError && !pickerLoading && pickerFiles.length === 0 && (
+                <div className="text-white/50 text-center py-10 text-sm">No files in this folder.</div>
+              )}
+              {!pickerError && !pickerLoading && pickerFiles.length > 0 && (
+                <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3">
+                  {pickerFiles
+                    .filter((f) => !pickerQuery || f.name.toLowerCase().includes(pickerQuery.toLowerCase()))
+                    .map((f) => {
+                      const thumb = driveThumbnailUrl(`https://drive.google.com/file/d/${f.id}/view`, 400);
+                      return (
+                        <button
+                          key={f.id}
+                          onClick={() => attachDriveFile(pickerForId, f)}
+                          className="group text-left rounded-xl overflow-hidden border border-white/10 bg-white/5 hover:border-white/30 hover:bg-white/10 transition"
+                        >
+                          <div className="aspect-video bg-black/40 flex items-center justify-center overflow-hidden">
+                            {thumb ? (
+                              <img
+                                src={thumb}
+                                alt=""
+                                className="w-full h-full object-cover opacity-90 group-hover:opacity-100 transition"
+                                onError={(e) => { (e.target as HTMLImageElement).style.display = 'none'; }}
+                              />
+                            ) : (
+                              <span className="material-symbols-outlined text-white/30" style={{ fontSize: 36 }}>description</span>
+                            )}
+                          </div>
+                          <div className="p-2">
+                            <div className="text-white text-[11px] font-semibold truncate">{f.name}</div>
+                            <div className="text-white/40 text-[9px] truncate">{f.mimeType.replace('application/', '').replace('image/', 'image · ').replace('video/', 'video · ')}</div>
+                          </div>
+                        </button>
+                      );
+                    })}
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* Card grid view */}
       {!loading && viewMode === 'cards' && shown.length > 0 && (
         <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
@@ -910,7 +1242,31 @@ export default function ContentPage() {
                 ) : (
                   <>
                     <div className="flex items-center justify-between">
-                      <div className="text-xs font-bold uppercase tracking-wider text-white/60">{fmtDate(it.post_date)}</div>
+                      {isStaff && editingDateId === it.id ? (
+                        <input
+                          type="date"
+                          autoFocus
+                          defaultValue={it.post_date}
+                          onBlur={async (e) => {
+                            const v = e.target.value;
+                            if (v && v !== it.post_date) await saveDate(it.id, v);
+                            setEditingDateId(null);
+                          }}
+                          onKeyDown={(e) => {
+                            if (e.key === 'Escape') setEditingDateId(null);
+                            else if (e.key === 'Enter') (e.target as HTMLInputElement).blur();
+                          }}
+                          className="text-xs font-bold uppercase tracking-wider px-2 py-1 rounded bg-white/10 border border-white/25 text-white outline-none"
+                        />
+                      ) : (
+                        <button
+                          onClick={() => isStaff && setEditingDateId(it.id)}
+                          className={`text-xs font-bold uppercase tracking-wider text-white/60 ${isStaff ? 'hover:text-white' : 'cursor-default'}`}
+                          title={isStaff ? 'Click to edit date' : undefined}
+                        >
+                          {fmtDate(it.post_date)}
+                        </button>
+                      )}
                       <div className="flex items-center gap-2">
                         {parsed.phase && (
                           <span className="text-[10px] px-2 py-0.5 rounded-full bg-white/10 border border-white/20 text-white/80 uppercase tracking-wider">{parsed.phase}</span>
@@ -981,16 +1337,26 @@ export default function ContentPage() {
                           <button onClick={() => setEditingPhoto((e) => ({ ...e, [it.id]: false }))} className="rounded-lg px-3 py-1 text-[11px] font-semibold bg-white/10 text-white/80">Cancel</button>
                         </div>
                       ) : isStaff ? (
-                        <button
-                          onClick={() => {
-                            setPhotoDraft((d) => ({ ...d, [it.id]: it.photo_drive_url || '' }));
-                            setEditingPhoto((e) => ({ ...e, [it.id]: true }));
-                          }}
-                          className="text-[10px] font-semibold text-white/60 hover:text-white inline-flex items-center gap-1"
-                        >
-                          <span className="material-symbols-outlined" style={{ fontSize: 14 }}>{view ? 'edit' : 'add_photo_alternate'}</span>
-                          {view ? 'Edit Drive link' : 'Add Drive link'}
-                        </button>
+                        <div className="flex items-center gap-3">
+                          <button
+                            onClick={() => openDrivePicker(it.id)}
+                            className="text-[10px] font-semibold text-white/70 hover:text-white inline-flex items-center gap-1"
+                            title="Pick a file from the client's Drive folder"
+                          >
+                            <span className="material-symbols-outlined" style={{ fontSize: 14 }}>folder_open</span>
+                            Pick from Drive
+                          </button>
+                          <button
+                            onClick={() => {
+                              setPhotoDraft((d) => ({ ...d, [it.id]: it.photo_drive_url || '' }));
+                              setEditingPhoto((e) => ({ ...e, [it.id]: true }));
+                            }}
+                            className="text-[10px] font-semibold text-white/40 hover:text-white inline-flex items-center gap-1"
+                          >
+                            <span className="material-symbols-outlined" style={{ fontSize: 14 }}>{view ? 'edit' : 'link'}</span>
+                            {view ? 'Edit link' : 'Paste link'}
+                          </button>
+                        </div>
                       ) : null}
                     </div>
                   );

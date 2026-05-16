@@ -16,6 +16,7 @@ import { getAssignedClientIds, getStaffByEmail, isOwner } from '@/lib/staff';
 import UserBanner from './UserBanner';
 import StaffChecklist from './StaffChecklist';
 import StaffContentCalendar from './StaffContentCalendar';
+import WelcomeHero from './WelcomeHero';
 
 // ─── REAL DATA (Niceville) ──────────────────────────────────────────
 // Source: GHL manual pull 2026-04-08
@@ -64,12 +65,17 @@ function ClientCard({
 
   return (
     <div
-      className="glass-card p-5 cursor-pointer group"
+      className="glass-card p-5 cursor-pointer group relative overflow-hidden transition-all duration-300 hover:-translate-y-0.5 hover:shadow-[0_20px_60px_-15px_rgba(0,0,0,0.5)]"
       style={{ borderLeft: `3px solid ${gradientFrom}` }}
       onClick={onSelect}
     >
+      {/* Hover glow tint */}
+      <div
+        className="absolute inset-0 opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none"
+        style={{ background: `radial-gradient(circle at top left, ${gradientFrom}1f, transparent 60%)` }}
+      />
       {/* Header */}
-      <div className="flex items-center justify-between mb-4">
+      <div className="relative flex items-center justify-between mb-4">
         <div>
           <div className="flex items-center gap-2">
             <div className="text-[14px] font-bold text-white">{client.name}</div>
@@ -161,20 +167,8 @@ export default function AgencyOverview() {
 
   return (
     <div className="space-y-8 max-w-[1400px]">
+      <WelcomeHero />
       <UserBanner />
-
-      {/* Header */}
-      <div className="pt-1">
-        <div className="flex items-center gap-2 mb-1">
-          <div className="w-1.5 h-6 rounded-full" style={{ background: 'linear-gradient(180deg, #0c6da4, #4ab8ce)' }} />
-          <h1 className="text-[22px] font-extrabold text-white tracking-tight">
-            Agency Overview
-          </h1>
-        </div>
-        <p className="text-[12px] text-white/60 pl-3.5">
-          All clients at a glance · Click any card to view their full dashboard
-        </p>
-      </div>
 
       {/* ── AGENCY GROWTH GRAPH ── */}
       <div className="glass-card p-6 relative overflow-hidden">

@@ -27,6 +27,7 @@ import SalesBenchmarks from './SalesBenchmarks';
 import ConceptsPanel from './ConceptsPanel';
 import TikTokAnalytics from './TikTokAnalytics';
 import TikTokContentPlan from './TikTokContentPlan';
+import YouTubeAnalytics from './YouTubeAnalytics';
 
 // ─── REAL DATA ────────────────────────────────────────────────────────────
 // Source: client provided directly on 2026-04-08
@@ -198,6 +199,18 @@ export default function NicevilleDashboard({ client }: { client: Client }) {
             gradientTo={gradientTo}
           />
         </div>
+      </div>
+
+      {/* ── YOUTUBE ANALYTICS ── */}
+      <div>
+        <SectionLabel>YouTube · Niceville</SectionLabel>
+        <YouTubeAnalytics
+          ownerKey={client.id}
+          kvClientId={client.id}
+          label="Prime IV Niceville"
+          gradientFrom={gradientFrom}
+          gradientTo={gradientTo}
+        />
       </div>
 
       {/* ── SALES BENCHMARKS (manual entry: Niceville vs Destin vs Corporate) ── */}

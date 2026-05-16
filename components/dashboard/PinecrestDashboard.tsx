@@ -17,6 +17,7 @@ import ConceptsPanel from './ConceptsPanel';
 import PrimeIVMembershipCard from './PrimeIVMembershipCard';
 import TikTokAnalytics from './TikTokAnalytics';
 import TikTokContentPlan from './TikTokContentPlan';
+import YouTubeAnalytics from './YouTubeAnalytics';
 
 function SectionLabel({ children }: { children: React.ReactNode }) {
   return (
@@ -81,6 +82,18 @@ export default function PinecrestDashboard({ client }: { client: Client }) {
             gradientTo={gradientTo}
           />
         </div>
+      </div>
+
+      {/* ── YOUTUBE ANALYTICS ── */}
+      <div>
+        <SectionLabel>YouTube · Pinecrest</SectionLabel>
+        <YouTubeAnalytics
+          ownerKey={client.id}
+          kvClientId={client.id}
+          label="Prime IV Pinecrest"
+          gradientFrom={gradientFrom}
+          gradientTo={gradientTo}
+        />
       </div>
 
       {/* ── MEMBERSHIP TIERS (tier 3 pricing for Pinecrest) ── */}
