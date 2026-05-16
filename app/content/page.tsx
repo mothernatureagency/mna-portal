@@ -3,7 +3,7 @@ import React, { useEffect, useMemo, useState } from 'react';
 import { useClient } from '@/context/ClientContext';
 import { createClient } from '@/lib/supabase/client';
 import { driveThumbnailUrl, driveViewUrl } from '@/lib/drive';
-import { extractFolderId, type DriveFile } from '@/lib/google-drive';
+import { extractFolderId, type DriveFile } from '@/lib/google-drive-shared';
 
 /** Image with graceful fallback — hides itself if Drive thumbnail fails */
 function DriveThumb({ url, className }: { url: string | null | undefined; className?: string }) {
