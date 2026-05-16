@@ -1,31 +1,13 @@
-// Google Drive helpers built on top of the existing google_tokens OAuth flow
-// in lib/google-calendar.ts. We piggyback on the per-user access token rather
-// than maintaining a separate Drive connection.
+// Server-only Google Drive helpers. Uses the per-user OAuth token stored
+// by lib/google-calendar.ts. Importing this file from a client component
+// will pull pg/dns/net into the client bundle and break the build — import
+// from './google-drive-shared' for pure utilities + the DriveFile type.
 
 import { getAccessToken } from './google-calendar';
+import type { DriveFile } from './google-drive-shared';
 
-export type DriveFile = {
-  id: string;
-  name: string;
-  mimeType: string;
-  thumbnailLink?: string;
-  webViewLink?: string;
-  iconLink?: string;
-  modifiedTime?: string;
-};
-
-/** Extract a folder ID from a Drive folder URL or accept the raw ID. */
-export function extractFolderId(input: string | null | undefined): string | null {
-  if (!input) return null;
-  const trimmed = input.trim();
-  if (!trimmed) return null;
-  // https://drive.google.com/drive/folders/{ID}?usp=...
-  const folderMatch = trimmed.match(/\/folders\/([A-Za-z0-9_-]{10,})/);
-  if (folderMatch) return folderMatch[1];
-  // Raw ID
-  if (/^[A-Za-z0-9_-]{20,}$/.test(trimmed)) return trimmed;
-  return null;
-}
+export type { DriveFile } from './google-drive-shared';
+export { extractFolderId } from './google-drive-shared';
 
 /** List images / videos / docs in a Drive folder, newest first. */
 export async function listFolderFiles(userEmail: string, folderId: string): Promise<DriveFile[]> {
