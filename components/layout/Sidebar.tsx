@@ -43,6 +43,7 @@ const NAV = [
     { label: 'Team Roster', href: '/agents/team', e: 'groups' },
   ]},
   { sec: 'ACCOUNT', items: [
+    { label: 'Personal', href: '/personal', e: 'self_care' },
     { label: 'Settings', href: '/settings', e: 'settings' },
     { label: 'Client View', href: '/client', e: 'swap_horiz' },
     { label: 'Contractor View', href: '/contractor', e: 'engineering' },
