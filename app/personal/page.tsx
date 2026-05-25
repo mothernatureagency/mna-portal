@@ -13,11 +13,12 @@
  * to Marissa & Kyle's views automatically.
  */
 
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import Link from 'next/link';
 import { createClient as createSupabaseClient } from '@/lib/supabase/client';
 import { getParentForDate } from '@/lib/students';
 import { isMNAStaff } from '@/lib/staff';
+import { toPng } from 'html-to-image';
 
 type Parent = 'mom' | 'dad';
 type OverrideValue = Parent | 'clear';
@@ -206,14 +207,35 @@ export default function PersonalPage() {
     saveOverrides({});
   }
 
-  /** Co-parent share: print without overnight counts or builder UI. */
-  function printForCoParent() {
-    document.body.classList.add('share-mode');
-    setTimeout(() => {
-      window.print();
-      // Clear after the print dialog closes
-      setTimeout(() => document.body.classList.remove('share-mode'), 500);
-    }, 50);
+  /** Co-parent download: one-page PNG of the annual calendar with no
+   *  overnight counts. Captures a hidden off-screen render so the user's
+   *  on-screen view doesn't change. */
+  const exportRef = useRef<HTMLDivElement | null>(null);
+  const [downloading, setDownloading] = useState(false);
+  async function downloadForCoParent() {
+    if (!exportRef.current || downloading) return;
+    setDownloading(true);
+    try {
+      const node = exportRef.current;
+      // Render at 2x for a crisp screenshot-friendly image
+      const dataUrl = await toPng(node, {
+        pixelRatio: 2,
+        backgroundColor: '#ffffff',
+        cacheBust: true,
+      });
+      const a = document.createElement('a');
+      const stamp = todayStr.replace(/-/g, '');
+      a.href = dataUrl;
+      a.download = `custody-calendar-${schoolStartYear}-${schoolStartYear + 1}-${stamp}.png`;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+    } catch (err) {
+      console.error('Download failed', err);
+      alert('Sorry — could not generate the image. Try again or use Print.');
+    } finally {
+      setDownloading(false);
+    }
   }
 
   const monthStats   = useMemo(() => overnightsForMonth(year, month, overrides), [year, month, overrides]);
@@ -281,12 +303,12 @@ export default function PersonalPage() {
             <span className="material-symbols-outlined" style={{ fontSize: 14 }}>print</span>
             Print
           </button>
-          <button onClick={printForCoParent}
-            className="text-[11px] font-bold px-3 py-1.5 rounded-lg text-white flex items-center gap-1.5"
+          <button onClick={downloadForCoParent} disabled={downloading}
+            className="text-[11px] font-bold px-3 py-1.5 rounded-lg text-white flex items-center gap-1.5 disabled:opacity-60"
             style={{ background: 'linear-gradient(135deg,#0c6da4,#4ab8ce)' }}
-            title="One-page schedule with no overnight counts — clean view to send the other parent for approval">
-            <span className="material-symbols-outlined" style={{ fontSize: 14 }}>download</span>
-            Send to Co-Parent
+            title="One-page annual calendar PNG, no overnight counts — send to co-parent for approval">
+            <span className="material-symbols-outlined" style={{ fontSize: 14 }}>{downloading ? 'hourglass_top' : 'download'}</span>
+            {downloading ? 'Generating…' : 'Download'}
           </button>
         </div>
       </div>
@@ -441,18 +463,72 @@ export default function PersonalPage() {
         )}
       </div>
 
-      {/* Print-mode: hide page chrome, expand the paper card.
-          Share-mode (Send to Co-Parent) additionally hides overnight counts. */}
+      {/* Print styles (Print button) */}
       <style jsx global>{`
         @media print {
           body { background: #fff !important; }
           aside, .no-print { display: none !important; }
           #custody-paper { box-shadow: none !important; border-radius: 0 !important; }
         }
-        body.share-mode .overnights-block { display: none !important; }
-        @media print {
-          body.share-mode .overnights-block { display: none !important; }
-        }
+      `}</style>
+
+      {/* ──────────────────────────────────────────────────────────────
+          OFF-SCREEN EXPORT NODE
+          Always-rendered annual paper view used by the Download button.
+          Positioned off-screen so it doesn't affect the page; .share-mode
+          on this subtree hides overnight totals. We re-derive content
+          from the SAME overrides so it always reflects current state.
+          ────────────────────────────────────────────────────────────── */}
+      <div aria-hidden="true" style={{
+        position: 'fixed', top: 0, left: -100000, zIndex: -1,
+        width: 1100, background: '#fff',
+      }}>
+        <div ref={exportRef} className="share-mode" style={{
+          width: 1100, background: '#fff', color: PAPER.text,
+          fontFamily: 'system-ui, -apple-system, "Segoe UI", Roboto, sans-serif',
+          padding: 28,
+        }}>
+          {/* Heading block — formal, no overnights */}
+          <div style={{ display: 'flex', alignItems: 'flex-end', justifyContent: 'space-between', borderBottom: `1px solid ${PAPER.rule}`, paddingBottom: 14, marginBottom: 18 }}>
+            <div>
+              <div style={{ fontSize: 11, fontWeight: 700, letterSpacing: '0.14em', textTransform: 'uppercase', color: PAPER.brand }}>Custody Schedule</div>
+              <div style={{ fontSize: 24, fontWeight: 800, color: PAPER.text, marginTop: 6, letterSpacing: '-0.01em' }}>
+                Jun {schoolStartYear} → May {schoolStartYear + 1}
+              </div>
+              <div style={{ fontSize: 12.5, color: PAPER.mute, marginTop: 4 }}>
+                Generated {new Date().toLocaleDateString(undefined, { month: 'long', day: 'numeric', year: 'numeric' })}
+              </div>
+            </div>
+            <div style={{ display: 'flex', gap: 14, fontSize: 12, color: PAPER.text }}>
+              <span style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}>
+                <span style={{ width: 12, height: 12, background: PAPER.mom, borderRadius: 2 }} /> With Mom
+              </span>
+              <span style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}>
+                <span style={{ width: 12, height: 12, background: PAPER.dad, borderRadius: 2 }} /> With Dad
+              </span>
+              <span style={{ display: 'inline-flex', alignItems: 'center', gap: 6, color: PAPER.mute }}>
+                <span style={{ width: 6, height: 6, background: PAPER.brand, borderRadius: '50%' }} /> Pickup day
+              </span>
+            </div>
+          </div>
+
+          {/* 12-month grid — overnight subtitles hidden by .share-mode */}
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 14 }}>
+            {schoolMonths(schoolStartYear).map(({ year: y, month: m }) => (
+              <MiniMonth key={`exp-${y}-${m}`} year={y} month={m} overrides={overrides} onClick={() => { /* noop in export */ }} />
+            ))}
+          </div>
+
+          {/* Footer */}
+          <div style={{ marginTop: 18, paddingTop: 12, borderTop: `1px solid ${PAPER.rule}`, fontSize: 11.5, color: PAPER.mute, textAlign: 'center' }}>
+            For review and approval — please confirm pickup days and date ranges match what we agreed.
+          </div>
+        </div>
+      </div>
+
+      {/* Hide overnight counts inside the export node */}
+      <style jsx global>{`
+        .share-mode .overnights-block { display: none !important; }
       `}</style>
     </div>
   );
