@@ -22,7 +22,7 @@ import { isMNAStaff } from '@/lib/staff';
 type Parent = 'mom' | 'dad';
 type OverrideValue = Parent | 'clear';
 type Overrides = Record<string, OverrideValue>;
-type View = 'month' | 'year';
+type View = 'month' | 'year' | 'school';
 
 // ── Paper theme (calendar only) ─────────────────────────────────────────
 const PAPER = {
@@ -109,6 +109,27 @@ function isPickupDay(iso: string, overrides: Overrides): boolean {
   return custodyFor(prevIso, overrides) !== custodyFor(iso, overrides);
 }
 
+/** School year = May Y → May Y+1. Return the May-anchor year for a given date. */
+function getSchoolYearStartYear(d: Date = new Date()): number {
+  const y = d.getFullYear();
+  const m = d.getMonth(); // May = 4
+  return m >= 4 ? y : y - 1;
+}
+
+/** 13 months May startYear → May startYear+1, inclusive. */
+function schoolMonths(startYear: number): { year: number; month: number }[] {
+  const out: { year: number; month: number }[] = [];
+  for (let i = 0; i < 13; i++) {
+    const total = 4 + i; // May = 4
+    out.push({ year: startYear + Math.floor(total / 12), month: total % 12 });
+  }
+  return out;
+}
+
+function overnightsForSchoolYear(startYear: number, overrides: Overrides) {
+  return overnightsForRange(`${startYear}-05-01`, `${startYear + 1}-05-31`, overrides);
+}
+
 // ════════════════════════════════════════════════════════════════════════
 // Page
 // ════════════════════════════════════════════════════════════════════════
@@ -122,6 +143,7 @@ export default function PersonalPage() {
   const now = new Date();
   const [year, setYear] = useState(now.getFullYear());
   const [month, setMonth] = useState(now.getMonth());
+  const [schoolStartYear, setSchoolStartYear] = useState(getSchoolYearStartYear(now));
 
   const todayStr = todayIso();
   const [bulkOpen, setBulkOpen] = useState(false);
@@ -183,16 +205,36 @@ export default function PersonalPage() {
     saveOverrides({});
   }
 
-  const monthStats = useMemo(() => overnightsForMonth(year, month, overrides), [year, month, overrides]);
-  const yearStats  = useMemo(() => overnightsForYear(year, overrides), [year, overrides]);
-  const ytdStats   = useMemo(() => overnightsForRange(`${year}-01-01`, todayStr < `${year}-12-31` ? todayStr : `${year}-12-31`, overrides), [year, todayStr, overrides]);
+  /** Co-parent share: print without overnight counts or builder UI. */
+  function printForCoParent() {
+    document.body.classList.add('share-mode');
+    setTimeout(() => {
+      window.print();
+      // Clear after the print dialog closes
+      setTimeout(() => document.body.classList.remove('share-mode'), 500);
+    }, 50);
+  }
+
+  const monthStats   = useMemo(() => overnightsForMonth(year, month, overrides), [year, month, overrides]);
+  const yearStats    = useMemo(() => overnightsForYear(year, overrides), [year, overrides]);
+  const ytdStats     = useMemo(() => overnightsForRange(`${year}-01-01`, todayStr < `${year}-12-31` ? todayStr : `${year}-12-31`, overrides), [year, todayStr, overrides]);
+  const schoolStats  = useMemo(() => overnightsForSchoolYear(schoolStartYear, overrides), [schoolStartYear, overrides]);
 
   const handoffs = useMemo(() => {
-    const start = view === 'month' ? isoFor(year, month, 1) : `${year}-01-01`;
-    const last = view === 'month' ? new Date(year, month + 1, 0).getDate() : 31;
-    const end = view === 'month' ? isoFor(year, month, last) : `${year}-12-31`;
+    let start: string, end: string;
+    if (view === 'month') {
+      start = isoFor(year, month, 1);
+      const last = new Date(year, month + 1, 0).getDate();
+      end = isoFor(year, month, last);
+    } else if (view === 'school') {
+      start = `${schoolStartYear}-05-01`;
+      end = `${schoolStartYear + 1}-05-31`;
+    } else {
+      start = `${year}-01-01`;
+      end = `${year}-12-31`;
+    }
     return findHandoffs(start, end, overrides);
-  }, [view, year, month, overrides]);
+  }, [view, year, month, schoolStartYear, overrides]);
 
   if (authorized === null) {
     return <div className="min-h-screen flex items-center justify-center text-white/60 text-sm">Loading…</div>;
@@ -222,13 +264,13 @@ export default function PersonalPage() {
           </h1>
           <div className="text-white/50 text-[12px] mt-1.5">{dateLong}</div>
         </div>
-        <div className="flex items-center gap-2 flex-wrap">
+        <div className="flex items-center gap-2 flex-wrap no-print">
           <div className="flex gap-0.5 p-0.5 rounded-xl" style={{ background: 'rgba(255,255,255,0.06)' }}>
-            {(['month', 'year'] as View[]).map(v => (
+            {(['month', 'year', 'school'] as View[]).map(v => (
               <button key={v} onClick={() => setView(v)}
-                className={`px-4 py-1.5 text-[11px] font-bold rounded-lg transition-all capitalize ${view === v ? 'text-white' : 'text-white/40 hover:text-white/70'}`}
+                className={`px-3.5 py-1.5 text-[11px] font-bold rounded-lg transition-all ${view === v ? 'text-white' : 'text-white/40 hover:text-white/70'}`}
                 style={view === v ? { background: 'linear-gradient(135deg,#0c6da4,#4ab8ce)' } : undefined}>
-                {v}
+                {v === 'school' ? 'School Year' : v.charAt(0).toUpperCase() + v.slice(1)}
               </button>
             ))}
           </div>
@@ -238,24 +280,45 @@ export default function PersonalPage() {
             <span className="material-symbols-outlined" style={{ fontSize: 14 }}>print</span>
             Print
           </button>
+          <button onClick={printForCoParent}
+            className="text-[11px] font-bold px-3 py-1.5 rounded-lg text-white flex items-center gap-1.5"
+            style={{ background: 'linear-gradient(135deg,#0c6da4,#4ab8ce)' }}
+            title="One-page schedule with no overnight counts — clean view to send the other parent for approval">
+            <span className="material-symbols-outlined" style={{ fontSize: 14 }}>download</span>
+            Send to Co-Parent
+          </button>
         </div>
       </div>
 
       {/* ── AESTHETIC STAT CARDS (dark) ────────────────────────────── */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
-        <DarkStat
-          label={view === 'month' ? new Date(year, month).toLocaleDateString(undefined, { month: 'long', year: 'numeric' }) : `${year} · Full Year`}
-          mom={view === 'month' ? monthStats.mom : yearStats.mom}
-          dad={view === 'month' ? monthStats.dad : yearStats.dad}
-          total={view === 'month' ? monthStats.total : yearStats.total}
-          highlight
-        />
-        <DarkStat label={`${year} · Year-to-Date`} mom={ytdStats.mom} dad={ytdStats.dad} total={ytdStats.total} />
-        <DarkStat label={`${year} · Projected`} mom={yearStats.mom} dad={yearStats.dad} total={yearStats.total} />
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-3 overnights-block">
+        {view === 'school' ? (
+          <>
+            <DarkStat
+              label={`School Year · May ${schoolStartYear} → May ${schoolStartYear + 1}`}
+              mom={schoolStats.mom} dad={schoolStats.dad} total={schoolStats.total}
+              highlight
+            />
+            <DarkStat label={`${year} · Year-to-Date`} mom={ytdStats.mom} dad={ytdStats.dad} total={ytdStats.total} />
+            <DarkStat label={`${schoolStartYear + 1} · Calendar-Year Projected`} mom={overnightsForYear(schoolStartYear + 1, overrides).mom} dad={overnightsForYear(schoolStartYear + 1, overrides).dad} total={overnightsForYear(schoolStartYear + 1, overrides).total} />
+          </>
+        ) : (
+          <>
+            <DarkStat
+              label={view === 'month' ? new Date(year, month).toLocaleDateString(undefined, { month: 'long', year: 'numeric' }) : `${year} · Full Year`}
+              mom={view === 'month' ? monthStats.mom : yearStats.mom}
+              dad={view === 'month' ? monthStats.dad : yearStats.dad}
+              total={view === 'month' ? monthStats.total : yearStats.total}
+              highlight
+            />
+            <DarkStat label={`${year} · Year-to-Date`} mom={ytdStats.mom} dad={ytdStats.dad} total={ytdStats.total} />
+            <DarkStat label={`${year} · Projected`} mom={yearStats.mom} dad={yearStats.dad} total={yearStats.total} />
+          </>
+        )}
       </div>
 
       {/* ── AESTHETIC BUILDER PANEL ────────────────────────────────── */}
-      <div className="rounded-2xl p-4" style={{ background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.07)' }}>
+      <div className="rounded-2xl p-4 no-print" style={{ background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.07)' }}>
         <div className="flex items-center justify-between gap-3 flex-wrap">
           <div>
             <div className="text-[13px] font-bold text-white">Build your schedule</div>
@@ -323,11 +386,17 @@ export default function PersonalPage() {
             year={year} month={month} overrides={overrides}
             onDayClick={cycleDay} setYear={setYear} setMonth={setMonth}
           />
-        ) : (
+        ) : view === 'year' ? (
           <PaperYearView
             year={year} overrides={overrides}
             onYearChange={setYear}
             onPickMonth={(m) => { setMonth(m); setView('month'); }}
+          />
+        ) : (
+          <PaperSchoolView
+            startYear={schoolStartYear} overrides={overrides}
+            onStartYearChange={setSchoolStartYear}
+            onPickMonth={(y, m) => { setYear(y); setMonth(m); setView('month'); }}
           />
         )}
       </div>
@@ -336,7 +405,11 @@ export default function PersonalPage() {
       <div>
         <div className="flex items-baseline justify-between mb-2 px-1">
           <h2 className="text-[15px] font-extrabold text-white">
-            Handoff dates · {view === 'month' ? new Date(year, month).toLocaleDateString(undefined, { month: 'long', year: 'numeric' }) : year}
+            Handoff dates · {
+              view === 'month'  ? new Date(year, month).toLocaleDateString(undefined, { month: 'long', year: 'numeric' })
+              : view === 'school' ? `May ${schoolStartYear} → May ${schoolStartYear + 1}`
+              : year
+            }
           </h2>
           <span className="text-[11px] text-white/40">{handoffs.length} handoff{handoffs.length === 1 ? '' : 's'}</span>
         </div>
@@ -367,12 +440,17 @@ export default function PersonalPage() {
         )}
       </div>
 
-      {/* Print-mode: hide page chrome, expand the paper card */}
+      {/* Print-mode: hide page chrome, expand the paper card.
+          Share-mode (Send to Co-Parent) additionally hides overnight counts. */}
       <style jsx global>{`
         @media print {
           body { background: #fff !important; }
           aside, .no-print { display: none !important; }
           #custody-paper { box-shadow: none !important; border-radius: 0 !important; }
+        }
+        body.share-mode .overnights-block { display: none !important; }
+        @media print {
+          body.share-mode .overnights-block { display: none !important; }
         }
       `}</style>
     </div>
@@ -541,7 +619,7 @@ function PaperMonthView({
       </div>
 
       {/* Footer totals strip — included so it's part of the screenshot */}
-      <div style={{
+      <div className="overnights-block" style={{
         display: 'grid', gridTemplateColumns: '1fr 1fr 1fr',
         borderTop: `1px solid ${PAPER.rule}`, fontSize: 13, color: PAPER.text,
       }}>
@@ -586,7 +664,7 @@ function PaperYearView({
           <MiniMonth key={m} year={year} month={m} overrides={overrides} onClick={() => onPickMonth(m)} />
         ))}
       </div>
-      <div style={{
+      <div className="overnights-block" style={{
         display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', marginTop: 18,
         borderTop: `1px solid ${PAPER.rule}`, paddingTop: 14, fontSize: 13, color: PAPER.text,
       }}>
@@ -602,6 +680,56 @@ function PaperYearView({
         </div>
         <div style={{ display: 'flex', alignItems: 'center', gap: 10, color: PAPER.mute }}>
           <span>Total overnights</span>
+          <span style={{ marginLeft: 'auto', fontVariantNumeric: 'tabular-nums', fontWeight: 800, color: PAPER.text }}>{stats.total}</span>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function PaperSchoolView({
+  startYear, overrides, onStartYearChange, onPickMonth,
+}: {
+  startYear: number; overrides: Overrides;
+  onStartYearChange: (y: number) => void;
+  onPickMonth: (year: number, month: number) => void;
+}) {
+  const stats = overnightsForSchoolYear(startYear, overrides);
+  const months = schoolMonths(startYear);
+  const title = `School Year · May ${startYear} → May ${startYear + 1}`;
+
+  return (
+    <div style={{ padding: '16px 18px 20px' }}>
+      <div className="no-print" style={{
+        display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 14,
+      }}>
+        <button onClick={() => onStartYearChange(startYear - 1)} style={paperNavBtn} title="Previous school year">‹</button>
+        <div style={{ fontSize: 18, fontWeight: 800, color: PAPER.text, letterSpacing: '-0.01em', textAlign: 'center' }}>
+          {title}
+        </div>
+        <button onClick={() => onStartYearChange(startYear + 1)} style={paperNavBtn} title="Next school year">›</button>
+      </div>
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(230px, 1fr))', gap: 14 }}>
+        {months.map(({ year: y, month: m }) => (
+          <MiniMonth key={`${y}-${m}`} year={y} month={m} overrides={overrides} onClick={() => onPickMonth(y, m)} />
+        ))}
+      </div>
+      <div className="overnights-block" style={{
+        display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', marginTop: 18,
+        borderTop: `1px solid ${PAPER.rule}`, paddingTop: 14, fontSize: 13, color: PAPER.text,
+      }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+          <span style={{ width: 11, height: 11, background: PAPER.mom, borderRadius: 2 }} />
+          <span style={{ fontWeight: 700 }}>Mom</span>
+          <span style={{ marginLeft: 'auto', fontVariantNumeric: 'tabular-nums', paddingRight: 14 }}>{stats.mom} · {pct(stats.mom, stats.total)}</span>
+        </div>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+          <span style={{ width: 11, height: 11, background: PAPER.dad, borderRadius: 2 }} />
+          <span style={{ fontWeight: 700 }}>Dad</span>
+          <span style={{ marginLeft: 'auto', fontVariantNumeric: 'tabular-nums', paddingRight: 14 }}>{stats.dad} · {pct(stats.dad, stats.total)}</span>
+        </div>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 10, color: PAPER.mute }}>
+          <span>Total overnights · school year</span>
           <span style={{ marginLeft: 'auto', fontVariantNumeric: 'tabular-nums', fontWeight: 800, color: PAPER.text }}>{stats.total}</span>
         </div>
       </div>
@@ -633,7 +761,7 @@ function MiniMonth({
     >
       <div style={{ display: 'flex', alignItems: 'baseline', justifyContent: 'space-between', marginBottom: 6 }}>
         <div style={{ fontSize: 13, fontWeight: 800, color: PAPER.text }}>{monthName}</div>
-        <div style={{ fontSize: 10.5, color: PAPER.mute, fontVariantNumeric: 'tabular-nums' }}>
+        <div className="overnights-block" style={{ fontSize: 10.5, color: PAPER.mute, fontVariantNumeric: 'tabular-nums' }}>
           M {stats.mom} · D {stats.dad}
         </div>
       </div>
