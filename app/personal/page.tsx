@@ -109,25 +109,26 @@ function isPickupDay(iso: string, overrides: Overrides): boolean {
   return custodyFor(prevIso, overrides) !== custodyFor(iso, overrides);
 }
 
-/** School year = May Y → May Y+1. Return the May-anchor year for a given date. */
+/** School year = June 1, Y → May 31, Y+1 (12 full months / 365 days).
+ *  Return the June-anchor year for a given date. */
 function getSchoolYearStartYear(d: Date = new Date()): number {
   const y = d.getFullYear();
-  const m = d.getMonth(); // May = 4
-  return m >= 4 ? y : y - 1;
+  const m = d.getMonth(); // June = 5
+  return m >= 5 ? y : y - 1;
 }
 
-/** 13 months May startYear → May startYear+1, inclusive. */
+/** 12 months June startYear → May startYear+1, inclusive. */
 function schoolMonths(startYear: number): { year: number; month: number }[] {
   const out: { year: number; month: number }[] = [];
-  for (let i = 0; i < 13; i++) {
-    const total = 4 + i; // May = 4
+  for (let i = 0; i < 12; i++) {
+    const total = 5 + i; // June = 5
     out.push({ year: startYear + Math.floor(total / 12), month: total % 12 });
   }
   return out;
 }
 
 function overnightsForSchoolYear(startYear: number, overrides: Overrides) {
-  return overnightsForRange(`${startYear}-05-01`, `${startYear + 1}-05-31`, overrides);
+  return overnightsForRange(`${startYear}-06-01`, `${startYear + 1}-05-31`, overrides);
 }
 
 // ════════════════════════════════════════════════════════════════════════
@@ -295,7 +296,7 @@ export default function PersonalPage() {
         {view === 'school' ? (
           <>
             <DarkStat
-              label={`School Year · May ${schoolStartYear} → May ${schoolStartYear + 1}`}
+              label={`School Year · Jun ${schoolStartYear} → May ${schoolStartYear + 1}`}
               mom={schoolStats.mom} dad={schoolStats.dad} total={schoolStats.total}
               highlight
             />
@@ -407,7 +408,7 @@ export default function PersonalPage() {
           <h2 className="text-[15px] font-extrabold text-white">
             Handoff dates · {
               view === 'month'  ? new Date(year, month).toLocaleDateString(undefined, { month: 'long', year: 'numeric' })
-              : view === 'school' ? `May ${schoolStartYear} → May ${schoolStartYear + 1}`
+              : view === 'school' ? `Jun ${schoolStartYear} → May ${schoolStartYear + 1}`
               : year
             }
           </h2>
@@ -696,7 +697,7 @@ function PaperSchoolView({
 }) {
   const stats = overnightsForSchoolYear(startYear, overrides);
   const months = schoolMonths(startYear);
-  const title = `School Year · May ${startYear} → May ${startYear + 1}`;
+  const title = `School Year · Jun ${startYear} → May ${startYear + 1}`;
 
   return (
     <div style={{ padding: '16px 18px 20px' }}>
