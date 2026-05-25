@@ -100,6 +100,15 @@ function findHandoffs(start: string, end: string, overrides: Overrides): { date:
   return out;
 }
 
+/** A "pickup day" = first day with a new parent (custody changed overnight). */
+function isPickupDay(iso: string, overrides: Overrides): boolean {
+  const d = new Date(`${iso}T12:00:00`);
+  const prev = new Date(d);
+  prev.setDate(d.getDate() - 1);
+  const prevIso = isoFor(prev.getFullYear(), prev.getMonth(), prev.getDate());
+  return custodyFor(prevIso, overrides) !== custodyFor(iso, overrides);
+}
+
 // ════════════════════════════════════════════════════════════════════════
 // Page
 // ════════════════════════════════════════════════════════════════════════
@@ -494,7 +503,7 @@ function PaperMonthView({
           }
           const iso = isoFor(year, month, day);
           const who = custodyFor(iso, overrides);
-          const isOverride = !!overrides[iso];
+          const pickup = isPickupDay(iso, overrides);
           const isToday = iso === today;
           const fill = who === 'mom' ? PAPER.momFill : PAPER.dadFill;
           const bar = who === 'mom' ? PAPER.mom : PAPER.dad;
@@ -503,7 +512,7 @@ function PaperMonthView({
           return (
             <button key={iso}
               onClick={() => onDayClick(iso)}
-              title={`${fmtLong(iso)} · ${who === 'mom' ? 'Mom' : 'Dad'}${isOverride ? ' (custom)' : ''}`}
+              title={`${fmtLong(iso)} · ${who === 'mom' ? 'Mom' : 'Dad'}${pickup ? ' · pickup day' : ''}`}
               style={{
                 aspectRatio: '1.05 / 1',
                 borderTop: `1px solid ${PAPER.ruleSoft}`,
@@ -520,8 +529,8 @@ function PaperMonthView({
               <span style={{ position: 'absolute', top: 6, bottom: 6, left: 0, width: 3, background: bar, borderRadius: '0 2px 2px 0' }} />
               <span style={{ fontSize: 13.5, fontWeight: 700, paddingLeft: 6 }}>{day}</span>
               <span style={{ fontSize: 10, fontWeight: 800, letterSpacing: '0.08em', color: labelColor, paddingLeft: 6 }}>{label}</span>
-              {isOverride && (
-                <span title="Custom" style={{
+              {pickup && (
+                <span title="Pickup day" style={{
                   position: 'absolute', top: 8, right: 8, width: 6, height: 6,
                   borderRadius: '50%', background: PAPER.brand,
                 }} />
@@ -636,7 +645,7 @@ function MiniMonth({
           if (day === null) return <div key={`e-${i}`} style={{ aspectRatio: '1/1' }} />;
           const iso = isoFor(year, month, day);
           const who = custodyFor(iso, overrides);
-          const isOverride = !!overrides[iso];
+          const pickup = isPickupDay(iso, overrides);
           const isToday = iso === today;
           const fill = who === 'mom' ? PAPER.momFill : PAPER.dadFill;
           return (
@@ -649,7 +658,7 @@ function MiniMonth({
               outlineOffset: '-1.5px',
             }}>
               {day}
-              {isOverride && <span style={{ position: 'absolute', top: 1, right: 1, width: 3, height: 3, borderRadius: '50%', background: PAPER.brand }} />}
+              {pickup && <span style={{ position: 'absolute', top: 1, right: 1, width: 3, height: 3, borderRadius: '50%', background: PAPER.brand }} />}
             </div>
           );
         })}
