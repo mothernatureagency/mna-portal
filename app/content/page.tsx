@@ -418,6 +418,32 @@ export default function ContentPage() {
             nextItems = fresh.items || nextItems;
           } catch {}
         }
+
+        // Auto-seed the current PDM brand-cascade month so it's already in
+        // the calendar (marked blue) without anyone loading a playbook — MNA
+        // plans their own posts around it. Idempotent: POST skips dupes.
+        const PDM_AUTOSEED = { id: 'prime-iv-pdm-jun-2026', startDate: '2026-06-01' };
+        const hasPdmMonth = getPlaybooksForClient(activeClient!.id).some((p) => p.id === PDM_AUTOSEED.id);
+        const monthSeeded = nextItems.some(
+          (i) => /^\[\s*PDM\b/i.test(i.title || '') && (i.post_date || '').startsWith('2026-06'),
+        );
+        if (hasPdmMonth && !monthSeeded) {
+          try {
+            await fetch('/api/content-calendar', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({
+                clientName: activeClient!.name,
+                playbookId: PDM_AUTOSEED.id,
+                startDate: PDM_AUTOSEED.startDate,
+              }),
+            });
+            const r = await fetch(`/api/content-calendar?client=${encodeURIComponent(activeClient!.name)}`);
+            const fresh = await r.json();
+            nextItems = fresh.items || nextItems;
+          } catch {}
+        }
+
         setItems(nextItems);
       })
       .finally(() => setLoading(false));
