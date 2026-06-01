@@ -9,6 +9,7 @@ import AttributionOverview from '@/components/client-portal/AttributionOverview'
 import { getPerformanceForClient } from '@/lib/data/performance';
 import PerformanceOverview from '@/components/client-portal/PerformanceOverview';
 import CompetitorBenchmark from '@/components/dashboard/CompetitorBenchmark';
+import KPISection from '@/components/dashboard/KPISection';
 import { driveThumbnailUrl, driveViewUrl } from '@/lib/drive';
 
 type KPI = { label: string; value: string; sub?: string; color: string };
@@ -508,9 +509,19 @@ export default function ClientOverviewPage() {
         <div className="text-[11px] text-white/50 mt-2">{calMonthItems.length} posts this month</div>
       </div>
 
+      {/* Performance KPIs — auto-pull Meta ad metrics, manual pipeline numbers */}
+      <KPISection
+        clientId={client.id}
+        title="Performance KPIs"
+        gradientFrom={gradientFrom}
+        gradientTo={gradientTo}
+        adAccountId={client.metaAds?.adAccountId}
+        editable={isStaffPreview}
+      />
+
       {/* Competitor Benchmark — currently only wired with data for Prime IV Niceville */}
       {client.id === 'prime-iv' && (
-        <CompetitorBenchmark gradientFrom={gradientFrom} gradientTo={gradientTo} />
+        <CompetitorBenchmark gradientFrom={gradientFrom} gradientTo={gradientTo} clientId={client.id} editable={isStaffPreview} />
       )}
 
       {/* Calendar post preview modal */}

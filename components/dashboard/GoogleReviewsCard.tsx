@@ -7,6 +7,7 @@
  */
 
 import React, { useEffect, useState } from 'react';
+import MonthlyMoM from './MonthlyMoM';
 
 type Review = {
   google_review_id: string;
@@ -54,10 +55,12 @@ export default function GoogleReviewsCard({
   clientId,
   gradientFrom,
   gradientTo,
+  editable = true,
 }: {
   clientId: string;
   gradientFrom: string;
   gradientTo: string;
+  editable?: boolean;       // gate the "Capture this month" button (default true)
 }) {
   const [reviews, setReviews] = useState<Review[]>([]);
   const [summary, setSummary] = useState<Summary | null>(null);
@@ -444,6 +447,18 @@ export default function GoogleReviewsCard({
               </>
             );
           })()}
+
+          <MonthlyMoM
+            clientId={clientId}
+            scope="google_reviews"
+            gradientFrom={gradientFrom}
+            gradientTo={gradientTo}
+            editable={editable}
+            metrics={[
+              { key: 'rating', label: 'Avg Rating', value: summary!.avg_rating, fmt: (n) => n.toFixed(2) },
+              { key: 'total', label: 'Total Reviews', value: summary!.total },
+            ]}
+          />
 
           {/* Newest review only — client wants the freshest one, not a list */}
           <div>

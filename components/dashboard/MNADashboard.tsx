@@ -370,6 +370,7 @@ export default function MNADashboard() {
             clientName="Mother Nature Agency"
             gradientFrom={gradientFrom}
             gradientTo={gradientTo}
+            interactive
           />
 
           {/* Quick Stats Summary */}

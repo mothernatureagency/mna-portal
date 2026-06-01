@@ -261,6 +261,19 @@ async function initSchema() {
                         updated_at timestamptz not null default now(),
                         unique (client_id, competitor_key, metric, year_month)
                   )`,
+                  // Manual KPI overrides. The dashboard auto-pulls what it can
+                  // (Meta ad metrics); any metric the user types here wins over
+                  // the auto value. One row per (client_id, metric, year_month).
+                  `create table if not exists kpi_entries (
+                        id uuid primary key default uuid_generate_v4(),
+                        client_id text not null,
+                        metric text not null,
+                        year_month text not null,
+                        value numeric(14,2) not null,
+                        note text,
+                        updated_at timestamptz not null default now(),
+                        unique (client_id, metric, year_month)
+                  )`,
                   // STR reviews synced from platforms
                   `create table if not exists str_reviews (
                         id uuid primary key default uuid_generate_v4(),

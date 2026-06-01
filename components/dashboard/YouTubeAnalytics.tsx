@@ -9,6 +9,7 @@
  */
 
 import React, { useEffect, useState } from 'react';
+import MonthlyMoM from './MonthlyMoM';
 
 type Profile = {
   handle: string;
@@ -65,6 +66,7 @@ export default function YouTubeAnalytics({
   label,
   gradientFrom,
   gradientTo,
+  editable = true,
 }: {
   ownerKey: string;
   kvClientId: string;
@@ -72,6 +74,7 @@ export default function YouTubeAnalytics({
   label?: string;
   gradientFrom: string;
   gradientTo: string;
+  editable?: boolean;       // gate the "Capture this month" button (default true)
 }) {
   const [handle, setHandle] = useState<string>('');
   const [savedHandle, setSavedHandle] = useState<string>('');
@@ -235,6 +238,19 @@ export default function YouTubeAnalytics({
               </div>
             </div>
           )}
+
+          <MonthlyMoM
+            clientId={kvClientId}
+            scope="youtube"
+            gradientFrom={gradientFrom}
+            gradientTo={gradientTo}
+            editable={editable}
+            metrics={[
+              { key: 'subscribers', label: 'Subscribers', value: profile.subscribers, fmt },
+              { key: 'views', label: 'Total Views', value: profile.totalViews, fmt },
+              { key: 'videos', label: 'Videos', value: profile.videosCount },
+            ]}
+          />
 
           <div className="mb-1">
             <div className="text-[10px] uppercase tracking-wider font-bold text-white/55 mb-2">Top Videos · by views</div>

@@ -63,12 +63,55 @@ export default function CompetitorBenchmark({
   gradientFrom,
   gradientTo,
   clientId,
+  editable = false,
 }: {
   gradientFrom: string;
   gradientTo: string;
   clientId?: string;
+  // When true (staff views), Meta numbers become click-to-edit and persist to
+  // client_kv. Off for the client portal, which sees them read-only.
+  editable?: boolean;
 }) {
   const [tab, setTab] = useState<Tab>('meta');
+
+  // Meta competitor numbers — manual, persisted in client_kv (key
+  // `meta_competitors`). Seeded from the hand-fed defaults until saved values
+  // load. The client's own row is auto-filled from the connected Page when
+  // available (see pageAuto below).
+  const [metaComps, setMetaComps] = useState<Competitor[]>(COMPETITORS_28D);
+  const [metaEditing, setMetaEditing] = useState(false);
+  const [pageAuto, setPageAuto] = useState<{ followers: number | null; publishedContent: number | null } | null>(null);
+
+  // Load saved competitor numbers
+  useEffect(() => {
+    if (!clientId) return;
+    fetch(`/api/client-kv?clientId=${encodeURIComponent(clientId)}&key=meta_competitors`)
+      .then((r) => r.json())
+      .then((d) => { if (Array.isArray(d.value) && d.value.length) setMetaComps(d.value); })
+      .catch(() => {});
+  }, [clientId]);
+
+  // Auto-pull the client's own Page followers / published-post count
+  useEffect(() => {
+    fetch('/api/meta/page')
+      .then((r) => r.json())
+      .then((d) => {
+        if (d?.available) setPageAuto({ followers: d.followers ?? null, publishedContent: d.publishedContent ?? null });
+      })
+      .catch(() => {});
+  }, []);
+
+  async function saveMetaComps(next: Competitor[]) {
+    setMetaComps(next);
+    if (!clientId) return;
+    await fetch('/api/client-kv', {
+      method: 'PUT', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ clientId, key: 'meta_competitors', value: next }),
+    }).catch(() => {});
+  }
+  function updateComp(idx: number, patch: Partial<Competitor>) {
+    setMetaComps((prev) => prev.map((c, i) => (i === idx ? { ...c, ...patch } : c)));
+  }
   // Google place IDs per competitor slot — stored in client_kv so both
   // staff + client portal can see them. Keyed by competitor id.
   const [placeIds, setPlaceIds] = useState<Record<string, string>>({});
@@ -178,7 +221,18 @@ export default function CompetitorBenchmark({
     });
   }
 
-  const data = COMPETITORS_28D;
+  // Display data = manual numbers, with the client's own row overridden by the
+  // live Page snapshot when we have it.
+  const data = useMemo(() => metaComps.map((c) => {
+    if (c.isClient && pageAuto) {
+      return {
+        ...c,
+        followers: pageAuto.followers ?? c.followers,
+        publishedContent: pageAuto.publishedContent ?? c.publishedContent,
+      };
+    }
+    return c;
+  }), [metaComps, pageAuto]);
   const client = data.find((c) => c.isClient)!;
   const competitors = data.filter((c) => !c.isClient);
 
@@ -245,6 +299,79 @@ export default function CompetitorBenchmark({
               <span className="font-bold">{fmtMultiple(client.newFollows, competitors[1].newFollows)}</span> Aqua Vitae's. We have the smallest base but the strongest momentum.
             </div>
           </div>
+
+          {/* ── Editable numbers (staff) ── */}
+          {editable && (
+            <div className="mb-5">
+              <div className="flex items-center justify-between mb-2">
+                <div className="text-[10px] font-bold uppercase tracking-wider text-white/55">
+                  Competitor numbers · update manually like MoM
+                  {pageAuto && <span className="ml-2 text-emerald-300 normal-case tracking-normal font-semibold">· your page auto-synced</span>}
+                </div>
+                <button
+                  onClick={() => setMetaEditing((v) => !v)}
+                  className="text-[10px] font-semibold px-2.5 py-1 rounded-lg bg-white/10 text-white/70 hover:text-white hover:bg-white/20"
+                >
+                  {metaEditing ? 'Done' : 'Edit numbers'}
+                </button>
+              </div>
+              {metaEditing && (
+                <div className="rounded-xl p-3 space-y-2" style={{ background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.08)' }}>
+                  <div className="grid grid-cols-[1.6fr_1fr_1fr_1fr] gap-2 text-[9px] uppercase tracking-wider text-white/45 font-semibold px-1">
+                    <span>Name</span>
+                    <span className="text-right">Followers</span>
+                    <span className="text-right">New (28d)</span>
+                    <span className="text-right">Posts (28d)</span>
+                  </div>
+                  {metaComps.map((c, idx) => {
+                    const followersAuto = c.isClient && pageAuto?.followers != null;
+                    const postsAuto = c.isClient && pageAuto?.publishedContent != null;
+                    const numCls = 'w-full px-2 py-1.5 rounded-lg border text-white text-[12px] text-right tabular-nums focus:outline-none disabled:opacity-50';
+                    const numStyle = { background: 'rgba(0,0,0,0.35)', borderColor: 'rgba(255,255,255,0.18)' } as React.CSSProperties;
+                    return (
+                      <div key={c.id} className="grid grid-cols-[1.6fr_1fr_1fr_1fr] gap-2 items-center">
+                        <input
+                          value={c.name}
+                          onChange={(e) => updateComp(idx, { name: e.target.value })}
+                          onBlur={() => saveMetaComps(metaComps)}
+                          className="w-full px-2 py-1.5 rounded-lg border text-white text-[12px] focus:outline-none"
+                          style={numStyle}
+                        />
+                        <input
+                          type="number" inputMode="numeric"
+                          value={followersAuto ? (pageAuto!.followers ?? 0) : c.followers}
+                          disabled={!!followersAuto}
+                          title={followersAuto ? 'Auto-synced from your connected Page' : undefined}
+                          onChange={(e) => updateComp(idx, { followers: Number(e.target.value) || 0 })}
+                          onBlur={() => saveMetaComps(metaComps)}
+                          className={numCls} style={numStyle}
+                        />
+                        <input
+                          type="number" inputMode="numeric"
+                          value={c.newFollows}
+                          onChange={(e) => updateComp(idx, { newFollows: Number(e.target.value) || 0 })}
+                          onBlur={() => saveMetaComps(metaComps)}
+                          className={numCls} style={numStyle}
+                        />
+                        <input
+                          type="number" inputMode="numeric"
+                          value={postsAuto ? (pageAuto!.publishedContent ?? 0) : c.publishedContent}
+                          disabled={!!postsAuto}
+                          title={postsAuto ? 'Auto-synced from your connected Page' : undefined}
+                          onChange={(e) => updateComp(idx, { publishedContent: Number(e.target.value) || 0 })}
+                          onBlur={() => saveMetaComps(metaComps)}
+                          className={numCls} style={numStyle}
+                        />
+                      </div>
+                    );
+                  })}
+                  <div className="text-[9px] text-white/40 pt-1">
+                    Numbers save as you type. Greyed cells are pulled live from your connected Page and can't be overwritten.
+                  </div>
+                </div>
+              )}
+            </div>
+          )}
 
           {/* ── Market Activity Share ── */}
           <div className="grid grid-cols-2 gap-4 mb-5">

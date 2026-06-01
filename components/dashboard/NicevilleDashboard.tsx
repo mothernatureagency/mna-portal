@@ -24,6 +24,7 @@ import LeadSourceSplitEditor from './LeadSourceSplitEditor';
 import CompetitorBenchmark from './CompetitorBenchmark';
 import PrimeIVMembershipCard from './PrimeIVMembershipCard';
 import SalesBenchmarks from './SalesBenchmarks';
+import KPISection from './KPISection';
 import ConceptsPanel from './ConceptsPanel';
 import TikTokAnalytics from './TikTokAnalytics';
 import TikTokContentPlan from './TikTokContentPlan';
@@ -154,6 +155,19 @@ export default function NicevilleDashboard({ client }: { client: Client }) {
         </div>
       )}
 
+      {/* ── KPIs ── */}
+      <div>
+        <SectionLabel>Performance KPIs</SectionLabel>
+        <KPISection
+          clientId={client.id}
+          title="Niceville · Performance KPIs"
+          gradientFrom={gradientFrom}
+          gradientTo={gradientTo}
+          adAccountId={client.metaAds?.adAccountId}
+          editable
+        />
+      </div>
+
       {/* ── CONTENT CALENDAR (moved to top per client request) ── */}
       <div>
         <div className="flex items-center justify-between mb-2 flex-wrap gap-2">
@@ -175,7 +189,7 @@ export default function NicevilleDashboard({ client }: { client: Client }) {
       {/* ── COMPETITOR BENCHMARK (Meta + Google Reviews) ── */}
       <div>
         <SectionLabel>Competitive Position</SectionLabel>
-        <CompetitorBenchmark gradientFrom={gradientFrom} gradientTo={gradientTo} clientId={client.id} />
+        <CompetitorBenchmark gradientFrom={gradientFrom} gradientTo={gradientTo} clientId={client.id} editable />
       </div>
 
       {/* ── TIKTOK ANALYTICS ── */}

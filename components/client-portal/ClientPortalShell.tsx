@@ -151,6 +151,14 @@ export default function ClientPortalShell({
 
       {/* Bottom actions */}
       <div className="px-2.5 pb-4 pt-2" style={{ borderTop: '1px solid rgba(255,255,255,.07)' }}>
+        <Link
+          href="/security"
+          onClick={() => setMobileOpen(false)}
+          className="w-full flex items-center gap-2.5 px-2.5 py-2 rounded-xl text-[13px] text-white/60 hover:text-white hover:bg-white/10 transition-colors mb-0.5"
+        >
+          <span className="material-symbols-outlined" style={{ fontSize: 18 }}>shield_lock</span>
+          Account Security
+        </Link>
         {isStaffPreview && (
           <button
             onClick={() => router.push('/')}

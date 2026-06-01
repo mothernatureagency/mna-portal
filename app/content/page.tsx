@@ -151,6 +151,9 @@ export default function ContentPage() {
   const [redoGuidance, setRedoGuidance] = useState<Record<string, string>>({});
   const [showAddForm, setShowAddForm] = useState(false);
   const [sortAsc, setSortAsc] = useState(false); // newest first by default
+  // Calendar view: hide past months by default (content is approved ~2 weeks
+  // out on a 45-day window, so the current + upcoming months are what matters).
+  const [showPastMonths, setShowPastMonths] = useState(false);
   const [newPostPlatforms, setNewPostPlatforms] = useState<string[]>(['Instagram']);
   const [editPlatforms, setEditPlatforms] = useState<string[]>([]);
   const [viewMode, setViewMode] = useState<'cards' | 'calendar'>('calendar');
@@ -440,16 +443,25 @@ export default function ContentPage() {
     return sortAsc ? cmp : -cmp;
   });
 
-  // Calendar view: group by month
-  const calendarMonths = useMemo(() => {
+  // Calendar view: group by month, newest→oldest, with past months hidden
+  // unless the user toggles them back in.
+  const nowMonthKey = useMemo(() => {
+    const d = new Date();
+    return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
+  }, []);
+  const { calendarMonths, pastMonthCount } = useMemo(() => {
     const map = new Map<string, ContentItem[]>();
     for (const it of shown) {
       const k = monthKey(it.post_date);
       if (!map.has(k)) map.set(k, []);
       map.get(k)!.push(it);
     }
-    return Array.from(map.entries()).sort((a, b) => a[0].localeCompare(b[0]));
-  }, [shown]);
+    // Always newest → oldest
+    const all = Array.from(map.entries()).sort((a, b) => b[0].localeCompare(a[0]));
+    const past = all.filter(([k]) => k < nowMonthKey);
+    const visible = showPastMonths ? all : all.filter(([k]) => k >= nowMonthKey);
+    return { calendarMonths: visible, pastMonthCount: past.length };
+  }, [shown, nowMonthKey, showPastMonths]);
 
   const activeItem = items.find((i) => i.id === activeId) || null;
 
@@ -789,6 +801,19 @@ export default function ContentPage() {
           {isStaff
             ? 'No content yet. Click "+ Add Post" to create one, or load a playbook.'
             : 'No content to review yet. Your agency will share posts here for your approval.'}
+        </div>
+      )}
+
+      {/* Calendar past-months toggle */}
+      {!loading && viewMode === 'calendar' && pastMonthCount > 0 && (
+        <div className="flex justify-center">
+          <button
+            onClick={() => setShowPastMonths((v) => !v)}
+            className="flex items-center gap-1.5 px-4 py-2 rounded-xl text-xs font-semibold border bg-white/5 text-white/60 border-white/10 hover:bg-white/10 transition"
+          >
+            <span className="material-symbols-outlined" style={{ fontSize: 16 }}>{showPastMonths ? 'expand_less' : 'history'}</span>
+            {showPastMonths ? 'Hide past months' : `Show ${pastMonthCount} past month${pastMonthCount === 1 ? '' : 's'}`}
+          </button>
         </div>
       )}
 

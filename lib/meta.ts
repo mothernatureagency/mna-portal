@@ -203,3 +203,43 @@ export async function fetchLeadForms(adAccountId: string): Promise<MetaLeadFormS
     return [];
   }
 }
+
+// ───────────────────────────────────────────────────────────────
+// Page snapshot — the connected Facebook Page's own follower count and
+// recent published-post count. Used to auto-fill the client's own row in
+// the Competitor Benchmark so staff don't have to retype it every cycle.
+//
+// Requires META_PAGE_ID + a token with pages_read_engagement. When either is
+// missing the call degrades to null so the benchmark stays manual.
+// ───────────────────────────────────────────────────────────────
+export type MetaPageSnapshot = {
+  followers: number | null;
+  publishedContent: number | null;
+};
+
+export async function fetchPageSnapshot(): Promise<MetaPageSnapshot | null> {
+  const pageId = process.env.META_PAGE_ID;
+  if (!pageId) return null;
+
+  const info = await metaFetch<{ followers_count?: number; fan_count?: number }>(
+    `/${pageId}`,
+    { fields: 'followers_count,fan_count' }
+  );
+  const followers = info.followers_count ?? info.fan_count ?? null;
+
+  // Posts published in the trailing 28 days. Best-effort: the published_posts
+  // edge needs a Page token and is permission-gated, so swallow failures.
+  let publishedContent: number | null = null;
+  try {
+    const since = Math.floor((Date.now() - 28 * 24 * 60 * 60 * 1000) / 1000);
+    const posts = await metaFetch<{ summary?: { total_count: number } }>(
+      `/${pageId}/published_posts`,
+      { since: String(since), limit: '0', summary: 'total_count' }
+    );
+    publishedContent = posts.summary?.total_count ?? null;
+  } catch {
+    publishedContent = null;
+  }
+
+  return { followers, publishedContent };
+}

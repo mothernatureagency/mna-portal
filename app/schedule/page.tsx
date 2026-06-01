@@ -274,10 +274,28 @@ export default function SchedulePage() {
           </div>
           {/* Google Calendar connect */}
           {gcalConnected ? (
-            <span className="flex items-center gap-1.5 px-3 py-2 rounded-xl text-[11px] font-semibold text-emerald-400" style={{ background: 'rgba(34,197,94,0.1)', border: '1px solid rgba(34,197,94,0.2)' }}>
-              <span className="material-symbols-outlined" style={{ fontSize: 14 }}>check_circle</span>
-              Google Calendar
-            </span>
+            <div className="flex items-center gap-1.5">
+              <span className="flex items-center gap-1.5 px-3 py-2 rounded-xl text-[11px] font-semibold text-emerald-400" style={{ background: 'rgba(34,197,94,0.1)', border: '1px solid rgba(34,197,94,0.2)' }}>
+                <span className="material-symbols-outlined" style={{ fontSize: 14 }}>check_circle</span>
+                Google Calendar
+              </span>
+              <button
+                onClick={async () => {
+                  setGcalLoading(true);
+                  const res = await fetch(`/api/google/connect?email=${encodeURIComponent(userEmail)}`);
+                  const data = await res.json();
+                  if (data.url) window.location.href = data.url;
+                  setGcalLoading(false);
+                }}
+                disabled={gcalLoading || !userEmail}
+                title="Re-authorize Google to grant Drive access for the content picker"
+                className="flex items-center gap-1.5 px-3 py-2 rounded-xl text-[11px] font-semibold text-white/60 hover:text-white transition-colors disabled:opacity-40"
+                style={{ background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.1)' }}
+              >
+                <span className="material-symbols-outlined" style={{ fontSize: 14 }}>sync</span>
+                {gcalLoading ? 'Connecting...' : 'Reconnect / grant Drive'}
+              </button>
+            </div>
           ) : (
             <button
               onClick={async () => {

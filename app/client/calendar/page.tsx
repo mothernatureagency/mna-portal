@@ -91,6 +91,9 @@ export default function ClientCalendarPage() {
   const [view, setView] = useState<'grid' | 'list'>('grid');
   const [commentDraft, setCommentDraft] = useState<Record<string, string>>({});
   const [activeId, setActiveId] = useState<string | null>(null);
+  // Hide past months by default — clients only need the current + upcoming
+  // posts they have to approve. They can toggle past months back in.
+  const [showPastMonths, setShowPastMonths] = useState(false);
 
   useEffect(() => {
     setLoading(true);
@@ -100,16 +103,24 @@ export default function ClientCalendarPage() {
       .finally(() => setLoading(false));
   }, [client.name]);
 
-  // Group by month for the calendar view
-  const months = useMemo(() => {
+  // Group by month for the calendar view — newest→oldest, past months hidden
+  // unless toggled back in.
+  const nowMonthKey = useMemo(() => {
+    const d = new Date();
+    return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
+  }, []);
+  const { months, pastMonthCount } = useMemo(() => {
     const map = new Map<string, ContentItem[]>();
     for (const it of items) {
       const k = monthKey(it.post_date);
       if (!map.has(k)) map.set(k, []);
       map.get(k)!.push(it);
     }
-    return Array.from(map.entries()).sort((a, b) => a[0].localeCompare(b[0]));
-  }, [items]);
+    const all = Array.from(map.entries()).sort((a, b) => b[0].localeCompare(a[0]));
+    const past = all.filter(([k]) => k < nowMonthKey);
+    const visible = showPastMonths ? all : all.filter(([k]) => k >= nowMonthKey);
+    return { months: visible, pastMonthCount: past.length };
+  }, [items, nowMonthKey, showPastMonths]);
 
   async function patchItem(id: string, payload: Record<string, unknown>) {
     const res = await fetch('/api/content-calendar', {
@@ -170,6 +181,19 @@ export default function ClientCalendarPage() {
         <div className="glass-card p-8 text-center text-white/50">
           <div className="text-[14px] font-semibold text-white/70">No posts in your calendar yet</div>
           <div className="text-[12px] mt-1">Your agency will share content here for your review.</div>
+        </div>
+      )}
+
+      {/* Past-months toggle (grid view) */}
+      {!loading && view === 'grid' && pastMonthCount > 0 && (
+        <div className="flex justify-center">
+          <button
+            onClick={() => setShowPastMonths((v) => !v)}
+            className="flex items-center gap-1.5 px-4 py-2 rounded-xl text-xs font-semibold border bg-white/5 text-white/60 border-white/10 hover:bg-white/10 transition"
+          >
+            <span className="material-symbols-outlined" style={{ fontSize: 16 }}>{showPastMonths ? 'expand_less' : 'history'}</span>
+            {showPastMonths ? 'Hide past months' : `Show ${pastMonthCount} past month${pastMonthCount === 1 ? '' : 's'}`}
+          </button>
         </div>
       )}
 

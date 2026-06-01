@@ -16,6 +16,7 @@
  */
 
 import React, { useEffect, useState } from 'react';
+import MonthlyMoM from './MonthlyMoM';
 
 type Profile = {
   handle: string;
@@ -74,6 +75,7 @@ export default function TikTokAnalytics({
   gradientFrom,
   gradientTo,
   niche,
+  editable = true,
 }: {
   ownerKey: string;         // namespace for snapshots (e.g. 'prime-iv')
   kvClientId: string;       // client_id for client_kv (same or different)
@@ -82,6 +84,7 @@ export default function TikTokAnalytics({
   gradientFrom: string;
   gradientTo: string;
   niche?: string;
+  editable?: boolean;       // gate the "Capture this month" button (default true)
 }) {
   const [handle, setHandle] = useState<string>('');
   const [savedHandle, setSavedHandle] = useState<string>('');
@@ -278,6 +281,19 @@ export default function TikTokAnalytics({
               </div>
             </div>
           )}
+
+          <MonthlyMoM
+            clientId={kvClientId}
+            scope="tiktok"
+            gradientFrom={gradientFrom}
+            gradientTo={gradientTo}
+            editable={editable}
+            metrics={[
+              { key: 'followers', label: 'Followers', value: profile.followers, fmt },
+              { key: 'likes', label: 'Total Likes', value: profile.totalLikes, fmt },
+              { key: 'videos', label: 'Videos', value: profile.videosCount },
+            ]}
+          />
 
           {/* Top videos */}
           <div className="mb-5">

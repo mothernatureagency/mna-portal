@@ -9,6 +9,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import Link from 'next/link';
 import React from 'react';
+import { driveThumbnailUrl, driveViewUrl } from '@/lib/drive';
 
 type ApprovalStatus =
   | 'drafting'
@@ -26,6 +27,18 @@ type ContentItem = {
   caption: string | null;
   assigned_role: string | null;
   client_approval_status: ApprovalStatus | null;
+  photo_drive_url?: string | null;
+  client_comments?: string | null;
+  mna_comments?: string | null;
+  client_visible?: boolean | null;
+};
+
+const APPROVAL_LABEL: Record<ApprovalStatus, string> = {
+  drafting: 'Drafting',
+  pending_review: 'Ready for review',
+  approved: 'Approved',
+  changes_requested: 'Changes requested',
+  scheduled: 'Scheduled',
 };
 
 // PDM brand cascade posts are auto-approved reference items — styled dark
@@ -66,14 +79,128 @@ export default function MonthlyContentCalendar({
   clientName,
   gradientFrom,
   gradientTo,
+  interactive = false,
 }: {
   clientName: string;
   gradientFrom: string;
   gradientTo: string;
+  // When true, clicking a post opens an editable card popup and clicking an
+  // empty day starts a new post. Off by default so the Niceville dashboard's
+  // calendar keeps its read-only/multi-select behavior.
+  interactive?: boolean;
 }) {
   const [items, setItems] = useState<ContentItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [monthOffset, setMonthOffset] = useState(0); // 0 = current month
+
+  // Interactive mode: post-card popup + new-post composer
+  const [activePost, setActivePost] = useState<ContentItem | null>(null);
+  const [newPostDate, setNewPostDate] = useState<string | null>(null);
+  const [newPostPlatform, setNewPostPlatform] = useState('Instagram');
+  const [newPostTitle, setNewPostTitle] = useState('');
+  const [newPostBusy, setNewPostBusy] = useState(false);
+
+  // Per-post AI / edit state (keyed off the active post)
+  const [writing, setWriting] = useState(false);
+  const [redoOpen, setRedoOpen] = useState(false);
+  const [redoGuidance, setRedoGuidance] = useState('');
+  const [captionEditing, setCaptionEditing] = useState(false);
+  const [captionDraft, setCaptionDraft] = useState('');
+  const [photoDraft, setPhotoDraft] = useState('');
+  const [photoEditing, setPhotoEditing] = useState(false);
+  const [commentDraft, setCommentDraft] = useState('');
+
+  // Keep the open popup in sync with the latest items (after AI writes etc.)
+  function syncActive(updated: ContentItem) {
+    setItems((prev) => prev.map((p) => (p.id === updated.id ? { ...p, ...updated } : p)));
+    setActivePost((cur) => (cur && cur.id === updated.id ? { ...cur, ...updated } : cur));
+  }
+
+  function openPost(p: ContentItem) {
+    setActivePost(p);
+    setRedoOpen(false);
+    setRedoGuidance('');
+    setCaptionEditing(false);
+    setCaptionDraft(p.caption || '');
+    setPhotoEditing(false);
+    setPhotoDraft(p.photo_drive_url || '');
+    setCommentDraft('');
+  }
+
+  function openNewPost(iso: string) {
+    setNewPostDate(iso);
+    setNewPostPlatform('Instagram');
+    setNewPostTitle('');
+  }
+
+  async function patchPost(id: string, patch: Record<string, any>) {
+    const res = await fetch('/api/content-calendar', {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ id, ...patch }),
+    });
+    const data = await res.json().catch(() => ({}));
+    if (res.ok && data.item) syncActive(data.item);
+    return res.ok;
+  }
+
+  async function writeCopy(id: string, guidance?: string) {
+    setWriting(true);
+    try {
+      const res = await fetch(`/api/content-calendar/${id}/write-copy`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(guidance ? { guidance } : {}),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (res.ok && data.item) {
+        syncActive(data.item);
+        setCaptionDraft(data.item.caption || '');
+        setRedoOpen(false);
+        setRedoGuidance('');
+      }
+    } finally {
+      setWriting(false);
+    }
+  }
+
+  async function approvePost(id: string) {
+    await patchPost(id, { client_approval_status: 'approved', client_comments: null });
+  }
+  async function requestChangesPost(id: string) {
+    if (!commentDraft.trim()) return;
+    await patchPost(id, { client_approval_status: 'changes_requested', client_comments: commentDraft.trim() });
+    setCommentDraft('');
+  }
+
+  async function createPost() {
+    if (!newPostDate || !newPostTitle.trim()) return;
+    setNewPostBusy(true);
+    try {
+      const res = await fetch('/api/content-calendar', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          clientName,
+          items: [{
+            post_date: newPostDate,
+            platform: newPostPlatform,
+            title: newPostTitle.trim(),
+            status: 'Draft',
+          }],
+        }),
+      });
+      const data = await res.json().catch(() => ({}));
+      const created = data.inserted?.[0];
+      if (res.ok && created) {
+        setItems((prev) => [...prev, created]);
+        setNewPostDate(null);
+        openPost(created); // jump straight into the card so they can write copy
+      }
+    } finally {
+      setNewPostBusy(false);
+    }
+  }
 
   // Drag-to-reschedule: track the post being dragged and the day being hovered
   const [draggingId, setDraggingId] = useState<string | null>(null);
@@ -265,10 +392,18 @@ export default function MonthlyContentCalendar({
       </div>
 
       {/* Tip when nothing is selected */}
-      {selectedDays.size === 0 && !loading && items.length > 0 && (
-        <div className="text-[10px] text-white/45 mb-3">
-          Tip · Click a day to select it, drag a post to move it, or click "Generate Posts" after selecting days.
-        </div>
+      {interactive ? (
+        !loading && (
+          <div className="text-[10px] text-white/45 mb-3">
+            Tip · Click a post to open it and write/approve copy. Click an empty day to start a new post.
+          </div>
+        )
+      ) : (
+        selectedDays.size === 0 && !loading && items.length > 0 && (
+          <div className="text-[10px] text-white/45 mb-3">
+            Tip · Click a day to select it, drag a post to move it, or click "Generate Posts" after selecting days.
+          </div>
+        )
       )}
 
       {/* Generator dialog */}
@@ -331,7 +466,7 @@ export default function MonthlyContentCalendar({
         <div className="text-center text-white/50 py-10 text-sm">Loading calendar...</div>
       )}
 
-      {!loading && items.length === 0 && (
+      {!loading && items.length === 0 && !interactive && (
         <div className="rounded-xl border border-dashed border-white/20 p-6 text-center">
           <div className="text-[13px] font-semibold text-white/85">No content loaded yet</div>
           <div className="text-[11px] text-white/70 mt-1 mb-3">
@@ -347,7 +482,7 @@ export default function MonthlyContentCalendar({
         </div>
       )}
 
-      {!loading && items.length > 0 && (
+      {!loading && (items.length > 0 || interactive) && (
         <>
           {/* Status legend */}
           <div className="flex items-center gap-4 mb-3 flex-wrap text-[10px] text-white/70">
@@ -387,7 +522,11 @@ export default function MonthlyContentCalendar({
               return (
                 <div
                   key={iso}
-                  onClick={() => { if (isCurrentMonth) toggleDay(iso); }}
+                  onClick={() => {
+                    if (!isCurrentMonth) return;
+                    if (interactive) { if (posts.length === 0) openNewPost(iso); }
+                    else toggleDay(iso);
+                  }}
                   onDragOver={(e) => { if (draggingId) { e.preventDefault(); setDragOverIso(iso); } }}
                   onDragLeave={() => setDragOverIso((cur) => cur === iso ? null : cur)}
                   onDrop={(e) => {
@@ -432,7 +571,7 @@ export default function MonthlyContentCalendar({
                         draggable
                         onDragStart={(e) => { setDraggingId(p.id); e.dataTransfer.effectAllowed = 'move'; }}
                         onDragEnd={() => { setDraggingId(null); setDragOverIso(null); }}
-                        onClick={(e) => e.stopPropagation()}
+                        onClick={(e) => { e.stopPropagation(); if (interactive) openPost(p); }}
                         className="flex items-start gap-1 rounded px-1 py-0.5 cursor-grab active:cursor-grabbing"
                         style={{
                           ...(pdm ? { background: '#0b2547', border: '1px solid #1e3a8a' } : {}),
@@ -460,6 +599,253 @@ export default function MonthlyContentCalendar({
           </div>
         </>
       )}
+
+      {/* New-post composer (interactive mode) */}
+      {interactive && newPostDate && (
+        <div className="fixed inset-0 bg-black/60 flex items-center justify-center p-4 z-50" onClick={() => !newPostBusy && setNewPostDate(null)}>
+          <div
+            className="max-w-md w-full rounded-2xl p-5"
+            style={{ background: 'rgba(15,31,46,0.97)', border: '1px solid rgba(255,255,255,0.15)', backdropFilter: 'blur(24px)' }}
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="text-white font-bold mb-1">New post</div>
+            <div className="text-[11px] text-white/55 mb-3">
+              {new Date(`${newPostDate}T12:00:00`).toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric' })}
+            </div>
+            <div className="space-y-2">
+              <input
+                autoFocus
+                type="text"
+                placeholder="Post title / topic"
+                value={newPostTitle}
+                onChange={(e) => setNewPostTitle(e.target.value)}
+                onKeyDown={(e) => { if (e.key === 'Enter' && newPostTitle.trim()) createPost(); }}
+                className="w-full px-3 py-2 rounded-lg border text-white text-[13px] placeholder:text-white/55 focus:outline-none"
+                style={{ background: 'rgba(0,0,0,0.45)', borderColor: 'rgba(255,255,255,0.25)' }}
+              />
+              <select
+                value={newPostPlatform}
+                onChange={(e) => setNewPostPlatform(e.target.value)}
+                className="w-full px-3 py-2 rounded-lg border text-white text-[13px] focus:outline-none"
+                style={{ background: 'rgba(0,0,0,0.45)', borderColor: 'rgba(255,255,255,0.25)' }}
+              >
+                <option className="bg-slate-900">Instagram</option>
+                <option className="bg-slate-900">TikTok</option>
+                <option className="bg-slate-900">Facebook</option>
+                <option className="bg-slate-900">LinkedIn</option>
+              </select>
+            </div>
+            <div className="flex justify-end gap-2 mt-4">
+              <button
+                onClick={() => setNewPostDate(null)}
+                disabled={newPostBusy}
+                className="text-[11px] font-semibold px-3 py-1.5 rounded-lg bg-white/10 hover:bg-white/20 text-white disabled:opacity-50"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={createPost}
+                disabled={newPostBusy || !newPostTitle.trim()}
+                className="text-[11px] font-bold px-4 py-1.5 rounded-lg text-white disabled:opacity-50"
+                style={{ background: `linear-gradient(135deg,${gradientFrom},${gradientTo})` }}
+              >
+                {newPostBusy ? 'Creating…' : 'Create & write copy'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Post card popup (interactive mode) */}
+      {interactive && activePost && (() => {
+        const p = activePost;
+        const status = (p.client_approval_status || 'pending_review') as ApprovalStatus;
+        const thumb = driveThumbnailUrl(p.photo_drive_url);
+        const view = driveViewUrl(p.photo_drive_url);
+        return (
+          <div className="fixed inset-0 bg-black/60 flex items-center justify-center p-4 z-50" onClick={() => setActivePost(null)}>
+            <div
+              className="max-w-lg w-full rounded-2xl p-5 max-h-[88vh] overflow-y-auto"
+              style={{ background: 'rgba(15,31,46,0.97)', border: '1px solid rgba(255,255,255,0.15)', backdropFilter: 'blur(24px)' }}
+              onClick={(e) => e.stopPropagation()}
+            >
+              <div className="flex items-start justify-between gap-3 mb-3">
+                <div>
+                  <div className="text-[11px] font-bold uppercase tracking-wider text-white/55">
+                    {new Date(`${p.post_date.slice(0, 10)}T12:00:00`).toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' })}
+                    {' · '}{PLATFORM_EMOJI[p.platform] || ''} {p.platform}
+                  </div>
+                  <div className="text-white font-bold text-[15px] mt-0.5 leading-tight">{parseTitle(p.title) || 'Untitled'}</div>
+                </div>
+                <span className="text-[10px] px-2 py-0.5 rounded-full whitespace-nowrap" style={{ background: `${STATUS_DOT[status]}22`, color: STATUS_DOT[status], border: `1px solid ${STATUS_DOT[status]}55` }}>
+                  {APPROVAL_LABEL[status]}
+                </span>
+              </div>
+
+              {/* Photo */}
+              <div className="mb-3">
+                {thumb && !photoEditing && (
+                  <a href={view!} target="_blank" rel="noreferrer" className="block rounded-lg overflow-hidden border border-white/10 mb-2">
+                    <img src={thumb} alt="" className="w-full h-40 object-cover opacity-90 hover:opacity-100 transition-opacity" />
+                  </a>
+                )}
+                {photoEditing ? (
+                  <div className="flex gap-2">
+                    <input
+                      value={photoDraft}
+                      onChange={(e) => setPhotoDraft(e.target.value)}
+                      placeholder="Paste Google Drive share link"
+                      className="flex-1 text-[11px] rounded-lg bg-white/5 border border-white/15 p-2 text-white placeholder:text-white/30 outline-none"
+                    />
+                    <button
+                      onClick={async () => { await patchPost(p.id, { photo_drive_url: photoDraft.trim() || null }); setPhotoEditing(false); }}
+                      className="rounded-lg px-3 py-1 text-[11px] font-semibold bg-emerald-500/80 text-white"
+                    >Save</button>
+                    <button onClick={() => setPhotoEditing(false)} className="rounded-lg px-3 py-1 text-[11px] font-semibold bg-white/10 text-white/80">Cancel</button>
+                  </div>
+                ) : (
+                  <button
+                    onClick={() => { setPhotoDraft(p.photo_drive_url || ''); setPhotoEditing(true); }}
+                    className="text-[10px] font-semibold text-white/50 hover:text-white inline-flex items-center gap-1"
+                  >
+                    <span className="material-symbols-outlined" style={{ fontSize: 14 }}>{view ? 'edit' : 'link'}</span>
+                    {view ? 'Edit photo link' : 'Add photo (Drive link)'}
+                  </button>
+                )}
+              </div>
+
+              {/* Caption */}
+              <div className="mb-3">
+                <div className="flex items-center justify-between mb-1">
+                  <div className="text-[10px] uppercase tracking-wider text-white/50 font-semibold">Caption</div>
+                  {p.caption && !captionEditing && (
+                    <button
+                      onClick={() => { setCaptionDraft(p.caption || ''); setCaptionEditing(true); }}
+                      className="text-[10px] text-white/40 hover:text-white inline-flex items-center gap-1"
+                    >
+                      <span className="material-symbols-outlined" style={{ fontSize: 13 }}>edit</span> Edit
+                    </button>
+                  )}
+                </div>
+                {captionEditing ? (
+                  <div className="flex flex-col gap-2">
+                    <textarea
+                      value={captionDraft}
+                      onChange={(e) => setCaptionDraft(e.target.value)}
+                      rows={8}
+                      className="w-full text-xs rounded-lg bg-white/5 border border-white/10 p-3 text-white outline-none leading-relaxed"
+                    />
+                    <div className="flex gap-2">
+                      <button
+                        onClick={async () => { await patchPost(p.id, { caption: captionDraft }); setCaptionEditing(false); }}
+                        className="text-[11px] font-bold px-3 py-1.5 rounded-lg bg-emerald-500/80 text-white"
+                      >Save caption</button>
+                      <button onClick={() => setCaptionEditing(false)} className="text-[11px] font-bold px-3 py-1.5 rounded-lg bg-white/10 text-white/80">Cancel</button>
+                    </div>
+                  </div>
+                ) : p.caption ? (
+                  <div className="text-white/85 text-xs whitespace-pre-wrap leading-relaxed bg-white/5 rounded-lg p-3 border border-white/10">{p.caption}</div>
+                ) : (
+                  <div className="text-white/40 text-xs italic">No caption yet — generate one with AI below.</div>
+                )}
+              </div>
+
+              {/* AI write / redo */}
+              <div className="mb-3">
+                {!p.caption ? (
+                  <button
+                    onClick={() => writeCopy(p.id)}
+                    disabled={writing}
+                    className="text-[11px] font-bold px-3 py-1.5 rounded-lg text-white disabled:opacity-50"
+                    style={{ background: `linear-gradient(135deg,${gradientFrom},${gradientTo})` }}
+                  >
+                    {writing ? 'Writing…' : '✨ Write copy with AI'}
+                  </button>
+                ) : redoOpen ? (
+                  <div className="flex flex-col gap-2">
+                    <div className="text-[10px] uppercase tracking-wider text-white/50 font-semibold">What should change?</div>
+                    <textarea
+                      value={redoGuidance}
+                      onChange={(e) => setRedoGuidance(e.target.value)}
+                      placeholder="e.g. more casual, shorter, focus on the promo, less salesy…"
+                      rows={2}
+                      className="w-full text-xs rounded-lg bg-white/5 border border-white/10 p-2 text-white placeholder:text-white/30 outline-none"
+                    />
+                    <div className="flex gap-2">
+                      <button
+                        onClick={() => writeCopy(p.id, redoGuidance)}
+                        disabled={writing}
+                        className="text-[11px] font-bold px-3 py-1.5 rounded-lg text-white disabled:opacity-50"
+                        style={{ background: `linear-gradient(135deg,${gradientFrom},${gradientTo})` }}
+                      >
+                        {writing ? 'Rewriting…' : 'Regenerate'}
+                      </button>
+                      <button onClick={() => { setRedoOpen(false); setRedoGuidance(''); }} className="text-[11px] font-bold px-3 py-1.5 rounded-lg bg-white/10 text-white/80">Cancel</button>
+                    </div>
+                  </div>
+                ) : (
+                  <button
+                    onClick={() => setRedoOpen(true)}
+                    disabled={writing}
+                    className="text-[11px] font-semibold px-3 py-1.5 rounded-lg text-white/70 hover:text-white border border-white/15 bg-white/5 hover:bg-white/10 disabled:opacity-50"
+                  >
+                    ✨ Redo copy with guidance
+                  </button>
+                )}
+              </div>
+
+              {/* Client comments (if any) */}
+              {p.client_comments && (
+                <div className="text-xs bg-rose-400/10 border border-rose-400/30 rounded-lg p-2 mb-3">
+                  <div className="text-[10px] uppercase tracking-wider text-rose-200/80 font-semibold mb-1">Client comments</div>
+                  <div className="text-rose-100 whitespace-pre-wrap">{p.client_comments}</div>
+                </div>
+              )}
+
+              {/* Approval controls */}
+              {p.caption && status !== 'scheduled' && (
+                <div className="pt-3 border-t border-white/10 flex flex-col gap-2">
+                  <div className="flex gap-2 flex-wrap">
+                    <button
+                      onClick={() => approvePost(p.id)}
+                      disabled={status === 'approved'}
+                      className="rounded-lg px-3 py-1.5 text-xs font-semibold bg-emerald-500/80 text-white disabled:opacity-40"
+                    >
+                      Approve
+                    </button>
+                    <button
+                      onClick={() => requestChangesPost(p.id)}
+                      disabled={!commentDraft.trim()}
+                      className="rounded-lg px-3 py-1.5 text-xs font-semibold bg-rose-500/70 text-white disabled:opacity-40"
+                    >
+                      Request changes
+                    </button>
+                    <button
+                      onClick={async () => { await patchPost(p.id, { client_visible: !p.client_visible }); }}
+                      className={`rounded-lg px-3 py-1.5 text-xs font-semibold flex items-center gap-1 ${p.client_visible ? 'bg-emerald-500/20 text-emerald-300' : 'bg-white/5 text-white/60 border border-white/15'}`}
+                    >
+                      <span className="material-symbols-outlined" style={{ fontSize: 14 }}>{p.client_visible ? 'visibility' : 'visibility_off'}</span>
+                      {p.client_visible ? 'Live to client' : 'Push to client'}
+                    </button>
+                  </div>
+                  <textarea
+                    value={commentDraft}
+                    onChange={(e) => setCommentDraft(e.target.value)}
+                    placeholder="Comment (required to request changes)"
+                    rows={2}
+                    className="w-full text-xs rounded-lg bg-white/5 border border-white/10 p-2 text-white placeholder:text-white/30 outline-none"
+                  />
+                </div>
+              )}
+
+              <div className="flex justify-between items-center mt-4 pt-3 border-t border-white/10">
+                <Link href="/content" className="text-[10px] text-white/45 hover:text-white/80">Open in Content Tracker →</Link>
+                <button onClick={() => setActivePost(null)} className="text-[11px] font-semibold px-3 py-1.5 rounded-lg bg-white/10 hover:bg-white/20 text-white">Close</button>
+              </div>
+            </div>
+          </div>
+        );
+      })()}
     </div>
   );
 }
