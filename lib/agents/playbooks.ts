@@ -1040,6 +1040,114 @@ export const PRIME_IV_PDM_APR_2026: Playbook = {
   ],
 };
 
+// ─── PDM — JUNE 2026 CONTENT CALENDAR ───────────────────────────────
+// June 2026 brand-cascade calendar drafted in PDM's voice so MNA can plan
+// Niceville's own local content around it. Same rules as the April tab:
+// 'PDM · Brand Cascade' items cascade from the Prime IV corporate page
+// (auto-approved, marked blue as reference) and the two 'Local Reel'
+// items are non-cascading reels the Niceville location posts itself.
+//
+// Theme: Men's Health Month + Father's Day (6/21) + Summer Hydration.
+// Featured micronutrients: Vitamin D (energy, mood, immune, men's health)
+// and Magnesium (hydration, recovery, sleep through the summer heat).
+//
+// NOTE: this is an MNA-drafted June plan for planning purposes — confirm
+// against PDM's official June sheet before scheduling, and swap the reel
+// Asset/Audio placeholders for the real files from PDM's monthly folder.
+//
+// Load with startDate=2026-06-01 to place posts on their actual June dates.
+export const PRIME_IV_PDM_JUN_2026: Playbook = {
+  id: 'prime-iv-pdm-jun-2026',
+  name: 'Prime IV — PDM June 2026 Calendar',
+  description:
+    'June 2026 brand-cascade calendar (Men\'s Health Month + Father\'s Day + Summer Hydration; featured nutrients Vitamin D + Magnesium). Drafted in PDM\'s voice so MNA can see the brand cascade and plan complementary local content. Includes 2 local (non-cascading) reels the location posts from its own page. Confirm against PDM\'s official June sheet before scheduling.',
+  items: [
+    // Wk 6/1
+    { day: 1, platform: 'Instagram', content_type: 'Post', phase: 'PDM · Brand Cascade',
+      title: "Men's Health Month Kickoff",
+      hook: "June is Men's Health Month — a reminder to actually check in.",
+      cta: 'Book a wellness appointment',
+      caption: `June is Men's Health Month, and it's a good reminder that taking care of yourself is not a luxury. 💪 Low energy, poor sleep, brain fog, and feeling run down are easy to write off as just being busy, but they are often signs your body needs more support. This month is a chance to slow down, check in, and build in habits that actually help you feel like yourself again. Prime IV offers IV therapy and injections designed to support energy, recovery, focus, and overall wellness. #IVtherapy #PrimeIV #GetPrimed #OneHourVacation #IMinjections #Vitamins #Minerals #Antioxidants #Micronutrients #MensHealthMonth` },
+    { day: 3, platform: 'Instagram', content_type: 'Post', phase: 'PDM · Brand Cascade',
+      title: 'Vitamin D / Energy + Mood (Featured Nutrient)',
+      hook: 'Most people are running low on Vitamin D without knowing it.',
+      cta: 'Ask about adding Vitamin D',
+      caption: `Feeling tired, foggy, or just off lately? Vitamin D plays a key role in energy, mood, immune health, and bone strength, and most people are running lower than they think. ☀️ As one of June's featured nutrients, it is a simple but powerful way to support how you feel from the inside out. You can add it to your next IV therapy session or stop in for a quick injection. #IVtherapy #PrimeIV #GetPrimed #OneHourVacation #IMinjections #Vitamins #Minerals #Antioxidants #Micronutrients #VitaminD` },
+    { day: 5, platform: 'Instagram', content_type: 'Post', phase: 'PDM · Brand Cascade',
+      title: 'Summer Hydration / Beat the Heat',
+      hook: 'Summer heat dehydrates you faster than you realize.',
+      cta: 'Book a hydration IV',
+      caption: `Long days in the sun, more activity, and rising temperatures add up fast. 🥵 By the time you feel thirsty, you are often already behind. Dehydration shows up as fatigue, headaches, brain fog, and sluggish recovery. IV therapy delivers hydration plus key vitamins and minerals directly into your bloodstream so your body can actually keep up with summer. #IVtherapy #PrimeIV #GetPrimed #OneHourVacation #IMinjections #Vitamins #Minerals #Antioxidants #Micronutrients #SummerHydration` },
+
+    // Non-cascading local Reel #1
+    { day: 6, platform: 'Instagram', content_type: 'Reel', phase: 'Local Reel · post from our page',
+      title: '[LOCAL REEL] What IV therapy actually feels like',
+      hook: 'It is not just a bag of fluids.',
+      cta: 'Reply BOOK to try it',
+      caption: `If you have never tried IV therapy, here is what it actually feels like. A calm space, a comfortable chair, and a personalized blend of hydration, vitamins, and nutrients built around what your body needs. No rush. Just one hour to slow down and reset. That's the difference. #IVtherapy #PrimeIV #GetPrimed #OneHourVacation #IMinjections #Vitamins #Minerals #Antioxidants #Micronutrients #WellnessExperience\n\nAsset: JuneReel-1-PrimeIV.mp4 · Audio: TBD — pull from PDM June folder` },
+
+    // Wk 6/7
+    { day: 8, platform: 'Instagram', content_type: 'Post', phase: 'PDM · Brand Cascade',
+      title: 'Magnesium / Recovery + Sleep (Featured Nutrient)',
+      hook: 'Wound up, restless, not sleeping well? Magnesium matters.',
+      cta: 'Ask about Magnesium adds',
+      caption: `Busy summer schedules, heat, and packed weekends can leave your body wired and worn out at the same time. 🌙 Magnesium is a key nutrient for relaxation, muscle recovery, nerve function, and quality sleep, which is why it is one of June's featured nutrients. Supporting your body now helps you stay rested and ready for everything summer brings. #IVtherapy #PrimeIV #GetPrimed #OneHourVacation #IMinjections #Vitamins #Minerals #Antioxidants #Micronutrients #MagnesiumSupport` },
+    { day: 10, platform: 'Instagram', content_type: 'Post', phase: 'PDM · Brand Cascade',
+      title: "Father's Day Gift Card Push (Generic - No Promo)",
+      hook: 'The dad who has everything still needs to feel his best.',
+      cta: 'Grab a gift card',
+      caption: `Looking for a Father's Day gift that actually gets used? 🎁 A Prime IV gift card gives the dad in your life a chance to recharge, recover, and feel his best. Energy, hydration, recovery, or just a quiet hour to himself. It is the kind of gift that supports how he feels, not just one more thing on a shelf. #IVtherapy #PrimeIV #GetPrimed #OneHourVacation #IMinjections #Vitamins #Minerals #Antioxidants #Micronutrients #FathersDay` },
+    { day: 12, platform: 'Instagram', content_type: 'Post', phase: 'PDM · Brand Cascade',
+      title: 'Energy + Focus (B-12)',
+      hook: 'Running on empty by mid-afternoon?',
+      cta: 'Ask about a B-12 injection',
+      caption: `If your energy crashes by the afternoon and your focus is hard to hold onto, you are not alone. B-12 supports energy production, metabolism, and a healthy nervous system, making it one of the simplest ways to get a real lift without the crash. A quick injection or an add-on to your IV therapy can help you keep up with a full summer schedule. #IVtherapy #PrimeIV #GetPrimed #OneHourVacation #IMinjections #Vitamins #Minerals #Antioxidants #Micronutrients #EnergySupport` },
+
+    // Wk 6/14
+    { day: 15, platform: 'Instagram', content_type: 'Post', phase: 'PDM · Brand Cascade',
+      title: 'Brain Health + Focus (NAD+)',
+      hook: 'June is also Brain Awareness Month — support the mental side too.',
+      cta: 'Ask about NAD+',
+      caption: `Feeling your best is not just physical. June is Alzheimer's and Brain Awareness Month, a good reminder to support mental clarity, focus, and healthy aging too. 🧠 NAD+ therapy is a popular option for supporting cellular energy, sharper focus, and recovery on a deeper level. Because keeping up with life takes both a strong body and a clear mind. #IVtherapy #PrimeIV #GetPrimed #OneHourVacation #IMinjections #Vitamins #Minerals #Antioxidants #Micronutrients #BrainHealth` },
+    { day: 17, platform: 'Instagram', content_type: 'Post', phase: 'PDM · Brand Cascade',
+      title: 'Summer Travel + Recovery',
+      hook: 'Travel, heat, and packed schedules take a toll fast.',
+      cta: 'Book a recovery IV',
+      caption: `Summer travel is fun until the flights, heat, late nights, and disrupted routines catch up with you. ✈️ Dehydration, fatigue, and feeling run down can take the shine off a great trip. IV therapy with hydration, B vitamins, and key nutrients helps your body bounce back faster so you can actually enjoy the season instead of recovering from it. #IVtherapy #PrimeIV #GetPrimed #OneHourVacation #IMinjections #Vitamins #Minerals #Antioxidants #Micronutrients #RecoverySupport` },
+
+    // Non-cascading local Reel #2
+    { day: 19, platform: 'Instagram', content_type: 'Reel', phase: 'Local Reel · post from our page',
+      title: '[LOCAL REEL] POV: you booked the reset before summer chaos',
+      hook: 'Get ahead of the busy season instead of chasing it.',
+      cta: 'Reply BOOK to grab your spot',
+      caption: `POV: you finally booked the wellness appointment before the busy season takes over. Hydration, nutrients, and one quiet hour to reset can make a bigger difference than you think heading into a packed summer. Get ahead of it instead of chasing it. #IVtherapy #PrimeIV #GetPrimed #OneHourVacation #IMinjections #Vitamins #Minerals #Antioxidants #Micronutrients #WellnessReset\n\nAsset: JuneReel-2-PrimeIV.mp4 · Audio: TBD — pull from PDM June folder` },
+
+    // Wk 6/21 — Father's Day 6/21, Solstice 6/20
+    { day: 21, platform: 'Instagram', content_type: 'Post', phase: 'PDM · Brand Cascade',
+      title: "Happy Father's Day",
+      hook: 'To the dads who keep everyone else going.',
+      cta: 'Treat dad to a reset',
+      caption: `Happy Father's Day to the dads who are always taking care of everyone else. 💙 Today is a good reminder that feeling your best matters for you too. Whether it is more energy, better recovery, or just one hour to slow down, you deserve support that helps you keep showing up the way you do. #IVtherapy #PrimeIV #GetPrimed #OneHourVacation #IMinjections #Vitamins #Minerals #Antioxidants #Micronutrients #FathersDay` },
+    { day: 23, platform: 'Instagram', content_type: 'Post', phase: 'PDM · Brand Cascade',
+      title: 'National Hydration Day',
+      hook: 'It is National Hydration Day — and water alone is not always enough.',
+      cta: 'Book a hydration IV',
+      caption: `Happy National Hydration Day. 💧 Staying hydrated is about more than just drinking water. Your body also needs electrolytes, vitamins, and minerals to truly absorb and use that hydration, especially in the summer heat. IV therapy delivers all of it directly into your bloodstream for fast, full absorption so you feel the difference quickly. #IVtherapy #PrimeIV #GetPrimed #OneHourVacation #IMinjections #Vitamins #Minerals #Antioxidants #Micronutrients #NationalHydrationDay` },
+    { day: 25, platform: 'Instagram', content_type: 'Post', phase: 'PDM · Brand Cascade',
+      title: 'Summer Glow + Detox (Glutathione)',
+      hook: 'More sun, more events, more reasons to support your glow.',
+      cta: 'Ask about Glutathione',
+      caption: `Summer means more sun, more events, and more on your plate. ✨ Glutathione is one of the most talked about antioxidants for a reason. It helps support skin clarity, your body's natural detox processes, and overall wellness at the cellular level. Look for it in IV therapy, IV amplifiers, injections, and high-dose infusions designed to help you feel and look your best all season. #IVtherapy #PrimeIV #GetPrimed #OneHourVacation #IMinjections #Vitamins #Minerals #Antioxidants #Micronutrients #SkinHealth` },
+
+    // Wk 6/28
+    { day: 29, platform: 'Instagram', content_type: 'Post', phase: 'PDM · Brand Cascade',
+      title: 'Featured Nutrient Recap (Vitamin D + Magnesium)',
+      hook: 'Two nutrients that carried the month for a reason.',
+      cta: 'Add Vitamin D + Magnesium',
+      caption: `As June wraps up, here is a quick recap of the month's featured nutrients. ☀️🌙 Vitamin D supports energy, mood, immune health, and bone strength, while Magnesium supports recovery, relaxation, nerve function, and better sleep. Together they are a smart pairing for feeling balanced, rested, and ready for the rest of summer. Ask about adding them to your next visit. #IVtherapy #PrimeIV #GetPrimed #OneHourVacation #IMinjections #Vitamins #Minerals #Antioxidants #Micronutrients #FeelYourBest` },
+  ],
+};
+
 // Keep the pamphlet-derived membership playbook too — MNA can layer it in
 // between corporate cascades for stronger membership framing.
 export const PRIME_IV_MEMBERSHIPS: Playbook = {
@@ -1153,6 +1261,7 @@ export const PRIME_IV_MEMBERSHIPS: Playbook = {
 };
 
 export const PLAYBOOKS: Playbook[] = [
+  PRIME_IV_PDM_JUN_2026,
   PRIME_IV_PDM_APR_2026,
   PINECREST_REOPENING,
   NICEVILLE_SPRING_RESET,
@@ -1171,8 +1280,8 @@ export function getPlaybook(id: string): Playbook | undefined {
  */
 export const CLIENT_PLAYBOOKS: Record<string, string[]> = {
   // Corporate cascade first so it's the top one-click load each month
-  'prime-iv':           ['prime-iv-pdm-apr-2026', 'niceville-spring-reset', 'prime-iv-memberships'],
-  'prime-iv-pinecrest': ['prime-iv-pdm-apr-2026', 'pinecrest-reopening',    'prime-iv-memberships'],
+  'prime-iv':           ['prime-iv-pdm-jun-2026', 'prime-iv-pdm-apr-2026', 'niceville-spring-reset', 'prime-iv-memberships'],
+  'prime-iv-pinecrest': ['prime-iv-pdm-jun-2026', 'prime-iv-pdm-apr-2026', 'pinecrest-reopening',    'prime-iv-memberships'],
   'serenity-bayfront':  ['serenity-vrbo-launch'],
 };
 
