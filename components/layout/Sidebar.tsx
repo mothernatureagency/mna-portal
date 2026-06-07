@@ -13,6 +13,7 @@ const NAV = [
   ]},
   { sec: 'CONTENT', items: [
     { label: 'Content Tracker', href: '/content', e: 'grid_view' },
+    { label: 'LinkedIn', href: '/linkedin', e: 'business_center' },
     { label: 'Content Planner', href: '/planner', e: 'edit_calendar' },
     { label: 'Video Lab', href: '/video-lab', e: 'movie' },
     { label: 'Agenda', href: '/agenda', e: 'event_note' },
