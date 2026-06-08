@@ -17,7 +17,8 @@ import React, { useEffect, useMemo, useRef, useState } from 'react';
 import Link from 'next/link';
 import { createClient as createSupabaseClient } from '@/lib/supabase/client';
 import { getParentForDate } from '@/lib/students';
-import { isMNAStaff } from '@/lib/staff';
+import { isMNAStaff, isOwner } from '@/lib/staff';
+import { useRouter } from 'next/navigation';
 import { toPng } from 'html-to-image';
 
 type Parent = 'mom' | 'dad';
@@ -138,6 +139,8 @@ function overnightsForSchoolYear(startYear: number, overrides: Overrides) {
 export default function PersonalPage() {
   const [email, setEmail] = useState('');
   const [authorized, setAuthorized] = useState<boolean | null>(null);
+  const [isStaffNotOwner, setIsStaffNotOwner] = useState(false);
+  const router = useRouter();
 
   const [overrides, setOverrides] = useState<Overrides>({});
   const [view, setView] = useState<View>('month');
@@ -159,7 +162,17 @@ export default function PersonalPage() {
       const { data: { user } } = await supabase.auth.getUser();
       const e = user?.email || '';
       setEmail(e);
-      setAuthorized(isMNAStaff(e));
+      // This page is Alexus's private custody calendar — it should NOT be
+      // shared with the rest of the team. Other MNA staff get redirected to
+      // their own personal calendar at /schedule (already scoped by
+      // user_email there) instead of seeing Alexus's custody data.
+      const owner = isOwner(e);
+      setAuthorized(owner);
+      if (!owner && isMNAStaff(e)) {
+        setIsStaffNotOwner(true);
+        router.replace('/schedule');
+        return;
+      }
 
       try {
         const r = await fetch('/api/client-kv?clientId=mna&key=parent_overrides');
@@ -259,7 +272,7 @@ export default function PersonalPage() {
     return findHandoffs(start, end, overrides);
   }, [view, year, month, schoolStartYear, overrides]);
 
-  if (authorized === null) {
+  if (authorized === null || isStaffNotOwner) {
     return <div className="min-h-screen flex items-center justify-center text-white/60 text-sm">Loading…</div>;
   }
   if (!authorized) {
