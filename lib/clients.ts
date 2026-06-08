@@ -154,8 +154,8 @@ export const clients: Client[] = [
       accentColor: '#c8a96e',
       mode: 'light',
       logoText: 'Prime IV Pinecrest',
-      logoUrl: '/logos/primeiv-logo.png',
-      iconUrl: undefined,
+      logoUrl: '/logos/primeiv-pinecrest-logo.png',
+      iconUrl: '/logos/primeiv-pinecrest-logo.png',
     },
     kpiTargets: {
       leads: 220,
