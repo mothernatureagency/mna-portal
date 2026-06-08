@@ -13,6 +13,11 @@ function DriveThumb({ url, className }: { url: string | null | undefined; classN
   return <img src={thumb} alt="" className={className} onError={() => setFailed(true)} />;
 }
 import { getPlaybooksForClient } from '@/lib/agents/playbooks';
+import { clients as ALL_CLIENTS } from '@/lib/clients';
+
+// Other Prime IV locations this client can cross-post to. Filtered against
+// the active client so we never offer to push a post to itself.
+const PRIME_IV_CLIENTS = ALL_CLIENTS.filter((c) => c.id === 'prime-iv' || c.id.startsWith('prime-iv-'));
 
 type ApprovalStatus = 'drafting' | 'pending_review' | 'approved' | 'changes_requested' | 'scheduled';
 
@@ -174,6 +179,13 @@ export default function ContentPage() {
   const [pickerError, setPickerError] = useState<string | null>(null);
   const [pickerQuery, setPickerQuery] = useState('');
   const [newPost, setNewPost] = useState({ post_date: '', platform: 'Instagram', content_type: 'Post', title: '', caption: '' });
+  // Cross-post: push one post (or a whole filtered batch) to other Prime IV locations
+  const [crossPostId, setCrossPostId] = useState<string | null>(null);
+  const [crossPostTargets, setCrossPostTargets] = useState<string[]>([]);
+  const [crossPosting, setCrossPosting] = useState(false);
+  const [showBulkCrossPost, setShowBulkCrossPost] = useState(false);
+  const [bulkCrossTargets, setBulkCrossTargets] = useState<string[]>([]);
+  const [bulkCrossPosting, setBulkCrossPosting] = useState<{ done: number; total: number } | null>(null);
 
   // Detect user role
   useEffect(() => {
@@ -393,6 +405,78 @@ export default function ContentPage() {
     const listRes = await fetch(`/api/content-calendar?client=${encodeURIComponent(activeClient.name)}`);
     const listData = await listRes.json();
     setItems(listData.items || []);
+  }
+
+  // Push a single post to one or more other Prime IV locations. Creates a
+  // copy in each target client's calendar (same date/platform/type/title/
+  // caption), letting their team tweak/approve independently.
+  async function crossPostItem(item: ContentItem, targetClientNames: string[]) {
+    if (targetClientNames.length === 0) return { sent: 0, skipped: 0 };
+    let sent = 0, skipped = 0;
+    for (const clientName of targetClientNames) {
+      try {
+        const res = await fetch('/api/content-calendar', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            clientName,
+            items: [{
+              post_date: item.post_date,
+              platform: item.platform,
+              content_type: item.content_type || null,
+              title: item.title || null,
+              caption: item.caption || null,
+              status: 'Draft',
+              assigned_role: 'Social Media Manager',
+            }],
+          }),
+        });
+        const data = await res.json();
+        if (res.ok) {
+          sent += data.count || 0;
+          skipped += data.skipped || 0;
+        }
+      } catch {}
+    }
+    return { sent, skipped };
+  }
+
+  async function runCrossPost(id: string) {
+    const item = items.find((i) => i.id === id);
+    if (!item || crossPostTargets.length === 0) return;
+    setCrossPosting(true);
+    try {
+      const targets = PRIME_IV_CLIENTS.filter((c) => crossPostTargets.includes(c.id)).map((c) => c.name);
+      const { sent, skipped } = await crossPostItem(item, targets);
+      alert(`Cross-posted to ${sent} location${sent === 1 ? '' : 's'}.${skipped ? ` (${skipped} already existed and were skipped.)` : ''}`);
+      setCrossPostId(null);
+      setCrossPostTargets([]);
+    } catch (e: any) {
+      alert(e.message || 'Cross-post failed');
+    } finally {
+      setCrossPosting(false);
+    }
+  }
+
+  // Bulk cross-post: push every currently-filtered/visible post to the
+  // selected Prime IV locations in one go. Useful for syncing a whole
+  // month's plan across locations that run the same campaigns.
+  async function runBulkCrossPost() {
+    if (bulkCrossTargets.length === 0 || shown.length === 0) return;
+    if (!confirm(`Push all ${shown.length} visible post${shown.length === 1 ? '' : 's'} to ${bulkCrossTargets.length} location${bulkCrossTargets.length === 1 ? '' : 's'}? This creates copies — duplicates (same date+platform+title) are skipped automatically.`)) return;
+    setBulkCrossPosting({ done: 0, total: shown.length });
+    const targets = PRIME_IV_CLIENTS.filter((c) => bulkCrossTargets.includes(c.id)).map((c) => c.name);
+    let totalSent = 0, totalSkipped = 0;
+    for (const item of shown) {
+      const { sent, skipped } = await crossPostItem(item, targets);
+      totalSent += sent;
+      totalSkipped += skipped;
+      setBulkCrossPosting((p) => (p ? { done: p.done + 1, total: p.total } : p));
+    }
+    setBulkCrossPosting(null);
+    setShowBulkCrossPost(false);
+    setBulkCrossTargets([]);
+    alert(`Done. Created ${totalSent} post${totalSent === 1 ? '' : 's'} across ${targets.length} location${targets.length === 1 ? '' : 's'}.${totalSkipped ? ` ${totalSkipped} duplicates were skipped.` : ''}`);
   }
 
   useEffect(() => {
@@ -741,6 +825,102 @@ export default function ContentPage() {
                 <span className="material-symbols-outlined" style={{ fontSize: 14 }}>check_circle</span>
                 All posts are live
               </span>
+            )}
+          </div>
+        </div>
+      )}
+
+      {/* Cross-post to other Prime IV locations */}
+      {isStaff && items.length > 0 && PRIME_IV_CLIENTS.some((c) => c.id !== activeClient?.id) && (
+        <div className="glass-card p-4 flex items-center justify-between gap-4 flex-wrap" style={{ borderLeft: '3px solid #c8a96e' }}>
+          <div>
+            <div className="text-white font-semibold text-sm flex items-center gap-2">
+              <span className="material-symbols-outlined" style={{ fontSize: 18 }}>sync_alt</span>
+              Cross-post to other Prime IV locations
+            </div>
+            <div className="text-white/60 text-xs">
+              Push the {shown.length === items.length ? 'whole calendar' : `${shown.length} filtered post${shown.length === 1 ? '' : 's'}`} to other Prime IV clients at once. Each lands as a draft for their team to fine-tune and approve.
+            </div>
+          </div>
+          <button
+            onClick={() => { setShowBulkCrossPost(true); setBulkCrossTargets([]); }}
+            className="rounded-xl px-4 py-2 text-sm font-semibold text-white shrink-0 inline-flex items-center gap-1.5"
+            style={{ background: 'linear-gradient(135deg,#c8a96e,#e0c896)', color: '#1c3d6e' }}
+          >
+            <span className="material-symbols-outlined" style={{ fontSize: 16 }}>sync_alt</span>
+            Mass cross-post…
+          </button>
+        </div>
+      )}
+
+      {/* Bulk cross-post modal: choose target locations, then push all `shown` posts */}
+      {isStaff && showBulkCrossPost && (
+        <div className="fixed inset-0 bg-black/60 flex items-center justify-center p-4 z-50" onClick={() => !bulkCrossPosting && setShowBulkCrossPost(false)}>
+          <div
+            className="max-w-md w-full rounded-2xl p-6 space-y-4"
+            style={{ background: 'rgba(15,31,46,0.97)', border: '1px solid rgba(200,169,110,0.35)', backdropFilter: 'blur(24px)' }}
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="flex items-center justify-between">
+              <div className="text-white font-bold text-base flex items-center gap-2">
+                <span className="material-symbols-outlined" style={{ fontSize: 20, color: '#c8a96e' }}>sync_alt</span>
+                Mass cross-post
+              </div>
+              {!bulkCrossPosting && (
+                <button onClick={() => setShowBulkCrossPost(false)} className="text-white/40 hover:text-white">
+                  <span className="material-symbols-outlined">close</span>
+                </button>
+              )}
+            </div>
+            <div className="text-white/60 text-[12px]">
+              Sending <span className="font-bold text-white/80">{shown.length}</span> post{shown.length === 1 ? '' : 's'} from <span className="font-bold text-white/80">{activeClient?.name}</span> to:
+            </div>
+            <div className="flex flex-col gap-2">
+              {PRIME_IV_CLIENTS.filter((c) => c.id !== activeClient?.id).map((c) => {
+                const sel = bulkCrossTargets.includes(c.id);
+                return (
+                  <button
+                    key={c.id}
+                    type="button"
+                    disabled={!!bulkCrossPosting}
+                    onClick={() => setBulkCrossTargets((prev) => sel ? prev.filter((x) => x !== c.id) : [...prev, c.id])}
+                    className={`text-left text-[13px] font-semibold px-4 py-2.5 rounded-xl border transition-colors flex items-center gap-2 ${
+                      sel ? 'bg-white/15 text-white border-white/30' : 'bg-white/5 text-white/50 border-white/10 hover:border-white/20'
+                    }`}
+                  >
+                    <span className={`material-symbols-outlined`} style={{ fontSize: 18 }}>{sel ? 'check_box' : 'check_box_outline_blank'}</span>
+                    {c.shortName || c.name}
+                  </button>
+                );
+              })}
+            </div>
+            {bulkCrossPosting ? (
+              <div className="space-y-2">
+                <div className="text-white/70 text-[12px]">Pushing posts… {bulkCrossPosting.done} / {bulkCrossPosting.total}</div>
+                <div className="h-1.5 rounded-full bg-white/10 overflow-hidden">
+                  <div
+                    className="h-full rounded-full transition-all"
+                    style={{ width: `${(bulkCrossPosting.done / Math.max(1, bulkCrossPosting.total)) * 100}%`, background: 'linear-gradient(90deg,#c8a96e,#e0c896)' }}
+                  />
+                </div>
+              </div>
+            ) : (
+              <div className="flex gap-2">
+                <button
+                  onClick={runBulkCrossPost}
+                  disabled={bulkCrossTargets.length === 0}
+                  className="flex-1 font-bold text-[13px] px-4 py-2.5 rounded-xl disabled:opacity-40"
+                  style={{ background: 'linear-gradient(135deg,#c8a96e,#e0c896)', color: '#1c3d6e' }}
+                >
+                  Push {shown.length} post{shown.length === 1 ? '' : 's'} to {bulkCrossTargets.length || ''} location{bulkCrossTargets.length === 1 ? '' : 's'}
+                </button>
+                <button
+                  onClick={() => setShowBulkCrossPost(false)}
+                  className="text-[12px] font-semibold px-4 py-2.5 rounded-xl bg-white/5 text-white/60 border border-white/10"
+                >
+                  Cancel
+                </button>
+              </div>
             )}
           </div>
         </div>
@@ -1097,9 +1277,18 @@ export default function ContentPage() {
                             Mark scheduled
                           </button>
                         )}
+                        {PRIME_IV_CLIENTS.some((c) => c.id !== activeClient?.id) && (
+                          <button
+                            onClick={() => { setCrossPostId(activeItem.id); setCrossPostTargets([]); }}
+                            className="text-[11px] font-semibold px-3 py-2 rounded-lg text-white/70 hover:text-white border border-white/15 bg-white/5 hover:bg-white/10 inline-flex items-center gap-1 ml-auto"
+                          >
+                            <span className="material-symbols-outlined" style={{ fontSize: 14 }}>sync_alt</span>
+                            Cross-post
+                          </button>
+                        )}
                         <button
                           onClick={() => { setActiveId(null); setViewMode('cards'); }}
-                          className="text-[11px] font-semibold px-3 py-2 rounded-lg bg-white/5 text-white/40 hover:bg-white/10 ml-auto"
+                          className="text-[11px] font-semibold px-3 py-2 rounded-lg bg-white/5 text-white/40 hover:bg-white/10"
                         >
                           Open in cards view
                         </button>
@@ -1112,6 +1301,75 @@ export default function ContentPage() {
           </div>
         </div>
       )}
+
+      {/* Single-post cross-post picker */}
+      {isStaff && crossPostId && (() => {
+        const item = items.find((i) => i.id === crossPostId);
+        if (!item) return null;
+        const parsed = parseTitle(item.title);
+        return (
+          <div className="fixed inset-0 bg-black/60 flex items-center justify-center p-4 z-50" onClick={() => !crossPosting && setCrossPostId(null)}>
+            <div
+              className="max-w-md w-full rounded-2xl p-6 space-y-4"
+              style={{ background: 'rgba(15,31,46,0.97)', border: '1px solid rgba(200,169,110,0.35)', backdropFilter: 'blur(24px)' }}
+              onClick={(e) => e.stopPropagation()}
+            >
+              <div className="flex items-center justify-between">
+                <div className="text-white font-bold text-base flex items-center gap-2">
+                  <span className="material-symbols-outlined" style={{ fontSize: 20, color: '#c8a96e' }}>sync_alt</span>
+                  Cross-post
+                </div>
+                {!crossPosting && (
+                  <button onClick={() => setCrossPostId(null)} className="text-white/40 hover:text-white">
+                    <span className="material-symbols-outlined">close</span>
+                  </button>
+                )}
+              </div>
+              <div className="text-[12px] text-white/60 bg-white/5 rounded-lg p-3 border border-white/10">
+                <div className="font-bold text-white/85 text-[13px] truncate">{parsed.title || item.title || 'Untitled'}</div>
+                <div className="mt-0.5">{fmtDate(item.post_date)} · {item.platform} · {item.content_type || 'Post'}</div>
+              </div>
+              <div className="text-white/60 text-[12px]">Send a copy of this post to:</div>
+              <div className="flex flex-col gap-2">
+                {PRIME_IV_CLIENTS.filter((c) => c.id !== activeClient?.id).map((c) => {
+                  const sel = crossPostTargets.includes(c.id);
+                  return (
+                    <button
+                      key={c.id}
+                      type="button"
+                      disabled={crossPosting}
+                      onClick={() => setCrossPostTargets((prev) => sel ? prev.filter((x) => x !== c.id) : [...prev, c.id])}
+                      className={`text-left text-[13px] font-semibold px-4 py-2.5 rounded-xl border transition-colors flex items-center gap-2 ${
+                        sel ? 'bg-white/15 text-white border-white/30' : 'bg-white/5 text-white/50 border-white/10 hover:border-white/20'
+                      }`}
+                    >
+                      <span className="material-symbols-outlined" style={{ fontSize: 18 }}>{sel ? 'check_box' : 'check_box_outline_blank'}</span>
+                      {c.shortName || c.name}
+                    </button>
+                  );
+                })}
+              </div>
+              <div className="flex gap-2">
+                <button
+                  onClick={() => runCrossPost(crossPostId)}
+                  disabled={crossPosting || crossPostTargets.length === 0}
+                  className="flex-1 font-bold text-[13px] px-4 py-2.5 rounded-xl disabled:opacity-40"
+                  style={{ background: 'linear-gradient(135deg,#c8a96e,#e0c896)', color: '#1c3d6e' }}
+                >
+                  {crossPosting ? 'Sending…' : `Send to ${crossPostTargets.length || ''} location${crossPostTargets.length === 1 ? '' : 's'}`}
+                </button>
+                <button
+                  onClick={() => setCrossPostId(null)}
+                  disabled={crossPosting}
+                  className="text-[12px] font-semibold px-4 py-2.5 rounded-xl bg-white/5 text-white/60 border border-white/10"
+                >
+                  Cancel
+                </button>
+              </div>
+            </div>
+          </div>
+        );
+      })()}
 
       {/* Drive file picker modal */}
       {pickerForId && (
@@ -1586,6 +1844,16 @@ export default function ContentPage() {
                 <div className="pt-2 border-t border-white/10 flex items-center justify-between text-xs">
                   <span className="text-white/50">{it.assigned_role || ''}</span>
                   <div className="flex gap-2">
+                    {isStaff && PRIME_IV_CLIENTS.some((c) => c.id !== activeClient?.id) && (
+                      <button
+                        onClick={() => { setCrossPostId(it.id); setCrossPostTargets([]); }}
+                        className="rounded-lg px-3 py-1.5 font-semibold text-white/60 hover:text-white border border-white/15 bg-white/5 hover:bg-white/10 inline-flex items-center gap-1 transition-colors"
+                        title="Push this post to other Prime IV locations"
+                      >
+                        <span className="material-symbols-outlined" style={{ fontSize: 14 }}>sync_alt</span>
+                        Cross-post
+                      </button>
+                    )}
                     {isStaff && (
                       <button
                         onClick={async () => {
