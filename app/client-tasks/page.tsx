@@ -34,7 +34,12 @@ const CLIENT_ASSIGNEES = clients.map((c) => ({
   color: c.branding.gradientFrom,
 }));
 
+// Default assignee when a task is left unassigned — the whole MNA team.
+// Sentinel value 'team' (and legacy null) both render as this.
+const TEAM_DEFAULT = { email: 'team', name: 'Mother Nature team', short: 'MN', color: '#4ab8ce' };
+
 function getTeamMember(email: string | null) {
+  if (!email || email === 'team') return TEAM_DEFAULT;
   return TEAM.find((t) => t.email === email) || CLIENT_ASSIGNEES.find((c) => c.email === email) || null;
 }
 
@@ -48,14 +53,17 @@ function getClientColor(clientId: string) {
   return c?.branding.gradientFrom || '#0c6da4';
 }
 
-const FILTERS = ['All', 'My Tasks', 'Alexus', 'Vanessa', 'Sable', 'Marissa', 'Kyle', 'Unassigned'] as const;
+const FILTERS = ['All', 'My Tasks', 'MN Team', 'Alexus', 'Vanessa', 'Sable', 'Marissa', 'Kyle'] as const;
 
 export default function TaskManagerPage() {
   const [tasks, setTasks] = useState<Task[]>([]);
   const [activeFilter, setActiveFilter] = useState<string>('All');
   const [userEmail, setUserEmail] = useState('');
   const [showForm, setShowForm] = useState(false);
-  const [newTask, setNewTask] = useState({ clientId: '', title: '', description: '', assignedTo: '' });
+  const [newTask, setNewTask] = useState({ clientId: '', title: '', description: '', assignedTo: 'team' });
+  // Inline edit of an existing task's title/description
+  const [editingId, setEditingId] = useState<string | null>(null);
+  const [editDraft, setEditDraft] = useState({ title: '', description: '' });
 
   useEffect(() => {
     createClient().auth.getUser().then(({ data: { user } }) => {
@@ -83,11 +91,32 @@ export default function TaskManagerPage() {
         clientId: newTask.clientId,
         title: newTask.title,
         description: newTask.description || null,
-        assignedTo: newTask.assignedTo || null,
+        assignedTo: newTask.assignedTo || 'team',
       }),
     });
-    setNewTask({ clientId: '', title: '', description: '', assignedTo: '' });
+    setNewTask({ clientId: '', title: '', description: '', assignedTo: 'team' });
     setShowForm(false);
+    loadTasks();
+  }
+
+  function startEdit(task: Task) {
+    setEditingId(task.id);
+    setEditDraft({ title: task.title, description: task.description || '' });
+  }
+
+  function cancelEdit() {
+    setEditingId(null);
+    setEditDraft({ title: '', description: '' });
+  }
+
+  async function saveEdit(id: string) {
+    if (!editDraft.title.trim()) return;
+    await fetch('/api/client-requests', {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ id, title: editDraft.title.trim(), description: editDraft.description.trim() || null }),
+    });
+    cancelEdit();
     loadTasks();
   }
 
@@ -118,7 +147,7 @@ export default function TaskManagerPage() {
   const filtered = tasks.filter((t) => {
     if (activeFilter === 'All') return true;
     if (activeFilter === 'My Tasks') return t.assigned_to === userEmail;
-    if (activeFilter === 'Unassigned') return !t.assigned_to;
+    if (activeFilter === 'MN Team') return !t.assigned_to || t.assigned_to === 'team';
     const member = TEAM.find((m) => m.name === activeFilter);
     return member ? t.assigned_to === member.email : true;
   });
@@ -171,7 +200,7 @@ export default function TaskManagerPage() {
               onChange={(e) => setNewTask({ ...newTask, assignedTo: e.target.value })}
               className="text-[12px] px-3 py-2 rounded-xl bg-white/5 border border-white/15 text-white outline-none"
             >
-              <option value="">Assign to...</option>
+              <option value="team">Mother Nature team (default)</option>
               <optgroup label="Team">
                 {TEAM.map((m) => (
                   <option key={m.email} value={m.email}>{m.name}</option>
@@ -249,14 +278,40 @@ export default function TaskManagerPage() {
                   >
                     {task.status === 'done' && <span className="text-[10px] text-emerald-400">✓</span>}
                   </button>
-                  <div className="flex-1 min-w-0">
-                    <div className="text-[12px] font-semibold text-white/90 truncate">{task.title}</div>
-                    {task.description && (
-                      <div className="text-[10px] text-white/45 truncate">{task.description}</div>
-                    )}
-                  </div>
+                  {editingId === task.id ? (
+                    <div className="flex-1 min-w-0 flex flex-col gap-1.5">
+                      <input
+                        type="text"
+                        value={editDraft.title}
+                        onChange={(e) => setEditDraft({ ...editDraft, title: e.target.value })}
+                        placeholder="Task title..."
+                        autoFocus
+                        onKeyDown={(e) => { if (e.key === 'Enter') saveEdit(task.id); if (e.key === 'Escape') cancelEdit(); }}
+                        className="w-full text-[12px] px-2 py-1.5 rounded-lg bg-white/5 border border-white/15 text-white outline-none placeholder:text-white/30"
+                      />
+                      <input
+                        type="text"
+                        value={editDraft.description}
+                        onChange={(e) => setEditDraft({ ...editDraft, description: e.target.value })}
+                        placeholder="Description (optional)..."
+                        onKeyDown={(e) => { if (e.key === 'Enter') saveEdit(task.id); if (e.key === 'Escape') cancelEdit(); }}
+                        className="w-full text-[11px] px-2 py-1.5 rounded-lg bg-white/5 border border-white/15 text-white outline-none placeholder:text-white/30"
+                      />
+                      <div className="flex gap-1.5">
+                        <button onClick={() => saveEdit(task.id)} className="text-[10px] font-bold px-2.5 py-1 rounded-lg text-white" style={{ background: 'rgba(16,185,129,0.25)' }}>Save</button>
+                        <button onClick={cancelEdit} className="text-[10px] font-semibold px-2.5 py-1 rounded-lg bg-white/5 text-white/60 border border-white/10">Cancel</button>
+                      </div>
+                    </div>
+                  ) : (
+                    <div className="flex-1 min-w-0">
+                      <div className="text-[12px] font-semibold text-white/90 truncate">{task.title}</div>
+                      {task.description && (
+                        <div className="text-[10px] text-white/45 truncate">{task.description}</div>
+                      )}
+                    </div>
+                  )}
                   <select
-                    value={task.assigned_to || ''}
+                    value={task.assigned_to && task.assigned_to !== 'team' ? task.assigned_to : 'team'}
                     onChange={(e) => updateAssignee(task.id, e.target.value)}
                     className="text-[10px] font-semibold px-2 py-1 rounded-lg bg-transparent border border-white/10 outline-none cursor-pointer"
                     style={{
@@ -264,7 +319,7 @@ export default function TaskManagerPage() {
                       background: member ? member.color + '15' : 'transparent',
                     }}
                   >
-                    <option value="">Unassigned</option>
+                    <option value="team">Mother Nature team</option>
                     <optgroup label="Team">
                       {TEAM.map((m) => (
                         <option key={m.email} value={m.email}>{m.name}</option>
@@ -276,6 +331,15 @@ export default function TaskManagerPage() {
                       ))}
                     </optgroup>
                   </select>
+                  {editingId !== task.id && (
+                    <button
+                      onClick={() => startEdit(task)}
+                      className="text-white/20 hover:text-white/80 transition-colors opacity-0 group-hover:opacity-100"
+                      title="Edit task"
+                    >
+                      <span className="material-symbols-outlined" style={{ fontSize: 16 }}>edit</span>
+                    </button>
+                  )}
                   <button
                     onClick={() => deleteTask(task.id)}
                     className="text-[10px] text-white/20 hover:text-red-400 transition-colors opacity-0 group-hover:opacity-100"

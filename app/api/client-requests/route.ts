@@ -67,9 +67,11 @@ export async function POST(req: NextRequest) {
   const { clientId, title, description, assignedTo } = body || {};
   if (!clientId || !title) return NextResponse.json({ error: 'clientId and title required' }, { status: 400 });
 
+  // Assignment is optional — when left blank, the task goes to the Mother
+  // Nature team (sentinel 'team') rather than being left unassigned.
   const { rows } = await query(
     `INSERT INTO client_requests (client_id, title, description, assigned_to) VALUES ($1,$2,$3,$4) RETURNING *`,
-    [clientId, title, description || null, assignedTo || null]
+    [clientId, title, description || null, assignedTo || 'team']
   );
   return NextResponse.json({ item: rows[0] });
 }
@@ -86,7 +88,7 @@ export async function PATCH(req: NextRequest) {
 
   let body: any;
   try { body = await req.json(); } catch { return NextResponse.json({ error: 'Invalid JSON' }, { status: 400 }); }
-  const { id, status, assignedTo } = body || {};
+  const { id, status, assignedTo, title, description } = body || {};
   if (!id) return NextResponse.json({ error: 'id required' }, { status: 400 });
 
   // If a client is making the request, verify the row belongs to them.
@@ -111,8 +113,22 @@ export async function PATCH(req: NextRequest) {
   }
 
   if (assignedTo !== undefined) {
-    params.push(assignedTo || null);
+    // Clearing the assignee hands the task to the Mother Nature team
+    // rather than leaving it unassigned.
+    params.push(assignedTo || 'team');
     fields.push(`assigned_to = $${params.length}`);
+  }
+
+  // Title / description are editable by staff only (clients can only toggle status).
+  if (role !== 'client') {
+    if (title !== undefined) {
+      params.push(title);
+      fields.push(`title = $${params.length}`);
+    }
+    if (description !== undefined) {
+      params.push(description || null);
+      fields.push(`description = $${params.length}`);
+    }
   }
 
   if (fields.length === 0) return NextResponse.json({ error: 'Nothing to update' }, { status: 400 });
