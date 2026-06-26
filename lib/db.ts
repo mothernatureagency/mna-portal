@@ -334,6 +334,20 @@ async function initSchema() {
                         client_visible boolean not null default false,
                         created_at timestamptz not null default now()
                   )`,
+                  // Call Copilot sessions — the saved transcript ("notes") plus
+                  // every cue the copilot surfaced during a live call, so they
+                  // can be reviewed later instead of vanishing on stop/refresh.
+                  `create table if not exists copilot_sessions (
+                        id uuid primary key default uuid_generate_v4(),
+                        owner_email text not null,
+                        title text,
+                        transcript text,
+                        signals jsonb not null default '[]',
+                        client_id text,
+                        started_at timestamptz,
+                        ended_at timestamptz,
+                        created_at timestamptz not null default now()
+                  )`,
                   `create table if not exists schedule_events (
                         id uuid primary key default uuid_generate_v4(),
                         user_email text not null,

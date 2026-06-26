@@ -19,6 +19,21 @@ type Signal = {
   receivedAt: number;
 };
 
+type SavedSessionMeta = {
+  id: string;
+  title: string | null;
+  client_id: string | null;
+  started_at: string | null;
+  ended_at: string | null;
+  created_at: string;
+  cue_count: number;
+};
+
+type SavedSession = SavedSessionMeta & {
+  transcript: string | null;
+  signals: Signal[];
+};
+
 const SIGNAL_STYLES: Record<string, { bg: string; border: string; text: string; accent: string; icon: string }> = {
   'BUYING SIGNAL':   { bg: 'rgba(16,185,129,0.10)', border: 'rgba(52,211,153,0.45)', text: '#a7f3d0', accent: '#10b981', icon: 'trending_up' },
   'OBJECTION':       { bg: 'rgba(245,158,11,0.10)', border: 'rgba(251,191,36,0.45)', text: '#fde68a', accent: '#f59e0b', icon: 'report' },
@@ -53,12 +68,26 @@ export default function CopilotPage() {
   const [startedAt, setStartedAt] = useState<number | null>(null);
   const [tick, setTick] = useState(0);
 
+  // Saving / saved-session review
+  const [saving, setSaving] = useState(false);
+  const [saveMsg, setSaveMsg] = useState('');
+  const [showSaved, setShowSaved] = useState(false);
+  const [sessions, setSessions] = useState<SavedSessionMeta[]>([]);
+  const [openSession, setOpenSession] = useState<SavedSession | null>(null);
+  const [loadingSession, setLoadingSession] = useState(false);
+
   const recognitionRef = useRef<any>(null);
   const bufferRef = useRef<string>('');         // un-analyzed text since last API call
   const earlierRef = useRef<string>('');        // older transcript, sent as context summary
   const lastSentAtRef = useRef<number>(0);
   const inFlightRef = useRef<boolean>(false);
   const wantsListeningRef = useRef<boolean>(false);
+  // Full chronological cue history for the current session. `signals` (above)
+  // is capped at 8 for a glanceable display; this keeps every cue so the
+  // saved session has the complete record.
+  const allSignalsRef = useRef<Signal[]>([]);
+  const transcriptRef = useRef<string>('');     // mirror of transcript for save-on-stop
+  const savedRef = useRef<boolean>(false);      // current session already persisted?
 
   // Detect SpeechRecognition support
   useEffect(() => {
@@ -102,6 +131,9 @@ export default function CopilotPage() {
       }));
       if (newSignals.length > 0) {
         setSignals((prev) => [...newSignals, ...prev].slice(0, 8));
+        // Keep the full chronological history for the saved session.
+        allSignalsRef.current.push(...newSignals);
+        savedRef.current = false; // new cues → session has unsaved changes
       }
     } catch (e: any) {
       setError(e.message);
@@ -127,7 +159,12 @@ export default function CopilotPage() {
         if (r.isFinal) finalChunk += r[0].transcript + ' ';
       }
       if (finalChunk) {
-        setTranscript((prev) => (prev + ' ' + finalChunk).trim());
+        setTranscript((prev) => {
+          const next = (prev + ' ' + finalChunk).trim();
+          transcriptRef.current = next;
+          return next;
+        });
+        savedRef.current = false; // new transcript → unsaved changes
         bufferRef.current += ' ' + finalChunk;
         // Fire analyze if we have enough text OR enough time has passed
         const since = Date.now() - lastSentAtRef.current;
@@ -156,10 +193,52 @@ export default function CopilotPage() {
     if (!startedAt) setStartedAt(Date.now());
   }
 
+  const saveSession = useCallback(async (opts?: { silent?: boolean }) => {
+    const transcript = transcriptRef.current.trim();
+    const cues = allSignalsRef.current;
+    if (!transcript && cues.length === 0) {
+      if (!opts?.silent) setSaveMsg('Nothing to save yet');
+      return;
+    }
+    if (savedRef.current) {
+      if (!opts?.silent) setSaveMsg('Already saved');
+      return;
+    }
+    setSaving(true);
+    if (!opts?.silent) setSaveMsg('');
+    try {
+      const now = new Date();
+      const defaultTitle = `Call · ${now.toLocaleDateString(undefined, { month: 'short', day: 'numeric' })} ${now.toLocaleTimeString(undefined, { hour: 'numeric', minute: '2-digit' })}`;
+      const res = await fetch('/api/copilot/sessions', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          title: defaultTitle,
+          transcript,
+          signals: cues,
+          startedAt: startedAt ? new Date(startedAt).toISOString() : null,
+          endedAt: now.toISOString(),
+        }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || 'Save failed');
+      savedRef.current = true;
+      setSaveMsg('Saved — review under Saved sessions');
+      // Refresh the list if it's open so the new session shows up.
+      if (showSaved) loadSessions();
+    } catch (e: any) {
+      setSaveMsg(e.message || 'Save failed');
+    } finally {
+      setSaving(false);
+    }
+  }, [startedAt, showSaved]);
+
   function stop() {
     wantsListeningRef.current = false;
     try { recognitionRef.current?.stop(); } catch {}
     setListening(false);
+    // Auto-save the session so the transcript + cues don't disappear.
+    saveSession({ silent: true });
   }
 
   function clearAll() {
@@ -167,8 +246,53 @@ export default function CopilotPage() {
     setSignals([]);
     earlierRef.current = '';
     bufferRef.current = '';
+    transcriptRef.current = '';
+    allSignalsRef.current = [];
+    savedRef.current = false;
     setStartedAt(null);
     setError('');
+    setSaveMsg('');
+  }
+
+  const loadSessions = useCallback(async () => {
+    try {
+      const res = await fetch('/api/copilot/sessions');
+      const data = await res.json();
+      if (res.ok) setSessions(data.sessions || []);
+    } catch {}
+  }, []);
+
+  const openSessionById = useCallback(async (id: string) => {
+    setLoadingSession(true);
+    try {
+      const res = await fetch(`/api/copilot/sessions?id=${encodeURIComponent(id)}`);
+      const data = await res.json();
+      if (res.ok) {
+        const s = data.session;
+        setOpenSession({
+          ...s,
+          signals: Array.isArray(s.signals) ? s.signals : [],
+        });
+      }
+    } catch {} finally {
+      setLoadingSession(false);
+    }
+  }, []);
+
+  const deleteSession = useCallback(async (id: string) => {
+    try {
+      await fetch(`/api/copilot/sessions?id=${encodeURIComponent(id)}`, { method: 'DELETE' });
+      setSessions((prev) => prev.filter((s) => s.id !== id));
+      setOpenSession((cur) => (cur && cur.id === id ? null : cur));
+    } catch {}
+  }, []);
+
+  function toggleSaved() {
+    setShowSaved((v) => {
+      const next = !v;
+      if (next) loadSessions();
+      return next;
+    });
   }
 
   // Stop recognition on unmount
@@ -225,6 +349,23 @@ export default function CopilotPage() {
             </button>
           )}
           <button
+            onClick={() => saveSession()}
+            disabled={saving}
+            className="text-[12px] font-bold px-3 py-2 rounded-xl text-white border border-white/10 disabled:opacity-40 inline-flex items-center gap-1.5"
+            style={{ background: 'rgba(16,185,129,0.18)' }}
+            title="Save this session's transcript + cues"
+          >
+            <span className="material-symbols-outlined" style={{ fontSize: 16 }}>save</span>
+            {saving ? 'Saving…' : 'Save'}
+          </button>
+          <button
+            onClick={toggleSaved}
+            className={`text-[12px] font-semibold px-3 py-2 rounded-xl border border-white/10 inline-flex items-center gap-1.5 ${showSaved ? 'bg-white/15 text-white' : 'bg-white/5 text-white/70 hover:text-white'}`}
+          >
+            <span className="material-symbols-outlined" style={{ fontSize: 16 }}>history</span>
+            Saved sessions
+          </button>
+          <button
             onClick={clearAll}
             className="text-[12px] font-semibold px-3 py-2 rounded-xl bg-white/5 text-white/70 hover:text-white border border-white/10"
           >
@@ -232,6 +373,10 @@ export default function CopilotPage() {
           </button>
         </div>
       </div>
+
+      {saveMsg && (
+        <div className="text-[12px] text-emerald-200/90 -mt-2">{saveMsg}</div>
+      )}
 
       {supported === false && (
         <div className="glass-card p-4 text-amber-200 text-sm" style={{ background: 'rgba(245,158,11,0.10)', border: '1px solid rgba(245,158,11,0.4)' }}>
@@ -242,6 +387,100 @@ export default function CopilotPage() {
       {error && (
         <div className="glass-card p-3 text-rose-200 text-sm" style={{ background: 'rgba(244,63,94,0.10)', border: '1px solid rgba(244,63,94,0.3)' }}>
           {error}
+        </div>
+      )}
+
+      {/* Saved sessions */}
+      {showSaved && (
+        <div className="glass-card p-4">
+          <div className="flex items-center justify-between mb-3">
+            <div className="text-[11px] font-bold uppercase tracking-wider text-white/60">Saved sessions</div>
+            <button onClick={loadSessions} className="text-[11px] text-white/50 hover:text-white inline-flex items-center gap-1">
+              <span className="material-symbols-outlined" style={{ fontSize: 14 }}>refresh</span>Refresh
+            </button>
+          </div>
+          {sessions.length === 0 ? (
+            <div className="text-[13px] text-white/45 py-4 text-center">
+              No saved sessions yet. Hit <b className="text-white/70">Stop</b> or <b className="text-white/70">Save</b> during a call to keep the transcript and cues.
+            </div>
+          ) : (
+            <div className="space-y-1.5">
+              {sessions.map((s) => {
+                const when = new Date(s.created_at).toLocaleString(undefined, { month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' });
+                return (
+                  <div key={s.id} className="flex items-center gap-3 rounded-xl px-3 py-2.5" style={{ background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.07)' }}>
+                    <button onClick={() => openSessionById(s.id)} className="flex-1 text-left min-w-0">
+                      <div className="text-[13px] font-semibold text-white truncate">{s.title || 'Untitled session'}</div>
+                      <div className="text-[11px] text-white/45">{when} · {s.cue_count} cue{s.cue_count === 1 ? '' : 's'}</div>
+                    </button>
+                    <button onClick={() => openSessionById(s.id)} className="text-[11px] font-semibold px-2.5 py-1 rounded-lg bg-white/10 text-white/80 hover:text-white">Review</button>
+                    <button onClick={() => deleteSession(s.id)} className="text-white/35 hover:text-rose-300" title="Delete">
+                      <span className="material-symbols-outlined" style={{ fontSize: 18 }}>delete</span>
+                    </button>
+                  </div>
+                );
+              })}
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* Saved-session detail modal */}
+      {openSession && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4" style={{ background: 'rgba(0,0,0,0.6)' }} onClick={() => setOpenSession(null)}>
+          <div
+            className="glass-card w-full max-w-3xl max-h-[85vh] overflow-hidden flex flex-col"
+            style={{ background: 'linear-gradient(180deg,#0f1f2e,#0d1b2a)' }}
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="flex items-center justify-between gap-3 px-5 py-4" style={{ borderBottom: '1px solid rgba(255,255,255,.08)' }}>
+              <div className="min-w-0">
+                <div className="text-[15px] font-bold text-white truncate">{openSession.title || 'Untitled session'}</div>
+                <div className="text-[11px] text-white/45">
+                  {new Date(openSession.created_at).toLocaleString()} · {openSession.signals.length} cue{openSession.signals.length === 1 ? '' : 's'}
+                </div>
+              </div>
+              <button onClick={() => setOpenSession(null)} className="text-white/50 hover:text-white">
+                <span className="material-symbols-outlined">close</span>
+              </button>
+            </div>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 p-5 overflow-y-auto">
+              <div>
+                <div className="text-[10px] font-bold uppercase tracking-wider text-white/55 mb-1.5">Transcript</div>
+                <div className="rounded-xl p-3 text-[13px] leading-relaxed text-white/85 whitespace-pre-wrap" style={{ background: 'rgba(0,0,0,0.35)', border: '1px solid rgba(255,255,255,0.06)' }}>
+                  {openSession.transcript || <span className="text-white/35">No transcript captured.</span>}
+                </div>
+              </div>
+              <div>
+                <div className="text-[10px] font-bold uppercase tracking-wider text-white/55 mb-1.5">Cues given</div>
+                <div className="space-y-2">
+                  {openSession.signals.length === 0 && <div className="text-[13px] text-white/35">No cues captured.</div>}
+                  {openSession.signals.map((s, i) => {
+                    const st = styleFor(s.type);
+                    return (
+                      <div key={s.id || i} className="rounded-xl p-3" style={{ background: st.bg, border: `1px solid ${st.border}`, borderLeft: `4px solid ${st.accent}` }}>
+                        <div className="flex items-center gap-2 mb-1">
+                          <span className="material-symbols-outlined" style={{ fontSize: 16, color: st.accent }}>{st.icon}</span>
+                          <span className="text-[9px] font-black uppercase tracking-[0.15em]" style={{ color: st.text }}>{s.type}</span>
+                        </div>
+                        <div className="space-y-0.5">
+                          {(s.lines || []).map((l, j) => (
+                            <div key={j} className="text-[13px] leading-snug text-white">{l}</div>
+                          ))}
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {loadingSession && (
+        <div className="fixed inset-0 z-40 flex items-center justify-center" style={{ background: 'rgba(0,0,0,0.4)' }}>
+          <div className="glass-card px-5 py-3 text-white/80 text-sm">Loading session…</div>
         </div>
       )}
 
