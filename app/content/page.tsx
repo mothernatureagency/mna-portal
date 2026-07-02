@@ -1,16 +1,106 @@
 'use client';
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { useClient } from '@/context/ClientContext';
 import { createClient } from '@/lib/supabase/client';
 import { driveThumbnailUrl, driveViewUrl } from '@/lib/drive';
 import { extractFolderId, type DriveFile } from '@/lib/google-drive-shared';
 
-/** Image with graceful fallback — hides itself if Drive thumbnail fails */
+// Resolve a preview src for a stored photo URL. Google Drive links go through
+// the thumbnail endpoint; uploaded images (Supabase public URLs, or any plain
+// http(s) image) render directly.
+function previewSrc(url: string | null | undefined): string | null {
+  const drive = driveThumbnailUrl(url, 600);
+  if (drive) return drive;
+  const t = (url || '').trim();
+  return /^https?:\/\//i.test(t) ? t : null;
+}
+// Link to open the full photo — Drive view page for Drive links, else the raw URL.
+function photoOpenUrl(url: string | null | undefined): string | null {
+  return driveViewUrl(url) || (url && /^https?:\/\//i.test(url.trim()) ? url.trim() : null);
+}
+
+/** Image with graceful fallback — hides itself if the source fails to load */
 function DriveThumb({ url, className }: { url: string | null | undefined; className?: string }) {
-  const thumb = driveThumbnailUrl(url, 600);
+  const src = previewSrc(url);
   const [failed, setFailed] = useState(false);
-  if (!thumb || failed) return null;
-  return <img src={thumb} alt="" className={className} onError={() => setFailed(true)} />;
+  if (!src || failed) return null;
+  return <img src={src} alt="" className={className} onError={() => setFailed(true)} />;
+}
+
+// True when an OS file (not an internal reschedule drag) is being dragged.
+function dragHasFiles(e: React.DragEvent): boolean {
+  return Array.from(e.dataTransfer?.types || []).includes('Files');
+}
+
+/**
+ * Staff-only image drop zone. Wraps a post's photo area so an image file can
+ * be dragged from the desktop and dropped to attach it, or clicked to browse.
+ * Non-staff just see the children (view only).
+ */
+function PhotoDropZone({
+  isStaff, uploading, hasImage, onFile, className, children,
+}: {
+  isStaff: boolean;
+  uploading: boolean;
+  hasImage: boolean;
+  onFile: (f: File) => void;
+  className?: string;
+  children?: React.ReactNode;
+}) {
+  const inputRef = useRef<HTMLInputElement>(null);
+  const [over, setOver] = useState(false);
+  if (!isStaff) return <>{children}</>;
+  return (
+    <div
+      className={`relative ${className || ''}`}
+      onDragOver={(e) => { if (dragHasFiles(e)) { e.preventDefault(); e.stopPropagation(); setOver(true); } }}
+      onDragLeave={() => setOver(false)}
+      onDrop={(e) => {
+        if (!dragHasFiles(e)) return;
+        e.preventDefault(); e.stopPropagation(); setOver(false);
+        const f = e.dataTransfer.files?.[0];
+        if (f) onFile(f);
+      }}
+    >
+      {children}
+      {!hasImage && (
+        <button
+          type="button"
+          onClick={() => inputRef.current?.click()}
+          className="w-full flex flex-col items-center justify-center gap-1 rounded-lg border border-dashed border-white/20 hover:border-white/40 text-white/45 hover:text-white/70 transition-colors py-4 text-[11px] font-semibold"
+        >
+          <span className="material-symbols-outlined" style={{ fontSize: 20 }}>add_photo_alternate</span>
+          {uploading ? 'Uploading…' : 'Drag an image here or click to upload'}
+        </button>
+      )}
+      {hasImage && (
+        <button
+          type="button"
+          onClick={() => inputRef.current?.click()}
+          className="absolute top-1 right-1 z-10 text-[10px] font-semibold px-2 py-1 rounded-md bg-black/55 text-white/90 hover:bg-black/75 inline-flex items-center gap-1"
+          title="Replace image"
+        >
+          <span className="material-symbols-outlined" style={{ fontSize: 13 }}>swap_horiz</span>
+          Replace
+        </button>
+      )}
+      <input
+        ref={inputRef}
+        type="file"
+        accept="image/*"
+        className="hidden"
+        onChange={(e) => { const f = e.target.files?.[0]; if (f) onFile(f); e.target.value = ''; }}
+      />
+      {(over || uploading) && (
+        <div className="absolute inset-0 z-20 flex items-center justify-center rounded-lg pointer-events-none"
+             style={{ background: 'rgba(12,109,164,0.35)', border: '2px dashed rgba(74,184,206,0.9)' }}>
+          <span className="text-[12px] font-bold text-white bg-black/50 px-3 py-1.5 rounded-lg">
+            {uploading ? 'Uploading…' : 'Drop to attach'}
+          </span>
+        </div>
+      )}
+    </div>
+  );
 }
 import { getPlaybooksForClient } from '@/lib/agents/playbooks';
 import { clients as ALL_CLIENTS } from '@/lib/clients';
@@ -145,6 +235,7 @@ export default function ContentPage() {
   const [approvalFilter, setApprovalFilter] = useState<'all' | ApprovalStatus>('all');
   const [photoDraft, setPhotoDraft] = useState<Record<string, string>>({});
   const [editingPhoto, setEditingPhoto] = useState<Record<string, boolean>>({});
+  const [uploadingId, setUploadingId] = useState<string | null>(null);
   const [isStaff, setIsStaff] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editDraft, setEditDraft] = useState<{ post_date: string; platform: string; content_type: string; title: string }>({ post_date: '', platform: '', content_type: '', title: '' });
@@ -201,6 +292,25 @@ export default function ContentPage() {
       await patchItem(id, { photo_drive_url: url || null });
       setEditingPhoto((e) => ({ ...e, [id]: false }));
     } catch (e: any) { alert(e.message); }
+  }
+
+  // Upload a dropped/selected image and attach it to the post.
+  async function uploadImage(postId: string, file: File) {
+    if (!file.type.startsWith('image/')) { alert('Please choose an image file.'); return; }
+    setUploadingId(postId);
+    try {
+      const fd = new FormData();
+      fd.append('file', file);
+      fd.append('postId', postId);
+      const res = await fetch('/api/content-calendar/upload', { method: 'POST', body: fd });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || 'Upload failed');
+      setItems((prev) => prev.map((it) => (it.id === postId ? { ...it, photo_drive_url: data.url } : it)));
+    } catch (e: any) {
+      alert(e.message || 'Upload failed');
+    } finally {
+      setUploadingId(null);
+    }
   }
 
   async function patchItem(id: string, payload: Record<string, unknown>) {
@@ -1119,13 +1229,29 @@ export default function ContentPage() {
               const pdm = isPdmItem(activeItem);
               const status = (activeItem.client_approval_status || 'pending_review') as ApprovalStatus;
               const astyle = APPROVAL_STYLES[status];
-              const driveLink = driveViewUrl(activeItem.photo_drive_url);
+              const driveLink = photoOpenUrl(activeItem.photo_drive_url);
               return (
                 <>
-                  {activeItem.photo_drive_url && (
-                    <a href={driveLink!} target="_blank" rel="noreferrer" className="block bg-black rounded-t-2xl overflow-hidden">
-                      <DriveThumb url={activeItem.photo_drive_url} className="w-full max-h-80 object-contain" />
-                    </a>
+                  {isStaff ? (
+                    <PhotoDropZone
+                      isStaff={isStaff}
+                      uploading={uploadingId === activeItem.id}
+                      hasImage={!!activeItem.photo_drive_url}
+                      onFile={(f) => uploadImage(activeItem.id, f)}
+                      className="block overflow-hidden rounded-t-2xl"
+                    >
+                      {activeItem.photo_drive_url && (
+                        <a href={driveLink || undefined} target="_blank" rel="noreferrer" className="block bg-black">
+                          <DriveThumb url={activeItem.photo_drive_url} className="w-full max-h-80 object-contain" />
+                        </a>
+                      )}
+                    </PhotoDropZone>
+                  ) : (
+                    activeItem.photo_drive_url && (
+                      <a href={driveLink || undefined} target="_blank" rel="noreferrer" className="block bg-black rounded-t-2xl overflow-hidden">
+                        <DriveThumb url={activeItem.photo_drive_url} className="w-full max-h-80 object-contain" />
+                      </a>
+                    )
                   )}
                   {pdm && (
                     <div className="px-6 pt-5">
@@ -1597,16 +1723,26 @@ export default function ContentPage() {
                   </>
                 )}
 
-                {/* Photo / Drive link (staff can edit, client can view) */}
+                {/* Photo — drag-drop upload, Drive pick, or paste link (staff); view only (client) */}
                 {(() => {
-                  const view = driveViewUrl(it.photo_drive_url);
+                  const view = photoOpenUrl(it.photo_drive_url);
                   const isEditingP = editingPhoto[it.id];
+                  const hasImg = !!it.photo_drive_url && !isEditingP;
                   return (
                     <div className="space-y-2">
-                      {it.photo_drive_url && !isEditingP && (
-                        <a href={view!} target="_blank" rel="noreferrer" className="block rounded-lg overflow-hidden border border-white/10">
-                          <DriveThumb url={it.photo_drive_url} className="w-full h-32 object-cover opacity-80 hover:opacity-100 transition-opacity" />
-                        </a>
+                      {!isEditingP && (
+                        <PhotoDropZone
+                          isStaff={isStaff}
+                          uploading={uploadingId === it.id}
+                          hasImage={hasImg}
+                          onFile={(f) => uploadImage(it.id, f)}
+                        >
+                          {hasImg && (
+                            <a href={view || undefined} target="_blank" rel="noreferrer" className="block rounded-lg overflow-hidden border border-white/10">
+                              <DriveThumb url={it.photo_drive_url} className="w-full h-32 object-cover opacity-80 hover:opacity-100 transition-opacity" />
+                            </a>
+                          )}
+                        </PhotoDropZone>
                       )}
                       {isStaff && isEditingP ? (
                         <div className="flex gap-2">
