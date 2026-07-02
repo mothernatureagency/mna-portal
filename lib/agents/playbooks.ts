@@ -1148,6 +1148,234 @@ export const PRIME_IV_PDM_JUN_2026: Playbook = {
   ],
 };
 
+// ─── PDM — JULY 2026 CONTENT CALENDAR ───────────────────────────────
+// Actual July 2026 tab from PDM's Social Content Calendar (verbatim copy).
+// 'PDM · Brand Cascade' items cascade from the Prime IV corporate page
+// (auto-approved, marked blue as reference) so MNA sees them and plans
+// complementary local content; the two 'Local Reel' items are the reels
+// the Niceville location posts from its own page.
+//
+// Theme: Peak Summer — UV Safety Month, Independence Day, hydration, heat
+// recovery, travel. Featured micronutrients: B-12, Vitamin C. Seasonal
+// drip: The Glow Getter.
+//
+// Load with startDate=2026-07-01 to place posts on their actual July dates.
+export const PRIME_IV_PDM_JUL_2026: Playbook = {
+  id: 'prime-iv-pdm-jul-2026',
+  name: 'Prime IV — PDM July 2026 Calendar',
+  description:
+    'Actual July 2026 social content calendar from PDM (the brand agency for Prime IV). Peak Summer theme — UV Safety Month, Independence Day, hydration + heat recovery, summer travel; featured nutrients B-12 + Vitamin C and the seasonal Glow Getter drip. Captions verbatim from PDM. Load into Niceville\'s calendar so MNA can see the brand cascade and plan complementary local content. Includes 2 local (non-cascading) reels the location posts from its own page.',
+  items: [
+    // Wk 7/1 — Independence Day
+    { day: 4, platform: 'Instagram', content_type: 'Post', phase: 'PDM · Brand Cascade',
+      title: 'Independence Day / Long Weekend Reset',
+      hook: 'Happy Fourth of July weekend from Prime IV.',
+      cta: 'Book a post-holiday reset',
+      caption: `Happy Fourth of July weekend from Prime IV! ❤️🤍💙
+
+We hope your holiday is filled with rest, fun, and time with the people you love.
+
+Between the heat, travel, late nights, celebrations, and packed schedules, long weekends can leave you feeling a little drained.
+
+When you're ready for a post-holiday reset, Prime IV can help you explore wellness options that may support hydration, energy, recovery, and overall wellness.
+
+Enjoy the long weekend and take care of yourself.
+
+#PrimeIV #FourthOfJuly #SummerWellness #HydrationSupport #IVTherapy #WellnessReset` },
+
+    // Wk 7/5
+    { day: 5, platform: 'Instagram', content_type: 'Post', phase: 'PDM · Brand Cascade',
+      title: 'UV Safety Month / Skin Support',
+      hook: 'July is UV Safety Month — support your skin all summer.',
+      cta: 'Ask about summer skin support',
+      caption: `July is UV Safety Month, which means it's a good time to think about how you're supporting your skin all summer long. ☀️
+
+Sunscreen, shade, and protective clothing are always key. Nutrient support can also be part of your summer wellness routine, especially when it comes to antioxidant support, hydration, and healthy skin.
+
+Ask your Prime IV team about options that may support your summer skin and wellness goals.
+
+#PrimeIV #UVSafetyMonth #SkinSupport #SummerWellness #AntioxidantSupport #IVTherapy` },
+    { day: 7, platform: 'Instagram', content_type: 'Post', phase: 'PDM · Brand Cascade',
+      title: 'B-12 / Busy Summer Energy',
+      hook: 'For the "we have plans every weekend" crowd.',
+      cta: 'Ask if B-12 fits your routine',
+      caption: `For the "we have plans every weekend" crowd. ⚡
+
+Vitamin B-12 may help support natural energy production, mental clarity, red blood cell formation, nervous system function, and overall vitality.
+
+If your summer schedule feels nonstop, ask your Prime IV team if B-12 may be a good fit for your wellness routine.
+
+#PrimeIV #B12 #EnergySupport #SummerWellness #Micronutrients #WellnessRoutine` },
+    { day: 9, platform: 'Instagram', content_type: 'Post', phase: 'PDM · Brand Cascade',
+      title: 'Pool Bag Wellness Checklist',
+      hook: 'Pool bag checklist for peak summer.',
+      cta: 'Save this for your next pool day',
+      caption: `Pool bag checklist: 🕶️
+Sunscreen
+Water bottle
+Hat or sunglasses
+Snacks
+Book or headphones
+A plan to actually recover after a long day in the heat
+
+Hydration, nutrients, rest, and recovery all matter during peak summer. Prime IV can help you explore wellness options that may support how you feel through the season.
+
+Save this for your next pool day.
+
+#PrimeIV #PoolDay #SummerWellness #HydrationSupport #RecoverySupport #WellnessTips` },
+
+    // Non-cascading local Reel #1
+    { day: 10, platform: 'Instagram', content_type: 'Reel', phase: 'Local Reel · post from our page',
+      title: '[LOCAL REEL] POV / Peak Summer Reset',
+      hook: "POV: it's peak summer and your calendar has been full for weeks.",
+      cta: 'Ask about a summer reset',
+      caption: `POV: It's peak summer and your calendar has been full for weeks. ☀️
+
+Pool days. Travel. Heat. Late nights. Long weekends. Somehow still work on Monday.
+
+So you booked a Prime IV reset.
+
+A quiet chair, personalized support, and a little time to feel like yourself again.
+
+Ask your Prime IV team about options that may support hydration, energy, recovery, and overall wellness this summer.
+
+#PrimeIV #POV #SummerReset #IVTherapy #HydrationSupport #WellnessRoutine` },
+
+    // Wk 7/12
+    { day: 12, platform: 'Instagram', content_type: 'Post', phase: 'PDM · Brand Cascade',
+      title: 'Mid-Summer Check-In',
+      hook: 'Mid-summer check-in — actually feeling good?',
+      cta: 'Book a reset',
+      caption: `Mid-summer check-in: 👀
+
+Are you actually feeling good, or are you just running on iced coffee, sunscreen, and weekend plans?
+
+If your energy, hydration, or recovery routine could use support, Prime IV can help you reset with options designed around your wellness goals.
+
+Consider this your reminder to check in with your body before summer speeds by.
+
+#PrimeIV #SummerWellness #WellnessCheckIn #HydrationSupport #EnergySupport #IVTherapy` },
+    { day: 14, platform: 'Instagram', content_type: 'Post', phase: 'PDM · Brand Cascade',
+      title: 'Summer Time One-Hour Vacation®',
+      hook: 'Your summer calendar needs a One-Hour Vacation®.',
+      cta: 'Book your One-Hour Vacation®',
+      caption: `Your summer calendar called. It needs a One-Hour Vacation®. ☀️
+
+Between full weekends, hot days, travel, errands, work, family plans, and everything else summer seems to pack in, it can feel like there's never a real pause.
+
+At Prime IV, your appointment is more than checking wellness support off your list. It's time in a massage chair, a quiet moment to recharge, and personalized options that may support how you feel through the season.
+
+Book your One Hour Vacation® and give yourself a little breathing room this summer.
+
+#PrimeIV #OneHourVacation #SummerWellness #IVTherapy #WellnessSupport #Recharge` },
+    { day: 16, platform: 'Instagram', content_type: 'Post', phase: 'PDM · Brand Cascade',
+      title: 'What to Book Based on Your Summer Plans',
+      hook: 'Your wellness support can match your summer plans.',
+      cta: 'Let our team guide you',
+      caption: `Summer plans look different for everyone, and your wellness support can too. ✨
+
+Travel weekend? Ask about options that may support hydration and immune health.
+
+Outdoor workout? Ask about recovery and energy support.
+
+Pool day or beach trip? Ask about hydration and antioxidant support.
+
+Busy social week? Ask about options that may support overall wellness and vitality.
+
+Your Prime IV team can help guide you based on your goals.
+
+#PrimeIV #SummerWellness #WellnessSupport #IVTherapy #HydrationSupport #PersonalizedWellness` },
+
+    // Wk 7/19
+    { day: 19, platform: 'Instagram', content_type: 'Post', phase: 'PDM · Brand Cascade',
+      title: 'Glow Getter Highlight: Summer Plans / Travel / Heat / Hydration / Recovery',
+      hook: 'The Glow Getter — our seasonal summer IV drip.',
+      cta: 'Ask about The Glow Getter',
+      caption: `Summer plans can take a lot out of you.
+
+Between travel, heat, long weekends, workouts, and busy days in the sun, your body may need a little extra support. The Glow Getter is our seasonal summer IV drip, designed to help support hydration, energy, muscle recovery, radiant skin, and overall wellness. ✨
+
+Make time for a summer reset at Prime IV. Ask us about The Glow Getter.
+
+#PrimeIV #GlowGetter #SummerReset #IVTherapy #HydrationSupport #RecoverySupport #WellnessSupport` },
+    { day: 21, platform: 'Instagram', content_type: 'Post', phase: 'PDM · Brand Cascade',
+      title: "Things We're Normalizing This Summer",
+      hook: "Things we're normalizing this summer.",
+      cta: 'Give wellness a spot on your calendar',
+      caption: `Things we're normalizing this summer: ☀️
+
+Taking a break before you hit burnout
+Booking recovery time after a busy weekend
+Supporting hydration before you feel depleted
+Prioritizing wellness during travel season
+Making self-care part of the plan, not an afterthought
+
+Your summer calendar may be full, but your wellness routine still deserves a spot.
+
+#PrimeIV #SummerSelfCare #WellnessRoutine #HydrationSupport #RecoverySupport #PrimeIVHydration` },
+    { day: 23, platform: 'Instagram', content_type: 'Post', phase: 'PDM · Brand Cascade',
+      title: 'Vitamin C, But Make It Summer',
+      hook: "Vitamin C isn't just for cold season.",
+      cta: 'Ask if Vitamin C fits your goals',
+      caption: `Vitamin C is not just for cold season. 🍊
+
+During summer, Vitamin C may help support antioxidant protection, immune health, collagen production, and healthy skin. It can be a great micronutrient to ask about if your summer routine includes travel, sun, activity, and a very full calendar.
+
+Ask your Prime IV team if Vitamin C may be a good fit for your wellness goals.
+
+#PrimeIV #VitaminC #SummerWellness #AntioxidantSupport #SkinSupport #Micronutrients` },
+
+    // Non-cascading local Reel #2
+    { day: 24, platform: 'Instagram', content_type: 'Reel', phase: 'Local Reel · post from our page',
+      title: '[LOCAL REEL] What to Ask Us About Before a Summer Trip',
+      hook: 'Before your next summer trip, ask us about hydration, energy, immune + recovery.',
+      cta: 'Save this for your next trip',
+      caption: `Before your next summer trip, ask your Prime IV team about options that may help support:
+
+Hydration 💧
+Energy ⚡
+Immune health 🛡️
+Antioxidant support ✨
+Recovery after long travel days ✈️
+
+Summer travel can be fun, but heat, flights, road trips, late nights, and packed schedules can take a lot out of you.
+
+Before your next getaway, talk with your Prime IV team about wellness options that may be a good fit for your travel plans and goals.
+
+Save this for your next summer trip.
+
+#PrimeIV #SummerTravel #TravelWellness #IVTherapy #HydrationSupport #WellnessSupport` },
+
+    // Wk 7/26
+    { day: 26, platform: 'Instagram', content_type: 'Post', phase: 'PDM · Brand Cascade',
+      title: 'Social Battery Reset',
+      hook: 'Summer can be social — and a lot.',
+      cta: 'Book a quiet hour to recharge',
+      caption: `Summer can be social in the best way, but it can also be a lot. 🫠
+
+Parties, trips, family plans, late nights, full weekends, and trying to keep up with everything can take a toll on how you feel.
+
+Prime IV offers a relaxing wellness experience designed to help you pause, reset, and support your body through the busiest parts of the season.
+
+Book yourself a quiet hour to recharge.
+
+#PrimeIV #SocialBattery #SummerReset #SelfCareRoutine #IVTherapy #WellnessSupport` },
+    { day: 28, platform: 'Instagram', content_type: 'Post', phase: 'PDM · Brand Cascade',
+      title: 'Heat Hangover',
+      hook: 'Wiped out after a full day in the heat?',
+      cta: 'Explore hydration + recovery options',
+      caption: `Ever feel wiped out after a full day in the heat? 🥵
+
+Long pool days, outdoor events, travel, workouts, and high temps can leave you feeling more drained than expected.
+
+That "heat hangover" feeling is your reminder to prioritize hydration, electrolytes, rest, and recovery during peak summer.
+
+Prime IV can help you explore options that may support hydration, energy, recovery, and overall wellness when summer starts taking a toll.
+
+#PrimeIV #HeatHangover #SummerWellness #HydrationSupport #RecoverySupport #IVTherapy` },
+  ],
+};
+
 // Keep the pamphlet-derived membership playbook too — MNA can layer it in
 // between corporate cascades for stronger membership framing.
 export const PRIME_IV_MEMBERSHIPS: Playbook = {
@@ -1261,6 +1489,7 @@ export const PRIME_IV_MEMBERSHIPS: Playbook = {
 };
 
 export const PLAYBOOKS: Playbook[] = [
+  PRIME_IV_PDM_JUL_2026,
   PRIME_IV_PDM_JUN_2026,
   PRIME_IV_PDM_APR_2026,
   PINECREST_REOPENING,
@@ -1280,8 +1509,8 @@ export function getPlaybook(id: string): Playbook | undefined {
  */
 export const CLIENT_PLAYBOOKS: Record<string, string[]> = {
   // Corporate cascade first so it's the top one-click load each month
-  'prime-iv':           ['prime-iv-pdm-jun-2026', 'prime-iv-pdm-apr-2026', 'niceville-spring-reset', 'prime-iv-memberships'],
-  'prime-iv-pinecrest': ['prime-iv-pdm-jun-2026', 'prime-iv-pdm-apr-2026', 'pinecrest-reopening',    'prime-iv-memberships'],
+  'prime-iv':           ['prime-iv-pdm-jul-2026', 'prime-iv-pdm-jun-2026', 'prime-iv-pdm-apr-2026', 'niceville-spring-reset', 'prime-iv-memberships'],
+  'prime-iv-pinecrest': ['prime-iv-pdm-jul-2026', 'prime-iv-pdm-jun-2026', 'prime-iv-pdm-apr-2026', 'pinecrest-reopening',    'prime-iv-memberships'],
   'serenity-bayfront':  ['serenity-vrbo-launch'],
 };
 
