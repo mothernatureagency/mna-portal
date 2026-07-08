@@ -9,6 +9,7 @@ import { getTimeGreeting, getDateDisplay, getTodayInTimezone, DEFAULT_TIMEZONE }
 import { getDisplayName } from '@/lib/display-names';
 import { VoiceButton } from '@/components/ai/VoiceButton';
 import { speak } from '@/lib/voice';
+import StaffAssignments from '@/components/dashboard/StaffAssignments';
 
 type ScheduleEvent = {
   id: string;
@@ -602,6 +603,9 @@ export default function PersonalDashboard() {
           <p className="text-[13px] text-white/40 mt-0.5">{dateDisplay}</p>
         </div>
       </div>
+
+      {/* ── Team Assignments ── */}
+      <StaffAssignments />
 
       {/* ── Unified Calendar ── */}
       <div className="rounded-2xl overflow-hidden" style={{ background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.07)' }}>
