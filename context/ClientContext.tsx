@@ -1,6 +1,6 @@
 'use client';
-import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react';
-import { clients, Client } from '@/lib/clients';
+import React, { createContext, useContext, useState, useEffect, useMemo, ReactNode } from 'react';
+import { clients as staticClients, makePrimeIVClient, Client } from '@/lib/clients';
 import { createClient as createSupabaseClient } from '@/lib/supabase/client';
 
 type ClientContextType = {
@@ -9,6 +9,7 @@ type ClientContextType = {
   allClients: Client[];
   userRole: string;
   userEmail: string;
+  refreshClients: () => void;
 };
 
 const ClientContext = createContext<ClientContextType | null>(null);
@@ -19,6 +20,25 @@ export function ClientProvider({ children }: { children: ReactNode }) {
   const [userRole, setUserRole] = useState('staff');
   const [userEmail, setUserEmail] = useState('');
   const [accessibleClientIds, setAccessibleClientIds] = useState<string[] | null>(null);
+  const [customClients, setCustomClients] = useState<Client[]>([]);
+
+  // Load dynamically-added Prime IV clients and merge them with the built-ins.
+  function loadCustomClients() {
+    fetch('/api/clients')
+      .then((r) => r.json())
+      .then((d) => {
+        const rows = (d.items || []) as Array<{ id: string; name: string; short_name?: string; location?: string }>;
+        setCustomClients(rows.map((r) => makePrimeIVClient({ id: r.id, name: r.name, shortName: r.short_name, location: r.location })));
+      })
+      .catch(() => {});
+  }
+  useEffect(() => { loadCustomClients(); }, []);
+
+  // Built-in + custom, de-duped by id.
+  const clients = useMemo(() => {
+    const seen = new Set(staticClients.map((c) => c.id));
+    return [...staticClients, ...customClients.filter((c) => !seen.has(c.id))];
+  }, [customClients]);
 
   // Load user metadata and saved client on mount
   useEffect(() => {
@@ -59,16 +79,16 @@ export function ClientProvider({ children }: { children: ReactNode }) {
 
       // For staff/admin — load saved from localStorage, show all clients
       const saved = localStorage.getItem('mna_active_client');
-      if (saved && clients.some((c) => c.id === saved)) {
-        setActiveClientIdState(saved);
-      }
+      // Accept any saved id; it resolves against the merged (built-in +
+      // custom) list once custom clients finish loading.
+      if (saved) setActiveClientIdState(saved);
       setHydrated(true);
     }).catch(() => {
       // Fallback if not authenticated
       const saved = localStorage.getItem('mna_active_client');
-      if (saved && clients.some((c) => c.id === saved)) {
-        setActiveClientIdState(saved);
-      }
+      // Accept any saved id; it resolves against the merged (built-in +
+      // custom) list once custom clients finish loading.
+      if (saved) setActiveClientIdState(saved);
       setHydrated(true);
     });
   }, []);
@@ -90,7 +110,7 @@ export function ClientProvider({ children }: { children: ReactNode }) {
   if (!hydrated) return null;
 
   return (
-    <ClientContext.Provider value={{ activeClient, setActiveClientId, allClients, userRole, userEmail }}>
+    <ClientContext.Provider value={{ activeClient, setActiveClientId, allClients, userRole, userEmail, refreshClients: loadCustomClients }}>
       {children}
     </ClientContext.Provider>
   );

@@ -23,6 +23,7 @@ const NAV = [
     { label: 'Email Drafts', href: '/email-preview', e: 'mail' },
   ]},
   { sec: 'CLIENT MGMT', items: [
+    { label: 'Clients', href: '/clients', e: 'add_business' },
     { label: 'Task Manager', href: '/client-tasks', e: 'checklist' },
     { label: 'Meeting Notes', href: '/meeting-notes', e: 'description' },
     { label: 'Invoices', href: '/invoices', e: 'receipt_long' },

@@ -237,3 +237,60 @@ export const clients: Client[] = [
     integrations: ['IDX Broker', 'Follow Up Boss', 'Meta Ads', 'Google Ads', 'YouTube', 'Mailchimp', 'Cal.com'],
   },
 ];
+
+export function slugify(s: string): string {
+  return (s || '')
+    .toLowerCase()
+    .normalize('NFKD')
+    .replace(/[^a-z0-9]+/g, '-')
+    .replace(/^-+|-+$/g, '');
+}
+
+/**
+ * Build a full Prime IV client config from just a name/location.
+ *
+ * Prime IV franchises all share the same branding + KPI shape, so a new
+ * location only needs a name — everything else is derived. Used for
+ * dynamically-added clients (see the /clients admin page + custom_clients
+ * table) so staff can onboard a new Prime IV location by typing its name.
+ */
+export function makePrimeIVClient(input: {
+  id?: string;
+  name?: string;
+  shortName?: string;
+  location?: string;
+}): Client {
+  const raw = (input.name || input.location || '').trim();
+  const loc = (input.location || raw.replace(/^prime\s*iv\s*[—\-–:]*\s*/i, '')).trim() || raw;
+  const name = /prime\s*iv/i.test(raw) ? raw : `Prime IV — ${loc}`;
+  const shortName = input.shortName || `Prime IV ${loc}`;
+  const locSlug = slugify(loc);
+  const id = input.id || `prime-iv-${locSlug}`;
+  const handle = `primeiv${locSlug.replace(/-/g, '')}`;
+  return {
+    id,
+    name,
+    shortName,
+    industry: 'IV Therapy & Wellness',
+    location: loc,
+    branding: {
+      primaryColor: '#1c3d6e',
+      secondaryColor: '#7aafd4',
+      gradientFrom: '#1c3d6e',
+      gradientTo: '#3a7ab5',
+      accentColor: '#c8a96e',
+      mode: 'light',
+      logoText: 'Prime IV',
+      logoUrl: '/logos/primeiv-logo.png',
+    },
+    kpiTargets: { leads: 250, costPerLead: 53, conversionRate: 14, adSpend: 9000, appointments: 60, revenue: 80000 },
+    links: {
+      website: `https://${handle}.com`,
+      booking: `https://${handle}.com/book`,
+      instagram: `https://instagram.com/${handle}`,
+      facebook: `https://facebook.com/${handle}`,
+    },
+    notes: `Prime IV Hydration & Wellness — ${loc}. Added via the Clients admin; update links, branding, and Meta Ads details as needed.`,
+    integrations: ['Google Ads', 'Meta Ads'],
+  };
+}

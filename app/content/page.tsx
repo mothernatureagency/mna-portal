@@ -105,10 +105,6 @@ function PhotoDropZone({
 import { getPlaybooksForClient } from '@/lib/agents/playbooks';
 import { clients as ALL_CLIENTS } from '@/lib/clients';
 
-// Other Prime IV locations this client can cross-post to. Filtered against
-// the active client so we never offer to push a post to itself.
-const PRIME_IV_CLIENTS = ALL_CLIENTS.filter((c) => c.id === 'prime-iv' || c.id.startsWith('prime-iv-'));
-
 type ApprovalStatus = 'drafting' | 'pending_review' | 'approved' | 'changes_requested' | 'scheduled';
 
 type ContentItem = {
@@ -219,6 +215,10 @@ function firstWeekday(key: string) {
 export default function ContentPage() {
   const ctx = useClient() as any;
   const activeClient = ctx?.activeClient;
+  // Other Prime IV locations this client can cross-post to (built-in + custom,
+  // via context), filtered against the active client so we never offer self.
+  const primeIvClients = (((ctx?.allClients as any[]) || ALL_CLIENTS) as typeof ALL_CLIENTS)
+    .filter((c) => c.id === 'prime-iv' || c.id.startsWith('prime-iv-'));
   const [items, _setItems] = useState<ContentItem[]>([]);
   // Normalize post_date to YYYY-MM-DD on every update to avoid timezone issues
   function setItems(updater: ContentItem[] | ((prev: ContentItem[]) => ContentItem[])) {
@@ -587,7 +587,7 @@ export default function ContentPage() {
     if (!item || crossPostTargets.length === 0) return;
     setCrossPosting(true);
     try {
-      const targets = PRIME_IV_CLIENTS.filter((c) => crossPostTargets.includes(c.id)).map((c) => c.name);
+      const targets = primeIvClients.filter((c) => crossPostTargets.includes(c.id)).map((c) => c.name);
       const { sent, skipped } = await crossPostItem(item, targets);
       alert(`Cross-posted to ${sent} location${sent === 1 ? '' : 's'}.${skipped ? ` (${skipped} already existed and were skipped.)` : ''}`);
       setCrossPostId(null);
@@ -606,7 +606,7 @@ export default function ContentPage() {
     if (bulkCrossTargets.length === 0 || shown.length === 0) return;
     if (!confirm(`Push all ${shown.length} visible post${shown.length === 1 ? '' : 's'} to ${bulkCrossTargets.length} location${bulkCrossTargets.length === 1 ? '' : 's'}? This creates copies — duplicates (same date+platform+title) are skipped automatically.`)) return;
     setBulkCrossPosting({ done: 0, total: shown.length });
-    const targets = PRIME_IV_CLIENTS.filter((c) => bulkCrossTargets.includes(c.id)).map((c) => c.name);
+    const targets = primeIvClients.filter((c) => bulkCrossTargets.includes(c.id)).map((c) => c.name);
     let totalSent = 0, totalSkipped = 0;
     for (const item of shown) {
       const { sent, skipped } = await crossPostItem(item, targets);
@@ -972,7 +972,7 @@ export default function ContentPage() {
       )}
 
       {/* Cross-post to other Prime IV locations */}
-      {isStaff && items.length > 0 && PRIME_IV_CLIENTS.some((c) => c.id !== activeClient?.id) && (
+      {isStaff && items.length > 0 && primeIvClients.some((c) => c.id !== activeClient?.id) && (
         <div className="glass-card p-4 flex items-center justify-between gap-4 flex-wrap" style={{ borderLeft: '3px solid #c8a96e' }}>
           <div>
             <div className="text-white font-semibold text-sm flex items-center gap-2">
@@ -1017,7 +1017,7 @@ export default function ContentPage() {
               Sending <span className="font-bold text-white/80">{shown.length}</span> post{shown.length === 1 ? '' : 's'} from <span className="font-bold text-white/80">{activeClient?.name}</span> to:
             </div>
             <div className="flex flex-col gap-2">
-              {PRIME_IV_CLIENTS.filter((c) => c.id !== activeClient?.id).map((c) => {
+              {primeIvClients.filter((c) => c.id !== activeClient?.id).map((c) => {
                 const sel = bulkCrossTargets.includes(c.id);
                 return (
                   <button
@@ -1443,7 +1443,7 @@ export default function ContentPage() {
                             Mark scheduled
                           </button>
                         )}
-                        {PRIME_IV_CLIENTS.some((c) => c.id !== activeClient?.id) && (
+                        {primeIvClients.some((c) => c.id !== activeClient?.id) && (
                           <button
                             onClick={() => { setCrossPostId(activeItem.id); setCrossPostTargets([]); }}
                             className="text-[11px] font-semibold px-3 py-2 rounded-lg text-white/70 hover:text-white border border-white/15 bg-white/5 hover:bg-white/10 inline-flex items-center gap-1 ml-auto"
@@ -1497,7 +1497,7 @@ export default function ContentPage() {
               </div>
               <div className="text-white/60 text-[12px]">Send a copy of this post to:</div>
               <div className="flex flex-col gap-2">
-                {PRIME_IV_CLIENTS.filter((c) => c.id !== activeClient?.id).map((c) => {
+                {primeIvClients.filter((c) => c.id !== activeClient?.id).map((c) => {
                   const sel = crossPostTargets.includes(c.id);
                   return (
                     <button
@@ -2021,7 +2021,7 @@ export default function ContentPage() {
                 <div className="pt-2 border-t border-white/10 flex items-center justify-between text-xs">
                   <span className="text-white/50">{it.assigned_role || ''}</span>
                   <div className="flex gap-2">
-                    {isStaff && PRIME_IV_CLIENTS.some((c) => c.id !== activeClient?.id) && (
+                    {isStaff && primeIvClients.some((c) => c.id !== activeClient?.id) && (
                       <button
                         onClick={() => { setCrossPostId(it.id); setCrossPostTargets([]); }}
                         className="rounded-lg px-3 py-1.5 font-semibold text-white/60 hover:text-white border border-white/15 bg-white/5 hover:bg-white/10 inline-flex items-center gap-1 transition-colors"

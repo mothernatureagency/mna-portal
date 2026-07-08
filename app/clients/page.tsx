@@ -1,12 +1,71 @@
 'use client';
-import React from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { useClient } from '@/context/ClientContext';
-import Card from '@/components/ui/Card';
-import { Building2, Globe, Plus, MapPin } from 'lucide-react';
+import { makePrimeIVClient } from '@/lib/clients';
+import { Building2, Globe, Plus, MapPin, Trash2 } from 'lucide-react';
 
 export default function ClientsPage() {
-  const { allClients, activeClient, setActiveClientId } = useClient();
+  const { allClients, activeClient, setActiveClientId, refreshClients } = useClient();
   const { gradientFrom, gradientTo } = activeClient.branding;
+
+  // Add-a-Prime-IV-location form (name only — the rest is generated).
+  const [adding, setAdding] = useState(false);
+  const [name, setName] = useState('');
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState('');
+  const [customIds, setCustomIds] = useState<Set<string>>(new Set());
+  const formRef = useRef<HTMLDivElement>(null);
+
+  async function loadCustom() {
+    try {
+      const res = await fetch('/api/clients');
+      const data = await res.json();
+      setCustomIds(new Set((data.items || []).map((r: any) => r.id)));
+    } catch {}
+  }
+  useEffect(() => { loadCustom(); }, []);
+
+  function openForm() {
+    setAdding(true);
+    setError('');
+    setTimeout(() => formRef.current?.scrollIntoView({ behavior: 'smooth', block: 'center' }), 60);
+  }
+
+  const preview = name.trim() ? makePrimeIVClient({ name: name.trim() }) : null;
+
+  async function addClient() {
+    const n = name.trim();
+    if (!n) return;
+    setBusy(true); setError('');
+    try {
+      const res = await fetch('/api/clients', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ name: n }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || 'Could not add client');
+      setName('');
+      setAdding(false);
+      await loadCustom();
+      refreshClients();
+      if (data.client?.id) setActiveClientId(data.client.id);
+    } catch (e: any) {
+      setError(e.message);
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function removeClient(id: string, label: string) {
+    if (!confirm(`Remove ${label} from the client list? Content already created for it stays in the database.`)) return;
+    try {
+      await fetch(`/api/clients?id=${encodeURIComponent(id)}`, { method: 'DELETE' });
+      await loadCustom();
+      refreshClients();
+      if (activeClient.id === id) setActiveClientId('mna');
+    } catch {}
+  }
 
   return (
     <div className="space-y-7 max-w-5xl">
@@ -23,6 +82,7 @@ export default function ClientsPage() {
           <p className="text-[12px] text-gray-400 pl-3.5">Manage accounts, branding, and KPI targets</p>
         </div>
         <button
+          onClick={openForm}
           className="flex items-center gap-2 text-[12px] font-semibold px-4 py-2 rounded-xl text-white transition-all hover:scale-[1.02]"
           style={{
             background: `linear-gradient(135deg, ${gradientFrom}, ${gradientTo})`,
@@ -32,6 +92,42 @@ export default function ClientsPage() {
           <Plus size={14} /> Add Client
         </button>
       </div>
+
+      {/* Add a Prime IV location — name only */}
+      {adding && (
+        <div ref={formRef} className="bg-white rounded-[20px] p-6" style={{ border: '1px solid rgba(0,0,0,0.06)', boxShadow: '0 4px 16px rgba(0,0,0,0.05)' }}>
+          <div className="flex items-center justify-between mb-3">
+            <h3 className="text-[14px] font-bold text-gray-900">Add a Prime IV location</h3>
+            <button onClick={() => { setAdding(false); setName(''); setError(''); }} className="text-[12px] text-gray-400 hover:text-gray-600">Cancel</button>
+          </div>
+          <p className="text-[12px] text-gray-400 mb-3">Just type the location name — branding, KPIs, and links are generated from the Prime IV template.</p>
+          <div className="flex flex-col sm:flex-row gap-2">
+            <input
+              type="text"
+              value={name}
+              autoFocus
+              onChange={(e) => setName(e.target.value)}
+              onKeyDown={(e) => { if (e.key === 'Enter') addClient(); }}
+              placeholder='e.g. "Destin" or "Prime IV — Fort Walton Beach"'
+              className="flex-1 text-[13px] px-3 py-2.5 rounded-xl bg-gray-50 border border-gray-200 text-gray-900 outline-none focus:border-gray-300 placeholder:text-gray-300"
+            />
+            <button
+              onClick={addClient}
+              disabled={busy || !name.trim()}
+              className="text-[13px] font-bold px-5 py-2.5 rounded-xl text-white disabled:opacity-40 inline-flex items-center justify-center gap-1.5"
+              style={{ background: 'linear-gradient(135deg, #1c3d6e, #3a7ab5)' }}
+            >
+              <Plus size={16} /> {busy ? 'Adding…' : 'Add client'}
+            </button>
+          </div>
+          {preview && (
+            <div className="text-[11px] text-gray-400 mt-2">
+              Will create: <span className="text-gray-700 font-semibold">{preview.name}</span>
+            </div>
+          )}
+          {error && <div className="text-[12px] text-rose-600 bg-rose-50 border border-rose-200 rounded-lg p-2.5 mt-2">{error}</div>}
+        </div>
+      )}
 
       <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
         {allClients.map(client => {
@@ -151,6 +247,16 @@ export default function ClientsPage() {
                   >
                     Edit
                   </button>
+                  {customIds.has(client.id) && (
+                    <button
+                      onClick={() => removeClient(client.id, client.name)}
+                      title="Remove this location"
+                      className="px-3 py-2 rounded-xl text-[12px] font-semibold text-rose-500 transition-colors hover:bg-rose-50"
+                      style={{ border: '1px solid rgba(244,63,94,0.2)' }}
+                    >
+                      <Trash2 size={13} />
+                    </button>
+                  )}
                 </div>
               </div>
             </div>
@@ -159,6 +265,7 @@ export default function ClientsPage() {
 
         {/* Add Client placeholder */}
         <div
+          onClick={openForm}
           className="rounded-[20px] p-6 flex flex-col items-center justify-center gap-3 cursor-pointer transition-all group min-h-[220px] hover:-translate-y-[1px]"
           style={{
             border: '1.5px dashed rgba(0,0,0,0.1)',
