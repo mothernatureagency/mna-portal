@@ -242,10 +242,12 @@ export async function POST(req: NextRequest) {
         it.status || 'Draft',
         it.assigned_role || null,
         it.caption || null,
-        // PDM reference posts don't go through approval; mark approved.
+        // PDM reference posts don't go through approval. Mark them 'scheduled'
+        // so the client sees them as already-locked scheduled content (no
+        // approval actions, no special color) rather than something to review.
         // Otherwise: pre-written caption → pending_review; else drafting.
         isPDM
-          ? 'approved'
+          ? 'scheduled'
           : it.caption ? 'pending_review' : 'drafting',
         // PDM posts are visible to the client too — they fill the client's
         // calendar so it doesn't look empty, even though MNA didn't write them.

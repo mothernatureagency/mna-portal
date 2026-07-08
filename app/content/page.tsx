@@ -254,6 +254,9 @@ export default function ContentPage() {
   const [editPlatforms, setEditPlatforms] = useState<string[]>([]);
   const [viewMode, setViewMode] = useState<'cards' | 'calendar'>('calendar');
   const [activeId, setActiveId] = useState<string | null>(null);
+  // When crossing over from the calendar to cards view, scroll to this card
+  // instead of jumping to the top of the list.
+  const [focusCardId, setFocusCardId] = useState<string | null>(null);
   // Drag-to-reschedule on the calendar view
   const [draggingId, setDraggingId] = useState<string | null>(null);
   const [dragOverIso, setDragOverIso] = useState<string | null>(null);
@@ -312,6 +315,34 @@ export default function ContentPage() {
       setUploadingId(null);
     }
   }
+
+  // Click a calendar day → open the "add post" form prefilled with that date.
+  function openNewPostForDate(iso: string) {
+    if (!isStaff) return;
+    setNewPost((p) => ({ ...p, post_date: iso }));
+    setNewPostPlatforms((prev) => (prev.length ? prev : ['Instagram']));
+    setShowAddForm(true);
+    setTimeout(() => {
+      document.getElementById('add-post-form')?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    }, 60);
+  }
+
+  // Crossing over from the calendar modal to cards view scrolls to the chosen
+  // card rather than the top of the list.
+  useEffect(() => {
+    if (viewMode !== 'cards' || !focusCardId) return;
+    const t = setTimeout(() => {
+      const el = document.getElementById(`card-${focusCardId}`);
+      if (el) {
+        el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        el.style.transition = 'box-shadow 0.3s';
+        el.style.boxShadow = '0 0 0 2px rgba(74,184,206,0.8)';
+        setTimeout(() => { el.style.boxShadow = ''; }, 1600);
+      }
+      setFocusCardId(null);
+    }, 80);
+    return () => clearTimeout(t);
+  }, [viewMode, focusCardId]);
 
   async function patchItem(id: string, payload: Record<string, unknown>) {
     const res = await fetch('/api/content-calendar', {
@@ -713,7 +744,7 @@ export default function ContentPage() {
 
       {/* Add post form (staff only) */}
       {isStaff && showAddForm && (
-        <div className="glass-card p-5">
+        <div id="add-post-form" className="glass-card p-5">
           <div className="grid grid-cols-1 md:grid-cols-3 gap-3 mb-3">
             <input
               type="date"
@@ -1145,6 +1176,7 @@ export default function ContentPage() {
                 return (
                   <div
                     key={day}
+                    onClick={(e) => { if (isStaff && e.target === e.currentTarget) openNewPostForDate(iso); }}
                     onDragOver={(e) => { if (isStaff && draggingId) { e.preventDefault(); setDragOverIso(iso); } }}
                     onDragLeave={() => setDragOverIso((cur) => (cur === iso ? null : cur))}
                     onDrop={(e) => {
@@ -1157,10 +1189,18 @@ export default function ContentPage() {
                     }}
                     className={`min-h-[100px] rounded-xl border p-1.5 flex flex-col gap-1 ${
                       isToday ? 'border-sky-400/40 bg-sky-500/10' : 'border-white/10 bg-white/5'
-                    }`}
+                    } ${isStaff ? 'cursor-pointer' : ''}`}
                     style={isDragTarget ? { outline: '2px dashed #4ab8ce', outlineOffset: 2 } : undefined}
+                    title={isStaff ? 'Click an empty area to add a post on this day' : undefined}
                   >
-                    <div className={`text-[10px] font-bold ${isToday ? 'text-sky-300' : 'text-white/40'}`}>{day}</div>
+                    <button
+                      type="button"
+                      onClick={(e) => { e.stopPropagation(); if (isStaff) openNewPostForDate(iso); }}
+                      className={`text-[10px] font-bold text-left ${isToday ? 'text-sky-300' : 'text-white/40'} ${isStaff ? 'hover:text-white' : ''}`}
+                      title={isStaff ? 'Add a post on this day' : undefined}
+                    >
+                      {day}
+                    </button>
                     {posts.map((p) => {
                       const parsed = parseTitle(p.title);
                       const pdm = isPdmItem(p);
@@ -1172,7 +1212,7 @@ export default function ContentPage() {
                           draggable={isStaff}
                           onDragStart={isStaff ? (e) => { setDraggingId(p.id); e.dataTransfer.effectAllowed = 'move'; } : undefined}
                           onDragEnd={isStaff ? () => { setDraggingId(null); setDragOverIso(null); } : undefined}
-                          onClick={() => setActiveId(p.id)}
+                          onClick={(e) => { e.stopPropagation(); setActiveId(p.id); }}
                           className={`group relative text-left rounded-lg overflow-hidden hover:ring-2 hover:ring-white/20 transition ${pdm ? '' : 'border border-white/10'} ${isStaff ? 'cursor-grab active:cursor-grabbing' : ''}`}
                           style={{
                             ...(pdm
@@ -1413,7 +1453,7 @@ export default function ContentPage() {
                           </button>
                         )}
                         <button
-                          onClick={() => { setActiveId(null); setViewMode('cards'); }}
+                          onClick={() => { setFocusCardId(activeItem.id); setActiveId(null); setViewMode('cards'); }}
                           className="text-[11px] font-semibold px-3 py-2 rounded-lg bg-white/5 text-white/40 hover:bg-white/10"
                         >
                           Open in cards view
@@ -1594,7 +1634,8 @@ export default function ContentPage() {
             return (
               <div
                 key={it.id}
-                className="glass-card p-5 flex flex-col gap-3 group"
+                id={`card-${it.id}`}
+                className="glass-card p-5 flex flex-col gap-3 group scroll-mt-24"
                 style={pdm ? { borderLeft: `3px solid ${PDM_STYLE.chipBorder}` } : undefined}
               >
                 {/* Edit mode (staff only) */}

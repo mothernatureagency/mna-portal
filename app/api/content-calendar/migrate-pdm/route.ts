@@ -19,14 +19,14 @@ export async function POST() {
   const { rows } = await query<{ count: string }>(
     `with updated as (
        update content_calendar
-          set client_approval_status = 'approved',
+          set client_approval_status = 'scheduled',
               assigned_role = 'PDM (Brand)',
               status = 'Reference',
               client_visible = true,
               approved_at = coalesce(approved_at, now())
         where title like '[PDM%'
           and (coalesce(assigned_role, '') <> 'PDM (Brand)'
-               or coalesce(client_approval_status, '') <> 'approved'
+               or coalesce(client_approval_status, '') <> 'scheduled'
                or client_visible is distinct from true)
         returning id
      )
