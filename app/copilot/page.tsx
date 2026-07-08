@@ -34,6 +34,36 @@ type SavedSession = SavedSessionMeta & {
   signals: Signal[];
 };
 
+// One interpreted exchange in Spanish<->English interpreter mode.
+type Interp = {
+  id: string;
+  detected: 'es' | 'en' | 'other';
+  original: string;
+  translation: string;
+  targetLang: 'es' | 'en';
+  sayNext: string;
+  sayNextGloss: string;
+  at: number;
+};
+
+// Speak text aloud as "Mother Nature" using the browser's speech synthesis,
+// picking the best available voice for the target language.
+function speakAloud(text: string, lang: 'es' | 'en') {
+  if (!text || typeof window === 'undefined' || !window.speechSynthesis) return;
+  try {
+    const u = new SpeechSynthesisUtterance(text);
+    u.lang = lang === 'es' ? 'es-US' : 'en-US';
+    const voices = window.speechSynthesis.getVoices();
+    const pool = voices.filter((v) => (v.lang || '').toLowerCase().startsWith(lang));
+    const preferred =
+      pool.find((v) => /female|paulina|mónica|monica|samantha|google|luciana|helena/i.test(v.name)) || pool[0];
+    if (preferred) u.voice = preferred;
+    u.rate = 1; u.pitch = 1.05;
+    window.speechSynthesis.cancel();
+    window.speechSynthesis.speak(u);
+  } catch {}
+}
+
 const SIGNAL_STYLES: Record<string, { bg: string; border: string; text: string; accent: string; icon: string }> = {
   'BUYING SIGNAL':   { bg: 'rgba(16,185,129,0.10)', border: 'rgba(52,211,153,0.45)', text: '#a7f3d0', accent: '#10b981', icon: 'trending_up' },
   'OBJECTION':       { bg: 'rgba(245,158,11,0.10)', border: 'rgba(251,191,36,0.45)', text: '#fde68a', accent: '#f59e0b', icon: 'report' },
@@ -67,6 +97,20 @@ export default function CopilotPage() {
   const [thinking, setThinking] = useState(false);
   const [startedAt, setStartedAt] = useState<number | null>(null);
   const [tick, setTick] = useState(0);
+
+  // Interpreter mode (Spanish <-> English) + Mother Nature voice
+  const [mode, setMode] = useState<'sales' | 'interpret'>('sales');
+  const [mnVoice, setMnVoice] = useState(false);
+  const [listenLang, setListenLang] = useState<'es-US' | 'en-US'>('es-US');
+  const [interps, setInterps] = useState<Interp[]>([]);
+  const modeRef = useRef<'sales' | 'interpret'>('sales');
+  const mnVoiceRef = useRef(false);
+  const listenLangRef = useRef<'es-US' | 'en-US'>('es-US');
+  useEffect(() => { modeRef.current = mode; }, [mode]);
+  useEffect(() => { mnVoiceRef.current = mnVoice; }, [mnVoice]);
+  useEffect(() => { listenLangRef.current = listenLang; }, [listenLang]);
+  // Warm up the speech-synthesis voice list (some browsers load it lazily).
+  useEffect(() => { try { window.speechSynthesis?.getVoices(); } catch {} }, []);
 
   // Saving / saved-session review
   const [saving, setSaving] = useState(false);
@@ -104,11 +148,42 @@ export default function CopilotPage() {
 
   const analyze = useCallback(async () => {
     if (inFlightRef.current) return;
+    const interpret = modeRef.current === 'interpret';
     const recent = bufferRef.current.trim();
-    if (recent.length < 30) return;
+    if (recent.length < (interpret ? 10 : 30)) return;
     inFlightRef.current = true;
     setThinking(true);
     try {
+      if (interpret) {
+        // Interpreter mode — translate the snippet and optionally speak it.
+        const res = await fetch('/api/copilot/translate', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ recent }),
+        });
+        const d = await res.json();
+        if (!res.ok) throw new Error(d.error || 'Translate failed');
+        earlierRef.current = (earlierRef.current + ' ' + recent).slice(-4000);
+        bufferRef.current = '';
+        lastSentAtRef.current = Date.now();
+        if (d.translation || d.sayNext) {
+          const item: Interp = {
+            id: `${Date.now()}`,
+            detected: d.detected || 'other',
+            original: d.original || recent,
+            translation: d.translation || '',
+            targetLang: d.targetLang === 'es' ? 'es' : 'en',
+            sayNext: d.sayNext || '',
+            sayNextGloss: d.sayNextGloss || '',
+            at: Date.now(),
+          };
+          setInterps((prev) => [item, ...prev].slice(0, 12));
+          savedRef.current = false;
+          if (mnVoiceRef.current && item.translation) speakAloud(item.translation, item.targetLang);
+        }
+        return;
+      }
+
       const res = await fetch('/api/copilot', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -148,7 +223,9 @@ export default function CopilotPage() {
     const SR = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
     if (!SR) { setError('SpeechRecognition not supported in this browser. Use Chrome.'); return; }
     const rec = new SR();
-    rec.lang = 'en-US';
+    // In interpreter mode, listen in the language currently being spoken so
+    // the recognizer transcribes it accurately; sales mode is English.
+    rec.lang = modeRef.current === 'interpret' ? listenLangRef.current : 'en-US';
     rec.continuous = true;
     rec.interimResults = true;
 
@@ -166,9 +243,11 @@ export default function CopilotPage() {
         });
         savedRef.current = false; // new transcript → unsaved changes
         bufferRef.current += ' ' + finalChunk;
-        // Fire analyze if we have enough text OR enough time has passed
+        // Fire analyze if we have enough text OR enough time has passed.
+        // Interpreter mode reacts faster (shorter turns) than sales mode.
+        const interpret = modeRef.current === 'interpret';
         const since = Date.now() - lastSentAtRef.current;
-        if (bufferRef.current.length > 180 || since > 8000) analyze();
+        if (bufferRef.current.length > (interpret ? 60 : 180) || since > (interpret ? 3500 : 8000)) analyze();
       }
     };
     rec.onerror = (e: any) => {
@@ -191,6 +270,26 @@ export default function CopilotPage() {
     recognitionRef.current = rec;
     setListening(true);
     if (!startedAt) setStartedAt(Date.now());
+  }
+
+  // Recreate the recognizer (e.g. to apply a new listen language) without
+  // ending/saving the session. Detach the old onend so it doesn't auto-restart.
+  function restartListening() {
+    const old = recognitionRef.current;
+    if (old) { try { old.onend = null; old.stop(); } catch {} }
+    setTimeout(() => start(), 200);
+  }
+
+  function applyMode(m: 'sales' | 'interpret') {
+    setMode(m);
+    modeRef.current = m;
+    if (listening) restartListening();
+  }
+
+  function applyListenLang(l: 'es-US' | 'en-US') {
+    setListenLang(l);
+    listenLangRef.current = l;
+    if (listening && modeRef.current === 'interpret') restartListening();
   }
 
   const saveSession = useCallback(async (opts?: { silent?: boolean }) => {
@@ -244,6 +343,8 @@ export default function CopilotPage() {
   function clearAll() {
     setTranscript('');
     setSignals([]);
+    setInterps([]);
+    try { window.speechSynthesis?.cancel(); } catch {}
     earlierRef.current = '';
     bufferRef.current = '';
     transcriptRef.current = '';
@@ -319,8 +420,56 @@ export default function CopilotPage() {
             )}
           </div>
           <p className="text-white/60 mt-1 text-sm">
-            Quiet, glanceable signals during live calls — objections, buying cues, what to say next.
+            {mode === 'sales'
+              ? 'Quiet, glanceable signals during live calls — objections, buying cues, what to say next.'
+              : 'Live Spanish ⇄ English interpreter. Mother Nature can speak the translation aloud so you go back and forth.'}
           </p>
+
+          {/* Mode + interpreter controls */}
+          <div className="flex items-center gap-2 mt-3 flex-wrap">
+            <div className="inline-flex rounded-xl overflow-hidden border border-white/10">
+              <button
+                onClick={() => applyMode('sales')}
+                className={`text-[11px] font-bold px-3 py-1.5 inline-flex items-center gap-1.5 ${mode === 'sales' ? 'bg-white/15 text-white' : 'text-white/50 hover:text-white/80'}`}
+              >
+                <span className="material-symbols-outlined" style={{ fontSize: 15 }}>trending_up</span>
+                Sales copilot
+              </button>
+              <button
+                onClick={() => applyMode('interpret')}
+                className={`text-[11px] font-bold px-3 py-1.5 inline-flex items-center gap-1.5 ${mode === 'interpret' ? 'bg-white/15 text-white' : 'text-white/50 hover:text-white/80'}`}
+              >
+                <span className="material-symbols-outlined" style={{ fontSize: 15 }}>translate</span>
+                Interpreter (ES⇄EN)
+              </button>
+            </div>
+
+            {mode === 'interpret' && (
+              <>
+                <button
+                  onClick={() => setMnVoice((v) => { const nv = !v; if (!nv) { try { window.speechSynthesis?.cancel(); } catch {} } return nv; })}
+                  className={`text-[11px] font-bold px-3 py-1.5 rounded-xl border inline-flex items-center gap-1.5 ${mnVoice ? 'text-emerald-200 border-emerald-400/40 bg-emerald-500/15' : 'text-white/55 border-white/10 bg-white/5 hover:text-white/80'}`}
+                  title="Mother Nature speaks the translation aloud"
+                >
+                  <span className="material-symbols-outlined" style={{ fontSize: 15 }}>{mnVoice ? 'volume_up' : 'volume_off'}</span>
+                  Mother Nature voice {mnVoice ? 'on' : 'off'}
+                </button>
+                <div className="inline-flex items-center gap-1 text-[10px] text-white/45">
+                  <span className="uppercase tracking-wider font-bold">Listening for</span>
+                  <div className="inline-flex rounded-lg overflow-hidden border border-white/10">
+                    <button
+                      onClick={() => applyListenLang('es-US')}
+                      className={`px-2 py-1 font-bold ${listenLang === 'es-US' ? 'bg-white/15 text-white' : 'text-white/50 hover:text-white/80'}`}
+                    >Español</button>
+                    <button
+                      onClick={() => applyListenLang('en-US')}
+                      className={`px-2 py-1 font-bold ${listenLang === 'en-US' ? 'bg-white/15 text-white' : 'text-white/50 hover:text-white/80'}`}
+                    >English</button>
+                  </div>
+                </div>
+              </>
+            )}
+          </div>
         </div>
         <div className="flex items-center gap-2">
           {startedAt && (
@@ -500,48 +649,101 @@ export default function CopilotPage() {
           </div>
         </div>
 
-        {/* Right: signals */}
-        <div className="flex flex-col gap-3">
-          {signals.length === 0 && (
-            <div
-              className="glass-card p-6 text-center text-white/55 text-sm"
-              style={{ background: 'rgba(255,255,255,0.04)' }}
-            >
-              <span className="material-symbols-outlined block mb-2" style={{ fontSize: 36, color: '#4ab8ce', opacity: 0.6 }}>auto_awesome</span>
-              <div className="font-bold text-white/80">Cues will appear here</div>
-              <p className="text-[11px] text-white/55 max-w-sm mx-auto mt-1">
-                Buying signals · objections · what to say next · questions to ask · when to pause or close.
-              </p>
-            </div>
-          )}
-          {signals.map((s) => {
-            const st = styleFor(s.type);
-            return (
-              <div
-                key={s.id}
-                className="rounded-2xl p-4 transition-all"
-                style={{
-                  background: st.bg,
-                  border: `1px solid ${st.border}`,
-                  borderLeft: `4px solid ${st.accent}`,
-                  animation: 'mna-fade-up 280ms ease-out',
-                }}
-              >
-                <div className="flex items-center gap-2 mb-1.5">
-                  <span className="material-symbols-outlined" style={{ fontSize: 18, color: st.accent }}>{st.icon}</span>
-                  <span className="text-[10px] font-black uppercase tracking-[0.15em]" style={{ color: st.text }}>
-                    {s.type}
-                  </span>
-                </div>
-                <div className="space-y-1">
-                  {s.lines.map((l, i) => (
-                    <div key={i} className="text-[14px] leading-snug text-white">{l}</div>
-                  ))}
-                </div>
+        {/* Right: interpreter (interpret mode) or sales signals */}
+        {mode === 'interpret' ? (
+          <div className="flex flex-col gap-3">
+            {interps.length === 0 && (
+              <div className="glass-card p-6 text-center text-white/55 text-sm" style={{ background: 'rgba(255,255,255,0.04)' }}>
+                <span className="material-symbols-outlined block mb-2" style={{ fontSize: 36, color: '#4ab8ce', opacity: 0.6 }}>translate</span>
+                <div className="font-bold text-white/80">Translations will appear here</div>
+                <p className="text-[11px] text-white/55 max-w-sm mx-auto mt-1">
+                  Set <b>Listening for</b> to whoever is talking. Each turn is translated to the other language.
+                  Turn on <b>Mother Nature voice</b> to have the translation spoken aloud so you can go back and forth.
+                </p>
               </div>
-            );
-          })}
-        </div>
+            )}
+            {interps.map((it) => (
+              <div key={it.id} className="rounded-2xl p-4" style={{ background: 'rgba(14,165,233,0.08)', border: '1px solid rgba(56,189,248,0.35)', borderLeft: '4px solid #0ea5e9', animation: 'mna-fade-up 280ms ease-out' }}>
+                <div className="flex items-center justify-between gap-2 mb-1.5">
+                  <span className="text-[10px] font-black uppercase tracking-[0.15em] text-sky-200">
+                    {it.detected === 'es' ? 'Heard · Español' : it.detected === 'en' ? 'Heard · English' : 'Heard'}
+                    {' → '}
+                    {it.targetLang === 'es' ? 'Español' : 'English'}
+                  </span>
+                  <button
+                    onClick={() => speakAloud(it.translation, it.targetLang)}
+                    className="text-white/50 hover:text-white inline-flex items-center gap-1 text-[10px] font-semibold"
+                    title="Speak translation"
+                  >
+                    <span className="material-symbols-outlined" style={{ fontSize: 15 }}>volume_up</span>
+                    Speak
+                  </button>
+                </div>
+                {it.original && <div className="text-[11px] text-white/45 italic mb-1">“{it.original}”</div>}
+                <div className="text-[15px] leading-snug text-white font-semibold">{it.translation}</div>
+                {it.sayNext && (
+                  <div className="mt-2 rounded-lg p-2.5" style={{ background: 'rgba(16,185,129,0.10)', border: '1px solid rgba(52,211,153,0.3)' }}>
+                    <div className="flex items-center justify-between gap-2 mb-0.5">
+                      <span className="text-[9px] font-bold uppercase tracking-wider text-emerald-300/70">Say next</span>
+                      <button
+                        onClick={() => speakAloud(it.sayNext, it.detected === 'en' ? 'en' : 'es')}
+                        className="text-emerald-300/70 hover:text-emerald-200 inline-flex items-center gap-1 text-[10px] font-semibold"
+                        title="Speak this reply"
+                      >
+                        <span className="material-symbols-outlined" style={{ fontSize: 14 }}>volume_up</span>
+                        Speak
+                      </button>
+                    </div>
+                    <div className="text-[13px] text-emerald-100 leading-snug">{it.sayNext}</div>
+                    {it.sayNextGloss && <div className="text-[10px] text-white/40 mt-0.5">{it.sayNextGloss}</div>}
+                  </div>
+                )}
+              </div>
+            ))}
+          </div>
+        ) : (
+          <div className="flex flex-col gap-3">
+            {signals.length === 0 && (
+              <div
+                className="glass-card p-6 text-center text-white/55 text-sm"
+                style={{ background: 'rgba(255,255,255,0.04)' }}
+              >
+                <span className="material-symbols-outlined block mb-2" style={{ fontSize: 36, color: '#4ab8ce', opacity: 0.6 }}>auto_awesome</span>
+                <div className="font-bold text-white/80">Cues will appear here</div>
+                <p className="text-[11px] text-white/55 max-w-sm mx-auto mt-1">
+                  Buying signals · objections · what to say next · questions to ask · when to pause or close.
+                </p>
+              </div>
+            )}
+            {signals.map((s) => {
+              const st = styleFor(s.type);
+              return (
+                <div
+                  key={s.id}
+                  className="rounded-2xl p-4 transition-all"
+                  style={{
+                    background: st.bg,
+                    border: `1px solid ${st.border}`,
+                    borderLeft: `4px solid ${st.accent}`,
+                    animation: 'mna-fade-up 280ms ease-out',
+                  }}
+                >
+                  <div className="flex items-center gap-2 mb-1.5">
+                    <span className="material-symbols-outlined" style={{ fontSize: 18, color: st.accent }}>{st.icon}</span>
+                    <span className="text-[10px] font-black uppercase tracking-[0.15em]" style={{ color: st.text }}>
+                      {s.type}
+                    </span>
+                  </div>
+                  <div className="space-y-1">
+                    {s.lines.map((l, i) => (
+                      <div key={i} className="text-[14px] leading-snug text-white">{l}</div>
+                    ))}
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        )}
       </div>
 
       <style jsx global>{`
