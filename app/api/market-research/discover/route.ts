@@ -5,71 +5,24 @@ import { createClient } from '@/lib/supabase/server';
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
 
-const PLACES_KEY = process.env.GOOGLE_PLACES_API_KEY;
-
 /**
- * Auto-discover local outreach targets near a client via Google Places text
- * search, then persist any new ones (deduped by place_id per client).
- *
- * Tries the new Places API, falling back to the legacy API (same as the
- * reviews reader) so it works with whichever the project's key has enabled.
+ * Auto-discover local outreach targets near a client using OpenStreetMap —
+ * Nominatim to geocode the address, Overpass to find POIs within ~15 miles.
+ * Free, keyless, no billing (no Google API needed). New results are saved,
+ * deduped by their OSM id per client.
  *
  * POST { clientId, location, category }  category: 'gym' | 'urgent_care' | 'b2b'
  */
 
-const QUERY_FOR: Record<string, string> = {
-  gym: 'gyms and fitness studios',
-  urgent_care: 'urgent care clinics',
-  b2b: 'wellness and medical spas',
+const UA = 'MotherNatureAgencyPortal/1.0 (mn@mothernatureagency.com)';
+const RADIUS_M = 24140; // ~15 miles
+
+// Overpass tag filters per category (each gets the (around:…) clause appended).
+const FILTERS: Record<string, string[]> = {
+  gym: ['nwr[leisure=fitness_centre]', 'nwr[leisure=sports_centre]', 'nwr["sport"="fitness"]'],
+  urgent_care: ['nwr[amenity=clinic]', 'nwr[healthcare=clinic]', 'nwr[amenity=doctors]', 'nwr[amenity=hospital]'],
+  b2b: ['nwr[leisure=spa]', 'nwr[shop=massage]', 'nwr[shop=beauty]', 'nwr[amenity=spa]'],
 };
-
-type Place = { id: string; name: string; address: string | null; phone: string | null; mapsUri: string | null };
-
-async function searchNew(textQuery: string): Promise<{ ok: boolean; places?: Place[]; status?: number; body?: string }> {
-  const r = await fetch('https://places.googleapis.com/v1/places:searchText', {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-      'X-Goog-Api-Key': PLACES_KEY!,
-      'X-Goog-FieldMask': 'places.id,places.displayName,places.formattedAddress,places.nationalPhoneNumber,places.googleMapsUri',
-    },
-    body: JSON.stringify({ textQuery, pageSize: 20 }),
-  });
-  const body = await r.text();
-  if (!r.ok) return { ok: false, status: r.status, body };
-  try {
-    const data = JSON.parse(body);
-    const places: Place[] = (data.places || []).map((p: any) => ({
-      id: p.id,
-      name: p.displayName?.text || 'Unknown',
-      address: p.formattedAddress || null,
-      phone: p.nationalPhoneNumber || null,
-      mapsUri: p.googleMapsUri || null,
-    }));
-    return { ok: true, places };
-  } catch { return { ok: false, status: r.status, body }; }
-}
-
-async function searchLegacy(textQuery: string): Promise<{ ok: boolean; places?: Place[]; status?: number; body?: string }> {
-  const url = `https://maps.googleapis.com/maps/api/place/textsearch/json?query=${encodeURIComponent(textQuery)}&key=${PLACES_KEY}`;
-  const r = await fetch(url);
-  const body = await r.text();
-  if (!r.ok) return { ok: false, status: r.status, body };
-  try {
-    const data = JSON.parse(body);
-    if (data.status !== 'OK' && data.status !== 'ZERO_RESULTS') {
-      return { ok: false, status: r.status, body: data.error_message || data.status };
-    }
-    const places: Place[] = (data.results || []).map((p: any) => ({
-      id: p.place_id,
-      name: p.name || 'Unknown',
-      address: p.formatted_address || null,
-      phone: null, // legacy text search doesn't return phone
-      mapsUri: `https://www.google.com/maps/place/?q=place_id:${p.place_id}`,
-    }));
-    return { ok: true, places };
-  } catch { return { ok: false, status: r.status, body }; }
-}
 
 async function role(): Promise<string> {
   try {
@@ -79,35 +32,57 @@ async function role(): Promise<string> {
   } catch { return ''; }
 }
 
+async function geocode(loc: string): Promise<{ lat: number; lon: number } | null> {
+  const url = `https://nominatim.openstreetmap.org/search?q=${encodeURIComponent(loc)}&format=json&limit=1`;
+  const r = await fetch(url, { headers: { 'User-Agent': UA, 'Accept-Language': 'en' } });
+  if (!r.ok) return null;
+  const data = await r.json();
+  if (!Array.isArray(data) || data.length === 0) return null;
+  return { lat: parseFloat(data[0].lat), lon: parseFloat(data[0].lon) };
+}
+
+function composeAddress(tags: any): string | null {
+  const parts = [
+    [tags['addr:housenumber'], tags['addr:street']].filter(Boolean).join(' '),
+    tags['addr:city'],
+    [tags['addr:state'], tags['addr:postcode']].filter(Boolean).join(' '),
+  ].filter(Boolean);
+  return parts.length ? parts.join(', ') : null;
+}
+
 export async function POST(req: NextRequest) {
   await ensureSchema();
   const r = await role();
   if (!r) return NextResponse.json({ error: 'Not authenticated' }, { status: 401 });
   if (r === 'client') return NextResponse.json({ error: 'Only staff can run discovery' }, { status: 403 });
-  if (!PLACES_KEY) return NextResponse.json({ error: 'GOOGLE_PLACES_API_KEY is not set in Vercel env vars.' }, { status: 500 });
 
   let body: any;
   try { body = await req.json(); } catch { return NextResponse.json({ error: 'Invalid JSON' }, { status: 400 }); }
   const { clientId, location, category } = body || {};
   if (!clientId || !category) return NextResponse.json({ error: 'clientId and category required' }, { status: 400 });
   const loc = (location || '').toString().trim();
-  if (!loc) return NextResponse.json({ error: 'Enter an address or city to search near.' }, { status: 400 });
+  if (!loc) return NextResponse.json({ error: 'Enter an address, city/state, or ZIP to search near.' }, { status: 400 });
 
-  const textQuery = `${QUERY_FOR[category] || category} near ${loc}`;
-  const a = await searchNew(textQuery);
-  let result = a;
-  let legacyNote = '';
-  if (!a.ok) {
-    const b = await searchLegacy(textQuery);
-    result = b;
-    if (!b.ok) legacyNote = ` · Legacy API: ${b.status} ${String(b.body).slice(0, 200)}`;
+  const geo = await geocode(loc);
+  if (!geo) return NextResponse.json({ error: `Couldn't find "${loc}" on the map — try "City, State" or a ZIP.` }, { status: 400 });
+
+  const filters = FILTERS[category] || FILTERS.b2b;
+  const clauses = filters.map((f) => `${f}(around:${RADIUS_M},${geo.lat},${geo.lon});`).join('');
+  const overpassQL = `[out:json][timeout:25];(${clauses});out center 60;`;
+
+  let elements: any[] = [];
+  try {
+    const or = await fetch('https://overpass-api.de/api/interpreter', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/x-www-form-urlencoded', 'User-Agent': UA },
+      body: `data=${encodeURIComponent(overpassQL)}`,
+    });
+    if (!or.ok) return NextResponse.json({ error: `Map search failed (${or.status}). Try again in a moment.` }, { status: 502 });
+    const data = await or.json();
+    elements = Array.isArray(data.elements) ? data.elements : [];
+  } catch (e: any) {
+    return NextResponse.json({ error: `Map search error: ${e?.message || e}` }, { status: 502 });
   }
-  if (!result.ok) {
-    return NextResponse.json({
-      error: `Places lookup failed. New API: ${a.status} ${String(a.body).slice(0, 200)}${legacyNote}. Likely the API key isn't set in Vercel, or "Places API" / "Places API (New)" isn't enabled in Google Cloud, or the key is restricted.`,
-    }, { status: 502 });
-  }
-  const places = result.places || [];
 
   const { rows: existing } = await query<{ place_id: string }>(
     `select place_id from market_targets where client_id = $1 and place_id is not null`,
@@ -116,16 +91,28 @@ export async function POST(req: NextRequest) {
   const seen = new Set(existing.map((e) => e.place_id));
 
   let added = 0;
-  for (const p of places) {
-    if (!p.id || seen.has(p.id)) continue;
-    seen.add(p.id);
+  let found = 0;
+  for (const el of elements) {
+    const tags = el.tags || {};
+    const name = tags.name;
+    if (!name) continue; // skip unnamed POIs
+    found++;
+    const placeId = `osm_${el.type}${el.id}`;
+    if (seen.has(placeId)) continue;
+    seen.add(placeId);
+    const lat = el.lat ?? el.center?.lat;
+    const lon = el.lon ?? el.center?.lon;
+    const phone = tags.phone || tags['contact:phone'] || null;
+    const mapsUri = lat && lon
+      ? `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(name)}%20${lat},${lon}`
+      : `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(name + ' ' + loc)}`;
     await query(
       `insert into market_targets (client_id, category, name, address, phone, place_id, maps_uri)
        values ($1, $2, $3, $4, $5, $6, $7)`,
-      [clientId, category, p.name, p.address, p.phone, p.id, p.mapsUri],
+      [clientId, category, name, composeAddress(tags), phone, placeId, mapsUri],
     );
     added++;
   }
 
-  return NextResponse.json({ added, found: places.length });
+  return NextResponse.json({ added, found });
 }
