@@ -42,7 +42,14 @@ export default function ClientsPage() {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ name: n }),
+        cache: 'no-store',
       });
+      // If the session lapsed, the request is redirected to /login and comes
+      // back as HTML — surface that clearly instead of failing silently.
+      const ct = res.headers.get('content-type') || '';
+      if (res.redirected || !ct.includes('application/json')) {
+        throw new Error('Your session may have expired. Refresh the page, sign in, and try again.');
+      }
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || 'Could not add client');
       setName('');
@@ -51,7 +58,7 @@ export default function ClientsPage() {
       refreshClients();
       if (data.client?.id) setActiveClientId(data.client.id);
     } catch (e: any) {
-      setError(e.message);
+      setError(e.message || 'Could not add client');
     } finally {
       setBusy(false);
     }
