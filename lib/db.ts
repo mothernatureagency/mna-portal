@@ -334,6 +334,21 @@ async function initSchema() {
                         client_visible boolean not null default false,
                         created_at timestamptz not null default now()
                   )`,
+                  // Market research / local outreach targets per client
+                  // (B2B partners, gyms, urgent cares within ~15 miles).
+                  `create table if not exists market_targets (
+                        id uuid primary key default uuid_generate_v4(),
+                        client_id text not null,
+                        category text not null,
+                        name text not null,
+                        address text,
+                        phone text,
+                        place_id text,
+                        maps_uri text,
+                        status text not null default 'to_contact',
+                        notes text,
+                        created_at timestamptz not null default now()
+                  )`,
                   // Staff → client assignments (who works on which client).
                   // Editable overlay over the static defaults in lib/staff.ts.
                   `create table if not exists staff_assignments (

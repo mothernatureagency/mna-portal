@@ -24,6 +24,7 @@ const NAV = [
   ]},
   { sec: 'CLIENT MGMT', items: [
     { label: 'Clients', href: '/clients', e: 'add_business' },
+    { label: 'Market Research', href: '/market-research', e: 'travel_explore' },
     { label: 'Task Manager', href: '/client-tasks', e: 'checklist' },
     { label: 'Meeting Notes', href: '/meeting-notes', e: 'description' },
     { label: 'Invoices', href: '/invoices', e: 'receipt_long' },
