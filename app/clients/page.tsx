@@ -14,7 +14,11 @@ export default function ClientsPage() {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
   const [customIds, setCustomIds] = useState<Set<string>>(new Set());
+  const [logoUrl, setLogoUrl] = useState('');       // logo for the new location
+  const [uploadingLogo, setUploadingLogo] = useState(false);
+  const [logoBusyId, setLogoBusyId] = useState<string | null>(null); // per-card logo upload
   const formRef = useRef<HTMLDivElement>(null);
+  const formLogoInput = useRef<HTMLInputElement>(null);
 
   async function loadCustom() {
     try {
@@ -24,6 +28,40 @@ export default function ClientsPage() {
     } catch {}
   }
   useEffect(() => { loadCustom(); }, []);
+
+  // Upload an image and return its hosted URL (reuses the content uploader).
+  async function uploadImageFile(file: File): Promise<string | null> {
+    if (!file.type.startsWith('image/')) { setError('Logo must be an image file.'); return null; }
+    const fd = new FormData();
+    fd.append('file', file);
+    const res = await fetch('/api/content-calendar/upload', { method: 'POST', body: fd });
+    const ct = res.headers.get('content-type') || '';
+    if (res.redirected || !ct.includes('application/json')) { setError('Session may have expired — refresh and try again.'); return null; }
+    const data = await res.json();
+    if (!res.ok) { setError(data.error || 'Logo upload failed'); return null; }
+    return data.url as string;
+  }
+
+  async function onPickFormLogo(file: File) {
+    setUploadingLogo(true); setError('');
+    try { const url = await uploadImageFile(file); if (url) setLogoUrl(url); }
+    finally { setUploadingLogo(false); }
+  }
+
+  // Set/replace the logo on an existing custom location.
+  async function changeClientLogo(id: string, file: File) {
+    setLogoBusyId(id); setError('');
+    try {
+      const url = await uploadImageFile(file);
+      if (!url) return;
+      await fetch('/api/clients', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ id, logoUrl: url }),
+      });
+      refreshClients();
+    } finally { setLogoBusyId(null); }
+  }
 
   function openForm() {
     setAdding(true);
@@ -41,7 +79,7 @@ export default function ClientsPage() {
       const res = await fetch('/api/clients', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ name: n }),
+        body: JSON.stringify({ name: n, logoUrl: logoUrl || undefined }),
         cache: 'no-store',
       });
       // If the session lapsed, the request is redirected to /login and comes
@@ -53,6 +91,7 @@ export default function ClientsPage() {
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || 'Could not add client');
       setName('');
+      setLogoUrl('');
       setAdding(false);
       await loadCustom();
       refreshClients();
@@ -127,6 +166,30 @@ export default function ClientsPage() {
               <Plus size={16} /> {busy ? 'Adding…' : 'Add client'}
             </button>
           </div>
+          {/* Optional logo */}
+          <div className="flex items-center gap-3 mt-3">
+            <div className="w-12 h-12 rounded-xl bg-gray-50 border border-gray-200 flex items-center justify-center overflow-hidden shrink-0">
+              {logoUrl ? (
+                <img src={logoUrl} alt="logo" className="w-full h-full object-contain" />
+              ) : (
+                <span className="material-symbols-outlined text-gray-300" style={{ fontSize: 22 }}>image</span>
+              )}
+            </div>
+            <div>
+              <button
+                type="button"
+                onClick={() => formLogoInput.current?.click()}
+                disabled={uploadingLogo}
+                className="text-[12px] font-semibold px-3 py-1.5 rounded-lg text-gray-600 border border-gray-200 hover:bg-gray-50 disabled:opacity-50"
+              >
+                {uploadingLogo ? 'Uploading…' : logoUrl ? 'Change logo' : 'Upload logo (optional)'}
+              </button>
+              <div className="text-[10px] text-gray-400 mt-1">PNG or SVG. Defaults to the Prime IV logo if left blank.</div>
+            </div>
+            <input ref={formLogoInput} type="file" accept="image/*" className="hidden"
+                   onChange={(e) => { const f = e.target.files?.[0]; if (f) onPickFormLogo(f); e.target.value = ''; }} />
+          </div>
+
           {preview && (
             <div className="text-[11px] text-gray-400 mt-2">
               Will create: <span className="text-gray-700 font-semibold">{preview.name}</span>
@@ -163,10 +226,14 @@ export default function ClientsPage() {
                 {/* Client header */}
                 <div className="flex items-start gap-4 mb-4">
                   <div
-                    className="w-12 h-12 rounded-2xl flex items-center justify-center text-white text-xl font-extrabold shadow-md flex-shrink-0"
-                    style={{ background: `linear-gradient(135deg, ${client.branding.gradientFrom}, ${client.branding.gradientTo})` }}
+                    className="w-12 h-12 rounded-2xl flex items-center justify-center text-white text-xl font-extrabold shadow-md flex-shrink-0 overflow-hidden"
+                    style={client.branding.logoUrl
+                      ? { background: '#fff', border: '1px solid rgba(0,0,0,0.06)' }
+                      : { background: `linear-gradient(135deg, ${client.branding.gradientFrom}, ${client.branding.gradientTo})` }}
                   >
-                    {client.name.charAt(0)}
+                    {client.branding.logoUrl
+                      ? <img src={client.branding.logoUrl} alt="" className="w-full h-full object-contain p-1" />
+                      : client.name.charAt(0)}
                   </div>
                   <div className="flex-1 min-w-0">
                     <h3 className="text-[16px] font-bold text-gray-900 tracking-tight truncate">{client.name}</h3>
@@ -254,6 +321,22 @@ export default function ClientsPage() {
                   >
                     Edit
                   </button>
+                  {customIds.has(client.id) && (
+                    <label
+                      title="Set or replace this location's logo"
+                      className="px-3 py-2 rounded-xl text-[12px] font-semibold text-gray-500 transition-colors hover:bg-gray-50 cursor-pointer inline-flex items-center gap-1"
+                      style={{ border: '1px solid rgba(0,0,0,0.08)' }}
+                    >
+                      <span className="material-symbols-outlined" style={{ fontSize: 14 }}>image</span>
+                      {logoBusyId === client.id ? 'Uploading…' : 'Logo'}
+                      <input
+                        type="file"
+                        accept="image/*"
+                        className="hidden"
+                        onChange={(e) => { const f = e.target.files?.[0]; if (f) changeClientLogo(client.id, f); e.target.value = ''; }}
+                      />
+                    </label>
+                  )}
                   {customIds.has(client.id) && (
                     <button
                       onClick={() => removeClient(client.id, client.name)}

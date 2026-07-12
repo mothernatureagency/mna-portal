@@ -27,8 +27,8 @@ export function ClientProvider({ children }: { children: ReactNode }) {
     fetch('/api/clients')
       .then((r) => r.json())
       .then((d) => {
-        const rows = (d.items || []) as Array<{ id: string; name: string; short_name?: string; location?: string }>;
-        setCustomClients(rows.map((r) => makePrimeIVClient({ id: r.id, name: r.name, shortName: r.short_name, location: r.location })));
+        const rows = (d.items || []) as Array<{ id: string; name: string; short_name?: string; location?: string; logo_url?: string }>;
+        setCustomClients(rows.map((r) => makePrimeIVClient({ id: r.id, name: r.name, shortName: r.short_name, location: r.location, logoUrl: r.logo_url })));
       })
       .catch(() => {});
   }

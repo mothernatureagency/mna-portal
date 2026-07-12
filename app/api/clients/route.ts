@@ -30,7 +30,7 @@ async function role(): Promise<string> {
 export async function GET() {
   await ensureSchema();
   const { rows } = await query(
-    `select id, name, short_name, location, created_at from custom_clients order by created_at asc`,
+    `select id, name, short_name, location, logo_url, created_at from custom_clients order by created_at asc`,
   );
   return NextResponse.json({ items: rows });
 }
@@ -44,11 +44,12 @@ export async function POST(req: NextRequest) {
   let body: any;
   try { body = await req.json(); } catch { return NextResponse.json({ error: 'Invalid JSON' }, { status: 400 }); }
   const name = (body?.name || '').toString().trim();
+  const logoUrl = (body?.logoUrl || '').toString().trim() || null;
   if (!name) return NextResponse.json({ error: 'name required' }, { status: 400 });
 
   // Generate the full config so we can derive/validate the id, then persist
   // just the identifying fields (the rest is regenerated on load).
-  const client = makePrimeIVClient({ name });
+  const client = makePrimeIVClient({ name, logoUrl: logoUrl || undefined });
   if (!slugify(client.location || client.name)) {
     return NextResponse.json({ error: 'Please enter a valid location name' }, { status: 400 });
   }
@@ -60,11 +61,11 @@ export async function POST(req: NextRequest) {
 
   try {
     const { rows } = await query(
-      `insert into custom_clients (id, name, short_name, location)
-       values ($1, $2, $3, $4)
+      `insert into custom_clients (id, name, short_name, location, logo_url)
+       values ($1, $2, $3, $4, $5)
        on conflict (id) do nothing
-       returning id, name, short_name, location, created_at`,
-      [client.id, client.name, client.shortName, client.location || null],
+       returning id, name, short_name, location, logo_url, created_at`,
+      [client.id, client.name, client.shortName, client.location || null, logoUrl],
     );
     if (rows.length === 0) {
       return NextResponse.json({ error: `That location already exists (${client.name})` }, { status: 409 });
@@ -73,6 +74,28 @@ export async function POST(req: NextRequest) {
   } catch (e: any) {
     return NextResponse.json({ error: e?.message || 'Could not add client' }, { status: 500 });
   }
+}
+
+// PATCH /api/clients  { id, logoUrl } — update a custom client's logo.
+export async function PATCH(req: NextRequest) {
+  await ensureSchema();
+  const r = await role();
+  if (!r) return NextResponse.json({ error: 'Not authenticated' }, { status: 401 });
+  if (r === 'client') return NextResponse.json({ error: 'Only staff can edit clients' }, { status: 403 });
+
+  let body: any;
+  try { body = await req.json(); } catch { return NextResponse.json({ error: 'Invalid JSON' }, { status: 400 }); }
+  const id = (body?.id || '').toString().trim();
+  if (!id) return NextResponse.json({ error: 'id required' }, { status: 400 });
+  const logoUrl = (body?.logoUrl ?? '').toString().trim() || null;
+
+  const { rows } = await query(
+    `update custom_clients set logo_url = $1 where id = $2
+     returning id, name, short_name, location, logo_url, created_at`,
+    [logoUrl, id],
+  );
+  if (rows.length === 0) return NextResponse.json({ error: 'Not a custom client (built-ins can\'t be edited here)' }, { status: 404 });
+  return NextResponse.json({ item: rows[0] });
 }
 
 export async function DELETE(req: NextRequest) {

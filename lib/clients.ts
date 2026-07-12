@@ -259,6 +259,7 @@ export function makePrimeIVClient(input: {
   name?: string;
   shortName?: string;
   location?: string;
+  logoUrl?: string;
 }): Client {
   const raw = (input.name || input.location || '').trim();
   const loc = (input.location || raw.replace(/^prime\s*iv\s*[—\-–:]*\s*/i, '')).trim() || raw;
@@ -281,7 +282,9 @@ export function makePrimeIVClient(input: {
       accentColor: '#c8a96e',
       mode: 'light',
       logoText: 'Prime IV',
-      logoUrl: '/logos/primeiv-logo.png',
+      // Per-location logo when set, otherwise the shared Prime IV mark.
+      logoUrl: input.logoUrl || '/logos/primeiv-logo.png',
+      iconUrl: input.logoUrl || undefined,
     },
     kpiTargets: { leads: 250, costPerLead: 53, conversionRate: 14, adSpend: 9000, appointments: 60, revenue: 80000 },
     links: {
