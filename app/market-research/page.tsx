@@ -50,6 +50,14 @@ export default function MarketResearchPage() {
   const [newName, setNewName] = useState<Record<string, string>>({});
   const [template, setTemplate] = useState('');
   const [templateSaved, setTemplateSaved] = useState(false);
+  // Editable search address — where "Find nearby" looks. Defaults to the
+  // client's location, persisted per client so it sticks.
+  const [searchLocation, setSearchLocation] = useState('');
+  // Income / population lookup (US Census)
+  const [zipInput, setZipInput] = useState('');
+  const [areas, setAreas] = useState<{ zip: string; name: string | null; income: number | null; population: number | null }[]>([]);
+  const [demoLoading, setDemoLoading] = useState(false);
+  const [demoSource, setDemoSource] = useState('');
 
   async function load() {
     if (!clientId) return;
@@ -68,7 +76,22 @@ export default function MarketResearchPage() {
       setTemplate(typeof data.value === 'string' && data.value ? data.value : DEFAULT_TEMPLATE);
     } catch { setTemplate(DEFAULT_TEMPLATE); }
   }
-  useEffect(() => { load(); loadTemplate(); /* eslint-disable-next-line */ }, [clientId]);
+  async function loadSearchLocation() {
+    if (!clientId) return;
+    try {
+      const res = await fetch(`/api/client-kv?clientId=${encodeURIComponent(clientId)}&key=market_location`);
+      const data = await res.json();
+      setSearchLocation(typeof data.value === 'string' && data.value ? data.value : (location || ''));
+    } catch { setSearchLocation(location || ''); }
+  }
+  function saveSearchLocation() {
+    if (!clientId) return;
+    fetch('/api/client-kv', {
+      method: 'PUT', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ clientId, key: 'market_location', value: searchLocation }),
+    }).catch(() => {});
+  }
+  useEffect(() => { load(); loadTemplate(); loadSearchLocation(); /* eslint-disable-next-line */ }, [clientId]);
 
   async function saveTemplate() {
     if (!clientId) return;
@@ -88,7 +111,7 @@ export default function MarketResearchPage() {
       const res = await fetch('/api/market-research/discover', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ clientId, location, category }),
+        body: JSON.stringify({ clientId, location: searchLocation || location, category }),
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || 'Discovery failed');
@@ -121,6 +144,29 @@ export default function MarketResearchPage() {
     await fetch(`/api/market-research?id=${encodeURIComponent(id)}`, { method: 'DELETE' });
   }
 
+  function useTargetZips() {
+    const zips = Array.from(new Set(
+      targets.map((t) => (t.address || '').match(/\b\d{5}\b/)?.[0]).filter(Boolean) as string[],
+    ));
+    setZipInput(zips.join(', '));
+  }
+
+  async function lookupDemographics() {
+    const zips = Array.from(new Set((zipInput.match(/\d{5}/g) || [])));
+    if (zips.length === 0) { setMsg('Enter at least one 5-digit ZIP code.'); return; }
+    setDemoLoading(true); setMsg('');
+    try {
+      const res = await fetch('/api/market-research/demographics', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ zips }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || 'Lookup failed');
+      setAreas(data.areas || []);
+      setDemoSource(data.source || '');
+    } catch (e: any) { setMsg(e.message); } finally { setDemoLoading(false); }
+  }
+
   const byCat = useMemo(() => {
     const m: Record<string, Target[]> = {};
     for (const c of CATEGORIES) m[c.key] = [];
@@ -141,10 +187,25 @@ export default function MarketResearchPage() {
             <h1 className="text-3xl font-bold text-white tracking-tight">Market Research</h1>
           </div>
           <p className="text-white/60 mt-1 text-sm">
-            Local B2B, gyms, and urgent cares near <b className="text-white/80">{activeClient?.shortName}</b>
-            {location ? <> · {location}</> : ' · set a location on this client to enable auto-discovery'} · outreach targets within ~15 miles.
+            Local B2B, gyms, and urgent cares near <b className="text-white/80">{activeClient?.shortName}</b> · outreach targets within ~15 miles.
           </p>
         </div>
+      </div>
+
+      {/* Search address */}
+      <div className="rounded-2xl p-4 flex flex-col sm:flex-row sm:items-center gap-2" style={{ background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.07)' }}>
+        <span className="material-symbols-outlined text-cyan-400 shrink-0" style={{ fontSize: 18 }}>location_on</span>
+        <div className="flex-1">
+          <div className="text-[10px] font-bold uppercase tracking-wider text-white/45 mb-0.5">Search location</div>
+          <input
+            value={searchLocation}
+            onChange={(e) => setSearchLocation(e.target.value)}
+            onBlur={saveSearchLocation}
+            placeholder="e.g. 123 Main St, Niceville FL 32578  (or just a city/ZIP)"
+            className="w-full text-[13px] px-3 py-2 rounded-lg bg-white/5 border border-white/10 text-white outline-none placeholder:text-white/30"
+          />
+        </div>
+        <div className="text-[10px] text-white/40 sm:max-w-[220px]">“Find nearby” searches around this address. Saved per location.</div>
       </div>
 
       {msg && <div className="text-[12px] text-white/70 bg-white/5 border border-white/10 rounded-lg px-3 py-2">{msg}</div>}
@@ -177,6 +238,47 @@ export default function MarketResearchPage() {
         </div>
       </div>
 
+      {/* Income / population — top neighborhoods to target */}
+      <div className="rounded-2xl p-5" style={{ background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.07)' }}>
+        <div className="flex items-center justify-between mb-2 flex-wrap gap-2">
+          <div className="text-[11px] font-bold uppercase tracking-wider text-white/55">Income & population — top areas to target</div>
+          {demoSource && <span className="text-[10px] text-white/35">{demoSource}</span>}
+        </div>
+        <div className="flex flex-col sm:flex-row gap-2 mb-3">
+          <input
+            value={zipInput}
+            onChange={(e) => setZipInput(e.target.value)}
+            onKeyDown={(e) => { if (e.key === 'Enter') lookupDemographics(); }}
+            placeholder="ZIP codes, comma-separated  (e.g. 32578, 32541, 32547)"
+            className="flex-1 text-[13px] px-3 py-2 rounded-lg bg-white/5 border border-white/10 text-white outline-none placeholder:text-white/30"
+          />
+          <button onClick={useTargetZips} className="text-[11px] font-semibold px-3 py-2 rounded-lg bg-white/5 text-white/70 hover:text-white border border-white/10">Use ZIPs from my targets</button>
+          <button onClick={lookupDemographics} disabled={demoLoading} className="text-[12px] font-bold px-4 py-2 rounded-lg text-white disabled:opacity-40" style={{ background: 'linear-gradient(135deg,#0c6da4,#4ab8ce)' }}>
+            {demoLoading ? 'Looking up…' : 'Look up'}
+          </button>
+        </div>
+        {areas.length > 0 && (
+          <div className="flex flex-col gap-1.5">
+            {areas.map((a, i) => (
+              <div key={a.zip} className="flex items-center gap-3 rounded-xl px-3 py-2" style={{ background: i < 3 ? 'rgba(16,185,129,0.12)' : 'rgba(0,0,0,0.22)', border: `1px solid ${i < 3 ? 'rgba(52,211,153,0.3)' : 'rgba(255,255,255,0.06)'}` }}>
+                {i < 3 && <span className="text-[9px] font-black px-1.5 py-0.5 rounded bg-emerald-500 text-white shrink-0">TOP {i + 1}</span>}
+                <div className="text-[13px] font-bold text-white w-16 shrink-0">{a.zip}</div>
+                <div className="flex-1 flex items-center gap-4">
+                  <div>
+                    <div className="text-[9px] uppercase tracking-wider text-white/40">Median income</div>
+                    <div className="text-[13px] font-bold text-white">{a.income != null ? `$${a.income.toLocaleString()}` : '—'}</div>
+                  </div>
+                  <div>
+                    <div className="text-[9px] uppercase tracking-wider text-white/40">Population</div>
+                    <div className="text-[13px] font-bold text-white">{a.population != null ? a.population.toLocaleString() : '—'}</div>
+                  </div>
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
+
       {/* Category columns */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
         {CATEGORIES.map((cat) => {
@@ -191,8 +293,8 @@ export default function MarketResearchPage() {
                 </div>
                 <button
                   onClick={() => discover(cat.key)}
-                  disabled={discovering === cat.key || !location}
-                  title={location ? 'Find nearby via Google' : 'Set a location on this client first'}
+                  disabled={discovering === cat.key || !searchLocation.trim()}
+                  title={searchLocation.trim() ? 'Find nearby via Google' : 'Enter a search location above first'}
                   className="text-[10px] font-bold px-2.5 py-1 rounded-lg text-white disabled:opacity-40 inline-flex items-center gap-1"
                   style={{ background: 'rgba(255,255,255,0.1)' }}
                 >
