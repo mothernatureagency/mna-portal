@@ -103,5 +103,10 @@ export async function middleware(request: NextRequest) {
 }
 
 export const config = {
-  matcher: ['/((?!_next/static|_next/image|favicon.ico).*)'],
+  // Skip middleware for static assets (logos, icons, and any file with an
+  // image/font extension). Otherwise unauthenticated asset requests on public
+  // pages like /login get redirected to /login and render as a broken image.
+  matcher: [
+    '/((?!_next/static|_next/image|favicon.ico|logos/|icons/|.*\\.(?:png|jpe?g|svg|gif|webp|ico|woff2?)).*)',
+  ],
 };
