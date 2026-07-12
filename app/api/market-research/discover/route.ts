@@ -95,10 +95,16 @@ export async function POST(req: NextRequest) {
 
   const textQuery = `${QUERY_FOR[category] || category} near ${loc}`;
   const a = await searchNew(textQuery);
-  const result = a.ok ? a : await searchLegacy(textQuery);
+  let result = a;
+  let legacyNote = '';
+  if (!a.ok) {
+    const b = await searchLegacy(textQuery);
+    result = b;
+    if (!b.ok) legacyNote = ` · Legacy API: ${b.status} ${String(b.body).slice(0, 200)}`;
+  }
   if (!result.ok) {
     return NextResponse.json({
-      error: `Places lookup failed. New: ${a.status} ${String(a.body).slice(0, 160)}. Check that the API key is set and "Places API" is enabled in Google Cloud.`,
+      error: `Places lookup failed. New API: ${a.status} ${String(a.body).slice(0, 200)}${legacyNote}. Likely the API key isn't set in Vercel, or "Places API" / "Places API (New)" isn't enabled in Google Cloud, or the key is restricted.`,
     }, { status: 502 });
   }
   const places = result.places || [];
