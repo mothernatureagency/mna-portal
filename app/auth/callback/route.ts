@@ -15,9 +15,11 @@ export const dynamic = 'force-dynamic';
 export async function GET(request: NextRequest) {
   const { searchParams, origin } = request.nextUrl;
   const code = searchParams.get('code');
+  const tokenHash = searchParams.get('token_hash');
+  const type = searchParams.get('type');
   const next = searchParams.get('next') || '/reset-password';
 
-  if (code) {
+  if (code || tokenHash) {
     const cookieStore = await cookies();
 
     const supabase = createServerClient(
@@ -37,7 +39,11 @@ export async function GET(request: NextRequest) {
       }
     );
 
-    const { error } = await supabase.auth.exchangeCodeForSession(code);
+    // Newer Supabase links deliver a PKCE ?code=; older/recovery links deliver
+    // a ?token_hash=&type=recovery. Handle both so the reset link always works.
+    const { error } = code
+      ? await supabase.auth.exchangeCodeForSession(code)
+      : await supabase.auth.verifyOtp({ type: (type as any) || 'recovery', token_hash: tokenHash! });
 
     if (!error) {
       return NextResponse.redirect(`${origin}${next}`);

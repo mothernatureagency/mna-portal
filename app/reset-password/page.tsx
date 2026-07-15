@@ -10,28 +10,45 @@ function ResetPasswordForm() {
   const [success, setSuccess] = useState('');
   const [loading, setLoading] = useState(false);
   const [ready, setReady] = useState(false);
+  const [linkError, setLinkError] = useState(false);
   const [showPw, setShowPw] = useState(false);
 
   const router = useRouter();
   const supabase = createClient();
 
   useEffect(() => {
-    // The /auth/callback route already exchanged the code for a session.
-    // We just need to verify the user has a valid session.
-    supabase.auth.getSession().then(({ data: { session } }) => {
-      if (session) {
-        setReady(true);
-      }
-    });
+    let settled = false;
+    const markReady = () => { settled = true; setReady(true); };
 
-    // Also listen for auth state changes (PASSWORD_RECOVERY or SIGNED_IN)
+    (async () => {
+      // Normally /auth/callback already exchanged the code and set the session.
+      // But handle the token directly too, in case the email links straight
+      // here or arrives as a token_hash/recovery link instead of a ?code=.
+      try {
+        const url = new URL(window.location.href);
+        const code = url.searchParams.get('code');
+        const tokenHash = url.searchParams.get('token_hash');
+        const type = url.searchParams.get('type') || 'recovery';
+        if (code) {
+          await supabase.auth.exchangeCodeForSession(code);
+        } else if (tokenHash) {
+          await supabase.auth.verifyOtp({ type: type as any, token_hash: tokenHash });
+        }
+      } catch { /* fall through to session check */ }
+
+      const { data: { session } } = await supabase.auth.getSession();
+      if (session) markReady();
+    })();
+
     const { data: { subscription } } = supabase.auth.onAuthStateChange((event) => {
-      if (event === 'PASSWORD_RECOVERY' || event === 'SIGNED_IN') {
-        setReady(true);
-      }
+      if (event === 'PASSWORD_RECOVERY' || event === 'SIGNED_IN') markReady();
     });
 
-    return () => subscription.unsubscribe();
+    // If no valid session shows up, tell the user the link is bad/expired
+    // instead of leaving them on an endless "verifying…".
+    const t = setTimeout(() => { if (!settled) setLinkError(true); }, 5000);
+
+    return () => { subscription.unsubscribe(); clearTimeout(t); };
   }, [supabase.auth]);
 
   async function handleSubmit(e: FormEvent) {
@@ -83,17 +100,22 @@ function ResetPasswordForm() {
           <p className="text-neutral-500 text-base">Enter your new password below</p>
         </div>
 
-        {!ready && !success && (
+        {!ready && !success && !linkError && (
           <p className="text-amber-400 text-sm text-center bg-amber-400/10 rounded-xl py-3 px-3">
-            Verifying your reset link... If this takes too long, go back to{' '}
+            Verifying your reset link…
+          </p>
+        )}
+        {!ready && !success && linkError && (
+          <p className="text-red-400 text-sm text-center bg-red-400/10 rounded-xl py-3 px-3">
+            This reset link is invalid or expired. Go back to{' '}
             <button
               type="button"
               onClick={() => router.push('/login')}
-              className="underline text-amber-300 hover:text-white"
+              className="underline text-red-300 hover:text-white"
             >
               sign in
             </button>{' '}
-            and request a new reset link.
+            and request a new one.
           </p>
         )}
 
