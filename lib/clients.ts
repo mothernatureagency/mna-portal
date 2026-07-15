@@ -254,6 +254,55 @@ export function slugify(s: string): string {
  * dynamically-added clients (see the /clients admin page + custom_clients
  * table) so staff can onboard a new Prime IV location by typing its name.
  */
+/**
+ * Build a client from a name + optional branding/industry. Non-Prime-IV
+ * businesses (a campground, a spa, a realtor…) provide their own industry and
+ * brand colors; when those are omitted this falls back to the Prime IV
+ * template so existing Prime IV locations keep working unchanged.
+ */
+export function makeCustomClient(input: {
+  id?: string;
+  name?: string;
+  shortName?: string;
+  location?: string;
+  logoUrl?: string;
+  industry?: string;
+  brandFrom?: string;
+  brandTo?: string;
+  notes?: string;
+}): Client {
+  const isGeneric = !!(input.industry || input.brandFrom || input.brandTo);
+  if (!isGeneric) return makePrimeIVClient(input);
+
+  const name = (input.name || '').trim() || 'New Client';
+  const shortName = input.shortName || name;
+  const id = input.id || slugify(name);
+  const from = input.brandFrom || '#0c6da4';
+  const to = input.brandTo || '#4ab8ce';
+  return {
+    id,
+    name,
+    shortName,
+    industry: input.industry || 'Business',
+    location: input.location || undefined,
+    branding: {
+      primaryColor: from,
+      secondaryColor: to,
+      gradientFrom: from,
+      gradientTo: to,
+      accentColor: to,
+      mode: 'light',
+      logoText: shortName,
+      logoUrl: input.logoUrl || undefined,
+      iconUrl: input.logoUrl || undefined,
+    },
+    kpiTargets: { leads: 200, costPerLead: 25, conversionRate: 10, adSpend: 3000, appointments: 40, revenue: 40000 },
+    links: {},
+    notes: input.notes || '',
+    integrations: ['Meta Ads', 'Google Ads'],
+  };
+}
+
 export function makePrimeIVClient(input: {
   id?: string;
   name?: string;

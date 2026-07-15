@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { ensureSchema, query } from '@/lib/db';
 import { createClient } from '@/lib/supabase/server';
-import { clients as staticClients, makePrimeIVClient, slugify } from '@/lib/clients';
+import { clients as staticClients, makePrimeIVClient, makeCustomClient, slugify } from '@/lib/clients';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -30,7 +30,7 @@ async function role(): Promise<string> {
 export async function GET() {
   await ensureSchema();
   const { rows } = await query(
-    `select id, name, short_name, location, logo_url, created_at from custom_clients order by created_at asc`,
+    `select id, name, short_name, location, logo_url, industry, brand_from, brand_to, notes, created_at from custom_clients order by created_at asc`,
   );
   return NextResponse.json({ items: rows });
 }
@@ -45,30 +45,38 @@ export async function POST(req: NextRequest) {
   try { body = await req.json(); } catch { return NextResponse.json({ error: 'Invalid JSON' }, { status: 400 }); }
   const name = (body?.name || '').toString().trim();
   const logoUrl = (body?.logoUrl || '').toString().trim() || null;
+  const industry = (body?.industry || '').toString().trim() || null;
+  const brandFrom = (body?.brandFrom || '').toString().trim() || null;
+  const brandTo = (body?.brandTo || '').toString().trim() || null;
+  const notes = (body?.notes || '').toString().trim() || null;
   if (!name) return NextResponse.json({ error: 'name required' }, { status: 400 });
 
-  // Generate the full config so we can derive/validate the id, then persist
-  // just the identifying fields (the rest is regenerated on load).
-  const client = makePrimeIVClient({ name, logoUrl: logoUrl || undefined });
-  if (!slugify(client.location || client.name)) {
-    return NextResponse.json({ error: 'Please enter a valid location name' }, { status: 400 });
+  // Prime IV location (name only) vs. an "other business" with its own
+  // industry/branding. The generic factory picks the id (plain slug) while
+  // Prime IV clients get the prime-iv- prefix.
+  const isGeneric = !!(industry || brandFrom || brandTo);
+  const client = isGeneric
+    ? makeCustomClient({ name, logoUrl: logoUrl || undefined, industry: industry || undefined, brandFrom: brandFrom || undefined, brandTo: brandTo || undefined, notes: notes || undefined })
+    : makePrimeIVClient({ name, logoUrl: logoUrl || undefined });
+  if (!slugify(name)) {
+    return NextResponse.json({ error: 'Please enter a valid name' }, { status: 400 });
   }
 
   // Guard against colliding with a built-in client id.
   if (staticClients.some((c) => c.id === client.id)) {
-    return NextResponse.json({ error: `That location already exists (${client.name})` }, { status: 409 });
+    return NextResponse.json({ error: `That client already exists (${client.name})` }, { status: 409 });
   }
 
   try {
     const { rows } = await query(
-      `insert into custom_clients (id, name, short_name, location, logo_url)
-       values ($1, $2, $3, $4, $5)
+      `insert into custom_clients (id, name, short_name, location, logo_url, industry, brand_from, brand_to, notes)
+       values ($1, $2, $3, $4, $5, $6, $7, $8, $9)
        on conflict (id) do nothing
-       returning id, name, short_name, location, logo_url, created_at`,
-      [client.id, client.name, client.shortName, client.location || null, logoUrl],
+       returning id, name, short_name, location, logo_url, industry, brand_from, brand_to, notes, created_at`,
+      [client.id, client.name, client.shortName, client.location || null, logoUrl, industry, brandFrom, brandTo, notes],
     );
     if (rows.length === 0) {
-      return NextResponse.json({ error: `That location already exists (${client.name})` }, { status: 409 });
+      return NextResponse.json({ error: `That client already exists (${client.name})` }, { status: 409 });
     }
     return NextResponse.json({ item: rows[0], client });
   } catch (e: any) {

@@ -1,7 +1,7 @@
 'use client';
 import React, { useEffect, useRef, useState } from 'react';
 import { useClient } from '@/context/ClientContext';
-import { makePrimeIVClient } from '@/lib/clients';
+import { makePrimeIVClient, makeCustomClient } from '@/lib/clients';
 import { Building2, Globe, Plus, MapPin, Trash2 } from 'lucide-react';
 
 export default function ClientsPage() {
@@ -15,6 +15,10 @@ export default function ClientsPage() {
   const [error, setError] = useState('');
   const [customIds, setCustomIds] = useState<Set<string>>(new Set());
   const [logoUrl, setLogoUrl] = useState('');       // logo for the new location
+  const [kind, setKind] = useState<'prime-iv' | 'other'>('prime-iv');
+  const [industry, setIndustry] = useState('');
+  const [brandFrom, setBrandFrom] = useState('#0d6e7a');
+  const [brandTo, setBrandTo] = useState('#35c4d6');
   const [uploadingLogo, setUploadingLogo] = useState(false);
   const [logoBusyId, setLogoBusyId] = useState<string | null>(null); // per-card logo upload
   const formRef = useRef<HTMLDivElement>(null);
@@ -69,7 +73,11 @@ export default function ClientsPage() {
     setTimeout(() => formRef.current?.scrollIntoView({ behavior: 'smooth', block: 'center' }), 60);
   }
 
-  const preview = name.trim() ? makePrimeIVClient({ name: name.trim() }) : null;
+  const preview = name.trim()
+    ? (kind === 'other'
+        ? makeCustomClient({ name: name.trim(), industry: industry || 'Business', brandFrom, brandTo })
+        : makePrimeIVClient({ name: name.trim() }))
+    : null;
 
   async function addClient() {
     const n = name.trim();
@@ -79,7 +87,11 @@ export default function ClientsPage() {
       const res = await fetch('/api/clients', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ name: n, logoUrl: logoUrl || undefined }),
+        body: JSON.stringify({
+          name: n,
+          logoUrl: logoUrl || undefined,
+          ...(kind === 'other' ? { industry: industry || undefined, brandFrom, brandTo } : {}),
+        }),
         cache: 'no-store',
       });
       // If the session lapsed, the request is redirected to /login and comes
@@ -143,10 +155,19 @@ export default function ClientsPage() {
       {adding && (
         <div ref={formRef} className="bg-white rounded-[20px] p-6" style={{ border: '1px solid rgba(0,0,0,0.06)', boxShadow: '0 4px 16px rgba(0,0,0,0.05)' }}>
           <div className="flex items-center justify-between mb-3">
-            <h3 className="text-[14px] font-bold text-gray-900">Add a Prime IV location</h3>
+            <h3 className="text-[14px] font-bold text-gray-900">Add a client</h3>
             <button onClick={() => { setAdding(false); setName(''); setError(''); }} className="text-[12px] text-gray-400 hover:text-gray-600">Cancel</button>
           </div>
-          <p className="text-[12px] text-gray-400 mb-3">Just type the location name — branding, KPIs, and links are generated from the Prime IV template.</p>
+          {/* Type toggle */}
+          <div className="inline-flex rounded-xl overflow-hidden border border-gray-200 mb-3">
+            <button onClick={() => setKind('prime-iv')} className={`text-[12px] font-semibold px-3 py-1.5 ${kind === 'prime-iv' ? 'bg-gray-900 text-white' : 'bg-white text-gray-500'}`}>Prime IV location</button>
+            <button onClick={() => setKind('other')} className={`text-[12px] font-semibold px-3 py-1.5 ${kind === 'other' ? 'bg-gray-900 text-white' : 'bg-white text-gray-500'}`}>Other business</button>
+          </div>
+          <p className="text-[12px] text-gray-400 mb-3">
+            {kind === 'prime-iv'
+              ? 'Just type the location name — branding, KPIs, and links come from the Prime IV template.'
+              : 'Enter the business name, its industry, and pick its brand colors.'}
+          </p>
           <div className="flex flex-col sm:flex-row gap-2">
             <input
               type="text"
@@ -154,7 +175,7 @@ export default function ClientsPage() {
               autoFocus
               onChange={(e) => setName(e.target.value)}
               onKeyDown={(e) => { if (e.key === 'Enter') addClient(); }}
-              placeholder='e.g. "Destin" or "Prime IV — Fort Walton Beach"'
+              placeholder={kind === 'prime-iv' ? 'e.g. "Destin" or "Prime IV — Fort Walton Beach"' : 'e.g. "Vortex Spring"'}
               className="flex-1 text-[13px] px-3 py-2.5 rounded-xl bg-gray-50 border border-gray-200 text-gray-900 outline-none focus:border-gray-300 placeholder:text-gray-300"
             />
             <button
@@ -166,6 +187,25 @@ export default function ClientsPage() {
               <Plus size={16} /> {busy ? 'Adding…' : 'Add client'}
             </button>
           </div>
+
+          {kind === 'other' && (
+            <div className="flex flex-col sm:flex-row gap-3 mt-3 items-start sm:items-center">
+              <input
+                type="text"
+                value={industry}
+                onChange={(e) => setIndustry(e.target.value)}
+                placeholder="Industry — e.g. Campground & Springs · Events"
+                className="flex-1 text-[13px] px-3 py-2.5 rounded-xl bg-gray-50 border border-gray-200 text-gray-900 outline-none focus:border-gray-300 placeholder:text-gray-300"
+              />
+              <div className="flex items-center gap-2">
+                <span className="text-[11px] text-gray-400">Brand</span>
+                <input type="color" value={brandFrom} onChange={(e) => setBrandFrom(e.target.value)} title="Primary color" className="w-8 h-8 rounded-lg border border-gray-200 bg-white cursor-pointer" />
+                <input type="color" value={brandTo} onChange={(e) => setBrandTo(e.target.value)} title="Accent color" className="w-8 h-8 rounded-lg border border-gray-200 bg-white cursor-pointer" />
+                <span className="w-16 h-8 rounded-lg" style={{ background: `linear-gradient(135deg, ${brandFrom}, ${brandTo})` }} />
+              </div>
+            </div>
+          )}
+
           {/* Optional logo */}
           <div className="flex items-center gap-3 mt-3">
             <div className="w-12 h-12 rounded-xl bg-gray-50 border border-gray-200 flex items-center justify-center overflow-hidden shrink-0">

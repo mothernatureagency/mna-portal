@@ -1,6 +1,6 @@
 'use client';
 import React, { createContext, useContext, useState, useEffect, useMemo, ReactNode } from 'react';
-import { clients as staticClients, makePrimeIVClient, Client } from '@/lib/clients';
+import { clients as staticClients, makeCustomClient, Client } from '@/lib/clients';
 import { createClient as createSupabaseClient } from '@/lib/supabase/client';
 
 type ClientContextType = {
@@ -27,8 +27,8 @@ export function ClientProvider({ children }: { children: ReactNode }) {
     fetch('/api/clients')
       .then((r) => r.json())
       .then((d) => {
-        const rows = (d.items || []) as Array<{ id: string; name: string; short_name?: string; location?: string; logo_url?: string }>;
-        setCustomClients(rows.map((r) => makePrimeIVClient({ id: r.id, name: r.name, shortName: r.short_name, location: r.location, logoUrl: r.logo_url })));
+        const rows = (d.items || []) as Array<{ id: string; name: string; short_name?: string; location?: string; logo_url?: string; industry?: string; brand_from?: string; brand_to?: string; notes?: string }>;
+        setCustomClients(rows.map((r) => makeCustomClient({ id: r.id, name: r.name, shortName: r.short_name, location: r.location, logoUrl: r.logo_url, industry: r.industry, brandFrom: r.brand_from, brandTo: r.brand_to, notes: r.notes })));
       })
       .catch(() => {});
   }

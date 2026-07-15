@@ -367,6 +367,10 @@ async function initSchema() {
                         created_at timestamptz not null default now()
                   )`,
                   `alter table custom_clients add column if not exists logo_url text`,
+                  `alter table custom_clients add column if not exists industry text`,
+                  `alter table custom_clients add column if not exists brand_from text`,
+                  `alter table custom_clients add column if not exists brand_to text`,
+                  `alter table custom_clients add column if not exists notes text`,
                   // Call Copilot sessions — the saved transcript ("notes") plus
                   // every cue the copilot surfaced during a live call, so they
                   // can be reviewed later instead of vanishing on stop/refresh.
