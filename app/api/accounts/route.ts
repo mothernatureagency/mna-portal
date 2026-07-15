@@ -78,17 +78,24 @@ export async function POST(req: NextRequest) {
   const email = (body?.email || '').toString().trim().toLowerCase();
   const role = (body?.role || '').toString().trim();
   const clientIds: string[] = Array.isArray(body?.clientIds) ? body.clientIds.filter(Boolean) : [];
+  const chosenPassword = (body?.password || '').toString();
 
   if (!email || !/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(email)) return NextResponse.json({ error: 'A valid email is required' }, { status: 400 });
   if (!ALLOWED_ROLES.includes(role)) return NextResponse.json({ error: 'role must be client, owner, or staff' }, { status: 400 });
   if ((role === 'client' || role === 'owner') && clientIds.length === 0) {
     return NextResponse.json({ error: 'Pick at least one store for a client or scoped manager.' }, { status: 400 });
   }
+  // A blank password auto-generates a temporary one; a provided one is used
+  // as-is so the person can sign in without resetting.
+  const custom = chosenPassword.length > 0;
+  if (custom && chosenPassword.length < 6) {
+    return NextResponse.json({ error: 'Password must be at least 6 characters.' }, { status: 400 });
+  }
 
   const user_metadata: Record<string, unknown> = { role };
   if (role !== 'staff' && clientIds.length) user_metadata.client_ids = clientIds.join(',');
 
-  const password = tempPassword();
+  const password = custom ? chosenPassword : tempPassword();
   const { data, error } = await a.auth.admin.createUser({
     email,
     password,
@@ -107,7 +114,10 @@ export async function POST(req: NextRequest) {
     email,
     role,
     clientIds,
-    tempPassword: password,
+    custom,
+    // Only echo back an auto-generated password; a chosen one the staffer
+    // already knows, so we don't return it.
+    tempPassword: custom ? null : password,
     userId: data?.user?.id,
   });
 }

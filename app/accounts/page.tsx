@@ -18,9 +18,11 @@ export default function AccountsPage() {
   const [email, setEmail] = useState('');
   const [role, setRole] = useState('client');
   const [picked, setPicked] = useState<Set<string>>(new Set());
+  const [password, setPassword] = useState('');
+  const [showPw, setShowPw] = useState(false);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
-  const [result, setResult] = useState<{ email: string; role: string; tempPassword: string; clientIds: string[] } | null>(null);
+  const [result, setResult] = useState<{ email: string; role: string; tempPassword: string | null; custom: boolean; clientIds: string[] } | null>(null);
   const [copied, setCopied] = useState(false);
 
   const [accounts, setAccounts] = useState<Account[]>([]);
@@ -46,17 +48,18 @@ export default function AccountsPage() {
     setError(''); setResult(null);
     if (!email.trim()) { setError('Enter an email.'); return; }
     if (needsStores && picked.size === 0) { setError('Pick at least one store.'); return; }
+    if (password && password.length < 6) { setError('Password must be at least 6 characters.'); return; }
     setBusy(true);
     try {
       const res = await fetch('/api/accounts', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ email: email.trim(), role, clientIds: needsStores ? Array.from(picked) : [] }),
+        body: JSON.stringify({ email: email.trim(), role, clientIds: needsStores ? Array.from(picked) : [], password: password || undefined }),
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || 'Could not create account');
-      setResult({ email: data.email, role: data.role, tempPassword: data.tempPassword, clientIds: data.clientIds || [] });
-      setEmail(''); setPicked(new Set());
+      setResult({ email: data.email, role: data.role, tempPassword: data.tempPassword, custom: !!data.custom, clientIds: data.clientIds || [] });
+      setEmail(''); setPicked(new Set()); setPassword('');
       loadAccounts();
     } catch (e: any) { setError(e.message); } finally { setBusy(false); }
   }
@@ -110,6 +113,25 @@ export default function AccountsPage() {
           </div>
         )}
 
+        <div>
+          <label className="text-[10px] font-bold uppercase tracking-wider text-white/45">Password</label>
+          <div className="relative mt-1">
+            <input
+              type={showPw ? 'text' : 'password'}
+              value={password}
+              onChange={(e) => setPassword(e.target.value)}
+              placeholder="Leave blank to auto-generate a temporary password"
+              autoComplete="new-password"
+              className={`${inputCls} w-full pr-10`}
+            />
+            <button type="button" onClick={() => setShowPw(!showPw)} tabIndex={-1}
+              className="absolute right-2.5 top-1/2 -translate-y-1/2 text-white/40 hover:text-white">
+              <span className="material-symbols-outlined" style={{ fontSize: 18 }}>{showPw ? 'visibility_off' : 'visibility'}</span>
+            </button>
+          </div>
+          <div className="text-[10px] text-white/40 mt-1">Set a password so they can sign in right away, or leave blank and share the generated one.</div>
+        </div>
+
         {error && <div className="text-[12px] text-rose-300 bg-rose-500/10 border border-rose-500/30 rounded-lg px-3 py-2">{error}</div>}
 
         <div>
@@ -128,17 +150,23 @@ export default function AccountsPage() {
               Role: <b className="text-white">{ROLES.find((r) => r.key === result.role)?.label}</b>
               {result.clientIds.length > 0 && <> · Stores: {result.clientIds.map(nameFor).join(', ')}</>}
             </div>
-            <div className="flex items-center gap-2 flex-wrap">
-              <span className="text-[11px] text-white/50">Temporary password:</span>
-              <code className="text-[13px] font-mono text-white bg-black/40 px-2 py-1 rounded">{result.tempPassword}</code>
-              <button onClick={() => { navigator.clipboard?.writeText(result.tempPassword); setCopied(true); setTimeout(() => setCopied(false), 1400); }}
-                className="text-[11px] font-bold text-white/70 hover:text-white inline-flex items-center gap-1">
-                <span className="material-symbols-outlined" style={{ fontSize: 13 }}>content_copy</span>{copied ? 'Copied!' : 'Copy'}
-              </button>
-            </div>
-            <div className="text-[11px] text-white/45 mt-2">
-              Share this with them to sign in at the portal login, then have them change it via “Forgot password.”
-            </div>
+            {result.custom ? (
+              <div className="text-[12px] text-white/70">They can sign in right away with the password you set — no reset needed.</div>
+            ) : (
+              <>
+                <div className="flex items-center gap-2 flex-wrap">
+                  <span className="text-[11px] text-white/50">Temporary password:</span>
+                  <code className="text-[13px] font-mono text-white bg-black/40 px-2 py-1 rounded">{result.tempPassword}</code>
+                  <button onClick={() => { if (result.tempPassword) { navigator.clipboard?.writeText(result.tempPassword); setCopied(true); setTimeout(() => setCopied(false), 1400); } }}
+                    className="text-[11px] font-bold text-white/70 hover:text-white inline-flex items-center gap-1">
+                    <span className="material-symbols-outlined" style={{ fontSize: 13 }}>content_copy</span>{copied ? 'Copied!' : 'Copy'}
+                  </button>
+                </div>
+                <div className="text-[11px] text-white/45 mt-2">
+                  Share this with them to sign in at the portal login, then have them change it via “Forgot password.”
+                </div>
+              </>
+            )}
           </div>
         )}
       </div>
