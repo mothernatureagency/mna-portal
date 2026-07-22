@@ -46,19 +46,32 @@ type Interp = {
   at: number;
 };
 
-// Speak text aloud as "Mother Nature" using the browser's speech synthesis,
-// picking the best available voice for the target language.
-function speakAloud(text: string, lang: 'es' | 'en') {
+// Pick the best available voice for a language (prefers native es-MX/es-US
+// Spanish voices, which sound far more authentic than the default es-ES).
+function bestVoice(voices: SpeechSynthesisVoice[], lang: 'es' | 'en'): SpeechSynthesisVoice | undefined {
+  const pool = voices.filter((v) => (v.lang || '').toLowerCase().startsWith(lang));
+  if (lang === 'es') {
+    return (
+      pool.find((v) => /paulina|m[oó]nica|luciana|google.*espa|espa.*google/i.test(v.name)) ||
+      pool.find((v) => /es[-_]?(mx|us|419)/i.test(v.lang)) ||
+      pool.find((v) => /google/i.test(v.name)) ||
+      pool[0]
+    );
+  }
+  return pool.find((v) => /samantha|google|jenny|aria|zira/i.test(v.name)) || pool[0];
+}
+
+// Speak text aloud with the browser's speech synthesis. A specific voiceURI
+// (chosen in the UI) wins; otherwise fall back to the best voice for the lang.
+function speakAloud(text: string, lang: 'es' | 'en', voiceURI?: string) {
   if (!text || typeof window === 'undefined' || !window.speechSynthesis) return;
   try {
     const u = new SpeechSynthesisUtterance(text);
-    u.lang = lang === 'es' ? 'es-US' : 'en-US';
     const voices = window.speechSynthesis.getVoices();
-    const pool = voices.filter((v) => (v.lang || '').toLowerCase().startsWith(lang));
-    const preferred =
-      pool.find((v) => /female|paulina|mónica|monica|samantha|google|luciana|helena/i.test(v.name)) || pool[0];
-    if (preferred) u.voice = preferred;
-    u.rate = 1; u.pitch = 1.05;
+    const voice = (voiceURI ? voices.find((v) => v.voiceURI === voiceURI) : undefined) || bestVoice(voices, lang);
+    if (voice) { u.voice = voice; u.lang = voice.lang; }
+    else u.lang = lang === 'es' ? 'es-US' : 'en-US';
+    u.rate = 1; u.pitch = 1.03;
     window.speechSynthesis.cancel();
     window.speechSynthesis.speak(u);
   } catch {}
@@ -103,14 +116,81 @@ export default function CopilotPage() {
   const [mnVoice, setMnVoice] = useState(false);
   const [listenLang, setListenLang] = useState<'es-US' | 'en-US'>('es-US');
   const [interps, setInterps] = useState<Interp[]>([]);
+  // Selectable voices, a type-your-reply box, and business context to keep
+  // the AI grounded (so it stops inventing services like "iron infusions").
+  const [voices, setVoices] = useState<SpeechSynthesisVoice[]>([]);
+  const [esVoice, setEsVoice] = useState('');
+  const [enVoice, setEnVoice] = useState('');
+  const [myReply, setMyReply] = useState('');
+  const [replyBusy, setReplyBusy] = useState(false);
+  const [context, setContext] = useState('');
+  const [showContext, setShowContext] = useState(false);
+  const [ctxSaved, setCtxSaved] = useState(false);
+
   const modeRef = useRef<'sales' | 'interpret'>('sales');
   const mnVoiceRef = useRef(false);
   const listenLangRef = useRef<'es-US' | 'en-US'>('es-US');
+  const esVoiceRef = useRef(''); const enVoiceRef = useRef(''); const contextRef = useRef('');
   useEffect(() => { modeRef.current = mode; }, [mode]);
   useEffect(() => { mnVoiceRef.current = mnVoice; }, [mnVoice]);
   useEffect(() => { listenLangRef.current = listenLang; }, [listenLang]);
-  // Warm up the speech-synthesis voice list (some browsers load it lazily).
-  useEffect(() => { try { window.speechSynthesis?.getVoices(); } catch {} }, []);
+  useEffect(() => { esVoiceRef.current = esVoice; }, [esVoice]);
+  useEffect(() => { enVoiceRef.current = enVoice; }, [enVoice]);
+  useEffect(() => { contextRef.current = context; }, [context]);
+
+  // Load the speech-synthesis voices (some browsers populate them async) and
+  // pick sensible defaults (a native Spanish voice for the response).
+  useEffect(() => {
+    function load() {
+      const vs = window.speechSynthesis?.getVoices?.() || [];
+      if (!vs.length) return;
+      setVoices(vs);
+      setEsVoice((prev) => prev || bestVoice(vs, 'es')?.voiceURI || '');
+      setEnVoice((prev) => prev || bestVoice(vs, 'en')?.voiceURI || '');
+    }
+    load();
+    if (window.speechSynthesis) window.speechSynthesis.onvoiceschanged = load;
+    return () => { if (window.speechSynthesis) window.speechSynthesis.onvoiceschanged = null; };
+  }, []);
+
+  // Business context persists globally for the copilot.
+  useEffect(() => {
+    fetch('/api/client-kv?clientId=mna&key=copilot_context')
+      .then((r) => r.json())
+      .then((d) => { if (typeof d.value === 'string') setContext(d.value); })
+      .catch(() => {});
+  }, []);
+  function saveContext() {
+    fetch('/api/client-kv', { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ clientId: 'mna', key: 'copilot_context', value: context }) })
+      .then(() => { setCtxSaved(true); setTimeout(() => setCtxSaved(false), 1400); })
+      .catch(() => {});
+  }
+
+  // Speak in a language using the user's chosen voice for that language.
+  const speakIn = (text: string, lang: 'es' | 'en') => speakAloud(text, lang, lang === 'es' ? esVoiceRef.current : enVoiceRef.current);
+
+  // Type a reply → translate it → speak it (defaults to speaking Spanish).
+  async function speakMyReply() {
+    const text = myReply.trim();
+    if (!text) return;
+    setReplyBusy(true); setError('');
+    try {
+      const res = await fetch('/api/copilot/translate', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ recent: text, context: contextRef.current }),
+      });
+      const d = await res.json();
+      if (!res.ok) throw new Error(d.error || 'Translate failed');
+      const spoken = d.translation || text;
+      const lang: 'es' | 'en' = d.targetLang === 'en' ? 'en' : 'es';
+      speakIn(spoken, lang);
+      setInterps((prev) => [{
+        id: `me-${Date.now()}`, detected: (d.detected || 'en'), original: text,
+        translation: spoken, targetLang: lang, sayNext: '', sayNextGloss: '', at: Date.now(),
+      }, ...prev].slice(0, 12));
+      setMyReply('');
+    } catch (e: any) { setError(e.message); } finally { setReplyBusy(false); }
+  }
 
   // Saving / saved-session review
   const [saving, setSaving] = useState(false);
@@ -159,7 +239,7 @@ export default function CopilotPage() {
         const res = await fetch('/api/copilot/translate', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ recent }),
+          body: JSON.stringify({ recent, context: contextRef.current }),
         });
         const d = await res.json();
         if (!res.ok) throw new Error(d.error || 'Translate failed');
@@ -179,7 +259,7 @@ export default function CopilotPage() {
           };
           setInterps((prev) => [item, ...prev].slice(0, 12));
           savedRef.current = false;
-          if (mnVoiceRef.current && item.translation) speakAloud(item.translation, item.targetLang);
+          if (mnVoiceRef.current && item.translation) speakIn(item.translation, item.targetLang);
         }
         return;
       }
@@ -190,6 +270,7 @@ export default function CopilotPage() {
         body: JSON.stringify({
           recent,
           conversationSoFar: earlierRef.current.slice(-2000),
+          context: contextRef.current,
         }),
       });
       const data = await res.json();
@@ -652,6 +733,75 @@ export default function CopilotPage() {
         {/* Right: interpreter (interpret mode) or sales signals */}
         {mode === 'interpret' ? (
           <div className="flex flex-col gap-3">
+            {/* Type a reply → speak it in Spanish */}
+            <div className="rounded-2xl p-3" style={{ background: 'rgba(16,185,129,0.08)', border: '1px solid rgba(52,211,153,0.3)' }}>
+              <div className="text-[10px] font-bold uppercase tracking-wider text-emerald-300/70 mb-1.5">Type your reply → speak it</div>
+              <div className="flex gap-2">
+                <input
+                  value={myReply}
+                  onChange={(e) => setMyReply(e.target.value)}
+                  onKeyDown={(e) => { if (e.key === 'Enter') speakMyReply(); }}
+                  placeholder="Type in English — it speaks in Spanish"
+                  className="flex-1 text-[13px] px-3 py-2 rounded-lg bg-black/30 border border-white/10 text-white outline-none placeholder:text-white/30"
+                />
+                <button onClick={speakMyReply} disabled={replyBusy || !myReply.trim()}
+                  className="text-[12px] font-bold px-3 py-2 rounded-lg text-white disabled:opacity-40 inline-flex items-center gap-1"
+                  style={{ background: 'linear-gradient(135deg,#0f766e,#10b981)' }}>
+                  <span className="material-symbols-outlined" style={{ fontSize: 16 }}>{replyBusy ? 'hourglass_top' : 'volume_up'}</span>
+                  {replyBusy ? '…' : 'Say it'}
+                </button>
+              </div>
+
+              {/* Voice pickers */}
+              <div className="grid grid-cols-2 gap-2 mt-2">
+                <div>
+                  <div className="text-[9px] uppercase tracking-wider text-white/40 mb-0.5">Spanish voice (the reply)</div>
+                  <div className="flex gap-1">
+                    <select value={esVoice} onChange={(e) => setEsVoice(e.target.value)}
+                      className="flex-1 text-[11px] px-2 py-1.5 rounded-lg bg-black/30 border border-white/10 text-white outline-none">
+                      {voices.filter((v) => (v.lang || '').toLowerCase().startsWith('es')).map((v) => (
+                        <option key={v.voiceURI} value={v.voiceURI}>{v.name} ({v.lang})</option>
+                      ))}
+                    </select>
+                    <button onClick={() => speakAloud('Hola, gracias por llamar. ¿En qué puedo ayudarle?', 'es', esVoice)} title="Test" className="text-white/50 hover:text-white px-1.5 rounded-lg bg-white/5 border border-white/10">
+                      <span className="material-symbols-outlined" style={{ fontSize: 15 }}>play_arrow</span>
+                    </button>
+                  </div>
+                </div>
+                <div>
+                  <div className="text-[9px] uppercase tracking-wider text-white/40 mb-0.5">English voice</div>
+                  <div className="flex gap-1">
+                    <select value={enVoice} onChange={(e) => setEnVoice(e.target.value)}
+                      className="flex-1 text-[11px] px-2 py-1.5 rounded-lg bg-black/30 border border-white/10 text-white outline-none">
+                      {voices.filter((v) => (v.lang || '').toLowerCase().startsWith('en')).map((v) => (
+                        <option key={v.voiceURI} value={v.voiceURI}>{v.name} ({v.lang})</option>
+                      ))}
+                    </select>
+                    <button onClick={() => speakAloud('Hi, thanks for calling. How can I help?', 'en', enVoice)} title="Test" className="text-white/50 hover:text-white px-1.5 rounded-lg bg-white/5 border border-white/10">
+                      <span className="material-symbols-outlined" style={{ fontSize: 15 }}>play_arrow</span>
+                    </button>
+                  </div>
+                </div>
+              </div>
+
+              {/* Business info */}
+              <button onClick={() => setShowContext((s) => !s)} className="text-[10px] font-semibold text-white/50 hover:text-white mt-2 inline-flex items-center gap-1">
+                <span className="material-symbols-outlined" style={{ fontSize: 13 }}>{showContext ? 'expand_less' : 'expand_more'}</span>
+                Business info {context ? '· set' : '· add so it stops guessing services'}
+              </button>
+              {showContext && (
+                <div className="mt-1.5">
+                  <textarea value={context} onChange={(e) => setContext(e.target.value)} rows={3}
+                    placeholder="What this business actually offers, hours, location, pricing, promos… The AI only suggests replies grounded in this."
+                    className="w-full text-[12px] rounded-lg p-2 text-white/85 outline-none" style={{ background: 'rgba(0,0,0,0.3)', border: '1px solid rgba(255,255,255,0.08)' }} />
+                  <div className="flex items-center gap-2 mt-1">
+                    <button onClick={saveContext} className="text-[11px] font-bold px-2.5 py-1 rounded-lg text-white" style={{ background: 'rgba(255,255,255,0.12)' }}>Save</button>
+                    {ctxSaved && <span className="text-[10px] text-emerald-300">Saved</span>}
+                  </div>
+                </div>
+              )}
+            </div>
+
             {interps.length === 0 && (
               <div className="glass-card p-6 text-center text-white/55 text-sm" style={{ background: 'rgba(255,255,255,0.04)' }}>
                 <span className="material-symbols-outlined block mb-2" style={{ fontSize: 36, color: '#4ab8ce', opacity: 0.6 }}>translate</span>
@@ -671,7 +821,7 @@ export default function CopilotPage() {
                     {it.targetLang === 'es' ? 'Español' : 'English'}
                   </span>
                   <button
-                    onClick={() => speakAloud(it.translation, it.targetLang)}
+                    onClick={() => speakIn(it.translation, it.targetLang)}
                     className="text-white/50 hover:text-white inline-flex items-center gap-1 text-[10px] font-semibold"
                     title="Speak translation"
                   >
@@ -686,7 +836,7 @@ export default function CopilotPage() {
                     <div className="flex items-center justify-between gap-2 mb-0.5">
                       <span className="text-[9px] font-bold uppercase tracking-wider text-emerald-300/70">Say next</span>
                       <button
-                        onClick={() => speakAloud(it.sayNext, it.detected === 'en' ? 'en' : 'es')}
+                        onClick={() => speakIn(it.sayNext, it.detected === 'en' ? 'en' : 'es')}
                         className="text-emerald-300/70 hover:text-emerald-200 inline-flex items-center gap-1 text-[10px] font-semibold"
                         title="Speak this reply"
                       >

@@ -51,14 +51,19 @@ export async function POST(req: NextRequest) {
   let body: any;
   try { body = await req.json(); } catch { return NextResponse.json({ error: 'Invalid JSON' }, { status: 400 }); }
   const recent: string = (body?.recent || '').toString().trim();
+  const context: string = (body?.context || '').toString().trim();
   if (!recent) return NextResponse.json({ detected: 'other', original: '', translation: '', targetLang: 'en', sayNext: '', sayNextGloss: '' });
+
+  const systemWithContext = context
+    ? `${SYSTEM}\n\nBUSINESS FACTS (the ONLY services/details you may reference in sayNext — never invent services, prices, or offerings not listed here):\n${context}`
+    : SYSTEM;
 
   const client = new Anthropic({ apiKey });
   try {
     const res = await client.messages.create({
       model: 'claude-haiku-4-5-20251001',
       max_tokens: 500,
-      system: SYSTEM,
+      system: systemWithContext,
       messages: [{ role: 'user', content: `Live snippet:\n"""\n${recent}\n"""` }],
     });
     const text = res.content.filter((b: any) => b.type === 'text').map((b: any) => b.text).join('');

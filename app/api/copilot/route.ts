@@ -74,9 +74,13 @@ export async function POST(req: NextRequest) {
   try { body = await req.json(); } catch { return NextResponse.json({ error: 'Invalid JSON' }, { status: 400 }); }
   const recent: string = (body?.recent || '').toString().trim();
   const earlier: string = (body?.conversationSoFar || '').toString().trim();
+  const context: string = (body?.context || '').toString().trim();
   if (!recent) return NextResponse.json({ signals: [] });
 
   const client = new Anthropic({ apiKey });
+  const systemPrompt = context
+    ? `${SYSTEM}\n\nBUSINESS FACTS (only reference services/offerings/prices listed here — never invent ones that aren't):\n${context}`
+    : SYSTEM;
 
   const userMessage = [
     earlier ? `Earlier in the call (summary, do NOT react to this directly, only use for context):\n${earlier}\n\n` : '',
@@ -91,7 +95,7 @@ export async function POST(req: NextRequest) {
       // pinned @anthropic-ai/sdk version doesn't surface cache_control in
       // its TextBlockParam typings. Pass as a plain string for now; switch
       // to a cached system block when the SDK is upgraded.
-      system: SYSTEM,
+      system: systemPrompt,
       messages: [{ role: 'user', content: userMessage }],
     });
     const text = res.content
