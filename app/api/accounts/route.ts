@@ -121,3 +121,18 @@ export async function POST(req: NextRequest) {
     userId: data?.user?.id,
   });
 }
+
+// DELETE /api/accounts?id=<userId> — remove a login account.
+export async function DELETE(req: NextRequest) {
+  const r = await callerRole();
+  if (!r) return NextResponse.json({ error: 'Not authenticated' }, { status: 401 });
+  if (r === 'client') return NextResponse.json({ error: 'Only staff can remove accounts' }, { status: 403 });
+  const a = admin();
+  if (!a) return NextResponse.json({ error: 'Auth admin not configured' }, { status: 500 });
+
+  const id = req.nextUrl.searchParams.get('id');
+  if (!id) return NextResponse.json({ error: 'id required' }, { status: 400 });
+  const { error } = await a.auth.admin.deleteUser(id);
+  if (error) return NextResponse.json({ error: error.message }, { status: 400 });
+  return NextResponse.json({ ok: true });
+}

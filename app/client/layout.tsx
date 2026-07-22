@@ -1,10 +1,29 @@
 import { createClient } from '@/lib/supabase/server';
 import { redirect } from 'next/navigation';
 import { cookies } from 'next/headers';
-import { clients } from '@/lib/clients';
+import { clients as staticClients, makeCustomClient, type Client } from '@/lib/clients';
+import { query } from '@/lib/db';
 import ClientPortalShell from '@/components/client-portal/ClientPortalShell';
 
 export const dynamic = 'force-dynamic';
+
+// Static built-ins + custom clients (High Street, Holland, Vortex, …) from the
+// DB, so the portal switcher and access resolution see every client.
+async function getAllClients(): Promise<Client[]> {
+  try {
+    const { rows } = await query<any>(
+      `select id, name, short_name, location, logo_url, industry, brand_from, brand_to, notes from custom_clients`,
+    );
+    const custom = rows.map((r) => makeCustomClient({
+      id: r.id, name: r.name, shortName: r.short_name, location: r.location,
+      logoUrl: r.logo_url, industry: r.industry, brandFrom: r.brand_from, brandTo: r.brand_to, notes: r.notes,
+    }));
+    const seen = new Set(staticClients.map((c) => c.id));
+    return [...staticClients, ...custom.filter((c) => !seen.has(c.id))];
+  } catch {
+    return staticClients;
+  }
+}
 
 /**
  * Client Portal layout.
@@ -26,6 +45,8 @@ export default async function ClientPortalLayout({
   } = await supabase.auth.getUser();
 
   if (!user) redirect('/login?next=/client');
+
+  const clients = await getAllClients();
 
   const meta = (user.user_metadata || {}) as Record<string, unknown>;
   const role = (meta.role as string) || 'staff';

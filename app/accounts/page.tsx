@@ -38,6 +38,15 @@ export default function AccountsPage() {
   }
   useEffect(() => { loadAccounts(); }, []);
 
+  async function removeAccount(id: string, email: string) {
+    if (!confirm(`Remove the login account for ${email}? They will no longer be able to sign in. This can't be undone.`)) return;
+    try {
+      const res = await fetch(`/api/accounts?id=${encodeURIComponent(id)}`, { method: 'DELETE' });
+      if (!res.ok) { const d = await res.json().catch(() => ({})); alert(d.error || 'Could not remove account'); return; }
+      loadAccounts();
+    } catch { alert('Could not remove account'); }
+  }
+
   const needsStores = role === 'client' || role === 'owner';
 
   function toggle(id: string) {
@@ -190,6 +199,13 @@ export default function AccountsPage() {
                 }}>
                   {ROLES.find((r) => r.key === a.role)?.label || a.role}
                 </span>
+                <button
+                  onClick={() => removeAccount(a.id, a.email)}
+                  title="Remove account"
+                  className="text-white/30 hover:text-rose-300 shrink-0"
+                >
+                  <span className="material-symbols-outlined" style={{ fontSize: 18 }}>delete</span>
+                </button>
               </div>
             ))}
           </div>
