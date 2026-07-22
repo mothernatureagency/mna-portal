@@ -161,7 +161,7 @@ export default function NicevilleDashboard({ client }: { client: Client }) {
       {/* ── COMPETITOR BENCHMARK (Meta + Google Reviews) ── */}
       <div>
         <SectionLabel>Competitive Position</SectionLabel>
-        <CompetitorBenchmark gradientFrom={gradientFrom} gradientTo={gradientTo} clientId={client.id} editable />
+        <CompetitorBenchmark gradientFrom={gradientFrom} gradientTo={gradientTo} clientId={client.id} clientName={client.shortName} editable />
       </div>
 
       {/* ── TIKTOK ANALYTICS ── */}

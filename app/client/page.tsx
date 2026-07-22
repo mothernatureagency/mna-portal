@@ -521,7 +521,7 @@ export default function ClientOverviewPage() {
 
       {/* Competitor Benchmark — currently only wired with data for Prime IV Niceville */}
       {client.id === 'prime-iv' && (
-        <CompetitorBenchmark gradientFrom={gradientFrom} gradientTo={gradientTo} clientId={client.id} editable={isStaffPreview} />
+        <CompetitorBenchmark gradientFrom={gradientFrom} gradientTo={gradientTo} clientId={client.id} clientName={client.shortName} editable={isStaffPreview} />
       )}
 
       {/* Calendar post preview modal */}

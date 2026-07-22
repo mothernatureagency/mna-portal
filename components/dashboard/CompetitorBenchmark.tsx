@@ -63,11 +63,15 @@ export default function CompetitorBenchmark({
   gradientFrom,
   gradientTo,
   clientId,
+  clientName,
   editable = false,
 }: {
   gradientFrom: string;
   gradientTo: string;
   clientId?: string;
+  // The active client's display name — used to label their own row and the
+  // insight text (so non-Niceville clients don't read "Niceville").
+  clientName?: string;
   // When true (staff views), Meta numbers become click-to-edit and persist to
   // client_kv. Off for the client portal, which sees them read-only.
   editable?: boolean;
@@ -224,15 +228,20 @@ export default function CompetitorBenchmark({
   // Display data = manual numbers, with the client's own row overridden by the
   // live Page snapshot when we have it.
   const data = useMemo(() => metaComps.map((c) => {
-    if (c.isClient && pageAuto) {
+    if (c.isClient) {
       return {
         ...c,
-        followers: pageAuto.followers ?? c.followers,
-        publishedContent: pageAuto.publishedContent ?? c.publishedContent,
+        // Label the client's own row with the active client's name, not the
+        // hardcoded seed ("Prime IV Niceville").
+        name: clientName || c.name,
+        ...(pageAuto ? {
+          followers: pageAuto.followers ?? c.followers,
+          publishedContent: pageAuto.publishedContent ?? c.publishedContent,
+        } : {}),
       };
     }
     return c;
-  }), [metaComps, pageAuto]);
+  }), [metaComps, pageAuto, clientName]);
   const client = data.find((c) => c.isClient)!;
   const competitors = data.filter((c) => !c.isClient);
 
@@ -293,7 +302,7 @@ export default function CompetitorBenchmark({
               ✦ Activity & Growth Leader
             </div>
             <div className="text-white text-[13px] leading-relaxed">
-              Niceville is publishing <span className="font-bold">{fmtMultiple(client.publishedContent, competitors[1].publishedContent)} more</span> than Aqua Vitae and{' '}
+              {client.name} is publishing <span className="font-bold">{fmtMultiple(client.publishedContent, competitors[1].publishedContent)} more</span> than Aqua Vitae and{' '}
               <span className="font-bold">{fmtMultiple(client.publishedContent, competitors[0].publishedContent)} more</span> than the Destin location, while gaining{' '}
               <span className="font-bold">{fmtMultiple(client.newFollows, competitors[0].newFollows)} the new follows</span> of Destin and{' '}
               <span className="font-bold">{fmtMultiple(client.newFollows, competitors[1].newFollows)}</span> Aqua Vitae's. We have the smallest base but the strongest momentum.
