@@ -22,6 +22,7 @@ import UserBanner from './UserBanner';
 import MonthlyContentCalendar from './MonthlyContentCalendar';
 import LeadSourceSplitEditor from './LeadSourceSplitEditor';
 import CompetitorBenchmark from './CompetitorBenchmark';
+import MetaAdsCard from './MetaAdsCard';
 import PrimeIVMembershipCard from './PrimeIVMembershipCard';
 import SalesBenchmarks from './SalesBenchmarks';
 import KPISection from './KPISection';
@@ -123,37 +124,8 @@ export default function NicevilleDashboard({ client }: { client: Client }) {
         </div>
       </div>
 
-      {/* Meta Ads Account card (still useful at top) */}
-      {client.metaAds && (
-        <div>
-          <SectionLabel>Meta Ads Account</SectionLabel>
-          <div className="glass-card p-5 grid gap-3" style={{ gridTemplateColumns: '1.4fr 1fr 1fr', borderLeft: `3px solid ${gradientFrom}` }}>
-            <div>
-              <div className="text-[10px] font-bold uppercase tracking-wider text-white/60 mb-1">Business Portfolio</div>
-              <div className="text-[14px] font-bold text-white">{client.metaAds.businessPortfolioName}</div>
-              <div className="text-[11px] text-white/70 font-mono">{client.metaAds.businessPortfolioId}</div>
-            </div>
-            <div>
-              <div className="text-[10px] font-bold uppercase tracking-wider text-white/60 mb-1">Ad Account</div>
-              <div className="text-[13px] font-bold text-white font-mono">{client.metaAds.adAccountId}</div>
-              {client.metaAds.partnerName && (
-                <div className="text-[11px] text-white/70 mt-1">Partner: <span className="font-semibold text-white/85">{client.metaAds.partnerName}</span></div>
-              )}
-            </div>
-            <div>
-              <div className="text-[10px] font-bold uppercase tracking-wider text-white/60 mb-1">Pixel</div>
-              {client.metaAds.datasetPixel && (
-                <>
-                  <div className="text-[13px] font-bold text-white">{client.metaAds.datasetPixel.name}</div>
-                  <span className="mt-1 inline-block text-[10px] font-bold px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-700">
-                    ✓ {client.metaAds.datasetPixel.status}
-                  </span>
-                </>
-              )}
-            </div>
-          </div>
-        </div>
-      )}
+      {/* Meta Ads Account — editable */}
+      <MetaAdsCard client={client} accent={gradientFrom} />
 
       {/* ── KPIs ── */}
       <div>
