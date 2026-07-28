@@ -1572,7 +1572,194 @@ export const VORTEX_SUMMER_2026: Playbook = {
   ],
 };
 
+// ─── PDM — AUGUST 2026 CONTENT CALENDAR ─────────────────────────────
+// Actual August 2026 tab from PDM (verbatim). Theme: National Wellness
+// Month + Back-to-Routine / Back-to-School. Featured nutrients: B-12,
+// Vitamin C, Amino Acids, Magnesium, Mineral Blend, NAC; Glow Getter drip.
+// Cascade posts render blue (reference); the 2 reels are local (the
+// location posts them). Load with startDate=2026-08-01 for August dates.
+export const PRIME_IV_PDM_AUG_2026: Playbook = {
+  id: 'prime-iv-pdm-aug-2026',
+  name: 'Prime IV — PDM August 2026 Calendar',
+  description:
+    'Actual August 2026 social content calendar from PDM. National Wellness Month + Back-to-Routine theme (B-12, Vitamin C, Amino Acids, Magnesium, Mineral Blend, NAC; Glow Getter). Captions verbatim. 12 cascading reference posts + 2 local reels.',
+  items: [
+    // Wk 8/2
+    { day: 2, platform: 'Instagram', content_type: 'Post', phase: 'PDM · Brand Cascade',
+      title: 'National Wellness Month: Build a Routine That Supports You',
+      hook: 'August is National Wellness Month — put your well-being back on the calendar.',
+      cta: 'Book your One Hour Vacation®',
+      caption: `August is National Wellness Month, a reminder that feeling your best often starts with the small habits you return to consistently. ✨
+
+Whether you are getting back into school schedules, work routines, workouts, or simply making more time for yourself, Prime IV can help support your energy, hydration, recovery, and overall wellness along the way.
+
+Make this the month you put your well-being back on the calendar. Book your next One Hour Vacation® and take an hour to recharge.
+
+#PrimeIV #NationalWellnessMonth #WellnessRoutine #SelfCare #IVTherapy #HydrationSupport #OneHourVacation` },
+    { day: 4, platform: 'Instagram', content_type: 'Post', phase: 'PDM · Brand Cascade',
+      title: 'Back-to-Routine Energy: Vitamin B-12',
+      hook: 'The calendar is filling up again — support your energy.',
+      cta: 'Ask about B-12',
+      caption: `The calendar is filling up again. School mornings, work deadlines, workouts, practices, appointments, and family schedules can make August feel like one long to-do list. ⚡
+
+Vitamin B-12 may help support natural energy production, mental clarity, red blood cell formation, and healthy nervous system function, making it a timely addition to your back-to-routine wellness plan.
+
+Explore Vitamin B-12 injections, The Awaken Amplifier, and IV drips featuring B-12 at Prime IV.
+
+#PrimeIV #VitaminB12 #EnergySupport #BackToRoutine #WellnessRoutine #IVTherapy` },
+    { day: 6, platform: 'Instagram', content_type: 'Post', phase: 'PDM · Brand Cascade',
+      title: 'Back-to-School Wellness: Vitamin C',
+      hook: 'New routines, fuller calendars, shared spaces — support your immune health.',
+      cta: 'Ask about Vitamin C options',
+      caption: `Back-to-school season brings new routines, fuller calendars, shared spaces, and less downtime. Supporting your wellness consistently can help you feel more prepared for everything the season brings. 🍊
+
+Vitamin C may help support immune health, antioxidant protection, collagen production, healthy skin, and overall wellness.
+
+Ask your Prime IV team about Vitamin C injections, Tri-Immune injections, The Shield Amplifier, High Dose Vitamin C IV infusions, and select IV drips featuring Vitamin C.
+
+#PrimeIV #VitaminC #ImmuneSupport #BackToSchoolWellness #WellnessRoutine #IVTherapy` },
+
+    // Wk 8/9
+    { day: 9, platform: 'Instagram', content_type: 'Post', phase: 'PDM · Brand Cascade',
+      title: 'Amino Acid Blend Spotlight: Support Your Active Routine',
+      hook: 'Getting back into a fitness routine? Support recovery and performance.',
+      cta: 'Ask about the Amino Acid Blend',
+      caption: `Getting back into a fitness routine? Preparing for fall sports, weekend activities, or a busier daily schedule?
+
+Amino acids are building blocks of protein and may help support natural energy production, circulation, physical performance, muscle recovery, lean muscle maintenance, collagen production, and tissue repair.
+
+Ask your Prime IV team about the Amino Acid Blend injection or IV drips featuring Amino Acids.
+
+#PrimeIV #AminoAcids #MuscleRecovery #ActiveLifestyle #FitnessRoutine #WellnessSupport` },
+
+    // Non-cascading local Reel #1
+    { day: 11, platform: 'Instagram', content_type: 'Reel', phase: 'Local Reel · post from our page',
+      title: '[LOCAL REEL] Staff Reel: Back-to-Routine Wellness Non-Negotiables',
+      hook: 'Our team shares the habits they rely on to stay supported.',
+      cta: 'Comment your wellness non-negotiable',
+      caption: `Busy schedules are back, so we asked our Prime IV team to share the simple wellness habits they rely on to stay supported through full weeks. ✨
+
+From hydration and movement to sleep, meal prep, and making time to recharge, small habits can make a big difference when routines get busy.
+
+What is one wellness non-negotiable you are bringing into the new season?
+
+#PrimeIV #BackToRoutine #WellnessHabits #HealthyRoutine #StaffFavorites #LocalWellness` },
+
+    { day: 12, platform: 'Instagram', content_type: 'Post', phase: 'PDM · Brand Cascade',
+      title: 'Magnesium Spotlight: Calm Meets Recovery',
+      hook: 'Your routine should leave room for rest and recovery.',
+      cta: 'Ask about Magnesium',
+      caption: `Your routine should support more than productivity. It should also leave room for rest and recovery.
+
+Magnesium plays an important role in healthy muscle and nervous system function and may help support relaxation, restful sleep, circulation, and recovery. It can be especially relevant as workouts, school schedules, work demands, and busy evenings return.
+
+Explore Magnesium injections, Mineral Blend injections, The Unwind Amplifier, and IV drips featuring Magnesium at Prime IV.
+
+#PrimeIV #Magnesium #StressSupport #MuscleRecovery #RestAndRecovery #WellnessSupport` },
+    { day: 14, platform: 'Instagram', content_type: 'Post', phase: 'PDM · Brand Cascade',
+      title: 'Your One Hour Reset',
+      hook: 'When the calendar fills up, put an hour for yourself back on it.',
+      cta: 'Book your One Hour Vacation®',
+      caption: `When work, school, family schedules, practices, and errands begin filling the calendar again, taking time for yourself can easily fall to the bottom of the list.
+
+Your One Hour Vacation® is a chance to step away from the noise, settle into a massage chair, and make space to recharge.
+
+Put an hour for yourself back on the calendar and book your next Prime IV visit.
+
+#PrimeIV #OneHourVacation #WellnessReset #SelfCareRoutine #BackToRoutine #IVTherapy` },
+
+    // Wk 8/16
+    { day: 16, platform: 'Instagram', content_type: 'Post', phase: 'PDM · Brand Cascade',
+      title: 'Workday Wellness: Build in a Reset',
+      hook: 'Build small wellness resets into your busy workdays.',
+      cta: 'Ask about Mineral Blend',
+      caption: `Busy workdays can make it easy to move from one task to the next without pausing to stretch, hydrate, eat, or step away from the screen.
+
+Build small wellness resets into your routine. Refill your water, take a short walk, stretch between meetings, and make time to recharge outside your workspace.
+
+Mineral Blend may help support hydration, natural energy production, healthy muscle function, and resilience through demanding schedules.
+
+Ask your Prime IV team about Mineral Blend injections and IV drips featuring essential minerals.
+
+#PrimeIV #WorkdayWellness #MineralBlend #HydrationSupport #HealthyHabits #WellnessRoutine` },
+    { day: 18, platform: 'Instagram', content_type: 'Post', phase: 'PDM · Brand Cascade',
+      title: 'Start With Your Wellness Goals',
+      hook: 'Your routine should reflect what you are working toward.',
+      cta: 'Start with a conversation',
+      caption: `Your wellness routine should reflect what you are working toward, whether that is supporting energy, hydration, recovery, immune health, relaxation, or overall well-being.
+
+At Prime IV, your team can help you explore options based on your goals, lifestyle, and current routine, so you can feel more informed about the services you choose.
+
+Not sure where to begin? Start with a conversation about what you want more support with this season.
+
+#PrimeIV #PersonalizedWellness #WellnessGoals #IVTherapy #WellnessRoutine #OneHourVacation` },
+
+    // Non-cascading local Reel #2
+    { day: 19, platform: 'Instagram', content_type: 'Reel', phase: 'Local Reel · post from our page',
+      title: '[LOCAL REEL] POV Reel: You Put Yourself Back on the Calendar',
+      hook: 'POV: your schedule is full, but you still made an hour for yourself.',
+      cta: 'Book your One Hour Vacation®',
+      caption: `POV: Your schedule is full, but you still made an hour for yourself. ✨
+
+Step away from the errands, practices, meetings, and endless to-do list and settle into your One Hour Vacation®.
+
+How are you making space to recharge this month?
+
+#PrimeIV #OneHourVacation #SelfCareRoutine #WellnessReset #BackToRoutine #IVTherapy` },
+
+    { day: 20, platform: 'Instagram', content_type: 'Post', phase: 'PDM · Brand Cascade',
+      title: 'Wellness at Every Age',
+      hook: 'Wellness needs evolve, but the foundations remain the same.',
+      cta: 'Explore options for your journey',
+      caption: `Wellness needs can evolve through different stages of life, but the foundations often remain the same.
+
+Consistent hydration, movement, rest, balanced nutrition, and time for self-care can all help support overall well-being.
+
+Wherever you are in your wellness journey, your Prime IV team can help you explore options that complement your individual goals and routine.
+
+#PrimeIV #WellnessAtEveryAge #HealthyAging #HydrationSupport #WellnessRoutine #OneHourVacation` },
+
+    // Wk 8/23
+    { day: 23, platform: 'Instagram', content_type: 'Post', phase: 'PDM · Brand Cascade',
+      title: 'Fall Fitness Reset: Don\'t Skip Recovery',
+      hook: 'A strong routine includes recovery too.',
+      cta: 'Ask about recovery-focused drips',
+      caption: `Getting back into the gym, fall sports, running, or more active weekends? A strong routine includes recovery too. 💪
+
+Remember to hydrate, stretch, refuel, prioritize sleep, and give your body time to recharge between workouts.
+
+Amino Acids may help support physical performance, muscle recovery, lean muscle maintenance, and tissue repair, while Magnesium may help support healthy muscle function and recovery.
+
+Explore recovery-focused options at Prime IV, including Muscle Rescue, Weekend Warrior, and Champion.
+
+#PrimeIV #FitnessRecovery #AminoAcids #Magnesium #ActiveLifestyle #MuscleRecovery` },
+    { day: 25, platform: 'Instagram', content_type: 'Post', phase: 'PDM · Brand Cascade',
+      title: 'NAC Spotlight: Support Your Natural Defenses',
+      hook: 'Sometimes a reset is about consistent foundational support.',
+      cta: 'Ask about NAC',
+      caption: `A routine reset is not always about adding more. Sometimes it is about giving your body consistent foundational support.
+
+Acetylcysteine, commonly known as NAC, helps support the production of glutathione, an important antioxidant. NAC may also help support the body's natural antioxidant defenses and detoxification processes.
+
+Ask your Prime IV team about options featuring NAC.
+
+#PrimeIV #NAC #AntioxidantSupport #WellnessRoutine #CellularSupport #IVTherapy` },
+    { day: 27, platform: 'Instagram', content_type: 'Post', phase: 'PDM · Brand Cascade',
+      title: 'Glow Getter Highlight: End-of-Summer Wellness Reset',
+      hook: 'Give your body a little end-of-season support.',
+      cta: 'Ask about The Glow Getter',
+      caption: `Before summer winds down, give your body a little end-of-season support. ✨
+
+The Glow Getter is our seasonal summer IV drip, designed to help support radiant skin, hydration, energy, muscle recovery, and overall wellness after sun-soaked days, travel, and nonstop summer plans.
+
+Book your end-of-summer reset and ask your Prime IV team about The Glow Getter.
+
+#PrimeIV #GlowGetter #SummerWellness #IVTherapy #HydrationSupport #WellnessReset #OneHourVacation` },
+  ],
+};
+
 export const PLAYBOOKS: Playbook[] = [
+  PRIME_IV_PDM_AUG_2026,
   VORTEX_SUMMER_2026,
   PRIME_IV_PDM_JUL_2026,
   PRIME_IV_PDM_JUN_2026,
@@ -1594,10 +1781,12 @@ export function getPlaybook(id: string): Playbook | undefined {
  */
 export const CLIENT_PLAYBOOKS: Record<string, string[]> = {
   // Corporate cascade first so it's the top one-click load each month
-  'prime-iv':           ['prime-iv-pdm-jul-2026', 'prime-iv-pdm-jun-2026', 'prime-iv-pdm-apr-2026', 'niceville-spring-reset', 'prime-iv-memberships'],
-  'prime-iv-pinecrest': ['prime-iv-pdm-jul-2026', 'prime-iv-pdm-jun-2026', 'prime-iv-pdm-apr-2026', 'pinecrest-reopening',    'prime-iv-memberships'],
-  'serenity-bayfront':  ['serenity-vrbo-launch'],
-  'vortex':             ['vortex-summer-2026'],
+  'prime-iv':              ['prime-iv-pdm-aug-2026', 'prime-iv-pdm-jul-2026', 'prime-iv-pdm-jun-2026', 'prime-iv-pdm-apr-2026', 'niceville-spring-reset', 'prime-iv-memberships'],
+  'prime-iv-pinecrest':    ['prime-iv-pdm-aug-2026', 'prime-iv-pdm-jul-2026', 'prime-iv-pdm-jun-2026', 'prime-iv-pdm-apr-2026', 'pinecrest-reopening',    'prime-iv-memberships'],
+  'prime-iv-high-street':  ['prime-iv-pdm-aug-2026', 'prime-iv-pdm-jul-2026', 'prime-iv-memberships'],
+  'prime-iv-holland-mi':   ['prime-iv-pdm-aug-2026', 'prime-iv-pdm-jul-2026', 'prime-iv-memberships'],
+  'serenity-bayfront':     ['serenity-vrbo-launch'],
+  'vortex':                ['vortex-summer-2026'],
 };
 
 export function getPlaybooksForClient(clientId: string): Playbook[] {
