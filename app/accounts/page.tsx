@@ -2,8 +2,12 @@
 
 import React, { useEffect, useMemo, useState } from 'react';
 import { useClient } from '@/context/ClientContext';
+import { STAFF } from '@/lib/staff';
 
 type Account = { id: string; email: string; role: string; client_ids: string; created_at: string; last_sign_in_at: string | null };
+type Member = { email: string; name: string; role?: string; color?: string; custom: boolean };
+
+const OWNER_EMAIL = 'mn@mothernatureagency.com';
 
 const ROLES = [
   { key: 'client', label: 'Client', hint: 'Client portal only — sees just the stores you pick.' },
@@ -28,6 +32,20 @@ export default function AccountsPage() {
   const [accounts, setAccounts] = useState<Account[]>([]);
   const [loading, setLoading] = useState(true);
 
+  // Team roster (assignable staff — separate from login accounts)
+  const [customStaff, setCustomStaff] = useState<Member[]>([]);
+  const [rName, setRName] = useState('');
+  const [rEmail, setREmail] = useState('');
+  const [rRole, setRRole] = useState('');
+  const [rErr, setRErr] = useState('');
+
+  const roster = useMemo<Member[]>(() => {
+    const base: Member[] = STAFF.map((s) => ({ email: s.email, name: s.name, role: s.role, custom: false }));
+    const seen = new Set(base.map((m) => m.email.toLowerCase()));
+    for (const c of customStaff) if (!seen.has(c.email.toLowerCase())) base.push(c);
+    return base;
+  }, [customStaff]);
+
   async function loadAccounts() {
     setLoading(true);
     try {
@@ -36,7 +54,35 @@ export default function AccountsPage() {
       if (res.ok) setAccounts(data.accounts || []);
     } catch {} finally { setLoading(false); }
   }
-  useEffect(() => { loadAccounts(); }, []);
+  async function loadRoster() {
+    try {
+      const res = await fetch('/api/staff');
+      const data = await res.json();
+      setCustomStaff((data.staff || []).map((s: any) => ({ email: s.email, name: s.name, role: s.role, color: s.color, custom: true })));
+    } catch {}
+  }
+  useEffect(() => { loadAccounts(); loadRoster(); }, []);
+
+  async function addTeammate() {
+    const name = rName.trim(); const em = rEmail.trim();
+    if (!name || !em) { setRErr('Name and email are required.'); return; }
+    setRErr('');
+    try {
+      const res = await fetch('/api/staff', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ name, email: em, role: rRole.trim() || undefined }),
+      });
+      const d = await res.json();
+      if (!res.ok) throw new Error(d.error || 'Could not add teammate');
+      setRName(''); setREmail(''); setRRole('');
+      loadRoster();
+    } catch (e: any) { setRErr(e.message); }
+  }
+  async function removeTeammate(em: string, name: string) {
+    if (!confirm(`Remove ${name} from the team roster? Their client assignments are cleared too.`)) return;
+    setCustomStaff((prev) => prev.filter((m) => m.email.toLowerCase() !== em.toLowerCase()));
+    try { await fetch(`/api/staff?email=${encodeURIComponent(em)}`, { method: 'DELETE' }); } catch {}
+  }
 
   async function removeAccount(id: string, email: string) {
     if (!confirm(`Remove the login account for ${email}? They will no longer be able to sign in. This can't be undone.`)) return;
@@ -210,6 +256,47 @@ export default function AccountsPage() {
             ))}
           </div>
         )}
+      </div>
+
+      {/* Team Roster */}
+      <div className="rounded-2xl p-5" style={{ background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.07)' }}>
+        <div className="flex items-center gap-2.5 mb-1">
+          <span className="material-symbols-outlined text-cyan-400" style={{ fontSize: 20 }}>groups</span>
+          <h3 className="text-[15px] font-bold text-white">Team Roster</h3>
+        </div>
+        <p className="text-[11px] text-white/45 mb-3">Your teammates — these are who you can assign to clients (Team Assignments on the dashboard). Separate from login accounts above.</p>
+
+        {/* Add teammate */}
+        <div className="grid grid-cols-1 sm:grid-cols-4 gap-2 mb-2">
+          <input value={rName} onChange={(e) => setRName(e.target.value)} placeholder="Name" className="text-[12px] px-2.5 py-2 rounded-lg bg-white/5 border border-white/10 text-white outline-none placeholder:text-white/30" />
+          <input value={rEmail} onChange={(e) => setREmail(e.target.value)} placeholder="email@mothernatureagency.com" className="text-[12px] px-2.5 py-2 rounded-lg bg-white/5 border border-white/10 text-white outline-none placeholder:text-white/30 sm:col-span-2" />
+          <div className="flex gap-2">
+            <input value={rRole} onChange={(e) => setRRole(e.target.value)} onKeyDown={(e) => { if (e.key === 'Enter') addTeammate(); }} placeholder="Role" className="flex-1 min-w-0 text-[12px] px-2.5 py-2 rounded-lg bg-white/5 border border-white/10 text-white outline-none placeholder:text-white/30" />
+            <button onClick={addTeammate} className="text-[12px] font-bold px-3 py-2 rounded-lg text-white shrink-0" style={{ background: 'linear-gradient(135deg,#0c6da4,#4ab8ce)' }}>Add</button>
+          </div>
+        </div>
+        {rErr && <div className="text-[11px] text-rose-300 mb-2">{rErr}</div>}
+
+        <div className="flex flex-col gap-1.5">
+          {roster.map((m) => (
+            <div key={m.email} className="flex items-center gap-3 rounded-xl px-3 py-2" style={{ background: 'rgba(0,0,0,0.22)', border: '1px solid rgba(255,255,255,0.06)' }}>
+              <span className="w-7 h-7 rounded-lg flex items-center justify-center text-[11px] font-extrabold text-white shrink-0" style={{ background: (m.color || '#7c3aed') }}>
+                {m.name.split(/\s+/).map((w) => w[0]).join('').slice(0, 2).toUpperCase()}
+              </span>
+              <div className="flex-1 min-w-0">
+                <div className="text-[13px] font-semibold text-white truncate">{m.name}{m.email.toLowerCase() === OWNER_EMAIL && <span className="text-white/40 font-normal"> · you</span>}</div>
+                <div className="text-[10px] text-white/40 truncate">{m.email}{m.role ? ` · ${m.role}` : ''}</div>
+              </div>
+              {m.custom ? (
+                <button onClick={() => removeTeammate(m.email, m.name)} title="Remove teammate" className="text-white/30 hover:text-rose-300 shrink-0">
+                  <span className="material-symbols-outlined" style={{ fontSize: 18 }}>delete</span>
+                </button>
+              ) : (
+                <span className="text-[9px] font-bold px-2 py-0.5 rounded-full bg-white/10 text-white/50 shrink-0">Built-in</span>
+              )}
+            </div>
+          ))}
+        </div>
       </div>
     </div>
   );
