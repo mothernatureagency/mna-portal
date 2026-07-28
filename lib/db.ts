@@ -349,6 +349,15 @@ async function initSchema() {
                         notes text,
                         created_at timestamptz not null default now()
                   )`,
+                  // Staff roster — teammates added on the fly (beyond the
+                  // built-in list in lib/staff.ts). Assignable to clients.
+                  `create table if not exists staff_members (
+                        email text primary key,
+                        name text not null,
+                        role text,
+                        color text,
+                        created_at timestamptz not null default now()
+                  )`,
                   // Staff → client assignments (who works on which client).
                   // Editable overlay over the static defaults in lib/staff.ts.
                   `create table if not exists staff_assignments (
