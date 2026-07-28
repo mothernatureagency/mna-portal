@@ -57,6 +57,7 @@ export async function GET() {
     return {
       id: u.id,
       email: u.email,
+      name: meta.name || meta.full_name || '',
       role: meta.role || 'staff',
       client_ids: meta.client_ids || meta.client_id || '',
       created_at: u.created_at,

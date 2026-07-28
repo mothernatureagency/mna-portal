@@ -27,6 +27,7 @@ export default function StaffAssignments() {
 
   const [assignments, setAssignments] = useState<Assignment[]>([]);
   const [custom, setCustom] = useState<Member[]>([]);
+  const [accountStaff, setAccountStaff] = useState<Member[]>([]);
   const [loading, setLoading] = useState(true);
 
   // Add-teammate form
@@ -36,17 +37,21 @@ export default function StaffAssignments() {
   const [nRole, setNRole] = useState('');
   const [err, setErr] = useState('');
 
-  // Built-in staff (minus owner) + custom teammates, de-duped by email.
+  // Built-in staff + custom teammates + staff/manager login accounts (all
+  // minus the owner), de-duped by email — everyone who can be assigned.
   const roster = useMemo<Member[]>(() => {
     const base: Member[] = STAFF
       .filter((s) => s.email.toLowerCase() !== OWNER_EMAIL)
       .map((s) => ({ email: s.email, name: s.name, role: s.role }));
     const seen = new Set(base.map((m) => m.email.toLowerCase()));
-    for (const c of custom) {
-      if (!seen.has(c.email.toLowerCase())) base.push({ ...c, custom: true });
+    for (const c of [...custom, ...accountStaff]) {
+      const em = c.email.toLowerCase();
+      if (em === OWNER_EMAIL || seen.has(em)) continue;
+      base.push({ ...c, custom: c.custom });
+      seen.add(em);
     }
     return base;
-  }, [custom]);
+  }, [custom, accountStaff]);
 
   function colorFor(email: string) {
     const c = custom.find((m) => m.email.toLowerCase() === email.toLowerCase());
@@ -55,12 +60,16 @@ export default function StaffAssignments() {
 
   async function load() {
     try {
-      const [aRes, sRes] = await Promise.all([
+      const [aRes, sRes, acctRes] = await Promise.all([
         fetch('/api/staff-assignments').then((r) => r.json()),
         fetch('/api/staff').then((r) => r.json()),
+        fetch('/api/accounts').then((r) => r.json()).catch(() => ({})),
       ]);
       setAssignments(aRes.assignments || []);
       setCustom((sRes.staff || []).map((s: any) => ({ email: s.email, name: s.name, role: s.role, color: s.color, custom: true })));
+      setAccountStaff(((acctRes.accounts || []) as any[])
+        .filter((a) => a.role !== 'client' && a.email)
+        .map((a) => ({ email: a.email, name: a.name || a.email.split('@')[0], role: a.role, custom: false })));
     } catch {} finally { setLoading(false); }
   }
   useEffect(() => { load(); }, []);

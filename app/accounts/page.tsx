@@ -4,8 +4,8 @@ import React, { useEffect, useMemo, useState } from 'react';
 import { useClient } from '@/context/ClientContext';
 import { STAFF } from '@/lib/staff';
 
-type Account = { id: string; email: string; role: string; client_ids: string; created_at: string; last_sign_in_at: string | null };
-type Member = { email: string; name: string; role?: string; color?: string; custom: boolean };
+type Account = { id: string; email: string; name?: string; role: string; client_ids: string; created_at: string; last_sign_in_at: string | null };
+type Member = { email: string; name: string; role?: string; color?: string; custom: boolean; login?: boolean };
 
 const OWNER_EMAIL = 'mn@mothernatureagency.com';
 
@@ -42,9 +42,17 @@ export default function AccountsPage() {
   const roster = useMemo<Member[]>(() => {
     const base: Member[] = STAFF.map((s) => ({ email: s.email, name: s.name, role: s.role, custom: false }));
     const seen = new Set(base.map((m) => m.email.toLowerCase()));
-    for (const c of customStaff) if (!seen.has(c.email.toLowerCase())) base.push(c);
+    for (const c of customStaff) if (!seen.has(c.email.toLowerCase())) { base.push(c); seen.add(c.email.toLowerCase()); }
+    // Staff/manager login accounts are assignable too — surface them even if
+    // they were never added to the roster explicitly.
+    for (const a of accounts) {
+      const em = (a.email || '').toLowerCase();
+      if (!em || a.role === 'client' || seen.has(em)) continue;
+      base.push({ email: a.email, name: a.name || a.email.split('@')[0], role: a.role, custom: false, login: true });
+      seen.add(em);
+    }
     return base;
-  }, [customStaff]);
+  }, [customStaff, accounts]);
 
   async function loadAccounts() {
     setLoading(true);
@@ -83,6 +91,18 @@ export default function AccountsPage() {
     setCustomStaff((prev) => prev.filter((m) => m.email.toLowerCase() !== em.toLowerCase()));
     try { await fetch(`/api/staff?email=${encodeURIComponent(em)}`, { method: 'DELETE' }); } catch {}
   }
+
+  // Pre-fill the create-account form from a roster teammate (default to a
+  // full staff login) and scroll up so you can finish + create.
+  function createLoginFor(m: Member) {
+    setEmail(m.email);
+    setRole('staff');
+    setPicked(new Set());
+    setResult(null);
+    setError('');
+    if (typeof window !== 'undefined') window.scrollTo({ top: 0, behavior: 'smooth' });
+  }
+  const hasLogin = (em: string) => accounts.some((a) => a.email?.toLowerCase() === em.toLowerCase());
 
   async function removeAccount(id: string, email: string) {
     if (!confirm(`Remove the login account for ${email}? They will no longer be able to sign in. This can't be undone.`)) return;
@@ -292,7 +312,7 @@ export default function AccountsPage() {
                   <span className="material-symbols-outlined" style={{ fontSize: 18 }}>delete</span>
                 </button>
               ) : (
-                <span className="text-[9px] font-bold px-2 py-0.5 rounded-full bg-white/10 text-white/50 shrink-0">Built-in</span>
+                <span className="text-[9px] font-bold px-2 py-0.5 rounded-full bg-white/10 text-white/50 shrink-0">{m.login ? 'Has login' : 'Built-in'}</span>
               )}
             </div>
           ))}
