@@ -18,6 +18,7 @@ import UserBanner from '@/components/dashboard/UserBanner';
 import Card from '@/components/ui/Card';
 import DailyBriefing from '@/components/dashboard/DailyBriefing';
 import PersonalDashboard from '@/components/dashboard/PersonalDashboard';
+import DashboardStats from '@/components/dashboard/DashboardStats';
 
 // ─────────────────────────────────────────────────────────────────
 // Client-specific KPI data
@@ -296,87 +297,14 @@ export default function DashboardPage() {
         </div>
       )}
 
-      <div>
-        <SectionLabel>Key Metrics</SectionLabel>
-        <div className="grid gap-4 mb-4" style={{ gridTemplateColumns: '1.6fr 1fr 1fr' }}>
-          <div className="rounded-[20px] p-6 text-white relative overflow-hidden" style={{ background: `linear-gradient(135deg, ${gradientFrom}, ${gradientTo})` }}>
-            <div className="relative z-10">
-              <div className="flex items-center justify-between mb-2">
-                <span className="text-[10px] font-bold uppercase opacity-85">Total Leads</span>
-                {data.totalLeadsChange !== null && data.totalLeadsChange > 0 && (
-                  <span className="text-[10px] font-bold px-2 py-0.5 rounded-full" style={{ background: 'rgba(255,255,255,0.2)' }}>+{data.totalLeadsChange}% ↑</span>
-                )}
-                {data.totalLeadsChange === null && (
-                  <span className="text-[10px] font-bold px-2 py-0.5 rounded-full" style={{ background: 'rgba(255,255,255,0.2)' }}>No trend data</span>
-                )}
-                {data.totalLeads > data.totalLeadsTarget && (
-                  <span className="text-[10px] font-bold px-2 py-0.5 rounded-full" style={{ background: 'rgba(255,255,255,0.2)' }}>Exceeded ✦</span>
-                )}
-              </div>
-              <div className="text-[52px] font-black leading-none mb-1">{data.totalLeads}</div>
-              <div className="text-[12px] mb-4 opacity-70">Target: {data.totalLeadsTarget} leads</div>
-              <div className="h-1.5 rounded-full mb-1.5" style={{ background: 'rgba(255,255,255,0.2)' }}>
-                <div className="h-full rounded-full bg-white" style={{ width: `${leadsPct}%` }} />
-              </div>
-              <div className="flex justify-between text-[10px] mb-3 opacity-70">
-                <span>Progress to target</span>
-                <span className="font-bold">{leadsPct}%</span>
-              </div>
-              <div className="flex items-end gap-0.5 h-7">
-                {data.sparkline.length > 0 ? (
-                  data.sparkline.map((v, i) => (
-                    <div key={i} className="flex-1 rounded-sm" style={{ height: Math.round((v / leadsMax) * 28), background: `rgba(255,255,255,${0.3 + (v / leadsMax) * 0.5})` }} />
-                  ))
-                ) : (
-                  <div className="text-[10px] opacity-60 italic">Historical trend unavailable — awaiting API</div>
-                )}
-              </div>
-            </div>
-          </div>
-          <div className="glass-card p-5 relative overflow-hidden">
-            <div className="absolute top-0 left-0 right-0 h-1 rounded-t-[20px]" style={{ background: 'linear-gradient(90deg,#3b82f6,#6366f1)' }} />
-            <span className="text-[10px] font-bold uppercase text-gray-400">Cost Per Lead</span>
-            <div className="text-[34px] font-black text-gray-900 leading-none my-2">{data.cpl}</div>
-            <div className="text-[11px] text-gray-400 mb-3">Target: ≤$45.00</div>
-            <div className="h-1.5 rounded-full overflow-hidden mb-3" style={{ background: '#eff6ff' }}>
-              <div className="h-full rounded-full" style={{ width: `${data.cplPct}%`, background: 'linear-gradient(90deg,#3b82f6,#6366f1)' }} />
-            </div>
-            <div className="text-[11px] font-bold" style={{ color: '#059669' }}>{data.cplNote}</div>
-          </div>
-          <div className="glass-card p-5 relative overflow-hidden">
-            <div className="absolute top-0 left-0 right-0 h-1 rounded-t-[20px]" style={{ background: 'linear-gradient(90deg,#8b5cf6,#a78bfa)' }} />
-            <span className="text-[10px] font-bold uppercase text-gray-400">Conversion Rate</span>
-            <div className="text-[34px] font-black text-gray-900 leading-none my-2">{data.convRate}</div>
-            <div className="text-[11px] mb-3">
-              <span className="text-gray-400">Target: {data.convRateTarget} </span>
-              {parseFloat(data.convRate) > parseFloat(data.convRateTarget) && (
-                <span className="font-bold" style={{ color: '#7c3aed' }}>Exceeded ✦</span>
-              )}
-            </div>
-            <div className="text-[11px] font-bold" style={{ color: '#7c3aed' }}>{data.convRateNote}</div>
-          </div>
-        </div>
-        <div className="grid grid-cols-3 gap-4">
-          {[
-            { label: 'Ad Spend', value: data.adSpend, target: data.adSpendTarget, pct: data.adSpendPct, change: data.adSpendChange, color: '#f59e0b' },
-            { label: 'Appointments', value: data.appointments, target: data.appointmentsTarget, pct: data.appointmentsPct, change: data.appointmentsChange, color: '#ec4899' },
-            { label: 'Revenue', value: data.revenue, target: data.revenueTarget, pct: data.revenuePct, change: data.revenueChange, color: '#06b6d4' },
-          ].map((k) => (
-            <div key={k.label} className="glass-card p-5 relative overflow-hidden">
-              <div className="absolute top-0 left-0 right-0 h-1 rounded-t-[20px]" style={{ background: k.color }} />
-              <span className="text-[10px] font-bold uppercase text-gray-400">{k.label}</span>
-              <div className="text-[30px] font-black text-gray-900 leading-none my-2">{k.value}</div>
-              <div className="text-[11px] text-gray-400 mb-3">Target: {k.target}</div>
-              <div className="h-1.5 rounded-full overflow-hidden mb-3" style={{ background: k.color + '18' }}>
-                <div className="h-full rounded-full" style={{ width: k.pct + '%', background: k.color }} />
-              </div>
-              <div className="text-[11px] font-bold" style={{ color: k.color }}>
-                {k.change === null ? 'No data yet' : k.change > 0 ? `+${k.change}% vs last month` : '— vs last month'}
-              </div>
-            </div>
-          ))}
-        </div>
-      </div>
+      <DashboardStats client={activeClient} defaults={{
+        leads:   { value: String(data.totalLeads), target: String(data.totalLeadsTarget), note: data.totalLeadsChange != null ? `+${data.totalLeadsChange}% vs last month` : '' },
+        cpl:     { value: data.cpl, target: '', note: data.cplNote || '' },
+        conv:    { value: data.convRate, target: data.convRateTarget, note: data.convRateNote || '' },
+        adSpend: { value: data.adSpend, target: data.adSpendTarget, note: data.adSpendChange != null ? `+${data.adSpendChange}% vs last month` : '' },
+        appts:   { value: data.appointments, target: data.appointmentsTarget, note: data.appointmentsChange != null ? `+${data.appointmentsChange}% vs last month` : '' },
+        revenue: { value: data.revenue, target: data.revenueTarget, note: data.revenueChange != null ? `+${data.revenueChange}% vs last month` : '' },
+      }} />
       <div><SectionLabel>Performance Trends</SectionLabel><LeadTrendsChart /></div>
       <div><SectionLabel>Ad Performance</SectionLabel><AdPerformanceChart /></div>
       <div><SectionLabel>Financial Projections</SectionLabel><FinancialProjections /></div>
