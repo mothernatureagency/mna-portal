@@ -6,6 +6,9 @@ import { clients as staticClients, makePrimeIVClient, makeCustomClient, slugify 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
 
+// Staff auto-assigned to every new Prime IV location (Sable + Vanessa).
+const DEFAULT_PRIME_STAFF = ['admin@mothernatureagency.com', 'info@mothernatureagency.com'];
+
 /**
  * Custom (dynamically-added) Prime IV clients.
  *
@@ -78,6 +81,17 @@ export async function POST(req: NextRequest) {
     if (rows.length === 0) {
       return NextResponse.json({ error: `That client already exists (${client.name})` }, { status: 409 });
     }
+
+    // New Prime IV locations auto-assign the default Prime team (Sable +
+    // Vanessa) so they're covered from day one. Never blocks client creation.
+    if (!isGeneric) {
+      try {
+        for (const email of DEFAULT_PRIME_STAFF) {
+          await query(`insert into staff_assignments (staff_email, client_id) values ($1, $2) on conflict do nothing`, [email, client.id]);
+        }
+      } catch { /* non-fatal */ }
+    }
+
     return NextResponse.json({ item: rows[0], client });
   } catch (e: any) {
     return NextResponse.json({ error: e?.message || 'Could not add client' }, { status: 500 });
