@@ -58,6 +58,11 @@ export async function POST(req: NextRequest) {
   )).slice(0, 12);
 
   if (zips.length === 0) return NextResponse.json({ error: 'Enter at least one 5-digit ZIP code.' }, { status: 400 });
+  if (!KEY) {
+    return NextResponse.json({
+      error: 'Income data needs a free US Census API key. Get one at api.census.gov/data/key_signup.html and add CENSUS_API_KEY in Vercel → Settings → Environment Variables, then redeploy.',
+    }, { status: 400 });
+  }
 
   const areas = await Promise.all(zips.map(fetchZip));
   const sorted = [...areas].sort((a, b) => (b.income || -1) - (a.income || -1));

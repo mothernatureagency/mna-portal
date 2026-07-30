@@ -20,6 +20,8 @@ const CATEGORIES: { key: string; label: string; icon: string; discoverable: bool
   { key: 'b2b', label: 'B2B Partners', icon: 'handshake', discoverable: true },
   { key: 'gym', label: 'Gyms & Fitness', icon: 'fitness_center', discoverable: true },
   { key: 'urgent_care', label: 'Urgent Cares', icon: 'local_hospital', discoverable: true },
+  { key: 'ob', label: "OB / Women's Clinics", icon: 'pregnant_woman', discoverable: true },
+  { key: 'surgery', label: 'Surgery Centers', icon: 'medical_services', discoverable: true },
 ];
 
 const STATUSES: { key: string; label: string; color: string }[] = [

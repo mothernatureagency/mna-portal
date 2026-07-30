@@ -20,7 +20,9 @@ const RADIUS_M = 24140; // ~15 miles
 // Overpass tag filters per category (each gets the (around:…) clause appended).
 const FILTERS: Record<string, string[]> = {
   gym: ['nwr[leisure=fitness_centre]', 'nwr[leisure=sports_centre]', 'nwr["sport"="fitness"]'],
-  urgent_care: ['nwr[amenity=clinic]', 'nwr[healthcare=clinic]', 'nwr[amenity=doctors]', 'nwr[amenity=hospital]'],
+  urgent_care: ['nwr[amenity=clinic]', 'nwr[healthcare=clinic]', 'nwr[amenity=doctors]', 'nwr["healthcare:speciality"~"urgent",i]'],
+  ob: ['nwr["healthcare:speciality"~"gyn|obstet",i]', 'nwr[amenity=clinic]["name"~"OB|OBGYN|gynec|obstet|women",i]', 'nwr[amenity=doctors]["name"~"OB|OBGYN|gynec|obstet|women",i]'],
+  surgery: ['nwr["healthcare:speciality"~"surgery",i]', 'nwr[healthcare=hospital]', 'nwr[amenity=hospital]', 'nwr["name"~"surgery|surgical",i][amenity~"clinic|doctors|hospital"]'],
   b2b: ['nwr[leisure=spa]', 'nwr[shop=massage]', 'nwr[shop=beauty]', 'nwr[amenity=spa]'],
 };
 
@@ -32,13 +34,42 @@ async function role(): Promise<string> {
   } catch { return ''; }
 }
 
+const OVERPASS_HOSTS = [
+  'https://overpass-api.de/api/interpreter',
+  'https://lz4.overpass-api.de/api/interpreter',
+];
+
 async function geocode(loc: string): Promise<{ lat: number; lon: number } | null> {
-  const url = `https://nominatim.openstreetmap.org/search?q=${encodeURIComponent(loc)}&format=json&limit=1`;
-  const r = await fetch(url, { headers: { 'User-Agent': UA, 'Accept-Language': 'en' } });
-  if (!r.ok) return null;
-  const data = await r.json();
-  if (!Array.isArray(data) || data.length === 0) return null;
-  return { lat: parseFloat(data[0].lat), lon: parseFloat(data[0].lon) };
+  const trimmed = loc.trim();
+  // Bare ZIPs and plain city names resolve much better with ", USA" appended.
+  const tries = [trimmed];
+  if (!/usa|united states/i.test(trimmed)) tries.push(`${trimmed}, USA`);
+  for (const q of tries) {
+    try {
+      const url = `https://nominatim.openstreetmap.org/search?q=${encodeURIComponent(q)}&format=json&limit=1&countrycodes=us`;
+      const r = await fetch(url, { headers: { 'User-Agent': UA, 'Accept-Language': 'en', 'Referer': 'https://portal.mothernatureagency.com' } });
+      if (!r.ok) continue;
+      const data = await r.json();
+      if (Array.isArray(data) && data.length) return { lat: parseFloat(data[0].lat), lon: parseFloat(data[0].lon) };
+    } catch { /* try next */ }
+  }
+  return null;
+}
+
+async function overpass(ql: string): Promise<any[] | null> {
+  for (const host of OVERPASS_HOSTS) {
+    try {
+      const r = await fetch(host, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/x-www-form-urlencoded', 'User-Agent': UA },
+        body: `data=${encodeURIComponent(ql)}`,
+      });
+      if (!r.ok) continue;
+      const data = await r.json();
+      return Array.isArray(data.elements) ? data.elements : [];
+    } catch { /* try next host */ }
+  }
+  return null; // all endpoints failed
 }
 
 function composeAddress(tags: any): string | null {
@@ -68,20 +99,11 @@ export async function POST(req: NextRequest) {
 
   const filters = FILTERS[category] || FILTERS.b2b;
   const clauses = filters.map((f) => `${f}(around:${RADIUS_M},${geo.lat},${geo.lon});`).join('');
-  const overpassQL = `[out:json][timeout:25];(${clauses});out center 60;`;
+  const overpassQL = `[out:json][timeout:25];(${clauses});out center 80;`;
 
-  let elements: any[] = [];
-  try {
-    const or = await fetch('https://overpass-api.de/api/interpreter', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/x-www-form-urlencoded', 'User-Agent': UA },
-      body: `data=${encodeURIComponent(overpassQL)}`,
-    });
-    if (!or.ok) return NextResponse.json({ error: `Map search failed (${or.status}). Try again in a moment.` }, { status: 502 });
-    const data = await or.json();
-    elements = Array.isArray(data.elements) ? data.elements : [];
-  } catch (e: any) {
-    return NextResponse.json({ error: `Map search error: ${e?.message || e}` }, { status: 502 });
+  const elements = await overpass(overpassQL);
+  if (elements === null) {
+    return NextResponse.json({ error: 'The map search service is busy right now — please try again in a few seconds.' }, { status: 503 });
   }
 
   const { rows: existing } = await query<{ place_id: string }>(
