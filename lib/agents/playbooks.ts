@@ -1785,6 +1785,7 @@ export const CLIENT_PLAYBOOKS: Record<string, string[]> = {
   'prime-iv-pinecrest':    ['prime-iv-pdm-aug-2026', 'prime-iv-pdm-jul-2026', 'prime-iv-pdm-jun-2026', 'prime-iv-pdm-apr-2026', 'pinecrest-reopening',    'prime-iv-memberships'],
   'prime-iv-high-street':  ['prime-iv-pdm-aug-2026', 'prime-iv-pdm-jul-2026', 'prime-iv-memberships'],
   'prime-iv-holland-mi':   ['prime-iv-pdm-aug-2026', 'prime-iv-pdm-jul-2026', 'prime-iv-memberships'],
+  'prime-iv-papillion-ne': ['prime-iv-pdm-aug-2026', 'prime-iv-pdm-jul-2026', 'prime-iv-memberships'],
   'serenity-bayfront':     ['serenity-vrbo-launch'],
   'vortex':                ['vortex-summer-2026'],
 };
