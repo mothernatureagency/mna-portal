@@ -1396,12 +1396,43 @@ export default function ContentPage() {
                         {parsed.cta}
                       </div>
                     )}
-                    {activeItem.caption && (
+                    {(activeItem.caption || isStaff) && (
                       <div>
-                        <div className="text-[10px] font-bold uppercase tracking-wider text-white/40 mb-1">Caption</div>
-                        <div className="text-[13px] text-white/70 whitespace-pre-wrap leading-relaxed bg-white/5 rounded-xl p-4 border border-white/10 max-h-60 overflow-y-auto">
-                          {activeItem.caption}
+                        <div className="flex items-center justify-between mb-1">
+                          <div className="text-[10px] font-bold uppercase tracking-wider text-white/40">Caption</div>
+                          {isStaff && !editingCaption[activeItem.id] && (
+                            <button
+                              onClick={() => { setCaptionDraft((d) => ({ ...d, [activeItem.id]: activeItem.caption || '' })); setEditingCaption((ec) => ({ ...ec, [activeItem.id]: true })); }}
+                              className="text-[10px] font-semibold text-white/50 hover:text-white inline-flex items-center gap-1"
+                            >
+                              <span className="material-symbols-outlined" style={{ fontSize: 13 }}>edit</span>{activeItem.caption ? 'Edit' : 'Add caption'}
+                            </button>
+                          )}
                         </div>
+                        {isStaff && editingCaption[activeItem.id] ? (
+                          <div>
+                            <textarea
+                              value={captionDraft[activeItem.id] ?? activeItem.caption ?? ''}
+                              onChange={(e) => setCaptionDraft((d) => ({ ...d, [activeItem.id]: e.target.value }))}
+                              rows={7}
+                              autoFocus
+                              className="w-full text-[13px] text-white/90 bg-white/5 rounded-xl p-3 border border-white/15 outline-none leading-relaxed"
+                            />
+                            <div className="flex gap-2 mt-2">
+                              <button
+                                onClick={async () => { try { await patchItem(activeItem.id, { caption: captionDraft[activeItem.id] }); } catch (e: any) { alert(e.message); } setEditingCaption((ec) => ({ ...ec, [activeItem.id]: false })); }}
+                                className="text-[11px] font-bold px-3 py-1.5 rounded-lg text-white" style={{ background: 'rgba(16,185,129,0.3)' }}
+                              >Save</button>
+                              <button onClick={() => setEditingCaption((ec) => ({ ...ec, [activeItem.id]: false }))} className="text-[11px] font-semibold px-2.5 py-1.5 rounded-lg bg-white/5 text-white/60 border border-white/10">Cancel</button>
+                            </div>
+                          </div>
+                        ) : activeItem.caption ? (
+                          <div className="text-[13px] text-white/70 whitespace-pre-wrap leading-relaxed bg-white/5 rounded-xl p-4 border border-white/10 max-h-60 overflow-y-auto">
+                            {activeItem.caption}
+                          </div>
+                        ) : (
+                          <div className="text-[12px] text-white/30 italic">No caption yet — click “Add caption”.</div>
+                        )}
                       </div>
                     )}
                     {activeItem.client_comments && (
