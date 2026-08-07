@@ -122,6 +122,10 @@ type ContentItem = {
   approved_at: string | null;
   photo_drive_url: string | null;
   client_visible: boolean;
+  auto_post?: boolean;
+  publish_status?: string | null;
+  published_at?: string | null;
+  publish_error?: string | null;
 };
 
 const MNA_EMAILS = [
@@ -236,6 +240,9 @@ export default function ContentPage() {
   const [photoDraft, setPhotoDraft] = useState<Record<string, string>>({});
   const [editingPhoto, setEditingPhoto] = useState<Record<string, boolean>>({});
   const [uploadingId, setUploadingId] = useState<string | null>(null);
+  const [publishing, setPublishing] = useState<string | null>(null);
+  const [ayrshareKey, setAyrshareKey] = useState('');
+  const [ayrshareSaved, setAyrshareSaved] = useState(false);
   const [isStaff, setIsStaff] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editDraft, setEditDraft] = useState<{ post_date: string; platform: string; content_type: string; title: string }>({ post_date: '', platform: '', content_type: '', title: '' });
@@ -353,6 +360,42 @@ export default function ContentPage() {
     const data = await res.json();
     if (!res.ok) throw new Error(data.error || 'Update failed');
     setItems((prev) => prev.map((it) => (it.id === id ? { ...it, ...data.item } : it)));
+  }
+
+  // ── Social auto-posting ──────────────────────────────────────────
+  useEffect(() => {
+    if (!activeClient?.id) return;
+    fetch(`/api/client-kv?clientId=${encodeURIComponent(activeClient.id)}&key=ayrshare_profile_key`)
+      .then((r) => r.json())
+      .then((d) => setAyrshareKey(typeof d.value === 'string' ? d.value : ''))
+      .catch(() => setAyrshareKey(''));
+  }, [activeClient?.id]);
+
+  function saveAyrshareKey() {
+    if (!activeClient?.id) return;
+    fetch('/api/client-kv', { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ clientId: activeClient.id, key: 'ayrshare_profile_key', value: ayrshareKey.trim() }) })
+      .then(() => { setAyrshareSaved(true); setTimeout(() => setAyrshareSaved(false), 1400); })
+      .catch(() => {});
+  }
+
+  async function toggleAutoPost(id: string, val: boolean) {
+    setItems((prev) => prev.map((it) => (it.id === id ? { ...it, auto_post: val } : it)));
+    try { await patchItem(id, { auto_post: val }); } catch {}
+  }
+
+  async function publishNow(id: string) {
+    if (!activeClient?.id) return;
+    if (!confirm('Publish this post to the connected social accounts now? This posts publicly.')) return;
+    setPublishing(id);
+    try {
+      const res = await fetch('/api/social/publish', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ id, clientId: activeClient.id }) });
+      const d = await res.json();
+      if (!res.ok) throw new Error(d.error || 'Publish failed');
+      setItems((prev) => prev.map((it) => (it.id === id ? { ...it, publish_status: 'posted', published_at: new Date().toISOString(), publish_error: null } : it)));
+    } catch (e: any) {
+      alert(e.message);
+      setItems((prev) => prev.map((it) => (it.id === id ? { ...it, publish_status: 'failed', publish_error: e.message } : it)));
+    } finally { setPublishing(null); }
   }
 
   // Optimistic move for drag-to-reschedule in the calendar view.
@@ -743,6 +786,21 @@ export default function ContentPage() {
       </div>
 
       {/* Add post form (staff only) */}
+      {isStaff && (
+        <div className="glass-card p-3 flex flex-col sm:flex-row sm:items-center gap-2">
+          <span className="material-symbols-outlined text-cyan-400 shrink-0" style={{ fontSize: 18 }}>share</span>
+          <div className="text-[11px] text-white/55 shrink-0">Social auto-post ({activeClient?.shortName}) —</div>
+          <input
+            value={ayrshareKey}
+            onChange={(e) => setAyrshareKey(e.target.value)}
+            placeholder="Paste this client's Ayrshare Profile Key to enable posting"
+            className="flex-1 text-[12px] px-2.5 py-1.5 rounded-lg bg-white/5 border border-white/10 text-white outline-none placeholder:text-white/30"
+          />
+          <button onClick={saveAyrshareKey} className="text-[11px] font-bold px-3 py-1.5 rounded-lg bg-white/10 text-white/80 hover:text-white shrink-0">Save</button>
+          {ayrshareSaved && <span className="text-[10px] text-emerald-300 shrink-0">Saved</span>}
+        </div>
+      )}
+
       {isStaff && showAddForm && (
         <div id="add-post-form" className="glass-card p-5">
           <div className="grid grid-cols-1 md:grid-cols-3 gap-3 mb-3">
@@ -1433,6 +1491,36 @@ export default function ContentPage() {
                         ) : (
                           <div className="text-[12px] text-white/30 italic">No caption yet — click “Add caption”.</div>
                         )}
+                      </div>
+                    )}
+                    {isStaff && !pdm && (
+                      <div className="rounded-lg p-3" style={{ background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.08)' }}>
+                        <div className="flex items-center justify-between gap-2 mb-1.5">
+                          <span className="text-[10px] font-bold uppercase tracking-wider text-white/40">Social auto-post</span>
+                          {activeItem.publish_status === 'posted' ? (
+                            <span className="text-[9px] font-bold px-2 py-0.5 rounded-full bg-emerald-500/20 text-emerald-300">✓ Posted</span>
+                          ) : activeItem.publish_status === 'failed' ? (
+                            <span className="text-[9px] font-bold px-2 py-0.5 rounded-full bg-rose-500/20 text-rose-300">Failed</span>
+                          ) : activeItem.auto_post ? (
+                            <span className="text-[9px] font-bold px-2 py-0.5 rounded-full bg-sky-500/20 text-sky-300">Auto-post on</span>
+                          ) : null}
+                        </div>
+                        <div className="flex items-center gap-3 flex-wrap">
+                          <label className="flex items-center gap-1.5 text-[11px] text-white/70 cursor-pointer">
+                            <input type="checkbox" checked={!!activeItem.auto_post} onChange={(e) => toggleAutoPost(activeItem.id, e.target.checked)} />
+                            Auto-post on {fmtDate(activeItem.post_date)}
+                          </label>
+                          <button
+                            onClick={() => publishNow(activeItem.id)}
+                            disabled={publishing === activeItem.id}
+                            className="text-[11px] font-bold px-3 py-1.5 rounded-lg text-white disabled:opacity-50 inline-flex items-center gap-1"
+                            style={{ background: 'linear-gradient(135deg,#0c6da4,#4ab8ce)' }}
+                          >
+                            <span className="material-symbols-outlined" style={{ fontSize: 14 }}>send</span>
+                            {publishing === activeItem.id ? 'Posting…' : 'Publish now'}
+                          </button>
+                        </div>
+                        {activeItem.publish_error && <div className="text-[10px] text-rose-300 mt-1.5">{activeItem.publish_error}</div>}
                       </div>
                     )}
                     {activeItem.client_comments && (

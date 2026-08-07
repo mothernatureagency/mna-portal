@@ -35,7 +35,7 @@ export async function PATCH(req: NextRequest) {
   await ensureSchema();
   let body: any;
   try { body = await req.json(); } catch { return NextResponse.json({ error: 'Invalid JSON' }, { status: 400 }); }
-  const { id, post_date, platform, content_type, title, caption, status, client_approval_status, client_comments, mna_comments, photo_drive_url } = body || {};
+  const { id, post_date, platform, content_type, title, caption, status, client_approval_status, client_comments, mna_comments, photo_drive_url, auto_post } = body || {};
   if (!id) return NextResponse.json({ error: 'id required' }, { status: 400 });
   const fields: string[] = [];
   const values: any[] = [];
@@ -55,6 +55,7 @@ export async function PATCH(req: NextRequest) {
   if (client_comments !== undefined) { values.push(client_comments); fields.push(`client_comments = $${values.length}`); }
   if (mna_comments !== undefined) { values.push(mna_comments); fields.push(`mna_comments = $${values.length}`); }
   if (photo_drive_url !== undefined) { values.push(photo_drive_url); fields.push(`photo_drive_url = $${values.length}`); }
+  if (auto_post !== undefined) { values.push(auto_post); fields.push(`auto_post = $${values.length}`); }
   const client_visible = body?.client_visible;
   if (client_visible !== undefined) {
     values.push(client_visible);

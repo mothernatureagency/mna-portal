@@ -16,6 +16,7 @@ function isPublicRoute(pathname: string) {
     pathname.startsWith('/api/weekly-summary') ||
     pathname.startsWith('/api/send-weekly-email') ||
     pathname.startsWith('/api/notifications') ||
+    pathname.startsWith('/api/social/run') ||
     pathname.startsWith('/book') ||
     pathname.startsWith('/api/booking') ||
     pathname.startsWith('/_next') ||

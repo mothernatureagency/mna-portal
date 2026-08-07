@@ -76,6 +76,12 @@ async function initSchema() {
                   `alter table content_calendar add column if not exists photo_drive_url text`,
                   // Staff can control when content becomes visible to clients.
                   `alter table content_calendar add column if not exists client_visible boolean not null default false`,
+                  // Social auto-posting (via a posting provider, e.g. Ayrshare).
+                  `alter table content_calendar add column if not exists auto_post boolean not null default false`,
+                  `alter table content_calendar add column if not exists publish_status text`,
+                  `alter table content_calendar add column if not exists published_at timestamptz`,
+                  `alter table content_calendar add column if not exists publish_ref text`,
+                  `alter table content_calendar add column if not exists publish_error text`,
                   // Client tasks: MNA asks the client for things. client_id is the lib/clients.ts id (text, not FK to projects).
                   `create table if not exists client_requests (
                         id uuid primary key default uuid_generate_v4(),
