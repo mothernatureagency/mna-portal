@@ -31,6 +31,7 @@ const METRICS: MetricDef[] = [
   { key: 'clicks',       label: 'Clicks',       source: 'meta',   metaField: 'totalClicks',      fmt: (n) => Math.round(n).toLocaleString(),        icon: 'ads_click' },
   { key: 'ctr',          label: 'CTR',          source: 'meta',   metaField: 'ctr',              fmt: (n) => `${n.toFixed(2)}%`,                     icon: 'percent' },
   { key: 'cpc',          label: 'Cost / Click', source: 'meta',   metaField: 'cpc',              fmt: (n) => `$${n.toFixed(2)}`,                     icon: 'sell', goodWhenUp: false },
+  { key: 'followers',    label: 'Followers',    source: 'manual', fmt: (n) => Math.round(n).toLocaleString(),        icon: 'diversity_3' },
   { key: 'leads',        label: 'Leads',        source: 'manual', fmt: (n) => Math.round(n).toLocaleString(),        icon: 'group_add' },
   { key: 'appointments', label: 'Booked Calls', source: 'manual', fmt: (n) => Math.round(n).toLocaleString(),        icon: 'event_available' },
   { key: 'revenue',      label: 'Revenue',      source: 'manual', fmt: (n) => `$${Math.round(n).toLocaleString()}`,  icon: 'attach_money' },
