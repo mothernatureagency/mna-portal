@@ -35,7 +35,16 @@ async function accountInsights(adAccountId: string, since: string, until: string
   const spend = Number(row.spend || 0);
   const clicks = Number(row.clicks || 0);
   const impressions = Number(row.impressions || 0);
-  const leads = (row.actions || []).filter((a: any) => /lead/i.test(a.action_type)).reduce((s: number, a: any) => s + Number(a.value || 0), 0);
+  // Meta reports several overlapping lead action types (e.g. `lead`,
+  // `onsite_conversion.lead_grouped`, `leadgen_grouped`,
+  // `offsite_conversion.fb_pixel_lead`). Summing them double-counts. Prefer the
+  // canonical `lead` total (matches Meta's `cost_per_lead`); if absent, take the
+  // single largest lead-type value rather than the sum.
+  const leadActions = (row.actions || []).filter((a: any) => /lead/i.test(a.action_type));
+  const exactLead = leadActions.find((a: any) => a.action_type === 'lead');
+  const leads = exactLead
+    ? Number(exactLead.value || 0)
+    : leadActions.reduce((m: number, a: any) => Math.max(m, Number(a.value || 0)), 0);
   return { spend, clicks, impressions, cpc: Number(row.cpc || 0), ctr: Number(row.ctr || 0), leads };
 }
 
