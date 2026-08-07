@@ -62,7 +62,7 @@ export async function GET(req: NextRequest) {
   for (const c of custom) ids.add(c.id);
 
   const results: any[] = [];
-  for (const clientId of ids) {
+  for (const clientId of Array.from(ids)) {
     const adAccountId = await adAccountFor(clientId);
     if (!adAccountId) continue;
     try {
