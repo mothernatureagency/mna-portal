@@ -1,8 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { ensureSchema, query } from '@/lib/db';
 import { clients as staticClients } from '@/lib/clients';
-import { ayrsharePublish } from '@/lib/ayrshare';
-import { platformsFor } from '../publish/route';
+import { ayrsharePublish, platformsFor, mediaFor } from '@/lib/ayrshare';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -18,12 +17,6 @@ async function clientIdForName(name: string): Promise<string | null> {
   if (s) return s.id;
   const { rows } = await query<{ id: string }>(`select id from custom_clients where name = $1 limit 1`, [name]);
   return rows[0]?.id || null;
-}
-
-function mediaFor(url: string | null): string[] {
-  const u = (url || '').trim();
-  if (!u || !/^https?:\/\//i.test(u) || /drive\.google\.com|docs\.google\.com/i.test(u)) return [];
-  return [u];
 }
 
 export async function GET(req: NextRequest) {

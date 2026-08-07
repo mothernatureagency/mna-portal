@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { ensureSchema, query } from '@/lib/db';
 import { createClient } from '@/lib/supabase/server';
-import { ayrsharePublish, ayrsharePlatform } from '@/lib/ayrshare';
+import { ayrsharePublish, platformsFor, mediaFor } from '@/lib/ayrshare';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -19,21 +19,6 @@ async function role(): Promise<string> {
     const { data: { user } } = await supabase.auth.getUser();
     return ((user?.user_metadata as Record<string, unknown> | null)?.role as string) || (user ? 'staff' : '');
   } catch { return ''; }
-}
-
-// A post's platform → the Ayrshare platforms to publish to.
-export function platformsFor(platform: string): string[] {
-  const p = (platform || '').toLowerCase();
-  if (p === 'meta') return ['facebook', 'instagram'];
-  const one = ayrsharePlatform(platform);
-  return one ? [one] : [];
-}
-
-function mediaFor(url: string | null): string[] {
-  const u = (url || '').trim();
-  // Only send a direct, public media URL. Google Drive share links won't work.
-  if (!u || !/^https?:\/\//i.test(u) || /drive\.google\.com|docs\.google\.com/i.test(u)) return [];
-  return [u];
 }
 
 export async function POST(req: NextRequest) {

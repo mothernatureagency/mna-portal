@@ -25,6 +25,21 @@ export function ayrsharePlatform(platform: string): string | null {
   return null;
 }
 
+// A post's platform label → the Ayrshare platforms to publish to.
+export function platformsFor(platform: string): string[] {
+  const p = (platform || '').toLowerCase();
+  if (p === 'meta') return ['facebook', 'instagram'];
+  const one = ayrsharePlatform(platform);
+  return one ? [one] : [];
+}
+
+// Only a direct, public media URL works — Google Drive share links won't.
+export function mediaFor(url: string | null): string[] {
+  const u = (url || '').trim();
+  if (!u || !/^https?:\/\//i.test(u) || /drive\.google\.com|docs\.google\.com/i.test(u)) return [];
+  return [u];
+}
+
 export type PublishInput = {
   profileKey?: string;      // the client's Ayrshare profile key
   caption: string;
