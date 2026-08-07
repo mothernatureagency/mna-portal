@@ -1,5 +1,6 @@
 {
   "crons": [
-    { "path": "/api/social/run", "schedule": "0 14 * * *" }
+    { "path": "/api/social/run", "schedule": "0 14 * * *" },
+    { "path": "/api/meta/refresh-kpis", "schedule": "0 8 1 * *" }
   ]
 }
