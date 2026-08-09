@@ -18,6 +18,9 @@ function isPublicRoute(pathname: string) {
     pathname.startsWith('/api/followups') ||
     pathname.startsWith('/api/notifications') ||
     pathname.startsWith('/api/social/run') ||
+    pathname.startsWith('/api/ai-crm/webhook') ||
+    pathname.startsWith('/api/ai-crm/process') ||
+    pathname.startsWith('/api/ai-crm/reviews/sync') ||
     pathname.startsWith('/api/meta/refresh-kpis') ||
     pathname.startsWith('/api/reviews/run') ||
     pathname.startsWith('/api/reviews/pending') ||
