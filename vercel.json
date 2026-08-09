@@ -1,6 +1,8 @@
 {
   "crons": [
     { "path": "/api/social/run", "schedule": "0 14 * * *" },
+    { "path": "/api/ai-crm/process", "schedule": "*/5 * * * *" },
+    { "path": "/api/ai-crm/reviews/sync", "schedule": "0 15 * * *" },
     { "path": "/api/meta/refresh-kpis", "schedule": "0 8 1 * *" }
   ]
 }

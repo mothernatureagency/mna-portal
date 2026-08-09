@@ -38,6 +38,7 @@ const NAV = [
   ]},
   { sec: 'CRM', items: [
     { label: 'Pipeline', href: '/crm', e: 'task_alt' },
+    { label: 'AI Conversations', href: '/ai-conversations', e: 'forum' },
   ]},
   { sec: 'INTELLIGENCE', items: [
     { label: 'AI Insights', href: '/reports', e: 'psychology' },
