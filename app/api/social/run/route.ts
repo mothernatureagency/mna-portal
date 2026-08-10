@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { ensureSchema, query } from '@/lib/db';
 import { clients as staticClients } from '@/lib/clients';
-import { postformePublish, platformsFor, mediaFor } from '@/lib/postforme';
+import { postformePublish, postformeRawAccounts, platformsFor, mediaFor } from '@/lib/postforme';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -32,6 +32,11 @@ export async function GET(req: NextRequest) {
   }
   if (!process.env.POST_FOR_ME_API_KEY) {
     return NextResponse.json({ error: 'POST_FOR_ME_API_KEY not set — auto-posting is not configured yet.', posted: 0 }, { status: 200 });
+  }
+
+  // Diagnostic: ?debug=1 dumps the raw Post for Me account pool (no filtering).
+  if (req.nextUrl.searchParams.get('debug')) {
+    return NextResponse.json(await postformeRawAccounts());
   }
 
   const { rows: due } = await query<any>(

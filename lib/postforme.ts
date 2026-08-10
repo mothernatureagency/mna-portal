@@ -83,6 +83,26 @@ export async function postformeListAccounts(opts?: { platforms?: string[] }): Pr
   }
 }
 
+// Diagnostic: raw account list with NO status filter, to see exactly what the
+// Post for Me API returns (status/platform values, count, HTTP status).
+export async function postformeRawAccounts(): Promise<{ ok: boolean; httpStatus: number; count: number; items: any[] }> {
+  const key = apiKey();
+  if (!key) return { ok: false, httpStatus: 0, count: 0, items: [] };
+  try {
+    const res = await fetch(`${API}/social-accounts?limit=200`, { headers: authHeaders(key) });
+    const raw: any = await res.json().catch(() => ({}));
+    const items = Array.isArray(raw?.data) ? raw.data : Array.isArray(raw) ? raw : raw?.items || [];
+    return {
+      ok: res.ok,
+      httpStatus: res.status,
+      count: items.length,
+      items: items.map((a: any) => ({ id: a.id, platform: a.platform, status: a.status, username: a.username ?? a.display_name ?? null, external_id: a.external_id })),
+    };
+  } catch (e: any) {
+    return { ok: false, httpStatus: -1, count: 0, items: [{ error: e?.message }] };
+  }
+}
+
 // Generate a connect (OAuth) link for a client to add one platform.
 export async function postformeAuthUrl(
   clientId: string,
