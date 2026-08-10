@@ -2,6 +2,7 @@
 
 import React, { useEffect, useState } from 'react';
 import { useClient } from '@/context/ClientContext';
+import { createClient } from '@/lib/supabase/client';
 
 type Review = {
   author_name: string | null;
@@ -9,6 +10,15 @@ type Review = {
   review_text: string | null;
   review_date: string | null;
   google_review_id: string;
+};
+
+type SyncedReview = Review & { reply_text: string | null; reply_date: string | null };
+
+type GbpState = {
+  connected: boolean;
+  mapping: { email: string; account: string; location: string; title?: string | null } | null;
+  accounts: { name: string; accountName: string; locations: { name: string; title: string }[] }[];
+  error?: string;
 };
 
 export default function ReviewResponsesPage() {
@@ -30,6 +40,130 @@ export default function ReviewResponsesPage() {
 
   const [copied, setCopied] = useState<string | null>(null);
   const [error, setError] = useState('');
+
+  // Google Business Profile via OAuth (no Places key needed)
+  const [userEmail, setUserEmail] = useState('');
+  const [gbp, setGbp] = useState<GbpState | null>(null);
+  const [gbpLoading, setGbpLoading] = useState(false);
+  const [pickLocation, setPickLocation] = useState(''); // "accountName|locationName|title"
+  const [syncing, setSyncing] = useState(false);
+  const [synced, setSynced] = useState<SyncedReview[]>([]);
+  const [gDrafts, setGDrafts] = useState<Record<string, string>>({});
+  const [gDrafting, setGDrafting] = useState(false);
+  const [posting, setPosting] = useState<string | null>(null);
+  const [gbpMsg, setGbpMsg] = useState('');
+
+  useEffect(() => {
+    createClient().auth.getUser().then(({ data: { user } }) => setUserEmail(user?.email || ''));
+  }, []);
+
+  async function loadGbp() {
+    if (!clientId) return;
+    setGbpLoading(true);
+    try {
+      const r = await fetch(`/api/google-business/locations?clientId=${encodeURIComponent(clientId)}`);
+      const d = await r.json();
+      setGbp(d);
+    } catch {
+      setGbp(null);
+    } finally {
+      setGbpLoading(false);
+    }
+  }
+
+  async function loadSynced() {
+    if (!clientId) return;
+    try {
+      const r = await fetch(`/api/google-reviews-sync?clientId=${encodeURIComponent(clientId)}&limit=50`);
+      const d = await r.json();
+      if (r.ok) setSynced(d.reviews || []);
+    } catch {}
+  }
+
+  useEffect(() => {
+    setGbp(null); setSynced([]); setGDrafts({}); setGbpMsg(''); setPickLocation('');
+    loadGbp();
+    loadSynced();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [clientId]);
+
+  async function connectGoogle() {
+    if (!userEmail) return;
+    try {
+      const res = await fetch(`/api/google/connect?email=${encodeURIComponent(userEmail)}`);
+      const d = await res.json();
+      if (d.url) window.location.href = d.url;
+    } catch {}
+  }
+
+  async function saveMapping() {
+    if (!clientId || !pickLocation) return;
+    const [account, location, title] = pickLocation.split('|');
+    setGbpMsg('');
+    const r = await fetch('/api/google-business/locations', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ clientId, account, location, title }),
+    });
+    const d = await r.json();
+    if (!r.ok) { setGbpMsg(d.error || 'Failed to save location'); return; }
+    setGbp((prev) => prev ? { ...prev, mapping: d.mapping } : prev);
+  }
+
+  async function syncNow() {
+    if (!clientId) return;
+    setSyncing(true); setGbpMsg('');
+    try {
+      const r = await fetch('/api/google-business/sync', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ clientId }),
+      });
+      const d = await r.json();
+      if (!r.ok) throw new Error(d.error || 'Sync failed');
+      setGbpMsg(`Synced ${d.total} reviews (${d.inserted} new, ${d.updated} updated)`);
+      await loadSynced();
+    } catch (e: any) {
+      setGbpMsg(e.message);
+    } finally {
+      setSyncing(false);
+    }
+  }
+
+  const unanswered = synced.filter((rv) => !rv.reply_text);
+
+  async function draftGoogle() {
+    if (unanswered.length === 0) return;
+    setGDrafting(true); setGbpMsg('');
+    try {
+      const replies = await draftReplies(unanswered.map((rv) => ({ author: rv.author_name, rating: rv.rating, text: rv.review_text || '' })));
+      const map: Record<string, string> = {};
+      replies.forEach((rep, i) => { if (rep) map[unanswered[i].google_review_id] = rep; });
+      setGDrafts(map);
+    } catch (e: any) { setGbpMsg(e.message); } finally { setGDrafting(false); }
+  }
+
+  async function postReply(googleReviewId: string) {
+    const reply = (gDrafts[googleReviewId] || '').trim();
+    if (!clientId || !reply) return;
+    setPosting(googleReviewId); setGbpMsg('');
+    try {
+      const r = await fetch('/api/google-business/reply', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ clientId, googleReviewId, reply }),
+      });
+      const d = await r.json();
+      if (!r.ok) throw new Error(d.error || 'Failed to post reply');
+      setSynced((prev) => prev.map((rv) => rv.google_review_id === googleReviewId
+        ? { ...rv, reply_text: reply, reply_date: new Date().toISOString() }
+        : rv));
+    } catch (e: any) {
+      setGbpMsg(e.message);
+    } finally {
+      setPosting(null);
+    }
+  }
 
   // Try to pull public reviews; silently no-ops if the Places key is down.
   useEffect(() => {
@@ -98,11 +232,134 @@ export default function ReviewResponsesPage() {
           <h1 className="text-3xl font-bold text-white tracking-tight">Review Responses</h1>
         </div>
         <p className="text-white/60 mt-1 text-sm">
-          Paste a review from Google (or GHL) and get a ready-to-send reply for <b className="text-white/80">{activeClient?.shortName}</b> — copy it back into GHL. Nothing is posted automatically.
+          Pull reviews for <b className="text-white/80">{activeClient?.shortName}</b> straight from Google (or paste one in), draft replies, and post them to the Google profile. Nothing is posted without you clicking it.
         </p>
       </div>
 
       {error && <div className="text-[12px] text-rose-300 bg-rose-500/10 border border-rose-500/30 rounded-lg px-3 py-2">{error}</div>}
+
+      {/* Google Business Profile (OAuth) — pull reviews + post replies */}
+      <div className="rounded-2xl p-5" style={{ background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.07)' }}>
+        <div className="flex items-center justify-between gap-2 mb-2 flex-wrap">
+          <div className="text-[11px] font-bold uppercase tracking-wider text-white/55">Google Business Profile</div>
+          {gbp?.mapping && (
+            <div className="flex items-center gap-2">
+              <button onClick={syncNow} disabled={syncing}
+                      className="text-[11px] font-bold px-3 py-1.5 rounded-lg text-white disabled:opacity-40 inline-flex items-center gap-1"
+                      style={{ background: 'linear-gradient(135deg,#0c6da4,#4ab8ce)' }}>
+                <span className="material-symbols-outlined" style={{ fontSize: 14 }}>sync</span>
+                {syncing ? 'Syncing…' : 'Sync reviews'}
+              </button>
+              <button onClick={async () => { await fetch(`/api/google-business/locations?clientId=${encodeURIComponent(clientId!)}`, { method: 'DELETE' }); await loadGbp(); }}
+                      className="text-[11px] text-white/50 hover:text-white">Change location</button>
+            </div>
+          )}
+        </div>
+
+        {gbpLoading && <div className="text-[12px] text-white/50">Checking Google connection…</div>}
+
+        {!gbpLoading && gbp && !gbp.connected && (
+          <div className="flex items-center gap-3 flex-wrap">
+            <div className="text-[12.5px] text-white/60">Connect Google to pull this client's reviews and post replies straight to the profile — no Places API key needed.</div>
+            <button onClick={connectGoogle} disabled={!userEmail}
+                    className="text-[12px] font-bold px-3.5 py-2 rounded-xl text-white disabled:opacity-40 inline-flex items-center gap-1.5"
+                    style={{ background: 'linear-gradient(135deg,#0c6da4,#4ab8ce)' }}>
+              <span className="material-symbols-outlined" style={{ fontSize: 15 }}>link</span>
+              Connect Google
+            </button>
+          </div>
+        )}
+
+        {!gbpLoading && gbp?.connected && !gbp.mapping && (
+          <div className="flex items-center gap-2 flex-wrap">
+            {gbp.accounts.some((a) => a.locations.length > 0) ? (
+              <>
+                <select value={pickLocation} onChange={(e) => setPickLocation(e.target.value)}
+                        className="text-[13px] px-3 py-2 rounded-lg bg-white/5 border border-white/10 text-white outline-none min-w-[240px]">
+                  <option value="">Pick the location for {activeClient?.shortName}…</option>
+                  {gbp.accounts.map((a) => a.locations.map((l) => (
+                    <option key={l.name} value={`${a.name}|${l.name}|${l.title}`}>{a.accountName} — {l.title}</option>
+                  )))}
+                </select>
+                <button onClick={saveMapping} disabled={!pickLocation}
+                        className="text-[12px] font-bold px-3.5 py-2 rounded-xl text-white disabled:opacity-40"
+                        style={{ background: 'linear-gradient(135deg,#0c6da4,#4ab8ce)' }}>
+                  Save
+                </button>
+              </>
+            ) : (
+              <div className="text-[12.5px] text-white/60">
+                {gbp.error
+                  ? <span className="text-amber-300/90">{gbp.error}</span>
+                  : 'Google is connected, but no Business Profile locations were found for your account. If you connected before this feature existed, reconnect Google so the new permission is granted.'}
+                {' '}<button onClick={connectGoogle} className="underline text-white/70 hover:text-white">Reconnect Google</button>
+              </div>
+            )}
+          </div>
+        )}
+
+        {!gbpLoading && gbp?.mapping && (
+          <div className="text-[12.5px] text-white/60">
+            Mapped to <b className="text-white/85">{gbp.mapping.title || gbp.mapping.location}</b> · syncs with {gbp.mapping.email}'s Google connection. Replies posted here go live on the Google profile.
+          </div>
+        )}
+
+        {gbpMsg && <div className="mt-2 text-[12px] text-cyan-200/90">{gbpMsg}</div>}
+      </div>
+
+      {/* Synced reviews awaiting a reply */}
+      {unanswered.length > 0 && (
+        <div className="rounded-2xl p-5" style={{ background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.07)' }}>
+          <div className="flex items-center justify-between mb-3">
+            <div className="text-[11px] font-bold uppercase tracking-wider text-white/55">Awaiting reply ({unanswered.length})</div>
+            <button onClick={draftGoogle} disabled={gDrafting}
+                    className="text-[11px] font-bold px-3 py-1.5 rounded-lg text-white disabled:opacity-40"
+                    style={{ background: 'linear-gradient(135deg,#0c6da4,#4ab8ce)' }}>
+              {gDrafting ? 'Drafting…' : 'Draft all'}
+            </button>
+          </div>
+          <div className="flex flex-col gap-3">
+            {unanswered.map((rv) => {
+              const negative = rv.rating <= 3;
+              const id = rv.google_review_id;
+              return (
+                <div key={id} className="rounded-xl p-3" style={{ background: 'rgba(0,0,0,0.22)', borderLeft: `4px solid ${negative ? '#f59e0b' : '#10b981'}` }}>
+                  <div className="flex items-center justify-between gap-2 mb-1">
+                    <div className="text-[13px] font-bold text-white">{rv.author_name || 'Anonymous'}</div>
+                    <div className="flex items-center gap-2">
+                      {rv.review_date && <span className="text-[11px] text-white/40">{new Date(rv.review_date).toLocaleDateString()}</span>}
+                      <div className="text-[12px]" style={{ color: negative ? '#fbbf24' : '#34d399' }}>{stars(rv.rating)}</div>
+                    </div>
+                  </div>
+                  {rv.review_text && <div className="text-[12px] text-white/70 leading-snug mb-2">“{rv.review_text}”</div>}
+                  {gDrafts[id] !== undefined && (
+                    <div className="rounded-lg p-2.5" style={{ background: 'rgba(0,0,0,0.28)', border: '1px solid rgba(255,255,255,0.08)' }}>
+                      <div className="flex items-center justify-between mb-1">
+                        <span className="text-[9px] font-bold uppercase tracking-wider text-cyan-300/70">Suggested reply</span>
+                        <button onClick={() => copy(`g${id}`, gDrafts[id])} className="text-[10px] font-bold text-white/70 hover:text-white inline-flex items-center gap-1">
+                          <span className="material-symbols-outlined" style={{ fontSize: 13 }}>content_copy</span>
+                          {copied === `g${id}` ? 'Copied!' : 'Copy'}
+                        </button>
+                      </div>
+                      <textarea value={gDrafts[id]} onChange={(e) => setGDrafts((d) => ({ ...d, [id]: e.target.value }))}
+                                rows={3} className="w-full text-[13px] rounded-lg p-2 text-white/90 outline-none leading-snug"
+                                style={{ background: 'rgba(0,0,0,0.25)', border: '1px solid rgba(255,255,255,0.06)' }} />
+                      <div className="mt-1.5">
+                        <button onClick={() => postReply(id)} disabled={posting === id || !gDrafts[id]?.trim() || !gbp?.mapping}
+                                className="text-[11px] font-bold px-3 py-1.5 rounded-lg text-white disabled:opacity-40 inline-flex items-center gap-1"
+                                style={{ background: 'linear-gradient(135deg,#059669,#34d399)' }}>
+                          <span className="material-symbols-outlined" style={{ fontSize: 13 }}>send</span>
+                          {posting === id ? 'Posting…' : 'Post reply to Google'}
+                        </button>
+                      </div>
+                    </div>
+                  )}
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      )}
 
       {/* Paste a review */}
       <div className="rounded-2xl p-5" style={{ background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.07)' }}>

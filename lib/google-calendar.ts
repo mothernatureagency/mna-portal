@@ -13,6 +13,9 @@ const SCOPES = [
   // Drive read-only — used by the content tracker's "Pick from Drive" picker.
   // Adding this scope requires staff to reconnect Google so consent re-prompts.
   'https://www.googleapis.com/auth/drive.readonly',
+  // Google Business Profile — read + reply to client reviews without a
+  // Places API key. Requires reconnect for existing connections.
+  'https://www.googleapis.com/auth/business.manage',
 ];
 
 /**
