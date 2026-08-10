@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { ensureSchema, query } from '@/lib/db';
 import { createClient } from '@/lib/supabase/server';
-import { postformePublish, platformsFor, mediaFor } from '@/lib/postforme';
+import { postformePublish, platformsFor, platformBase, mediaFor } from '@/lib/postforme';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -58,7 +58,7 @@ export async function POST(req: NextRequest) {
     [clientId],
   );
   const assigned: { id: string; platform: string }[] = Array.isArray(kv[0]?.value) ? kv[0].value : [];
-  const accountIds = assigned.filter((a) => platforms.includes(a.platform)).map((a) => a.id);
+  const accountIds = assigned.filter((a) => platforms.includes(platformBase(a.platform))).map((a) => a.id);
   if (accountIds.length === 0) {
     return NextResponse.json({ error: `No ${platforms.join('/')} account is assigned to this client. Tick the right account in the Content Tracker's Social auto-post bar first.` }, { status: 400 });
   }

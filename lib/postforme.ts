@@ -37,6 +37,12 @@ export function postformePlatform(platform: string): string | null {
   return null;
 }
 
+// Normalize provider variants (e.g. "tiktok_business" → "tiktok") so a post's
+// platform matches a connected account regardless of account subtype.
+export function platformBase(p: string): string {
+  return (p || '').toLowerCase().replace(/_business$/, '');
+}
+
 // A post's platform label → the Post for Me platforms to publish to.
 export function platformsFor(platform: string): string[] {
   const p = (platform || '').toLowerCase();

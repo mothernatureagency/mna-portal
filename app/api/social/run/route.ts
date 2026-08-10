@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { ensureSchema, query } from '@/lib/db';
 import { clients as staticClients } from '@/lib/clients';
-import { postformePublish, postformeRawAccounts, platformsFor, mediaFor } from '@/lib/postforme';
+import { postformePublish, postformeRawAccounts, platformsFor, platformBase, mediaFor } from '@/lib/postforme';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -73,7 +73,7 @@ export async function GET(req: NextRequest) {
     if (!clientId) { skipped++; continue; }
 
     const assigned = await assignedFor(clientId);
-    const accountIds = assigned.filter((a) => platforms.includes(a.platform)).map((a) => a.id);
+    const accountIds = assigned.filter((a) => platforms.includes(platformBase(a.platform))).map((a) => a.id);
     if (accountIds.length === 0) { skipped++; continue; }
 
     const result = await postformePublish({ accountIds, caption: (post.caption || '').toString(), mediaUrls: media });
