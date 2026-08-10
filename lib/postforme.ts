@@ -70,7 +70,7 @@ export async function postformeListAccounts(opts?: { platforms?: string[] }): Pr
   if (!key) return [];
   const params = new URLSearchParams();
   params.set('status', 'connected');
-  params.set('limit', '200');
+  params.set('limit', '100');
   for (const pl of opts?.platforms || []) params.append('platform', pl);
   try {
     const res = await fetch(`${API}/social-accounts?${params.toString()}`, { headers: authHeaders(key) });
@@ -85,12 +85,13 @@ export async function postformeListAccounts(opts?: { platforms?: string[] }): Pr
 
 // Diagnostic: raw account list with NO status filter, to see exactly what the
 // Post for Me API returns (status/platform values, count, HTTP status).
-export async function postformeRawAccounts(): Promise<{ ok: boolean; httpStatus: number; count: number; items: any[] }> {
+export async function postformeRawAccounts(): Promise<{ ok: boolean; httpStatus: number; count: number; items: any[]; errorBody?: any }> {
   const key = apiKey();
   if (!key) return { ok: false, httpStatus: 0, count: 0, items: [] };
   try {
-    const res = await fetch(`${API}/social-accounts?limit=200`, { headers: authHeaders(key) });
+    const res = await fetch(`${API}/social-accounts?limit=100`, { headers: authHeaders(key) });
     const raw: any = await res.json().catch(() => ({}));
+    if (!res.ok) return { ok: false, httpStatus: res.status, count: 0, items: [], errorBody: raw };
     const items = Array.isArray(raw?.data) ? raw.data : Array.isArray(raw) ? raw : raw?.items || [];
     return {
       ok: res.ok,
