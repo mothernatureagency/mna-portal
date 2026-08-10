@@ -51,8 +51,20 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: 'Instagram needs an image/video. Upload one to this post (a Drive link won\'t work), then publish.' }, { status: 400 });
   }
 
+  // Only post to the accounts this client is explicitly assigned to, matching
+  // the post's platform. No assignment → we refuse rather than guess.
+  const { rows: kv } = await query<{ value: any }>(
+    `select value from client_kv where client_id = $1 and key = 'postforme_accounts'`,
+    [clientId],
+  );
+  const assigned: { id: string; platform: string }[] = Array.isArray(kv[0]?.value) ? kv[0].value : [];
+  const accountIds = assigned.filter((a) => platforms.includes(a.platform)).map((a) => a.id);
+  if (accountIds.length === 0) {
+    return NextResponse.json({ error: `No ${platforms.join('/')} account is assigned to this client. Tick the right account in the Content Tracker's Social auto-post bar first.` }, { status: 400 });
+  }
+
   const caption = (post.caption || '').toString();
-  const result = await postformePublish({ clientId, caption, mediaUrls: media, platforms });
+  const result = await postformePublish({ accountIds, caption, mediaUrls: media });
 
   if (!result.ok) {
     await query(

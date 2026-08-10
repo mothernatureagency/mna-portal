@@ -47,6 +47,16 @@ export async function GET(req: NextRequest) {
       limit 50`,
   );
 
+  // Per-client account assignment (which accounts each client posts to).
+  const assignCache = new Map<string, { id: string; platform: string }[]>();
+  async function assignedFor(clientId: string) {
+    if (!assignCache.has(clientId)) {
+      const { rows } = await query<{ value: any }>(`select value from client_kv where client_id = $1 and key = 'postforme_accounts'`, [clientId]);
+      assignCache.set(clientId, Array.isArray(rows[0]?.value) ? rows[0].value : []);
+    }
+    return assignCache.get(clientId)!;
+  }
+
   let posted = 0, failed = 0, skipped = 0;
 
   for (const post of due) {
@@ -57,7 +67,11 @@ export async function GET(req: NextRequest) {
     const clientId = await clientIdForName(post.client_name);
     if (!clientId) { skipped++; continue; }
 
-    const result = await postformePublish({ clientId, caption: (post.caption || '').toString(), mediaUrls: media, platforms });
+    const assigned = await assignedFor(clientId);
+    const accountIds = assigned.filter((a) => platforms.includes(a.platform)).map((a) => a.id);
+    if (accountIds.length === 0) { skipped++; continue; }
+
+    const result = await postformePublish({ accountIds, caption: (post.caption || '').toString(), mediaUrls: media });
     if (result.ok) {
       await query(`update content_calendar set publish_status='posted', published_at=now(), publish_ref=$1, publish_error=null where id=$2`, [String(result.id), post.id]);
       posted++;

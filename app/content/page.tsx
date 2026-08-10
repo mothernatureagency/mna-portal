@@ -242,6 +242,7 @@ export default function ContentPage() {
   const [uploadingId, setUploadingId] = useState<string | null>(null);
   const [publishing, setPublishing] = useState<string | null>(null);
   const [socialAccounts, setSocialAccounts] = useState<{ id: string; platform: string; username: string | null }[]>([]);
+  const [socialSelected, setSocialSelected] = useState<Set<string>>(new Set());
   const [socialConfigured, setSocialConfigured] = useState(false);
   const [connecting, setConnecting] = useState<string | null>(null);
   const [isStaff, setIsStaff] = useState(false);
@@ -368,8 +369,12 @@ export default function ContentPage() {
     if (!activeClient?.id) return;
     fetch(`/api/social/accounts?clientId=${encodeURIComponent(activeClient.id)}`)
       .then((r) => r.json())
-      .then((d) => { setSocialAccounts(Array.isArray(d.accounts) ? d.accounts : []); setSocialConfigured(!!d.configured); })
-      .catch(() => { setSocialAccounts([]); setSocialConfigured(false); });
+      .then((d) => {
+        setSocialAccounts(Array.isArray(d.accounts) ? d.accounts : []);
+        setSocialConfigured(!!d.configured);
+        setSocialSelected(new Set((Array.isArray(d.selected) ? d.selected : []).map((a: any) => a.id)));
+      })
+      .catch(() => { setSocialAccounts([]); setSocialConfigured(false); setSocialSelected(new Set()); });
   }
   useEffect(() => { loadSocialAccounts(); /* eslint-disable-next-line react-hooks/exhaustive-deps */ }, [activeClient?.id]);
 
@@ -380,11 +385,23 @@ export default function ContentPage() {
       const res = await fetch('/api/social/connect', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ clientId: activeClient.id, platform }) });
       const d = await res.json();
       if (!res.ok) throw new Error(d.error || 'Could not start connection');
-      // Open Post for Me's OAuth in a new tab; refresh the list when they return.
+      // Open Post for Me's OAuth in a new tab; refresh the pool when they return.
       window.open(d.url, '_blank', 'noopener,noreferrer');
     } catch (e: any) {
       alert(e.message);
     } finally { setConnecting(null); }
+  }
+
+  // Tick/untick which pooled accounts THIS client posts to; save immediately.
+  async function toggleSocialAccount(acct: { id: string; platform: string; username: string | null }) {
+    if (!activeClient?.id) return;
+    const next = new Set(socialSelected);
+    if (next.has(acct.id)) next.delete(acct.id); else next.add(acct.id);
+    setSocialSelected(next);
+    const value = socialAccounts.filter((a) => next.has(a.id)).map((a) => ({ id: a.id, platform: a.platform, username: a.username }));
+    try {
+      await fetch('/api/client-kv', { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ clientId: activeClient.id, key: 'postforme_accounts', value }) });
+    } catch { /* keep optimistic state; user can retry */ }
   }
 
   async function toggleAutoPost(id: string, val: boolean) {
@@ -794,37 +811,57 @@ export default function ContentPage() {
         </div>
       </div>
 
-      {/* Social auto-post — connect accounts (staff only) */}
+      {/* Social auto-post — connect a pool, then assign per client (staff only) */}
       {isStaff && (
-        <div className="glass-card p-3 flex flex-col gap-2">
+        <div className="glass-card p-3 flex flex-col gap-2.5">
           <div className="flex items-center gap-2 flex-wrap">
             <span className="material-symbols-outlined text-cyan-400 shrink-0" style={{ fontSize: 18 }}>share</span>
             <div className="text-[11px] text-white/55 shrink-0">Social auto-post ({activeClient?.shortName}) —</div>
             {!socialConfigured ? (
-              <div className="text-[11px] text-amber-300/90">Add <code className="text-amber-200">POST_FOR_ME_API_KEY</code> in Vercel to enable connecting accounts.</div>
+              <div className="text-[11px] text-amber-300/90">Add <code className="text-amber-200">POST_FOR_ME_API_KEY</code> in Vercel to enable posting.</div>
             ) : (
               <>
-                {(['instagram', 'facebook', 'tiktok', 'youtube'] as const).map((pl) => {
-                  const linked = socialAccounts.find((a) => a.platform === pl);
-                  return (
-                    <button
-                      key={pl}
-                      onClick={() => connectSocial(pl)}
-                      disabled={connecting === pl}
-                      className={`text-[11px] font-bold px-3 py-1.5 rounded-lg shrink-0 capitalize ${linked ? 'bg-emerald-500/15 text-emerald-300 hover:bg-emerald-500/25' : 'bg-white/10 text-white/80 hover:text-white'}`}
-                      title={linked ? `Connected as ${linked.username || linked.id} — click to reconnect` : `Connect ${pl}`}
-                    >
-                      {linked ? '✓ ' : '+ '}{pl}
-                    </button>
-                  );
-                })}
-                <button onClick={loadSocialAccounts} className="text-[11px] text-white/50 hover:text-white/80 px-2 shrink-0" title="Refresh connected accounts">↻</button>
+                <span className="text-[10px] text-white/40 shrink-0">Connect accounts:</span>
+                {(['instagram', 'facebook', 'tiktok', 'youtube'] as const).map((pl) => (
+                  <button
+                    key={pl}
+                    onClick={() => connectSocial(pl)}
+                    disabled={connecting === pl}
+                    className="text-[11px] font-bold px-3 py-1.5 rounded-lg shrink-0 capitalize bg-white/10 text-white/80 hover:text-white disabled:opacity-50"
+                    title={`Connect a ${pl} account to your Post for Me pool`}
+                  >
+                    + {pl}
+                  </button>
+                ))}
+                <button onClick={loadSocialAccounts} className="text-[11px] text-white/50 hover:text-white/80 px-2 shrink-0" title="Refresh accounts">↻</button>
               </>
             )}
           </div>
-          {socialConfigured && socialAccounts.length > 0 && (
-            <div className="text-[10px] text-white/45 pl-7">
-              Linked: {socialAccounts.map((a) => `${a.platform}${a.username ? ` (@${a.username})` : ''}`).join(' · ')}
+
+          {socialConfigured && (
+            <div className="pl-7">
+              <div className="text-[10px] text-white/50 mb-1.5">
+                Post <span className="font-semibold text-white/70">{activeClient?.shortName}</span>&apos;s content ONLY to the ticked account(s):
+              </div>
+              {socialAccounts.length === 0 ? (
+                <div className="text-[10px] text-white/35">No accounts connected yet — use the buttons above, then hit ↻.</div>
+              ) : (
+                <div className="flex flex-col gap-1 max-h-44 overflow-y-auto">
+                  {socialAccounts.map((a) => {
+                    const on = socialSelected.has(a.id);
+                    return (
+                      <label key={a.id} className={`flex items-center gap-2 text-[11px] px-2 py-1 rounded-md cursor-pointer ${on ? 'bg-emerald-500/10 text-emerald-200' : 'text-white/60 hover:bg-white/5'}`}>
+                        <input type="checkbox" checked={on} onChange={() => toggleSocialAccount(a)} className="accent-emerald-400" />
+                        <span className="capitalize font-semibold w-16 shrink-0">{a.platform}</span>
+                        <span className="text-white/50 truncate">{a.username ? `@${a.username}` : a.id}</span>
+                      </label>
+                    );
+                  })}
+                </div>
+              )}
+              {socialSelected.size === 0 && socialAccounts.length > 0 && (
+                <div className="text-[10px] text-amber-300/80 mt-1">Nothing ticked — this client won&apos;t auto-post anywhere (safe default).</div>
+              )}
             </div>
           )}
         </div>

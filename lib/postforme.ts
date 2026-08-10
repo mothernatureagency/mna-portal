@@ -57,17 +57,20 @@ export function mediaFor(url: string | null): string[] {
 
 export type PfmAccount = { id: string; platform: string; username: string | null; status?: string };
 
-// List a client's connected accounts (grouped by external_id = clientId).
-export async function postformeListAccounts(
-  clientId: string,
-  opts?: { platforms?: string[] },
-): Promise<PfmAccount[]> {
+/**
+ * List connected accounts in the whole Post for Me project (the "pool").
+ * We deliberately do NOT group by external_id: connecting Facebook/Instagram
+ * pulls in every page/account the user admins, so a single OAuth can't be
+ * trusted to belong to one client. Instead the portal lets staff explicitly
+ * assign specific accounts to each client (stored in client_kv
+ * 'postforme_accounts'), and we post only to those.
+ */
+export async function postformeListAccounts(opts?: { platforms?: string[] }): Promise<PfmAccount[]> {
   const key = apiKey();
   if (!key) return [];
   const params = new URLSearchParams();
-  params.set('external_id', clientId);
   params.set('status', 'connected');
-  params.set('limit', '100');
+  params.set('limit', '200');
   for (const pl of opts?.platforms || []) params.append('platform', pl);
   try {
     const res = await fetch(`${API}/social-accounts?${params.toString()}`, { headers: authHeaders(key) });
@@ -108,10 +111,9 @@ export async function postformeAuthUrl(
 }
 
 export type PublishInput = {
-  clientId: string;
+  accountIds: string[]; // the exact Post for Me accounts to post to
   caption: string;
   mediaUrls?: string[]; // public image/video URLs
-  platforms: string[]; // Post for Me platform names
   scheduleISO?: string; // optional ISO time; we publish now, so usually omitted
 };
 
@@ -122,16 +124,10 @@ export type PublishResult =
 export async function postformePublish(input: PublishInput): Promise<PublishResult> {
   const key = apiKey();
   if (!key) return { ok: false, error: 'POST_FOR_ME_API_KEY is not set in the environment.' };
-  if (!input.platforms.length) return { ok: false, error: 'No supported platform for this post.' };
+  const ids = (input.accountIds || []).filter(Boolean);
+  if (!ids.length) return { ok: false, error: 'No account assigned to this client for this platform.' };
   if (!input.caption.trim() && !(input.mediaUrls && input.mediaUrls.length)) {
     return { ok: false, error: 'Nothing to post — add a caption or media.' };
-  }
-
-  // Resolve which of the client's connected accounts match these platforms.
-  const accounts = await postformeListAccounts(input.clientId, { platforms: input.platforms });
-  const ids = accounts.map((a) => a.id);
-  if (!ids.length) {
-    return { ok: false, error: `No connected ${input.platforms.join('/')} account for this client — connect it in the Content Tracker first.` };
   }
 
   const body: Record<string, unknown> = {
