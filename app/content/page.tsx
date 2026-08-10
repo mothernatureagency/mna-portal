@@ -367,7 +367,8 @@ export default function ContentPage() {
   // ── Social auto-posting (Post for Me) ────────────────────────────
   function loadSocialAccounts() {
     if (!activeClient?.id) return;
-    fetch(`/api/social/accounts?clientId=${encodeURIComponent(activeClient.id)}`)
+    // Cache-bust + no-store so a freshly connected account always shows up.
+    fetch(`/api/social/accounts?clientId=${encodeURIComponent(activeClient.id)}&_=${Date.now()}`, { cache: 'no-store' })
       .then((r) => r.json())
       .then((d) => {
         setSocialAccounts(Array.isArray(d.accounts) ? d.accounts : []);
@@ -377,6 +378,13 @@ export default function ContentPage() {
       .catch(() => { setSocialAccounts([]); setSocialConfigured(false); setSocialSelected(new Set()); });
   }
   useEffect(() => { loadSocialAccounts(); /* eslint-disable-next-line react-hooks/exhaustive-deps */ }, [activeClient?.id]);
+  // Re-check the pool when the user returns from the Post for Me connect tab.
+  useEffect(() => {
+    const onFocus = () => loadSocialAccounts();
+    window.addEventListener('focus', onFocus);
+    return () => window.removeEventListener('focus', onFocus);
+    /* eslint-disable-next-line react-hooks/exhaustive-deps */
+  }, [activeClient?.id]);
 
   async function connectSocial(platform: string) {
     if (!activeClient?.id) return;
