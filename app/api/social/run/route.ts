@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { ensureSchema, query } from '@/lib/db';
 import { clients as staticClients } from '@/lib/clients';
-import { ayrsharePublish, platformsFor, mediaFor } from '@/lib/ayrshare';
+import { postformePublish, platformsFor, mediaFor } from '@/lib/postforme';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -30,8 +30,8 @@ export async function GET(req: NextRequest) {
   if (!okCron && !okSecret) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
   }
-  if (!process.env.AYRSHARE_API_KEY) {
-    return NextResponse.json({ error: 'AYRSHARE_API_KEY not set — auto-posting is not configured yet.', posted: 0 }, { status: 200 });
+  if (!process.env.POST_FOR_ME_API_KEY) {
+    return NextResponse.json({ error: 'POST_FOR_ME_API_KEY not set — auto-posting is not configured yet.', posted: 0 }, { status: 200 });
   }
 
   const { rows: due } = await query<any>(
@@ -47,7 +47,6 @@ export async function GET(req: NextRequest) {
       limit 50`,
   );
 
-  const profileCache = new Map<string, string | undefined>();
   let posted = 0, failed = 0, skipped = 0;
 
   for (const post of due) {
@@ -57,13 +56,8 @@ export async function GET(req: NextRequest) {
 
     const clientId = await clientIdForName(post.client_name);
     if (!clientId) { skipped++; continue; }
-    if (!profileCache.has(clientId)) {
-      const { rows } = await query<{ value: any }>(`select value from client_kv where client_id = $1 and key = 'ayrshare_profile_key'`, [clientId]);
-      profileCache.set(clientId, typeof rows[0]?.value === 'string' ? rows[0].value : undefined);
-    }
-    const profileKey = profileCache.get(clientId);
 
-    const result = await ayrsharePublish({ profileKey, caption: (post.caption || '').toString(), mediaUrls: media, platforms });
+    const result = await postformePublish({ clientId, caption: (post.caption || '').toString(), mediaUrls: media, platforms });
     if (result.ok) {
       await query(`update content_calendar set publish_status='posted', published_at=now(), publish_ref=$1, publish_error=null where id=$2`, [String(result.id), post.id]);
       posted++;

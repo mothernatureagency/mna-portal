@@ -241,8 +241,9 @@ export default function ContentPage() {
   const [editingPhoto, setEditingPhoto] = useState<Record<string, boolean>>({});
   const [uploadingId, setUploadingId] = useState<string | null>(null);
   const [publishing, setPublishing] = useState<string | null>(null);
-  const [ayrshareKey, setAyrshareKey] = useState('');
-  const [ayrshareSaved, setAyrshareSaved] = useState(false);
+  const [socialAccounts, setSocialAccounts] = useState<{ id: string; platform: string; username: string | null }[]>([]);
+  const [socialConfigured, setSocialConfigured] = useState(false);
+  const [connecting, setConnecting] = useState<string | null>(null);
   const [isStaff, setIsStaff] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editDraft, setEditDraft] = useState<{ post_date: string; platform: string; content_type: string; title: string }>({ post_date: '', platform: '', content_type: '', title: '' });
@@ -362,20 +363,28 @@ export default function ContentPage() {
     setItems((prev) => prev.map((it) => (it.id === id ? { ...it, ...data.item } : it)));
   }
 
-  // ── Social auto-posting ──────────────────────────────────────────
-  useEffect(() => {
+  // ── Social auto-posting (Post for Me) ────────────────────────────
+  function loadSocialAccounts() {
     if (!activeClient?.id) return;
-    fetch(`/api/client-kv?clientId=${encodeURIComponent(activeClient.id)}&key=ayrshare_profile_key`)
+    fetch(`/api/social/accounts?clientId=${encodeURIComponent(activeClient.id)}`)
       .then((r) => r.json())
-      .then((d) => setAyrshareKey(typeof d.value === 'string' ? d.value : ''))
-      .catch(() => setAyrshareKey(''));
-  }, [activeClient?.id]);
+      .then((d) => { setSocialAccounts(Array.isArray(d.accounts) ? d.accounts : []); setSocialConfigured(!!d.configured); })
+      .catch(() => { setSocialAccounts([]); setSocialConfigured(false); });
+  }
+  useEffect(() => { loadSocialAccounts(); /* eslint-disable-next-line react-hooks/exhaustive-deps */ }, [activeClient?.id]);
 
-  function saveAyrshareKey() {
+  async function connectSocial(platform: string) {
     if (!activeClient?.id) return;
-    fetch('/api/client-kv', { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ clientId: activeClient.id, key: 'ayrshare_profile_key', value: ayrshareKey.trim() }) })
-      .then(() => { setAyrshareSaved(true); setTimeout(() => setAyrshareSaved(false), 1400); })
-      .catch(() => {});
+    setConnecting(platform);
+    try {
+      const res = await fetch('/api/social/connect', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ clientId: activeClient.id, platform }) });
+      const d = await res.json();
+      if (!res.ok) throw new Error(d.error || 'Could not start connection');
+      // Open Post for Me's OAuth in a new tab; refresh the list when they return.
+      window.open(d.url, '_blank', 'noopener,noreferrer');
+    } catch (e: any) {
+      alert(e.message);
+    } finally { setConnecting(null); }
   }
 
   async function toggleAutoPost(id: string, val: boolean) {
@@ -785,19 +794,39 @@ export default function ContentPage() {
         </div>
       </div>
 
-      {/* Add post form (staff only) */}
+      {/* Social auto-post — connect accounts (staff only) */}
       {isStaff && (
-        <div className="glass-card p-3 flex flex-col sm:flex-row sm:items-center gap-2">
-          <span className="material-symbols-outlined text-cyan-400 shrink-0" style={{ fontSize: 18 }}>share</span>
-          <div className="text-[11px] text-white/55 shrink-0">Social auto-post ({activeClient?.shortName}) —</div>
-          <input
-            value={ayrshareKey}
-            onChange={(e) => setAyrshareKey(e.target.value)}
-            placeholder="Paste this client's Ayrshare Profile Key to enable posting"
-            className="flex-1 text-[12px] px-2.5 py-1.5 rounded-lg bg-white/5 border border-white/10 text-white outline-none placeholder:text-white/30"
-          />
-          <button onClick={saveAyrshareKey} className="text-[11px] font-bold px-3 py-1.5 rounded-lg bg-white/10 text-white/80 hover:text-white shrink-0">Save</button>
-          {ayrshareSaved && <span className="text-[10px] text-emerald-300 shrink-0">Saved</span>}
+        <div className="glass-card p-3 flex flex-col gap-2">
+          <div className="flex items-center gap-2 flex-wrap">
+            <span className="material-symbols-outlined text-cyan-400 shrink-0" style={{ fontSize: 18 }}>share</span>
+            <div className="text-[11px] text-white/55 shrink-0">Social auto-post ({activeClient?.shortName}) —</div>
+            {!socialConfigured ? (
+              <div className="text-[11px] text-amber-300/90">Add <code className="text-amber-200">POST_FOR_ME_API_KEY</code> in Vercel to enable connecting accounts.</div>
+            ) : (
+              <>
+                {(['instagram', 'facebook', 'tiktok', 'youtube'] as const).map((pl) => {
+                  const linked = socialAccounts.find((a) => a.platform === pl);
+                  return (
+                    <button
+                      key={pl}
+                      onClick={() => connectSocial(pl)}
+                      disabled={connecting === pl}
+                      className={`text-[11px] font-bold px-3 py-1.5 rounded-lg shrink-0 capitalize ${linked ? 'bg-emerald-500/15 text-emerald-300 hover:bg-emerald-500/25' : 'bg-white/10 text-white/80 hover:text-white'}`}
+                      title={linked ? `Connected as ${linked.username || linked.id} — click to reconnect` : `Connect ${pl}`}
+                    >
+                      {linked ? '✓ ' : '+ '}{pl}
+                    </button>
+                  );
+                })}
+                <button onClick={loadSocialAccounts} className="text-[11px] text-white/50 hover:text-white/80 px-2 shrink-0" title="Refresh connected accounts">↻</button>
+              </>
+            )}
+          </div>
+          {socialConfigured && socialAccounts.length > 0 && (
+            <div className="text-[10px] text-white/45 pl-7">
+              Linked: {socialAccounts.map((a) => `${a.platform}${a.username ? ` (@${a.username})` : ''}`).join(' · ')}
+            </div>
+          )}
         </div>
       )}
 

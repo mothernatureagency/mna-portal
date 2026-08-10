@@ -1,0 +1,158 @@
+/**
+ * Post for Me posting provider — one API for Instagram, Facebook, TikTok,
+ * YouTube (plus X, LinkedIn, Pinterest, Threads, Bluesky).
+ *
+ * Each client (location) connects their own social accounts through a Post for
+ * Me OAuth link tagged with external_id = <clientId>. That lets us resolve
+ * exactly which accounts belong to which client at post time — no per-client
+ * key to paste, unlike the old Ayrshare "profile key" flow.
+ *
+ * Env: POST_FOR_ME_API_KEY (your Post for Me API key).
+ * Docs: https://api.postforme.dev  (REST, /v1)
+ *
+ * Nothing here publishes on its own — callers decide when.
+ */
+
+const API = 'https://api.postforme.dev/v1';
+
+function apiKey(): string | null {
+  return process.env.POST_FOR_ME_API_KEY || null;
+}
+function authHeaders(key: string) {
+  return { 'Content-Type': 'application/json', Authorization: `Bearer ${key}` };
+}
+
+// Our platform label → Post for Me platform name.
+export function postformePlatform(platform: string): string | null {
+  const p = (platform || '').toLowerCase();
+  if (p.includes('instagram')) return 'instagram';
+  if (p.includes('facebook')) return 'facebook';
+  if (p.includes('tiktok')) return 'tiktok';
+  if (p.includes('youtube')) return 'youtube';
+  if (p.includes('linkedin')) return 'linkedin';
+  if (p.includes('pinterest')) return 'pinterest';
+  if (p.includes('threads')) return 'threads';
+  if (p.includes('bluesky')) return 'bluesky';
+  if (p === 'x/twitter' || p.includes('twitter') || p === 'x') return 'x';
+  return null;
+}
+
+// A post's platform label → the Post for Me platforms to publish to.
+export function platformsFor(platform: string): string[] {
+  const p = (platform || '').toLowerCase();
+  if (p === 'meta') return ['facebook', 'instagram'];
+  const one = postformePlatform(platform);
+  return one ? [one] : [];
+}
+
+// The set of platforms the portal offers a connect button for.
+export const CONNECTABLE_PLATFORMS = ['instagram', 'facebook', 'tiktok', 'youtube'] as const;
+
+// Only a direct, public media URL works — Google Drive share links won't.
+export function mediaFor(url: string | null): string[] {
+  const u = (url || '').trim();
+  if (!u || !/^https?:\/\//i.test(u) || /drive\.google\.com|docs\.google\.com/i.test(u)) return [];
+  return [u];
+}
+
+export type PfmAccount = { id: string; platform: string; username: string | null; status?: string };
+
+// List a client's connected accounts (grouped by external_id = clientId).
+export async function postformeListAccounts(
+  clientId: string,
+  opts?: { platforms?: string[] },
+): Promise<PfmAccount[]> {
+  const key = apiKey();
+  if (!key) return [];
+  const params = new URLSearchParams();
+  params.set('external_id', clientId);
+  params.set('status', 'connected');
+  params.set('limit', '100');
+  for (const pl of opts?.platforms || []) params.append('platform', pl);
+  try {
+    const res = await fetch(`${API}/social-accounts?${params.toString()}`, { headers: authHeaders(key) });
+    const raw: any = await res.json().catch(() => ({}));
+    if (!res.ok) return [];
+    const items = Array.isArray(raw?.data) ? raw.data : Array.isArray(raw) ? raw : raw?.items || [];
+    return items.map((a: any) => ({ id: a.id, platform: a.platform, username: a.username ?? a.display_name ?? null, status: a.status }));
+  } catch {
+    return [];
+  }
+}
+
+// Generate a connect (OAuth) link for a client to add one platform.
+export async function postformeAuthUrl(
+  clientId: string,
+  platform: string,
+  redirect?: string,
+): Promise<{ ok: true; url: string } | { ok: false; error: string }> {
+  const key = apiKey();
+  if (!key) return { ok: false, error: 'POST_FOR_ME_API_KEY is not set in the environment.' };
+  const pfm = postformePlatform(platform) || platform;
+  const body: Record<string, unknown> = { platform: pfm, external_id: clientId };
+  if (redirect) body.redirect_url_override = redirect;
+  try {
+    const res = await fetch(`${API}/social-accounts/auth-url`, {
+      method: 'POST',
+      headers: authHeaders(key),
+      body: JSON.stringify(body),
+    });
+    const raw: any = await res.json().catch(() => ({}));
+    if (!res.ok) return { ok: false, error: raw?.error?.message || raw?.message || `Auth URL failed (${res.status})` };
+    const url = raw?.url || raw?.auth_url || raw?.data?.url;
+    if (!url) return { ok: false, error: 'No auth URL returned by Post for Me.' };
+    return { ok: true, url };
+  } catch (e: any) {
+    return { ok: false, error: e?.message || 'Auth URL request failed' };
+  }
+}
+
+export type PublishInput = {
+  clientId: string;
+  caption: string;
+  mediaUrls?: string[]; // public image/video URLs
+  platforms: string[]; // Post for Me platform names
+  scheduleISO?: string; // optional ISO time; we publish now, so usually omitted
+};
+
+export type PublishResult =
+  | { ok: true; id: string; accounts: number; raw: any }
+  | { ok: false; error: string; raw?: any };
+
+export async function postformePublish(input: PublishInput): Promise<PublishResult> {
+  const key = apiKey();
+  if (!key) return { ok: false, error: 'POST_FOR_ME_API_KEY is not set in the environment.' };
+  if (!input.platforms.length) return { ok: false, error: 'No supported platform for this post.' };
+  if (!input.caption.trim() && !(input.mediaUrls && input.mediaUrls.length)) {
+    return { ok: false, error: 'Nothing to post — add a caption or media.' };
+  }
+
+  // Resolve which of the client's connected accounts match these platforms.
+  const accounts = await postformeListAccounts(input.clientId, { platforms: input.platforms });
+  const ids = accounts.map((a) => a.id);
+  if (!ids.length) {
+    return { ok: false, error: `No connected ${input.platforms.join('/')} account for this client — connect it in the Content Tracker first.` };
+  }
+
+  const body: Record<string, unknown> = {
+    caption: input.caption,
+    social_accounts: ids,
+  };
+  if (input.mediaUrls && input.mediaUrls.length) body.media = input.mediaUrls.map((url) => ({ url }));
+  if (input.scheduleISO) body.scheduled_at = input.scheduleISO;
+
+  try {
+    const res = await fetch(`${API}/social-posts`, {
+      method: 'POST',
+      headers: authHeaders(key),
+      body: JSON.stringify(body),
+    });
+    const raw: any = await res.json().catch(() => ({}));
+    const id = raw?.id || raw?.data?.id;
+    if (res.ok && id) return { ok: true, id: String(id), accounts: ids.length, raw };
+    const err = raw?.error?.message || raw?.message || raw?.errors?.[0]?.message || `Publish failed (${res.status})`;
+    return { ok: false, error: err, raw };
+  } catch (e: any) {
+    return { ok: false, error: e?.message || 'Publish request failed' };
+  }
+}

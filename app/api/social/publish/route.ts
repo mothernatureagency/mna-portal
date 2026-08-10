@@ -1,13 +1,13 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { ensureSchema, query } from '@/lib/db';
 import { createClient } from '@/lib/supabase/server';
-import { ayrsharePublish, platformsFor, mediaFor } from '@/lib/ayrshare';
+import { postformePublish, platformsFor, mediaFor } from '@/lib/postforme';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
 
 /**
- * Publish one content_calendar post to social now, via Ayrshare.
+ * Publish one content_calendar post to social now, via Post for Me.
  * Staff-triggered. Never auto-runs.
  *
  * POST { id, clientId }
@@ -51,15 +51,8 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: 'Instagram needs an image/video. Upload one to this post (a Drive link won\'t work), then publish.' }, { status: 400 });
   }
 
-  // Client's Ayrshare profile key.
-  const { rows: kv } = await query<{ value: any }>(
-    `select value from client_kv where client_id = $1 and key = 'ayrshare_profile_key'`,
-    [clientId],
-  );
-  const profileKey = typeof kv[0]?.value === 'string' ? kv[0].value : undefined;
-
   const caption = (post.caption || '').toString();
-  const result = await ayrsharePublish({ profileKey, caption, mediaUrls: media, platforms });
+  const result = await postformePublish({ clientId, caption, mediaUrls: media, platforms });
 
   if (!result.ok) {
     await query(
