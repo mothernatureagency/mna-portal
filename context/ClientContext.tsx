@@ -25,7 +25,7 @@ export function ClientProvider({ children }: { children: ReactNode }) {
   // Load dynamically-added Prime IV clients and merge them with the built-ins.
   function loadCustomClients() {
     fetch('/api/clients')
-      .then((r) => r.json())
+      .then((r) => { if (!r.ok) throw new Error('clients fetch failed'); return r.json(); })
       .then((d) => {
         const rows = (d.items || []) as Array<{ id: string; name: string; short_name?: string; location?: string; logo_url?: string; industry?: string; brand_from?: string; brand_to?: string; notes?: string }>;
         setCustomClients(rows.map((r) => makeCustomClient({ id: r.id, name: r.name, shortName: r.short_name, location: r.location, logoUrl: r.logo_url, industry: r.industry, brandFrom: r.brand_from, brandTo: r.brand_to, notes: r.notes })));
@@ -34,14 +34,30 @@ export function ClientProvider({ children }: { children: ReactNode }) {
   }
   useEffect(() => { loadCustomClients(); }, []);
 
+  // The provider also mounts on /login (it wraps the whole app), where the
+  // custom-clients fetch and the user lookup run logged-out and fail. Login
+  // navigates client-side, so nothing remounts — re-run both when the auth
+  // state flips to signed-in so the full client list appears without a reload.
+  useEffect(() => {
+    const supabase = createSupabaseClient();
+    const { data: sub } = supabase.auth.onAuthStateChange((event) => {
+      if (event === 'SIGNED_IN') {
+        loadCustomClients();
+        loadUser();
+      }
+    });
+    return () => sub.subscription.unsubscribe();
+    /* eslint-disable-next-line react-hooks/exhaustive-deps */
+  }, []);
+
   // Built-in + custom, de-duped by id.
   const clients = useMemo(() => {
     const seen = new Set(staticClients.map((c) => c.id));
     return [...staticClients, ...customClients.filter((c) => !seen.has(c.id))];
   }, [customClients]);
 
-  // Load user metadata and saved client on mount
-  useEffect(() => {
+  // Load user metadata and saved client (on mount, and again after sign-in)
+  function loadUser() {
     const supabase = createSupabaseClient();
     supabase.auth.getUser().then(({ data: { user } }) => {
       if (user) {
@@ -91,7 +107,8 @@ export function ClientProvider({ children }: { children: ReactNode }) {
       if (saved) setActiveClientIdState(saved);
       setHydrated(true);
     });
-  }, []);
+  }
+  useEffect(() => { loadUser(); /* eslint-disable-next-line react-hooks/exhaustive-deps */ }, []);
 
   // Persist to localStorage on change
   function setActiveClientId(id: string) {

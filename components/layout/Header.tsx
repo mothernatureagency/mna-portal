@@ -32,9 +32,10 @@ function SwitcherLogo({ client, size }: { client: Client; size: 'button' | 'drop
   const dropdownHeight = 28;  // height inside the dropdown list rows
   const displayHeight = size === 'button' ? buttonHeight : dropdownHeight;
 
-  // 1. Icon file — square SVG gets a square slot, wide PNG gets an adaptive slot
+  // 1. Icon file — square SVG gets a square slot, any raster logo (png/jpg/
+  // webp, incl. uploaded remote URLs) gets an adaptive slot
   if (iconUrl) {
-    const isWide = iconUrl.toLowerCase().endsWith('.png');
+    const isWide = !iconUrl.toLowerCase().split('?')[0].endsWith('.svg');
     return (
       <div
         className="flex items-center justify-center flex-shrink-0 overflow-hidden rounded-lg"

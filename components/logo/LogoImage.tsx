@@ -75,12 +75,17 @@ export default function LogoImage({
   style,
   quality = 95,
 }: LogoImageProps) {
-  const isSvg = src.toLowerCase().endsWith('.svg');
+  const isSvg = src.toLowerCase().split('?')[0].endsWith('.svg');
+  // Remote logos (custom clients upload theirs to Supabase storage) can't go
+  // through next/image — remotePatterns is locked down to local files only —
+  // so render them with a plain <img> like SVGs. They're small uploads, so
+  // skipping the optimizer costs nothing.
+  const isRemote = /^https?:\/\//i.test(src);
 
-  // ── SVG: plain <img> tag ──────────────────────────────────
+  // ── SVG / remote URL: plain <img> tag ─────────────────────
   // width: auto lets the browser calculate the correct width
-  // from the SVG's intrinsic aspect ratio (preserveAspectRatio).
-  if (isSvg) {
+  // from the image's intrinsic aspect ratio.
+  if (isSvg || isRemote) {
     return (
       <img
         src={src}
@@ -90,6 +95,8 @@ export default function LogoImage({
           height: `${height}px`,
           width: 'auto',
           maxWidth: maxWidth ? `${maxWidth}px` : undefined,
+          // If maxWidth clamps the natural width, letterbox instead of squashing
+          objectFit: 'contain',
           display: 'block',
           flexShrink: 0,
           // Force hardware-accelerated compositing for crisp sub-pixel rendering
