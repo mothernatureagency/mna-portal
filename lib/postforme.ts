@@ -61,6 +61,17 @@ export function mediaFor(url: string | null): string[] {
   return [u];
 }
 
+// Is this media URL a video? (uploaded videos are named "…-video.<ext>")
+export function isVideoUrl(url: string): boolean {
+  return /\.(mp4|mov|m4v|webm|avi|mkv)(\?|$)/i.test(url || '') || /-video\./i.test(url || '');
+}
+
+// Platforms that can ONLY post video (no image-only posts).
+export function isVideoOnlyPlatform(p: string): boolean {
+  const b = platformBase(p);
+  return b === 'tiktok' || b === 'youtube';
+}
+
 export type PfmAccount = { id: string; platform: string; username: string | null; pageId: string | null; photo: string | null; status?: string };
 
 /**

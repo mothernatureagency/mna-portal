@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { ensureSchema, query } from '@/lib/db';
 import { createClient } from '@/lib/supabase/server';
-import { postformePublish, platformsFor, platformBase, mediaFor } from '@/lib/postforme';
+import { postformePublish, platformsFor, platformBase, mediaFor, isVideoUrl, isVideoOnlyPlatform } from '@/lib/postforme';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -49,6 +49,11 @@ export async function POST(req: NextRequest) {
   const media = mediaFor(post.photo_drive_url);
   if (platforms.includes('instagram') && media.length === 0) {
     return NextResponse.json({ error: 'Instagram needs an image/video. Upload one to this post (a Drive link won\'t work), then publish.' }, { status: 400 });
+  }
+  // TikTok / YouTube can only post video.
+  if (platforms.some(isVideoOnlyPlatform) && !media.some(isVideoUrl)) {
+    const which = platforms.filter(isVideoOnlyPlatform).join('/');
+    return NextResponse.json({ error: `${which} posts require a video. Upload an mp4 to this post, then publish.` }, { status: 400 });
   }
 
   // Only post to the accounts this client is explicitly assigned to, matching

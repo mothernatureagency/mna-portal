@@ -24,6 +24,10 @@ function DriveThumb({ url, className }: { url: string | null | undefined; classN
   const src = previewSrc(url);
   const [failed, setFailed] = useState(false);
   if (!src || failed) return null;
+  if (/\.(mp4|mov|m4v|webm|avi|mkv)(\?|$)/i.test(src) || /-video\./i.test(src)) {
+    // eslint-disable-next-line jsx-a11y/media-has-caption
+    return <video src={src} className={className} controls playsInline muted preload="metadata" onError={() => setFailed(true)} />;
+  }
   return <img src={src} alt="" className={className} onError={() => setFailed(true)} />;
 }
 
@@ -70,7 +74,7 @@ function PhotoDropZone({
           className="w-full flex flex-col items-center justify-center gap-1 rounded-lg border border-dashed border-white/20 hover:border-white/40 text-white/45 hover:text-white/70 transition-colors py-4 text-[11px] font-semibold"
         >
           <span className="material-symbols-outlined" style={{ fontSize: 20 }}>add_photo_alternate</span>
-          {uploading ? 'Uploading…' : 'Drag an image here or click to upload'}
+          {uploading ? 'Uploading…' : 'Drag an image or video here, or click to upload'}
         </button>
       )}
       {hasImage && (
@@ -87,7 +91,7 @@ function PhotoDropZone({
       <input
         ref={inputRef}
         type="file"
-        accept="image/*"
+        accept="image/*,video/*"
         className="hidden"
         onChange={(e) => { const f = e.target.files?.[0]; if (f) onFile(f); e.target.value = ''; }}
       />
@@ -126,6 +130,7 @@ type ContentItem = {
   publish_status?: string | null;
   published_at?: string | null;
   publish_error?: string | null;
+  scheduled_for?: string | null;
 };
 
 const MNA_EMAILS = [
@@ -306,18 +311,28 @@ export default function ContentPage() {
     } catch (e: any) { alert(e.message); }
   }
 
-  // Upload a dropped/selected image and attach it to the post.
+  // Upload a dropped/selected image OR video and attach it to the post.
+  // Uploads straight to Supabase Storage via a signed URL so large video files
+  // aren't blocked by the serverless request-body limit.
   async function uploadImage(postId: string, file: File) {
-    if (!file.type.startsWith('image/')) { alert('Please choose an image file.'); return; }
+    const isImg = file.type.startsWith('image/');
+    const isVid = file.type.startsWith('video/');
+    if (!isImg && !isVid) { alert('Please choose an image or video file.'); return; }
     setUploadingId(postId);
     try {
-      const fd = new FormData();
-      fd.append('file', file);
-      fd.append('postId', postId);
-      const res = await fetch('/api/content-calendar/upload', { method: 'POST', body: fd });
-      const data = await res.json();
-      if (!res.ok) throw new Error(data.error || 'Upload failed');
-      setItems((prev) => prev.map((it) => (it.id === postId ? { ...it, photo_drive_url: data.url } : it)));
+      // 1. Get a signed upload URL + the eventual public URL.
+      const r = await fetch('/api/content-calendar/upload-url', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ filename: file.name, contentType: file.type }),
+      });
+      const d = await r.json();
+      if (!r.ok) throw new Error(d.error || 'Could not start upload');
+      // 2. Send the file straight to Supabase Storage.
+      const up = await fetch(d.signedUrl, { method: 'PUT', headers: { 'content-type': file.type, 'x-upsert': 'true' }, body: file });
+      if (!up.ok) throw new Error('Upload to storage failed');
+      // 3. Attach the public URL to the post.
+      await patchItem(postId, { photo_drive_url: d.publicUrl });
+      setItems((prev) => prev.map((it) => (it.id === postId ? { ...it, photo_drive_url: d.publicUrl } : it)));
     } catch (e: any) {
       alert(e.message || 'Upload failed');
     } finally {
@@ -1593,6 +1608,8 @@ export default function ContentPage() {
                           <span className="text-[10px] font-bold uppercase tracking-wider text-white/40">Social auto-post</span>
                           {activeItem.publish_status === 'posted' ? (
                             <span className="text-[9px] font-bold px-2 py-0.5 rounded-full bg-emerald-500/20 text-emerald-300">✓ Posted</span>
+                          ) : activeItem.publish_status === 'scheduled' ? (
+                            <span className="text-[9px] font-bold px-2 py-0.5 rounded-full bg-violet-500/20 text-violet-300">⏱ Scheduled</span>
                           ) : activeItem.publish_status === 'failed' ? (
                             <span className="text-[9px] font-bold px-2 py-0.5 rounded-full bg-rose-500/20 text-rose-300">Failed</span>
                           ) : activeItem.auto_post ? (
@@ -1602,7 +1619,7 @@ export default function ContentPage() {
                         <div className="flex items-center gap-3 flex-wrap">
                           <label className="flex items-center gap-1.5 text-[11px] text-white/70 cursor-pointer">
                             <input type="checkbox" checked={!!activeItem.auto_post} onChange={(e) => toggleAutoPost(activeItem.id, e.target.checked)} />
-                            Auto-post on {fmtDate(activeItem.post_date)}
+                            Auto-post at the best time on {fmtDate(activeItem.post_date)}
                           </label>
                           <button
                             onClick={() => publishNow(activeItem.id)}
@@ -1614,6 +1631,12 @@ export default function ContentPage() {
                             {publishing === activeItem.id ? 'Posting…' : 'Publish now'}
                           </button>
                         </div>
+                        {activeItem.publish_status === 'scheduled' && activeItem.scheduled_for && (
+                          <div className="text-[10px] text-violet-300/90 mt-1.5">Scheduled to go out {new Date(activeItem.scheduled_for).toLocaleString([], { dateStyle: 'medium', timeStyle: 'short' })}</div>
+                        )}
+                        {activeItem.auto_post && activeItem.publish_status !== 'scheduled' && activeItem.publish_status !== 'posted' && (
+                          <div className="text-[10px] text-white/40 mt-1.5">Will post automatically at this location&apos;s best window that day (staggered if several are due).</div>
+                        )}
                         {activeItem.publish_error && <div className="text-[10px] text-rose-300 mt-1.5">{activeItem.publish_error}</div>}
                       </div>
                     )}

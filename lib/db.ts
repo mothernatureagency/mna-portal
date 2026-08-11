@@ -82,6 +82,7 @@ async function initSchema() {
                   `alter table content_calendar add column if not exists published_at timestamptz`,
                   `alter table content_calendar add column if not exists publish_ref text`,
                   `alter table content_calendar add column if not exists publish_error text`,
+                  `alter table content_calendar add column if not exists scheduled_for timestamptz`,
                   // Client tasks: MNA asks the client for things. client_id is the lib/clients.ts id (text, not FK to projects).
                   `create table if not exists client_requests (
                         id uuid primary key default uuid_generate_v4(),
