@@ -254,6 +254,7 @@ export default function ContentPage() {
   const [mergeVars, setMergeVars] = useState<Record<string, string>>({});
   const [showMerge, setShowMerge] = useState(false);
   const [mergeSaved, setMergeSaved] = useState(false);
+  const [pdmAutopost, setPdmAutopost] = useState(false);
   const [isStaff, setIsStaff] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editDraft, setEditDraft] = useState<{ post_date: string; platform: string; content_type: string; title: string }>({ post_date: '', platform: '', content_type: '', title: '' });
@@ -412,6 +413,20 @@ export default function ContentPage() {
     fetch('/api/client-kv', { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ clientId: activeClient.id, key: 'merge_vars', value: next }) })
       .then(() => { setMergeSaved(true); setTimeout(() => setMergeSaved(false), 1200); })
       .catch(() => {});
+  }
+
+  // Opt this location in/out of auto-posting PDM brand-cascade posts.
+  useEffect(() => {
+    if (!activeClient?.id) return;
+    fetch(`/api/client-kv?clientId=${encodeURIComponent(activeClient.id)}&key=pdm_autopost`)
+      .then((r) => r.json())
+      .then((d) => setPdmAutopost(d.value === true))
+      .catch(() => setPdmAutopost(false));
+  }, [activeClient?.id]);
+  function togglePdmAutopost(v: boolean) {
+    if (!activeClient?.id) return;
+    setPdmAutopost(v);
+    fetch('/api/client-kv', { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ clientId: activeClient.id, key: 'pdm_autopost', value: v }) }).catch(() => {});
   }
   // Re-check the pool when the user returns from the Post for Me connect tab.
   useEffect(() => {
@@ -913,6 +928,13 @@ export default function ContentPage() {
                 <div className="text-[10px] text-amber-300/80 mt-1">Nothing ticked — this client won&apos;t auto-post anywhere (safe default).</div>
               )}
             </div>
+          )}
+          {socialConfigured && (
+            <label className="flex items-center gap-2 pl-7 text-[11px] text-white/60 cursor-pointer">
+              <input type="checkbox" checked={pdmAutopost} onChange={(e) => togglePdmAutopost(e.target.checked)} className="accent-cyan-400" />
+              Also auto-post <span className="text-blue-300 font-semibold">PDM brand posts</span> for this location
+              <span className="text-white/35">(for locations corporate isn&apos;t covering)</span>
+            </label>
           )}
         </div>
       )}
@@ -1519,9 +1541,11 @@ export default function ContentPage() {
                            style={{ background: PDM_STYLE.chipBg, border: `1px solid ${PDM_STYLE.chipBorder}` }}>
                         <span className="material-symbols-outlined" style={{ fontSize: 18, color: PDM_STYLE.accent }}>info</span>
                         <div className="text-[12px] text-blue-100 leading-snug">
-                          <span className="font-bold">PDM · Brand Cascade.</span> Reference only — Prime IV
-                          corporate posts this from the brand page, so MNA doesn't need to approve or
-                          publish it. Use it to plan local content around.
+                          {pdmAutopost ? (
+                            <><span className="font-bold">PDM · Brand Cascade.</span> Auto-posting is <span className="font-bold">ON</span> for this location — MNA will publish this brand post to the assigned account(s) at the best time on its date.</>
+                          ) : (
+                            <><span className="font-bold">PDM · Brand Cascade.</span> Reference only — Prime IV corporate posts this from the brand page, so MNA doesn&apos;t need to approve or publish it. Use it to plan local content around.</>
+                          )}
                         </div>
                       </div>
                     </div>
@@ -1555,7 +1579,7 @@ export default function ContentPage() {
                           </button>
                         )}
                         <span>·&nbsp;</span>
-                        {isStaff && !pdm ? (
+                        {isStaff && (!pdm || pdmAutopost) ? (
                           <select
                             value={activeItem.platform}
                             onChange={async (e) => { try { await patchItem(activeItem.id, { platform: e.target.value }); } catch (err: any) { alert(err.message); } }}
@@ -1668,10 +1692,10 @@ export default function ContentPage() {
                         )}
                       </div>
                     )}
-                    {isStaff && !pdm && (
+                    {isStaff && (!pdm || pdmAutopost) && (
                       <div className="rounded-lg p-3" style={{ background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.08)' }}>
                         <div className="flex items-center justify-between gap-2 mb-1.5">
-                          <span className="text-[10px] font-bold uppercase tracking-wider text-white/40">Social auto-post</span>
+                          <span className="text-[10px] font-bold uppercase tracking-wider text-white/40">Social auto-post{pdm ? ' · PDM (opted in)' : ''}</span>
                           {activeItem.publish_status === 'posted' ? (
                             <span className="text-[9px] font-bold px-2 py-0.5 rounded-full bg-emerald-500/20 text-emerald-300">✓ Posted</span>
                           ) : activeItem.publish_status === 'scheduled' ? (

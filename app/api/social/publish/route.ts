@@ -42,7 +42,12 @@ export async function POST(req: NextRequest) {
   const post = rows[0];
   if (!post) return NextResponse.json({ error: 'Post not found' }, { status: 404 });
   if (String(post.assigned_role || '') === 'PDM (Brand)') {
-    return NextResponse.json({ error: 'PDM brand-cascade posts are published by corporate — not from here.' }, { status: 400 });
+    // PDM brand posts are corporate's job by default — but a client can opt in
+    // to have us push them (for locations corporate isn't covering).
+    const { rows: opt } = await query<{ value: any }>(`select value from client_kv where client_id = $1 and key = 'pdm_autopost'`, [clientId]);
+    if (opt[0]?.value !== true) {
+      return NextResponse.json({ error: 'PDM brand-cascade posts are published by corporate. To push them for this location, enable "Auto-post PDM posts" in the Content Tracker first.' }, { status: 400 });
+    }
   }
 
   const platforms = platformsFor(post.platform);

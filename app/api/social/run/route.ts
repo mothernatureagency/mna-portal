@@ -44,9 +44,16 @@ export async function GET(req: NextRequest) {
     return NextResponse.json(await postformeRawAccounts());
   }
 
-  const { rows: due } = await query<any>(
+  // Clients that opted in to auto-posting the PDM brand-cascade posts (for
+  // locations where corporate isn't posting them). Default off.
+  const { rows: optRows } = await query<{ client_id: string }>(
+    `select client_id from client_kv where key = 'pdm_autopost' and value = 'true'::jsonb`,
+  );
+  const pdmOptIn = new Set(optRows.map((r) => r.client_id));
+
+  const { rows: normal } = await query<any>(
     `select cc.id, cc.platform, cc.caption, cc.photo_drive_url,
-            to_char(cc.post_date, 'YYYY-MM-DD') as post_date, p.client_name
+            to_char(cc.post_date, 'YYYY-MM-DD') as post_date, p.client_name, false as is_pdm
        from content_calendar cc
        join projects p on p.id = cc.project_id
       where cc.auto_post = true
@@ -57,6 +64,24 @@ export async function GET(req: NextRequest) {
       order by cc.post_date asc, cc.id asc
       limit 50`,
   );
+
+  // PDM brand posts (only processed for opted-in clients, checked in the loop).
+  // These are brand-mandated, so no per-post auto_post/approval toggle needed.
+  const pdm = pdmOptIn.size
+    ? (await query<any>(
+        `select cc.id, cc.platform, cc.caption, cc.photo_drive_url,
+                to_char(cc.post_date, 'YYYY-MM-DD') as post_date, p.client_name, true as is_pdm
+           from content_calendar cc
+           join projects p on p.id = cc.project_id
+          where cc.assigned_role = 'PDM (Brand)'
+            and coalesce(cc.publish_status, '') not in ('posted', 'scheduled')
+            and cc.post_date <= current_date
+          order by cc.post_date asc, cc.id asc
+          limit 50`,
+      )).rows
+    : [];
+
+  const due = [...normal, ...pdm];
 
   // Per-client account assignment + timezone override (cached).
   const assignCache = new Map<string, { id: string; platform: string }[]>();
@@ -101,6 +126,7 @@ export async function GET(req: NextRequest) {
     if (!nameToId.has(post.client_name)) nameToId.set(post.client_name, await clientIdForName(post.client_name));
     const clientId = nameToId.get(post.client_name);
     if (!clientId) { skipped++; continue; }
+    if (post.is_pdm && !pdmOptIn.has(clientId)) { skipped++; continue; }
 
     const assigned = await assignedFor(clientId);
     const accountIds = assigned.filter((a) => platforms.includes(platformBase(a.platform))).map((a) => a.id);
