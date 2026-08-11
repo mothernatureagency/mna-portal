@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { ensureSchema, query } from '@/lib/db';
 import { createClient } from '@/lib/supabase/server';
 import { clients as staticClients } from '@/lib/clients';
-import { postformePublish, platformsFor, platformBase, mediaFor, isVideoUrl, isVideoOnlyPlatform } from '@/lib/postforme';
+import { postformePublish, platformsFor, platformBase, mediaForPost, isVideoUrl, isVideoOnlyPlatform } from '@/lib/postforme';
 import { applyMergeVars, effectiveVars, deriveLocation } from '@/lib/merge-vars';
 
 export const runtime = 'nodejs';
@@ -36,7 +36,7 @@ export async function POST(req: NextRequest) {
   if (!id || !clientId) return NextResponse.json({ error: 'id and clientId required' }, { status: 400 });
 
   const { rows } = await query<any>(
-    `select id, platform, caption, title, photo_drive_url, assigned_role from content_calendar where id = $1`,
+    `select id, platform, caption, title, photo_drive_url, photo_urls, assigned_role from content_calendar where id = $1`,
     [id],
   );
   const post = rows[0];
@@ -53,7 +53,7 @@ export async function POST(req: NextRequest) {
   const platforms = platformsFor(post.platform);
   if (platforms.length === 0) return NextResponse.json({ error: `No connected platform for "${post.platform}".` }, { status: 400 });
 
-  const media = mediaFor(post.photo_drive_url);
+  const media = mediaForPost(post);
   if (platforms.includes('instagram') && media.length === 0) {
     return NextResponse.json({ error: 'Instagram needs an image/video. Upload one to this post (a Drive link won\'t work), then publish.' }, { status: 400 });
   }

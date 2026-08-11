@@ -74,6 +74,9 @@ async function initSchema() {
                   `alter table content_calendar add column if not exists approved_at timestamptz`,
                   // Google Drive link to the photo/video for this post. Rendered as preview + click through.
                   `alter table content_calendar add column if not exists photo_drive_url text`,
+                  // Full ordered photo/video list (json array of URLs). photo_drive_url stays
+                  // in sync as the first entry (the cover) so single-photo consumers keep working.
+                  `alter table content_calendar add column if not exists photo_urls jsonb`,
                   // Staff can control when content becomes visible to clients.
                   `alter table content_calendar add column if not exists client_visible boolean not null default false`,
                   // Social auto-posting (via a posting provider, e.g. Ayrshare).

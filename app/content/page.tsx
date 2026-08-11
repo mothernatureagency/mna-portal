@@ -20,6 +20,13 @@ function photoOpenUrl(url: string | null | undefined): string | null {
   return driveViewUrl(url) || (url && /^https?:\/\//i.test(url.trim()) ? url.trim() : null);
 }
 
+// All photos on a post — the multi-photo list when present, else the legacy
+// single-photo column. First entry is the cover.
+function photosOf(i: { photo_urls?: string[] | null; photo_drive_url: string | null }): string[] {
+  if (Array.isArray(i.photo_urls) && i.photo_urls.length > 0) return i.photo_urls.filter(Boolean);
+  return i.photo_drive_url ? [i.photo_drive_url] : [];
+}
+
 /** Image with graceful fallback — hides itself if the source fails to load */
 function DriveThumb({ url, className }: { url: string | null | undefined; className?: string }) {
   const src = previewSrc(url);
@@ -38,17 +45,17 @@ function dragHasFiles(e: React.DragEvent): boolean {
 }
 
 /**
- * Staff-only image drop zone. Wraps a post's photo area so an image file can
- * be dragged from the desktop and dropped to attach it, or clicked to browse.
- * Non-staff just see the children (view only).
+ * Staff-only image drop zone. Wraps a post's photo area so image/video files
+ * can be dragged from the desktop and dropped to attach them (several at
+ * once), or clicked to browse. Non-staff just see the children (view only).
  */
 function PhotoDropZone({
-  isStaff, uploading, hasImage, onFile, className, children,
+  isStaff, uploading, hasImage, onFiles, className, children,
 }: {
   isStaff: boolean;
   uploading: boolean;
   hasImage: boolean;
-  onFile: (f: File) => void;
+  onFiles: (files: File[]) => void;
   className?: string;
   children?: React.ReactNode;
 }) {
@@ -63,8 +70,8 @@ function PhotoDropZone({
       onDrop={(e) => {
         if (!dragHasFiles(e)) return;
         e.preventDefault(); e.stopPropagation(); setOver(false);
-        const f = e.dataTransfer.files?.[0];
-        if (f) onFile(f);
+        const fs = Array.from(e.dataTransfer.files || []);
+        if (fs.length) onFiles(fs);
       }}
     >
       {children}
@@ -75,7 +82,7 @@ function PhotoDropZone({
           className="w-full flex flex-col items-center justify-center gap-1 rounded-lg border border-dashed border-white/20 hover:border-white/40 text-white/45 hover:text-white/70 transition-colors py-4 text-[11px] font-semibold"
         >
           <span className="material-symbols-outlined" style={{ fontSize: 20 }}>add_photo_alternate</span>
-          {uploading ? 'Uploading…' : 'Drag an image or video here, or click to upload'}
+          {uploading ? 'Uploading…' : 'Drag images or videos here, or click to upload'}
         </button>
       )}
       {hasImage && (
@@ -83,18 +90,19 @@ function PhotoDropZone({
           type="button"
           onClick={() => inputRef.current?.click()}
           className="absolute top-1 right-1 z-10 text-[10px] font-semibold px-2 py-1 rounded-md bg-black/55 text-white/90 hover:bg-black/75 inline-flex items-center gap-1"
-          title="Replace image"
+          title="Add more photos or videos"
         >
-          <span className="material-symbols-outlined" style={{ fontSize: 13 }}>swap_horiz</span>
-          Replace
+          <span className="material-symbols-outlined" style={{ fontSize: 13 }}>add_photo_alternate</span>
+          Add
         </button>
       )}
       <input
         ref={inputRef}
         type="file"
         accept="image/*,video/*"
+        multiple
         className="hidden"
-        onChange={(e) => { const f = e.target.files?.[0]; if (f) onFile(f); e.target.value = ''; }}
+        onChange={(e) => { const fs = Array.from(e.target.files || []); if (fs.length) onFiles(fs); e.target.value = ''; }}
       />
       {(over || uploading) && (
         <div className="absolute inset-0 z-20 flex items-center justify-center rounded-lg pointer-events-none"
@@ -126,6 +134,7 @@ type ContentItem = {
   mna_comments: string | null;
   approved_at: string | null;
   photo_drive_url: string | null;
+  photo_urls?: string[] | null;
   client_visible: boolean;
   auto_post?: boolean;
   publish_status?: string | null;
@@ -308,36 +317,56 @@ export default function ContentPage() {
     });
   }, []);
 
+  // Replace a post's full photo list; the first entry becomes the cover.
+  async function savePhotos(id: string, urls: string[]) {
+    await patchItem(id, { photo_urls: urls, photo_drive_url: urls[0] || null });
+  }
+
+  // "Paste link" — appends the pasted URL to the post's photo list.
   async function savePhoto(id: string) {
     const url = photoDraft[id]?.trim() || '';
     try {
-      await patchItem(id, { photo_drive_url: url || null });
+      if (url) {
+        const item = items.find((i) => i.id === id);
+        await savePhotos(id, [...(item ? photosOf(item) : []), url]);
+      }
+      setPhotoDraft((d) => ({ ...d, [id]: '' }));
       setEditingPhoto((e) => ({ ...e, [id]: false }));
     } catch (e: any) { alert(e.message); }
   }
 
-  // Upload a dropped/selected image OR video and attach it to the post.
-  // Uploads straight to Supabase Storage via a signed URL so large video files
+  async function removePhotoAt(id: string, index: number) {
+    const item = items.find((i) => i.id === id);
+    if (!item) return;
+    try { await savePhotos(id, photosOf(item).filter((_, i) => i !== index)); }
+    catch (e: any) { alert(e.message); }
+  }
+
+  // Upload dropped/selected images OR videos and attach them all to the post.
+  // Uploads straight to Supabase Storage via signed URLs so large video files
   // aren't blocked by the serverless request-body limit.
-  async function uploadImage(postId: string, file: File) {
-    const isImg = file.type.startsWith('image/');
-    const isVid = file.type.startsWith('video/');
-    if (!isImg && !isVid) { alert('Please choose an image or video file.'); return; }
+  async function uploadImages(postId: string, files: File[]) {
+    const valid = files.filter((f) => f.type.startsWith('image/') || f.type.startsWith('video/'));
+    if (valid.length === 0) { alert('Please choose image or video files.'); return; }
     setUploadingId(postId);
     try {
-      // 1. Get a signed upload URL + the eventual public URL.
-      const r = await fetch('/api/content-calendar/upload-url', {
-        method: 'POST', headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ filename: file.name, contentType: file.type }),
-      });
-      const d = await r.json();
-      if (!r.ok) throw new Error(d.error || 'Could not start upload');
-      // 2. Send the file straight to Supabase Storage.
-      const up = await fetch(d.signedUrl, { method: 'PUT', headers: { 'content-type': file.type, 'x-upsert': 'true' }, body: file });
-      if (!up.ok) throw new Error('Upload to storage failed');
-      // 3. Attach the public URL to the post.
-      await patchItem(postId, { photo_drive_url: d.publicUrl });
-      setItems((prev) => prev.map((it) => (it.id === postId ? { ...it, photo_drive_url: d.publicUrl } : it)));
+      const uploaded: string[] = [];
+      for (const file of valid) {
+        // 1. Get a signed upload URL + the eventual public URL.
+        const r = await fetch('/api/content-calendar/upload-url', {
+          method: 'POST', headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ filename: file.name, contentType: file.type }),
+        });
+        const d = await r.json();
+        if (!r.ok) throw new Error(d.error || 'Could not start upload');
+        // 2. Send the file straight to Supabase Storage.
+        const up = await fetch(d.signedUrl, { method: 'PUT', headers: { 'content-type': file.type, 'x-upsert': 'true' }, body: file });
+        if (!up.ok) throw new Error('Upload to storage failed');
+        uploaded.push(d.publicUrl);
+      }
+      // 3. Append the new URLs to the post's photo list.
+      const item = items.find((i) => i.id === postId);
+      await savePhotos(postId, [...(item ? photosOf(item) : []), ...uploaded]);
     } catch (e: any) {
       alert(e.message || 'Upload failed');
     } finally {
@@ -551,7 +580,8 @@ export default function ContentPage() {
   async function attachDriveFile(postId: string, file: DriveFile) {
     const url = file.webViewLink || `https://drive.google.com/file/d/${file.id}/view`;
     try {
-      await patchItem(postId, { photo_drive_url: url });
+      const item = items.find((i) => i.id === postId);
+      await savePhotos(postId, [...(item ? photosOf(item) : []), url]);
       setPickerForId(null);
     } catch (e: any) { alert(e.message); }
   }
@@ -1464,7 +1494,13 @@ export default function ContentPage() {
                           }}
                           title={pdm ? 'PDM · Brand Cascade (reference only, no approval)' : isStaff ? 'Click to open, drag to reschedule' : undefined}
                         >
-                          <DriveThumb url={p.photo_drive_url} className="w-full h-[48px] object-cover opacity-70 group-hover:opacity-90 transition-opacity" />
+                          <DriveThumb url={photosOf(p)[0]} className="w-full h-[48px] object-cover opacity-70 group-hover:opacity-90 transition-opacity" />
+                          {photosOf(p).length > 1 && (
+                            <span className="absolute top-0.5 right-0.5 z-10 text-[8px] font-bold px-1 py-0.5 rounded bg-black/60 text-white/90 inline-flex items-center gap-0.5">
+                              <span className="material-symbols-outlined" style={{ fontSize: 9 }}>photo_library</span>
+                              {photosOf(p).length}
+                            </span>
+                          )}
                           <div className="px-1.5 py-1">
                             <div className={`text-[9px] font-bold truncate ${pdm ? 'text-blue-100' : 'text-white/80'}`}>
                               {pdm && <span className="text-blue-300 font-bold">PDM · </span>}
@@ -1511,28 +1547,51 @@ export default function ContentPage() {
               const pdm = isPdmItem(activeItem);
               const status = (activeItem.client_approval_status || 'pending_review') as ApprovalStatus;
               const astyle = APPROVAL_STYLES[status];
-              const driveLink = photoOpenUrl(activeItem.photo_drive_url);
+              const photos = photosOf(activeItem);
+              const driveLink = photoOpenUrl(photos[0]);
+              const gallery = photos.length > 0 && (
+                <>
+                  <a href={driveLink || undefined} target="_blank" rel="noreferrer" className="block bg-black">
+                    <DriveThumb url={photos[0]} className="w-full max-h-80 object-contain" />
+                  </a>
+                  {photos.length > 1 && (
+                    <div className="flex gap-1.5 p-2 bg-black/60 overflow-x-auto">
+                      {photos.map((u, idx) => (
+                        <div key={`${u}-${idx}`} className="relative shrink-0">
+                          <a href={photoOpenUrl(u) || undefined} target="_blank" rel="noreferrer" className="block">
+                            <DriveThumb url={u} className="h-16 w-16 object-cover rounded-md border border-white/15" />
+                          </a>
+                          {isStaff && (
+                            <button
+                              type="button"
+                              onClick={() => removePhotoAt(activeItem.id, idx)}
+                              className="absolute top-0.5 right-0.5 z-10 w-4 h-4 rounded-full bg-black/80 text-white/80 hover:bg-rose-600 hover:text-white flex items-center justify-center"
+                              title="Remove this photo"
+                            >
+                              <span className="material-symbols-outlined" style={{ fontSize: 11 }}>close</span>
+                            </button>
+                          )}
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </>
+              );
               return (
                 <>
                   {isStaff ? (
                     <PhotoDropZone
                       isStaff={isStaff}
                       uploading={uploadingId === activeItem.id}
-                      hasImage={!!activeItem.photo_drive_url}
-                      onFile={(f) => uploadImage(activeItem.id, f)}
+                      hasImage={photos.length > 0}
+                      onFiles={(fs) => uploadImages(activeItem.id, fs)}
                       className="block overflow-hidden rounded-t-2xl"
                     >
-                      {activeItem.photo_drive_url && (
-                        <a href={driveLink || undefined} target="_blank" rel="noreferrer" className="block bg-black">
-                          <DriveThumb url={activeItem.photo_drive_url} className="w-full max-h-80 object-contain" />
-                        </a>
-                      )}
+                      {gallery}
                     </PhotoDropZone>
                   ) : (
-                    activeItem.photo_drive_url && (
-                      <a href={driveLink || undefined} target="_blank" rel="noreferrer" className="block bg-black rounded-t-2xl overflow-hidden">
-                        <DriveThumb url={activeItem.photo_drive_url} className="w-full max-h-80 object-contain" />
-                      </a>
+                    photos.length > 0 && (
+                      <div className="rounded-t-2xl overflow-hidden">{gallery}</div>
                     )
                   )}
                   {pdm && (
@@ -2090,36 +2149,70 @@ export default function ContentPage() {
                   </>
                 )}
 
-                {/* Photo — drag-drop upload, Drive pick, or paste link (staff); view only (client) */}
+                {/* Photos — drag-drop upload (multi), Drive pick, or paste link (staff); view only (client) */}
                 {(() => {
-                  const view = photoOpenUrl(it.photo_drive_url);
+                  const photos = photosOf(it);
                   const isEditingP = editingPhoto[it.id];
-                  const hasImg = !!it.photo_drive_url && !isEditingP;
                   return (
                     <div className="space-y-2">
                       {!isEditingP && (
                         <PhotoDropZone
                           isStaff={isStaff}
                           uploading={uploadingId === it.id}
-                          hasImage={hasImg}
-                          onFile={(f) => uploadImage(it.id, f)}
+                          hasImage={photos.length > 0}
+                          onFiles={(fs) => uploadImages(it.id, fs)}
                         >
-                          {hasImg && (
-                            <a href={view || undefined} target="_blank" rel="noreferrer" className="block rounded-lg overflow-hidden border border-white/10">
-                              <DriveThumb url={it.photo_drive_url} className="w-full h-32 object-cover opacity-80 hover:opacity-100 transition-opacity" />
-                            </a>
+                          {photos.length > 0 && (
+                            <div className="space-y-1.5">
+                              <div className="relative">
+                                <a href={photoOpenUrl(photos[0]) || undefined} target="_blank" rel="noreferrer" className="block rounded-lg overflow-hidden border border-white/10">
+                                  <DriveThumb url={photos[0]} className="w-full h-32 object-cover opacity-80 hover:opacity-100 transition-opacity" />
+                                </a>
+                                {isStaff && (
+                                  <button
+                                    type="button"
+                                    onClick={() => removePhotoAt(it.id, 0)}
+                                    className="absolute top-1 left-1 z-10 w-5 h-5 rounded-full bg-black/60 text-white/80 hover:bg-rose-600 hover:text-white flex items-center justify-center"
+                                    title="Remove this photo"
+                                  >
+                                    <span className="material-symbols-outlined" style={{ fontSize: 13 }}>close</span>
+                                  </button>
+                                )}
+                              </div>
+                              {photos.length > 1 && (
+                                <div className="grid grid-cols-4 gap-1.5">
+                                  {photos.slice(1).map((u, idx) => (
+                                    <div key={`${u}-${idx}`} className="relative">
+                                      <a href={photoOpenUrl(u) || undefined} target="_blank" rel="noreferrer" className="block rounded-md overflow-hidden border border-white/10">
+                                        <DriveThumb url={u} className="w-full h-14 object-cover opacity-80 hover:opacity-100 transition-opacity" />
+                                      </a>
+                                      {isStaff && (
+                                        <button
+                                          type="button"
+                                          onClick={() => removePhotoAt(it.id, idx + 1)}
+                                          className="absolute top-0.5 right-0.5 z-10 w-4 h-4 rounded-full bg-black/60 text-white/80 hover:bg-rose-600 hover:text-white flex items-center justify-center"
+                                          title="Remove this photo"
+                                        >
+                                          <span className="material-symbols-outlined" style={{ fontSize: 11 }}>close</span>
+                                        </button>
+                                      )}
+                                    </div>
+                                  ))}
+                                </div>
+                              )}
+                            </div>
                           )}
                         </PhotoDropZone>
                       )}
                       {isStaff && isEditingP ? (
                         <div className="flex gap-2">
                           <input
-                            value={photoDraft[it.id] ?? it.photo_drive_url ?? ''}
+                            value={photoDraft[it.id] ?? ''}
                             onChange={(e) => setPhotoDraft((d) => ({ ...d, [it.id]: e.target.value }))}
-                            placeholder="Paste Google Drive share link"
+                            placeholder="Paste an image URL or Google Drive share link"
                             className="flex-1 text-[11px] rounded-lg bg-white/5 border border-white/10 p-2 text-white placeholder:text-white/30"
                           />
-                          <button onClick={() => savePhoto(it.id)} className="rounded-lg px-3 py-1 text-[11px] font-semibold bg-emerald-500/80 text-white">Save</button>
+                          <button onClick={() => savePhoto(it.id)} className="rounded-lg px-3 py-1 text-[11px] font-semibold bg-emerald-500/80 text-white">Add</button>
                           <button onClick={() => setEditingPhoto((e) => ({ ...e, [it.id]: false }))} className="rounded-lg px-3 py-1 text-[11px] font-semibold bg-white/10 text-white/80">Cancel</button>
                         </div>
                       ) : isStaff ? (
@@ -2134,14 +2227,20 @@ export default function ContentPage() {
                           </button>
                           <button
                             onClick={() => {
-                              setPhotoDraft((d) => ({ ...d, [it.id]: it.photo_drive_url || '' }));
+                              setPhotoDraft((d) => ({ ...d, [it.id]: '' }));
                               setEditingPhoto((e) => ({ ...e, [it.id]: true }));
                             }}
                             className="text-[10px] font-semibold text-white/40 hover:text-white inline-flex items-center gap-1"
                           >
-                            <span className="material-symbols-outlined" style={{ fontSize: 14 }}>{view ? 'edit' : 'link'}</span>
-                            {view ? 'Edit link' : 'Paste link'}
+                            <span className="material-symbols-outlined" style={{ fontSize: 14 }}>link</span>
+                            {photos.length > 0 ? 'Add link' : 'Paste link'}
                           </button>
+                          {photos.length > 1 && (
+                            <span className="text-[10px] text-white/35 ml-auto inline-flex items-center gap-1">
+                              <span className="material-symbols-outlined" style={{ fontSize: 12 }}>photo_library</span>
+                              {photos.length} photos
+                            </span>
+                          )}
                         </div>
                       ) : null}
                     </div>

@@ -61,6 +61,16 @@ export function mediaFor(url: string | null): string[] {
   return [u];
 }
 
+// Every publishable media URL on a post — the multi-photo list when present
+// (posted as a carousel where the platform supports it), else the legacy
+// single-photo column. Unusable URLs (Drive share links) are filtered out.
+export function mediaForPost(post: { photo_urls?: unknown; photo_drive_url?: string | null }): string[] {
+  const list = Array.isArray(post.photo_urls) && post.photo_urls.length > 0
+    ? post.photo_urls.filter((u): u is string => typeof u === 'string')
+    : [post.photo_drive_url || null];
+  return list.flatMap((u) => mediaFor(u));
+}
+
 // Is this media URL a video? (uploaded videos are named "…-video.<ext>")
 export function isVideoUrl(url: string): boolean {
   return /\.(mp4|mov|m4v|webm|avi|mkv)(\?|$)/i.test(url || '') || /-video\./i.test(url || '');
