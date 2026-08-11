@@ -274,6 +274,8 @@ export default function ContentPage() {
   const [showRedoInput, setShowRedoInput] = useState<Record<string, boolean>>({});
   const [redoGuidance, setRedoGuidance] = useState<Record<string, string>>({});
   const [showAddForm, setShowAddForm] = useState(false);
+  // Quick-add popup opened by clicking an empty calendar day
+  const [showAddModal, setShowAddModal] = useState(false);
   const [sortAsc, setSortAsc] = useState(false); // newest first by default
   // Calendar view: hide past months by default (content is approved ~2 weeks
   // out on a 45-day window, so the current + upcoming months are what matters).
@@ -389,15 +391,13 @@ export default function ContentPage() {
     }
   }
 
-  // Click a calendar day → open the "add post" form prefilled with that date.
+  // Click a calendar day → quick "new post" popup prefilled with that date,
+  // right where you are (no scrolling away from the calendar).
   function openNewPostForDate(iso: string) {
     if (!isStaff) return;
     setNewPost((p) => ({ ...p, post_date: iso }));
     setNewPostPlatforms((prev) => (prev.length ? prev : ['Instagram']));
-    setShowAddForm(true);
-    setTimeout(() => {
-      document.getElementById('add-post-form')?.scrollIntoView({ behavior: 'smooth', block: 'center' });
-    }, 60);
+    setShowAddModal(true);
   }
 
   // Crossing over from the calendar modal to cards view scrolls to the chosen
@@ -789,6 +789,7 @@ export default function ContentPage() {
     setNewPost({ post_date: '', platform: 'Instagram', content_type: 'Post', title: '', caption: '' });
     setNewPostPlatforms(['Instagram']);
     setShowAddForm(false);
+    setShowAddModal(false);
     // Refresh
     const listRes = await fetch(`/api/content-calendar?client=${encodeURIComponent(activeClient.name)}`);
     const listData = await listRes.json();
@@ -1354,6 +1355,93 @@ export default function ContentPage() {
           >
             Add Post
           </button>
+        </div>
+      )}
+
+      {/* Quick-add popup — opened by clicking an empty day on the calendar */}
+      {isStaff && showAddModal && (
+        <div className="fixed inset-0 bg-black/60 flex items-center justify-center p-4 z-50" onClick={() => setShowAddModal(false)}>
+          <div
+            className="max-w-lg w-full rounded-2xl p-6 space-y-3"
+            style={{ background: 'rgba(15,31,46,0.97)', border: '1px solid rgba(255,255,255,0.15)', backdropFilter: 'blur(24px)' }}
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="flex items-center justify-between">
+              <div className="text-white font-bold text-base flex items-center gap-2">
+                <span className="material-symbols-outlined" style={{ fontSize: 20, color: '#4ab8ce' }}>add_circle</span>
+                New post{newPost.post_date ? ` — ${fmtDate(newPost.post_date)}` : ''}
+              </div>
+              <button onClick={() => setShowAddModal(false)} className="text-white/40 hover:text-white">
+                <span className="material-symbols-outlined">close</span>
+              </button>
+            </div>
+            <div className="grid grid-cols-2 gap-2">
+              <input
+                type="date"
+                value={newPost.post_date}
+                onChange={(e) => setNewPost({ ...newPost, post_date: e.target.value })}
+                className="text-[12px] px-3 py-2 rounded-xl bg-white/5 border border-white/15 text-white outline-none"
+              />
+              <select
+                value={newPost.content_type}
+                onChange={(e) => setNewPost({ ...newPost, content_type: e.target.value })}
+                className="text-[12px] px-3 py-2 rounded-xl bg-white/5 border border-white/15 text-white outline-none"
+              >
+                {CONTENT_TYPES.map((t) => <option key={t} value={t} className="bg-slate-800">{t}</option>)}
+              </select>
+            </div>
+            <div>
+              <div className="text-[10px] font-bold uppercase tracking-wider text-white/50 mb-1.5">Platforms</div>
+              <div className="flex flex-wrap gap-1.5">
+                {PLATFORMS.map((p) => {
+                  const selected = newPostPlatforms.includes(p);
+                  return (
+                    <button
+                      key={p}
+                      type="button"
+                      onClick={() => setNewPostPlatforms((prev) => (selected ? prev.filter((x) => x !== p) : [...prev, p]))}
+                      className={`text-[10px] font-semibold px-2.5 py-1 rounded-lg border transition-colors ${
+                        selected ? 'bg-white/15 text-white border-white/30' : 'bg-white/5 text-white/40 border-white/10 hover:border-white/20'
+                      }`}
+                    >
+                      {selected && <span className="mr-1">✓</span>}{p}
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+            <input
+              type="text"
+              autoFocus
+              placeholder="Post title..."
+              value={newPost.title}
+              onChange={(e) => setNewPost({ ...newPost, title: e.target.value })}
+              onKeyDown={(e) => { if (e.key === 'Enter' && newPost.title.trim()) addPost(); }}
+              className="w-full text-[13px] px-3 py-2 rounded-xl bg-white/5 border border-white/15 text-white outline-none placeholder:text-white/30"
+            />
+            <textarea
+              placeholder="Caption (optional — leave blank to write with AI later)..."
+              value={newPost.caption}
+              onChange={(e) => setNewPost({ ...newPost, caption: e.target.value })}
+              rows={3}
+              className="w-full text-[12px] px-3 py-2 rounded-xl bg-white/5 border border-white/15 text-white outline-none placeholder:text-white/30"
+            />
+            <div className="flex gap-2">
+              <button
+                onClick={addPost}
+                className="text-[12px] font-bold px-5 py-2 rounded-xl text-white"
+                style={{ background: 'linear-gradient(135deg, #0c6da4, #4ab8ce)' }}
+              >
+                Add Post
+              </button>
+              <button
+                onClick={() => setShowAddModal(false)}
+                className="text-[12px] font-semibold px-4 py-2 rounded-xl bg-white/5 text-white/60 border border-white/10"
+              >
+                Cancel
+              </button>
+            </div>
+          </div>
         </div>
       )}
 
