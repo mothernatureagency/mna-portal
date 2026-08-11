@@ -530,8 +530,8 @@ export default function ContentPage() {
     catch (e: any) { alert(e.message); }
   }
 
-  // Drive folder is stored per-client in localStorage. Survives reloads on the
-  // same browser. Persist to DB later if cross-device sync becomes a need.
+  // Drive folder is stored per-client in the DB (client_kv) so it follows
+  // staff across browsers/devices; localStorage doubles as an instant cache.
   function folderStorageKey(clientName: string) {
     return `mna_drive_folder:${clientName}`;
   }
@@ -542,7 +542,14 @@ export default function ContentPage() {
       const saved = localStorage.getItem(folderStorageKey(activeClient.name)) || '';
       setDriveFolderUrl(saved);
     } catch { setDriveFolderUrl(''); }
-  }, [activeClient?.name]);
+    // DB copy wins over the local cache when present.
+    if (activeClient?.id) {
+      fetch(`/api/client-kv?clientId=${encodeURIComponent(activeClient.id)}&key=drive_folder_url`)
+        .then((r) => r.json())
+        .then((d) => { if (typeof d.value === 'string' && d.value) setDriveFolderUrl(d.value); })
+        .catch(() => {});
+    }
+  }, [activeClient?.name, activeClient?.id]);
 
   function saveDriveFolderUrl(value: string) {
     setDriveFolderUrl(value);
@@ -551,18 +558,17 @@ export default function ContentPage() {
       if (value) localStorage.setItem(folderStorageKey(activeClient.name), value);
       else localStorage.removeItem(folderStorageKey(activeClient.name));
     } catch {}
+    if (activeClient?.id) {
+      fetch('/api/client-kv', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ clientId: activeClient.id, key: 'drive_folder_url', value: value || null }),
+      }).catch(() => {});
+    }
   }
 
-  async function openDrivePicker(postId: string) {
-    const folderId = extractFolderId(driveFolderUrl);
-    if (!folderId) {
-      setEditingFolder(true);
-      alert('Set the client Drive folder first (look for "Drive Library" at the top).');
-      return;
-    }
-    setPickerForId(postId);
+  async function loadPickerFiles(folderId: string) {
     setPickerError(null);
-    setPickerQuery('');
     setPickerLoading(true);
     setPickerFiles([]);
     try {
@@ -575,6 +581,17 @@ export default function ContentPage() {
     } finally {
       setPickerLoading(false);
     }
+  }
+
+  async function openDrivePicker(postId: string) {
+    setPickerForId(postId);
+    setPickerError(null);
+    setPickerQuery('');
+    setPickerFiles([]);
+    const folderId = extractFolderId(driveFolderUrl);
+    // No folder yet → the picker modal shows an inline folder prompt instead
+    // of a dead-end alert.
+    if (folderId) await loadPickerFiles(folderId);
   }
 
   async function attachDriveFile(postId: string, file: DriveFile) {
@@ -1594,6 +1611,24 @@ export default function ContentPage() {
                       <div className="rounded-t-2xl overflow-hidden">{gallery}</div>
                     )
                   )}
+                  {isStaff && (
+                    <div className="px-6 pt-4 -mb-1 flex items-center gap-3">
+                      <button
+                        onClick={() => openDrivePicker(activeItem.id)}
+                        className="text-[11px] font-semibold text-white/70 hover:text-white inline-flex items-center gap-1 px-2.5 py-1.5 rounded-lg bg-white/5 border border-white/10 hover:bg-white/10"
+                        title="Pick a file from the client's Drive folder"
+                      >
+                        <span className="material-symbols-outlined" style={{ fontSize: 14 }}>folder_open</span>
+                        Pick from Drive
+                      </button>
+                      {photos.length > 1 && (
+                        <span className="text-[10px] text-white/35 inline-flex items-center gap-1">
+                          <span className="material-symbols-outlined" style={{ fontSize: 12 }}>photo_library</span>
+                          {photos.length} photos
+                        </span>
+                      )}
+                    </div>
+                  )}
                   {pdm && (
                     <div className="px-6 pt-5">
                       <div className="rounded-xl p-3 flex items-center gap-2"
@@ -1936,7 +1971,7 @@ export default function ContentPage() {
                 <div>
                   <div className="text-white font-bold text-sm">Pick from Drive</div>
                   <div className="text-white/50 text-[11px]">
-                    {pickerLoading ? 'Loading…' : `${pickerFiles.length} files in folder`}
+                    {!extractFolderId(driveFolderUrl) ? 'Set the client folder below' : pickerLoading ? 'Loading…' : `${pickerFiles.length} files in folder`}
                   </div>
                 </div>
               </div>
@@ -1944,6 +1979,41 @@ export default function ContentPage() {
                 <span className="material-symbols-outlined">close</span>
               </button>
             </div>
+            {!extractFolderId(driveFolderUrl) ? (
+              <div className="p-6 space-y-3">
+                <div className="text-white/75 text-[13px] font-semibold">
+                  Paste {activeClient?.shortName || 'the client'}&apos;s Google Drive folder link to browse it here.
+                </div>
+                <div className="text-white/45 text-[11px]">
+                  This is saved once per client, so next time the picker opens straight to the folder. In Drive, open the folder → click <b>Share → Copy link</b> (or copy the address bar URL).
+                </div>
+                <div className="flex gap-2">
+                  <input
+                    type="text"
+                    value={driveFolderUrl}
+                    onChange={(e) => setDriveFolderUrl(e.target.value)}
+                    onKeyDown={(e) => { if (e.key === 'Enter') { const fid = extractFolderId(driveFolderUrl); if (fid) { saveDriveFolderUrl(driveFolderUrl); loadPickerFiles(fid); } } }}
+                    placeholder="https://drive.google.com/drive/folders/…"
+                    autoFocus
+                    className="flex-1 text-[12px] px-3 py-2 rounded-lg bg-white/5 border border-white/15 text-white outline-none placeholder:text-white/30"
+                  />
+                  <button
+                    onClick={() => {
+                      const fid = extractFolderId(driveFolderUrl);
+                      if (!fid) { setPickerError('That doesn’t look like a Drive folder link — it should contain /folders/.'); return; }
+                      saveDriveFolderUrl(driveFolderUrl);
+                      loadPickerFiles(fid);
+                    }}
+                    className="text-[12px] font-bold px-4 py-2 rounded-lg text-white"
+                    style={{ background: 'linear-gradient(135deg, #0c6da4, #4ab8ce)' }}
+                  >
+                    Save &amp; browse
+                  </button>
+                </div>
+                {pickerError && <div className="text-rose-300 text-[12px]">{pickerError}</div>}
+              </div>
+            ) : (
+            <>
             <div className="p-3 border-b border-white/10">
               <input
                 type="text"
@@ -2002,6 +2072,8 @@ export default function ContentPage() {
                 </div>
               )}
             </div>
+            </>
+            )}
           </div>
         </div>
       )}

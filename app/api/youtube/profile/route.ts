@@ -5,24 +5,27 @@ export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
 
 /**
- * YouTube channel stats fetcher via YouTube Data API v3 (public data only,
- * no OAuth required).
+ * YouTube channel stats fetcher (public data only, no OAuth, no access to
+ * the client's account needed).
+ *
+ * Two data sources, tried in order:
+ *  1. YouTube Data API v3 — if YOUTUBE_API_KEY is set (most accurate, free).
+ *  2. Apify scraper — if APIFY_TOKEN is set (the same token TikTok analytics
+ *     already uses), scrapes the public channel page instead. Zero Google
+ *     setup required.
  *
  * GET /api/youtube/profile?check=1
- *   Returns whether YOUTUBE_API_KEY is set.
+ *   Returns whether either source is configured.
  *
  * GET /api/youtube/profile?handle=@mrbeast&ownerKey=prime-iv
- *   Resolves handle → channel → uploads playlist → latest videos with stats.
- *   Snapshots subscriber/view counts daily and returns velocity from history.
- *
- * Setup: in Google Cloud Console, enable "YouTube Data API v3" on the same
- * project that already provides GOOGLE_PLACES_API_KEY, create an API key,
- * and put it in YOUTUBE_API_KEY env var. ~3 quota units per refresh; 10k/day
- * free quota covers ~3,300 refreshes.
+ *   Resolves handle → channel + latest videos with stats. Snapshots
+ *   subscriber/view counts daily and returns velocity from history.
  */
 
 const YT_KEY = process.env.YOUTUBE_API_KEY;
 const YT = 'https://youtube.googleapis.com/youtube/v3';
+// Same Apify account TikTok analytics uses — either env var name works.
+const APIFY_TOKEN = process.env.APIFY_TOKEN || process.env.APIFY_KEY;
 
 function normalizeHandle(input: string): { handle?: string; channelId?: string } {
   const s = (input || '').trim();
@@ -140,15 +143,93 @@ async function fetchRecentVideos(uploadsPlaylistId: string): Promise<Video[]> {
   }));
 }
 
+// Parse numbers that may arrive as strings with separators ("1,234,567").
+function numFrom(v: unknown): number {
+  if (typeof v === 'number') return Number.isFinite(v) ? v : 0;
+  const digits = String(v ?? '').replace(/[^\d]/g, '');
+  return digits ? Number(digits) : 0;
+}
+
+/**
+ * Scrape the public channel page via Apify's YouTube scraper — no Google
+ * key needed. Item fields vary a little between actor versions, so every
+ * read is defensive with fallbacks.
+ */
+async function fetchViaApify({ handle, channelId }: { handle?: string; channelId?: string }):
+  Promise<{ ch: ChannelLookup; videos: Video[] } | { error: string }> {
+  const channelUrl = channelId
+    ? `https://www.youtube.com/channel/${channelId}`
+    : `https://www.youtube.com/@${handle}`;
+  try {
+    const r = await fetch(
+      `https://api.apify.com/v2/acts/streamers~youtube-scraper/run-sync-get-dataset-items?token=${APIFY_TOKEN}&timeout=180`,
+      {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          startUrls: [{ url: channelUrl }],
+          maxResults: 20,
+          maxResultsShorts: 0,
+          maxResultStreams: 0,
+        }),
+      },
+    );
+    if (!r.ok) {
+      const txt = await r.text();
+      return { error: `Apify returned ${r.status}: ${txt.slice(0, 300)}` };
+    }
+    const items: any[] = await r.json().catch(() => []);
+    if (!Array.isArray(items) || items.length === 0) {
+      return { error: 'No videos returned — the handle may be wrong or the channel has no public videos.' };
+    }
+    const first = items.find((i) => i?.channelName || i?.numberOfSubscribers != null) || items[0];
+    const chId = first.channelId
+      || String(first.channelUrl || '').match(/channel\/(UC[A-Za-z0-9_-]{20,})/)?.[1]
+      || channelId || '';
+    const ch: ChannelLookup = {
+      channelId: chId,
+      title: first.channelName || first.channelTitle || handle || '',
+      description: first.channelDescription || '',
+      thumbnail: first.channelAvatarUrl || first.avatarUrl || null,
+      subscribers: numFrom(first.numberOfSubscribers ?? first.subscriberCount),
+      totalViews: numFrom(first.channelTotalViews),
+      videosCount: numFrom(first.channelTotalVideos) || items.length,
+      uploadsPlaylistId: null,
+      customUrl: first.channelUsername ? `@${String(first.channelUsername).replace(/^@/, '')}` : null,
+    };
+    const videos: Video[] = items
+      .filter((v) => v?.id || v?.url)
+      .map((v) => ({
+        id: v.id || String(v.url || '').match(/[?&]v=([\w-]{6,})/)?.[1] || '',
+        title: v.title || '',
+        description: v.text || v.description || '',
+        publishedAt: v.date || null,
+        thumbnail: v.thumbnailUrl || null,
+        url: v.url || (v.id ? `https://www.youtube.com/watch?v=${v.id}` : ''),
+        views: numFrom(v.viewCount),
+        likes: numFrom(v.likes),
+        comments: numFrom(v.commentsCount),
+        durationISO: null,
+      }))
+      .filter((v) => v.url);
+    return { ch, videos };
+  } catch (e: any) {
+    return { error: e?.message || 'Apify request failed' };
+  }
+}
+
 export async function GET(req: NextRequest) {
   await ensureSchema();
   if (req.nextUrl.searchParams.get('check') === '1') {
+    const configured = !!(YT_KEY || APIFY_TOKEN);
     return NextResponse.json({
-      configured: !!YT_KEY,
-      error: YT_KEY ? null : 'YOUTUBE_API_KEY not set. Enable YouTube Data API v3 in Google Cloud, create an API key, and add it as YOUTUBE_API_KEY in Vercel.',
+      configured,
+      error: configured ? null : 'Add APIFY_TOKEN (the same key TikTok analytics uses) or a free YOUTUBE_API_KEY to Vercel env vars.',
     });
   }
-  if (!YT_KEY) return NextResponse.json({ error: 'YOUTUBE_API_KEY not set in env vars' }, { status: 500 });
+  if (!YT_KEY && !APIFY_TOKEN) {
+    return NextResponse.json({ error: 'Neither YOUTUBE_API_KEY nor APIFY_TOKEN is set in env vars' }, { status: 500 });
+  }
 
   const handleRaw = req.nextUrl.searchParams.get('handle');
   const ownerKey = req.nextUrl.searchParams.get('ownerKey');
@@ -157,19 +238,35 @@ export async function GET(req: NextRequest) {
   const { handle, channelId } = normalizeHandle(handleRaw);
   if (!handle && !channelId) return NextResponse.json({ error: 'Could not parse handle' }, { status: 400 });
 
-  const chRes = await fetchChannel({ handle, channelId });
-  if ('error' in chRes) {
-    // Return history if scrape failed so the UI still shows trend data.
-    const { rows } = await query(
-      `select snapshot_date, subscribers, total_views, videos_count, top_videos
-         from youtube_snapshots where owner_key = $1 order by snapshot_date desc limit 30`,
-      [ownerKey],
-    );
-    return NextResponse.json({ error: chRes.error, history: rows }, { status: 500 });
+  // Official API when a Google key exists, else scrape the public page.
+  let ch: ChannelLookup;
+  let videos: Video[];
+  if (YT_KEY) {
+    const chRes = await fetchChannel({ handle, channelId });
+    if ('error' in chRes) {
+      // Return history if the lookup failed so the UI still shows trend data.
+      const { rows } = await query(
+        `select snapshot_date, subscribers, total_views, videos_count, top_videos
+           from youtube_snapshots where owner_key = $1 order by snapshot_date desc limit 30`,
+        [ownerKey],
+      );
+      return NextResponse.json({ error: chRes.error, history: rows }, { status: 500 });
+    }
+    ch = chRes;
+    videos = ch.uploadsPlaylistId ? await fetchRecentVideos(ch.uploadsPlaylistId) : [];
+  } else {
+    const scraped = await fetchViaApify({ handle, channelId });
+    if ('error' in scraped) {
+      const { rows } = await query(
+        `select snapshot_date, subscribers, total_views, videos_count, top_videos
+           from youtube_snapshots where owner_key = $1 order by snapshot_date desc limit 30`,
+        [ownerKey],
+      );
+      return NextResponse.json({ error: scraped.error, history: rows }, { status: 500 });
+    }
+    ch = scraped.ch;
+    videos = scraped.videos;
   }
-  const ch: ChannelLookup = chRes;
-
-  const videos = ch.uploadsPlaylistId ? await fetchRecentVideos(ch.uploadsPlaylistId) : [];
   const top = [...videos].sort((a, b) => b.views - a.views).slice(0, 10);
 
   // Daily snapshot upsert
