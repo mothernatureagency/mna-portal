@@ -181,15 +181,14 @@ export default function YouTubeAnalytics({
             <div className="flex-1 min-w-0">
               <div className="text-[13px] font-bold text-amber-100">YouTube needs one setup step (MNA-side, one time)</div>
               <div className="text-[11px] text-white/75 mt-1 leading-relaxed">
-                This is <b>MNA&apos;s own free Google key</b> — you do <b>not</b> need the client&apos;s YouTube login.
-                It reads public channel stats for any @handle. Add <code className="text-white font-bold">YOUTUBE_API_KEY</code> to
-                Vercel env vars once and it works for every client.
+                No client login needed — this reads <b>public</b> channel stats for any @handle, just like TikTok.
+                Easiest: add <code className="text-white font-bold">APIFY_TOKEN</code> to Vercel (the same key TikTok
+                analytics uses — if TikTok already works, it&apos;s already there and this banner shouldn&apos;t appear).
               </div>
-              <ol className="text-[11px] text-white/70 mt-2 space-y-0.5 list-decimal ml-4">
-                <li>console.cloud.google.com (any MNA Google account) → enable <b>YouTube Data API v3</b></li>
-                <li>Credentials → Create credentials → <b>API key</b> (free, no OAuth)</li>
-                <li>Add as <b>YOUTUBE_API_KEY</b> in Vercel env vars (all 3 environments), redeploy</li>
-              </ol>
+              <div className="text-[11px] text-white/60 mt-2 leading-relaxed">
+                Alternative: a free Google key — console.cloud.google.com → enable <b>YouTube Data API v3</b> →
+                Credentials → Create <b>API key</b> → add as <b>YOUTUBE_API_KEY</b> in Vercel (all 3 environments), redeploy.
+              </div>
             </div>
           </div>
         </div>
