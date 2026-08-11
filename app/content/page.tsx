@@ -301,6 +301,21 @@ export default function ContentPage() {
   const [pickerError, setPickerError] = useState<string | null>(null);
   const [pickerQuery, setPickerQuery] = useState('');
   const [newPost, setNewPost] = useState({ post_date: '', platform: 'Instagram', content_type: 'Post', title: '', caption: '' });
+  // Monthly Specials Planner — enter the month's specials, AI drafts the plan
+  const [showPlanner, setShowPlanner] = useState(false);
+  const [planMonth, setPlanMonth] = useState(() => {
+    const d = new Date();
+    return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
+  });
+  const [planSpecials, setPlanSpecials] = useState('');
+  const [planPerWeek, setPlanPerWeek] = useState(3);
+  const [planDays, setPlanDays] = useState<Set<string>>(new Set());
+  const [planResearch, setPlanResearch] = useState(false);
+  const [planning, setPlanning] = useState(false);
+  const [planError, setPlanError] = useState<string | null>(null);
+  const [planPreview, setPlanPreview] = useState<any[] | null>(null);
+  const [planChecked, setPlanChecked] = useState<Set<number>>(new Set());
+  const [planAdding, setPlanAdding] = useState(false);
   // Cross-post: push one post (or a whole filtered batch) to other Prime IV locations
   const [crossPostId, setCrossPostId] = useState<string | null>(null);
   const [crossPostTargets, setCrossPostTargets] = useState<string[]>([]);
@@ -695,6 +710,64 @@ export default function ContentPage() {
     } catch (e: any) { alert(e.message); }
   }
 
+  // ── Monthly Specials Planner ─────────────────────────────────────
+  async function generatePlan() {
+    if (!activeClient?.name) return;
+    setPlanning(true);
+    setPlanError(null);
+    try {
+      const res = await fetch('/api/content-calendar/plan-month', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          clientName: activeClient.name,
+          clientId: activeClient.id,
+          month: planMonth,
+          specials: planSpecials,
+          postsPerWeek: planPerWeek,
+          selectedDays: Array.from(planDays),
+          research: planResearch,
+        }),
+      });
+      const d = await res.json();
+      if (!res.ok) throw new Error(d.error || 'Planning failed');
+      setPlanPreview(d.items || []);
+      setPlanChecked(new Set((d.items || []).map((_: unknown, i: number) => i)));
+    } catch (e: any) {
+      setPlanError(e.message);
+    } finally {
+      setPlanning(false);
+    }
+  }
+
+  async function addPlannedPosts() {
+    if (!activeClient?.name || !planPreview) return;
+    const chosen = planPreview.filter((_, i) => planChecked.has(i));
+    if (chosen.length === 0) return;
+    setPlanAdding(true);
+    try {
+      const res = await fetch('/api/content-calendar', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ clientName: activeClient.name, items: chosen }),
+      });
+      const d = await res.json();
+      if (!res.ok) throw new Error(d.error || 'Could not add posts');
+      setPlanPreview(null);
+      setPlanDays(new Set());
+      setPlanSpecials('');
+      setShowPlanner(false);
+      const listRes = await fetch(`/api/content-calendar?client=${encodeURIComponent(activeClient.name)}`);
+      const listData = await listRes.json();
+      setItems(listData.items || []);
+      alert(`Added ${d.count} post${d.count === 1 ? '' : 's'} to the calendar.${d.skipped ? ` (${d.skipped} duplicates skipped.)` : ''}`);
+    } catch (e: any) {
+      alert(e.message);
+    } finally {
+      setPlanAdding(false);
+    }
+  }
+
   async function addPost() {
     if (!newPost.post_date || newPostPlatforms.length === 0 || !newPost.title) { alert('Date, at least one platform, and title are required'); return; }
     // Create one row per selected platform so each shows independently in the calendar
@@ -864,6 +937,13 @@ export default function ContentPage() {
 
   const activeItem = items.find((i) => i.id === activeId) || null;
 
+  // Days in the planner's month that already have posts (planner fills around).
+  const planTakenDays = useMemo(() => {
+    const s = new Set<string>();
+    items.forEach((i) => { if (monthKey(i.post_date) === planMonth) s.add(i.post_date); });
+    return s;
+  }, [items, planMonth]);
+
   return (
     <div className="flex flex-col gap-6">
       <div className="flex items-center justify-between">
@@ -1029,6 +1109,185 @@ export default function ContentPage() {
               >+ Add custom field</button>
             </div>
           )}
+        </div>
+      )}
+
+      {/* Monthly Specials Planner — specials in, AI month plan out (staff) */}
+      {isStaff && (
+        <div className="glass-card p-3" style={{ borderLeft: '3px solid #4ab8ce' }}>
+          <button onClick={() => setShowPlanner((s) => !s)} className="w-full flex items-center gap-2 text-left">
+            <span className="material-symbols-outlined text-cyan-300 shrink-0" style={{ fontSize: 18 }}>auto_awesome</span>
+            <span className="text-[12px] font-semibold text-white/80">Monthly Specials Planner</span>
+            <span className="text-[11px] text-white/45">— enter the month&apos;s specials and AI drafts the whole calendar around them</span>
+            <span className="ml-auto text-white/40 text-[11px]">{showPlanner ? '▲' : '▼'}</span>
+          </button>
+          {showPlanner && (
+            <div className="mt-4 space-y-4">
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+                <label className="flex flex-col gap-1">
+                  <span className="text-[10px] font-bold uppercase tracking-wider text-white/50">Month</span>
+                  <input
+                    type="month"
+                    value={planMonth}
+                    onChange={(e) => { setPlanMonth(e.target.value); setPlanDays(new Set()); }}
+                    className="text-[12px] px-3 py-2 rounded-xl bg-white/5 border border-white/15 text-white outline-none"
+                  />
+                </label>
+                <label className="flex flex-col gap-1">
+                  <span className="text-[10px] font-bold uppercase tracking-wider text-white/50">Posts per week {planDays.size > 0 && <span className="text-white/35 normal-case">(ignored — you picked days)</span>}</span>
+                  <select
+                    value={planPerWeek}
+                    onChange={(e) => setPlanPerWeek(Number(e.target.value))}
+                    disabled={planDays.size > 0}
+                    className="text-[12px] px-3 py-2 rounded-xl bg-white/5 border border-white/15 text-white outline-none disabled:opacity-40"
+                  >
+                    {[1, 2, 3, 4, 5, 6, 7].map((n) => <option key={n} value={n} className="bg-slate-800">{n} / week</option>)}
+                  </select>
+                </label>
+                <label className="flex items-end gap-2 pb-2 text-[11px] text-white/70 cursor-pointer">
+                  <input type="checkbox" checked={planResearch} onChange={(e) => setPlanResearch(e.target.checked)} className="accent-cyan-400" />
+                  Pull extra ideas from the website &amp; past posts
+                </label>
+              </div>
+              <label className="flex flex-col gap-1">
+                <span className="text-[10px] font-bold uppercase tracking-wider text-white/50">Specials &amp; promos this month</span>
+                <textarea
+                  value={planSpecials}
+                  onChange={(e) => setPlanSpecials(e.target.value)}
+                  rows={3}
+                  placeholder={'e.g. 20% off NAD+ drips all month · Buy 2 get 1 free memberships week of the 15th · Mother’s Day gift cards'}
+                  className="w-full text-[12px] px-3 py-2 rounded-xl bg-white/5 border border-white/15 text-white outline-none placeholder:text-white/25 leading-relaxed"
+                />
+              </label>
+              <div>
+                <div className="text-[10px] font-bold uppercase tracking-wider text-white/50 mb-1.5">
+                  Post days <span className="text-white/35 normal-case font-semibold">(optional — click days to hand-pick; leave blank and it spreads {planPerWeek}/week around existing posts)</span>
+                </div>
+                <div className="grid grid-cols-7 gap-1 max-w-md">
+                  {['S', 'M', 'T', 'W', 'T', 'F', 'S'].map((w, i) => (
+                    <div key={`${w}-${i}`} className="text-[9px] font-bold text-white/35 text-center">{w}</div>
+                  ))}
+                  {Array.from({ length: firstWeekday(planMonth) }).map((_, i) => <div key={`pp-${i}`} />)}
+                  {Array.from({ length: daysInMonth(planMonth) }).map((_, i) => {
+                    const day = i + 1;
+                    const iso = `${planMonth}-${String(day).padStart(2, '0')}`;
+                    const picked = planDays.has(iso);
+                    const taken = planTakenDays.has(iso);
+                    return (
+                      <button
+                        key={iso}
+                        type="button"
+                        onClick={() => setPlanDays((prev) => { const n = new Set(prev); if (n.has(iso)) n.delete(iso); else n.add(iso); return n; })}
+                        className={`h-8 rounded-lg text-[10px] font-bold border transition-colors relative ${
+                          picked
+                            ? 'bg-cyan-500/40 text-white border-cyan-300/60'
+                            : 'bg-white/5 text-white/50 border-white/10 hover:border-white/25'
+                        }`}
+                        title={taken ? 'Already has a post — the plan works around it' : picked ? 'Selected for a new post' : 'Click to post on this day'}
+                      >
+                        {day}
+                        {taken && <span className="absolute bottom-0.5 left-1/2 -translate-x-1/2 w-1 h-1 rounded-full bg-amber-300" />}
+                      </button>
+                    );
+                  })}
+                </div>
+                {planTakenDays.size > 0 && (
+                  <div className="text-[10px] text-white/40 mt-1.5">
+                    <span className="inline-block w-1.5 h-1.5 rounded-full bg-amber-300 mr-1 align-middle" />
+                    {planTakenDays.size} day{planTakenDays.size === 1 ? '' : 's'} already {planTakenDays.size === 1 ? 'has' : 'have'} posts — the plan fills around them and won&apos;t duplicate topics.
+                  </div>
+                )}
+              </div>
+              {planError && <div className="text-[12px] text-rose-300 bg-rose-500/10 border border-rose-500/30 rounded-lg p-2.5">{planError}</div>}
+              <button
+                onClick={generatePlan}
+                disabled={planning || (!planSpecials.trim() && !planResearch)}
+                className="text-[12px] font-bold px-5 py-2 rounded-xl text-white disabled:opacity-40 inline-flex items-center gap-1.5"
+                style={{ background: 'linear-gradient(135deg, #0c6da4, #4ab8ce)' }}
+              >
+                <span className="material-symbols-outlined" style={{ fontSize: 15 }}>auto_awesome</span>
+                {planning ? 'Planning the month…' : 'Generate plan'}
+              </button>
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* Planner preview — review the AI plan before it hits the calendar */}
+      {isStaff && planPreview && (
+        <div className="fixed inset-0 bg-black/60 flex items-center justify-center p-4 z-50" onClick={() => !planAdding && setPlanPreview(null)}>
+          <div
+            className="max-w-3xl w-full max-h-[88vh] flex flex-col rounded-2xl"
+            style={{ background: 'rgba(15,31,46,0.97)', border: '1px solid rgba(74,184,206,0.4)', backdropFilter: 'blur(24px)' }}
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="flex items-center justify-between p-5 border-b border-white/10">
+              <div className="text-white font-bold text-base flex items-center gap-2">
+                <span className="material-symbols-outlined text-cyan-300" style={{ fontSize: 20 }}>auto_awesome</span>
+                Proposed plan — {formatMonth(planMonth)}
+              </div>
+              <button onClick={() => setPlanPreview(null)} className="text-white/40 hover:text-white">
+                <span className="material-symbols-outlined">close</span>
+              </button>
+            </div>
+            <div className="text-[11px] text-white/50 px-5 pt-3">
+              Untick anything you don&apos;t want, then add the rest to the calendar as drafts. Nothing is visible to the client until you push it.
+            </div>
+            <div className="flex-1 overflow-y-auto p-5 space-y-2">
+              {planPreview.map((p, i) => {
+                const on = planChecked.has(i);
+                const parsed = parseTitle(p.title);
+                return (
+                  <label
+                    key={`${p.post_date}-${i}`}
+                    className={`flex gap-3 items-start rounded-xl border p-3 cursor-pointer transition-colors ${on ? 'bg-white/8 border-cyan-300/30' : 'bg-white/3 border-white/10 opacity-50'}`}
+                  >
+                    <input
+                      type="checkbox"
+                      checked={on}
+                      onChange={() => setPlanChecked((prev) => { const n = new Set(prev); if (n.has(i)) n.delete(i); else n.add(i); return n; })}
+                      className="mt-1 accent-cyan-400"
+                    />
+                    <div className="min-w-0 flex-1">
+                      <div className="flex items-center gap-2 flex-wrap">
+                        <span className="text-[11px] font-bold uppercase tracking-wider text-white/50">{fmtDate(p.post_date)}</span>
+                        <span className="text-[10px] px-1.5 py-0.5 rounded bg-white/10 text-white/70">{p.platform}</span>
+                        {p.content_type && <span className="text-[10px] px-1.5 py-0.5 rounded bg-white/10 text-white/70">{p.content_type}</span>}
+                        {parsed.phase && <span className="text-[9px] px-1.5 py-0.5 rounded-full bg-cyan-500/15 text-cyan-200 font-bold uppercase tracking-wider">{parsed.phase}</span>}
+                      </div>
+                      <div className="text-[13px] font-bold text-white mt-1">{parsed.title}</div>
+                      {parsed.hook && <div className="text-[11px] text-amber-200/80 mt-0.5">Hook: {parsed.hook}</div>}
+                      {p.caption && <div className="text-[11px] text-white/55 mt-1 line-clamp-2 whitespace-pre-wrap">{p.caption}</div>}
+                    </div>
+                  </label>
+                );
+              })}
+            </div>
+            <div className="p-4 border-t border-white/10 flex gap-2 flex-wrap">
+              <button
+                onClick={addPlannedPosts}
+                disabled={planAdding || planChecked.size === 0}
+                className="text-[13px] font-bold px-5 py-2.5 rounded-xl text-white disabled:opacity-40"
+                style={{ background: 'linear-gradient(135deg, #0c6da4, #4ab8ce)' }}
+              >
+                {planAdding ? 'Adding…' : `Add ${planChecked.size} post${planChecked.size === 1 ? '' : 's'} to calendar`}
+              </button>
+              <button
+                onClick={generatePlan}
+                disabled={planning || planAdding}
+                className="text-[12px] font-semibold px-4 py-2.5 rounded-xl bg-white/5 text-white/70 border border-white/10 hover:bg-white/10 disabled:opacity-40"
+              >
+                {planning ? 'Regenerating…' : '↻ Regenerate'}
+              </button>
+              <button
+                onClick={() => setPlanPreview(null)}
+                disabled={planAdding}
+                className="text-[12px] font-semibold px-4 py-2.5 rounded-xl bg-white/5 text-white/50 border border-white/10"
+              >
+                Discard
+              </button>
+            </div>
+          </div>
         </div>
       )}
 
