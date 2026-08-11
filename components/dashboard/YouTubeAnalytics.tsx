@@ -179,14 +179,16 @@ export default function YouTubeAnalytics({
           <div className="flex items-start gap-3">
             <span className="material-symbols-outlined text-amber-300" style={{ fontSize: 22 }}>settings</span>
             <div className="flex-1 min-w-0">
-              <div className="text-[13px] font-bold text-amber-100">YouTube needs one setup step</div>
+              <div className="text-[13px] font-bold text-amber-100">YouTube needs one setup step (MNA-side, one time)</div>
               <div className="text-[11px] text-white/75 mt-1 leading-relaxed">
-                Add <code className="text-white font-bold">YOUTUBE_API_KEY</code> to Vercel env vars and redeploy, then come back.
+                This is <b>MNA&apos;s own free Google key</b> — you do <b>not</b> need the client&apos;s YouTube login.
+                It reads public channel stats for any @handle. Add <code className="text-white font-bold">YOUTUBE_API_KEY</code> to
+                Vercel env vars once and it works for every client.
               </div>
               <ol className="text-[11px] text-white/70 mt-2 space-y-0.5 list-decimal ml-4">
-                <li>Google Cloud → enable <b>YouTube Data API v3</b> on your project</li>
-                <li>Credentials → Create API key</li>
-                <li>Add as <b>YOUTUBE_API_KEY</b> in Vercel env vars (all 3 environments)</li>
+                <li>console.cloud.google.com (any MNA Google account) → enable <b>YouTube Data API v3</b></li>
+                <li>Credentials → Create credentials → <b>API key</b> (free, no OAuth)</li>
+                <li>Add as <b>YOUTUBE_API_KEY</b> in Vercel env vars (all 3 environments), redeploy</li>
               </ol>
             </div>
           </div>
