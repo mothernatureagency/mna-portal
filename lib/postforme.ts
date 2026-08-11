@@ -61,7 +61,7 @@ export function mediaFor(url: string | null): string[] {
   return [u];
 }
 
-export type PfmAccount = { id: string; platform: string; username: string | null; status?: string };
+export type PfmAccount = { id: string; platform: string; username: string | null; pageId: string | null; photo: string | null; status?: string };
 
 /**
  * List connected accounts in the whole Post for Me project (the "pool").
@@ -83,7 +83,14 @@ export async function postformeListAccounts(opts?: { platforms?: string[] }): Pr
     const raw: any = await res.json().catch(() => ({}));
     if (!res.ok) return [];
     const items = Array.isArray(raw?.data) ? raw.data : Array.isArray(raw) ? raw : raw?.items || [];
-    return items.map((a: any) => ({ id: a.id, platform: a.platform, username: a.username ?? a.display_name ?? null, status: a.status }));
+    return items.map((a: any) => ({
+      id: a.id,
+      platform: a.platform,
+      username: a.username ?? a.display_name ?? null,
+      pageId: a.user_id ?? null, // the Facebook/Instagram page id — disambiguates same-named pages
+      photo: a.profile_photo_url ?? null,
+      status: a.status,
+    }));
   } catch {
     return [];
   }
@@ -99,8 +106,13 @@ export async function postformeRawAccounts(): Promise<{ ok: boolean; httpStatus:
     const raw: any = await res.json().catch(() => ({}));
     if (!res.ok) return { ok: false, httpStatus: res.status, count: 0, items: [], errorBody: raw };
     const items = Array.isArray(raw?.data) ? raw.data : Array.isArray(raw) ? raw : raw?.items || [];
-    // Return full raw objects so we can see every identifying field available.
-    return { ok: res.ok, httpStatus: res.status, count: items.length, items };
+    // Never return secrets (access_token/refresh_token) — only safe identifiers.
+    return {
+      ok: res.ok,
+      httpStatus: res.status,
+      count: items.length,
+      items: items.map((a: any) => ({ id: a.id, platform: a.platform, status: a.status, username: a.username ?? null, pageId: a.user_id ?? null, external_id: a.external_id ?? null })),
+    };
   } catch (e: any) {
     return { ok: false, httpStatus: -1, count: 0, items: [{ error: e?.message }] };
   }

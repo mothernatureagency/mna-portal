@@ -241,7 +241,7 @@ export default function ContentPage() {
   const [editingPhoto, setEditingPhoto] = useState<Record<string, boolean>>({});
   const [uploadingId, setUploadingId] = useState<string | null>(null);
   const [publishing, setPublishing] = useState<string | null>(null);
-  const [socialAccounts, setSocialAccounts] = useState<{ id: string; platform: string; username: string | null }[]>([]);
+  const [socialAccounts, setSocialAccounts] = useState<{ id: string; platform: string; username: string | null; pageId?: string | null; photo?: string | null }[]>([]);
   const [socialSelected, setSocialSelected] = useState<Set<string>>(new Set());
   const [socialConfigured, setSocialConfigured] = useState(false);
   const [connecting, setConnecting] = useState<string | null>(null);
@@ -406,7 +406,7 @@ export default function ContentPage() {
     const next = new Set(socialSelected);
     if (next.has(acct.id)) next.delete(acct.id); else next.add(acct.id);
     setSocialSelected(next);
-    const value = socialAccounts.filter((a) => next.has(a.id)).map((a) => ({ id: a.id, platform: a.platform, username: a.username }));
+    const value = socialAccounts.filter((a) => next.has(a.id)).map((a) => ({ id: a.id, platform: a.platform, username: a.username, pageId: a.pageId ?? null }));
     try {
       await fetch('/api/client-kv', { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ clientId: activeClient.id, key: 'postforme_accounts', value }) });
     } catch { /* keep optimistic state; user can retry */ }
@@ -860,8 +860,15 @@ export default function ContentPage() {
                     return (
                       <label key={a.id} className={`flex items-center gap-2 text-[11px] px-2 py-1 rounded-md cursor-pointer ${on ? 'bg-emerald-500/10 text-emerald-200' : 'text-white/60 hover:bg-white/5'}`}>
                         <input type="checkbox" checked={on} onChange={() => toggleSocialAccount(a)} className="accent-emerald-400" />
-                        <span className="capitalize font-semibold w-16 shrink-0">{a.platform}</span>
-                        <span className="text-white/50 truncate">{a.username ? `@${a.username}` : a.id}</span>
+                        {a.photo ? (
+                          // eslint-disable-next-line @next/next/no-img-element
+                          <img src={a.photo} alt="" className="w-5 h-5 rounded-full object-cover shrink-0" />
+                        ) : (
+                          <span className="w-5 h-5 rounded-full bg-white/10 shrink-0" />
+                        )}
+                        <span className="capitalize font-semibold w-24 shrink-0">{a.platform.replace('_business', '')}</span>
+                        <span className="text-white/60 truncate flex-1">{a.username ? `@${a.username}` : a.id}</span>
+                        {a.pageId && <span className="text-white/35 text-[9px] font-mono shrink-0" title="Facebook/Instagram Page ID">ID {a.pageId}</span>}
                       </label>
                     );
                   })}
