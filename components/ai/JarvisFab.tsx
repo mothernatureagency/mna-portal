@@ -28,6 +28,124 @@ const NAV_PHRASES: { match: RegExp; path: string; label: string }[] = [
 type Mode = 'idle' | 'listening' | 'thinking' | 'speaking';
 type Msg = { role: 'user' | 'assistant'; content: string };
 
+/**
+ * Holographic Mother Nature — a projected nature-goddess figure. Pure SVG +
+ * CSS: silhouette with flowing hair and a leaf crown, hologram scanlines,
+ * flicker, a projector beam rising from the emitter base, and drifting
+ * leaves. Glow intensity follows the assistant's mode.
+ */
+function MotherNatureHologram({ mode }: { mode: Mode }) {
+  const hot = mode === 'speaking' || mode === 'listening';
+  const glow = hot
+    ? 'drop-shadow(0 0 8px rgba(140,255,225,0.95)) drop-shadow(0 0 22px rgba(74,230,200,0.7)) drop-shadow(0 0 48px rgba(74,184,206,0.5))'
+    : 'drop-shadow(0 0 6px rgba(140,255,225,0.7)) drop-shadow(0 0 18px rgba(74,230,200,0.45)) drop-shadow(0 0 40px rgba(74,184,206,0.3))';
+  return (
+    <div className="relative w-full h-full overflow-hidden select-none pointer-events-none">
+      {/* Projector beam — cone of light widening up from the emitter */}
+      <div
+        className="absolute holo-flicker"
+        style={{
+          left: '50%', bottom: 6, transform: 'translateX(-50%)',
+          width: '78%', height: '88%',
+          clipPath: 'polygon(42% 100%, 58% 100%, 96% 0%, 4% 0%)',
+          background: 'linear-gradient(to top, rgba(120,255,220,0.35), rgba(120,255,220,0.1) 55%, rgba(120,255,220,0.02))',
+        }}
+      />
+      {/* The goddess */}
+      <div
+        className="absolute holo-flicker holo-bob"
+        style={{ left: '50%', bottom: 12, transform: 'translateX(-50%)', width: 118, height: 138, filter: glow, opacity: hot ? 1 : 0.92 }}
+      >
+        <svg viewBox="0 0 200 240" width="100%" height="100%" aria-hidden>
+          <defs>
+            <linearGradient id="mn-holo-skin" x1="0" y1="0" x2="0" y2="1">
+              <stop offset="0%" stopColor="#c9fff0" stopOpacity="0.95" />
+              <stop offset="60%" stopColor="#7de8d0" stopOpacity="0.8" />
+              <stop offset="100%" stopColor="#4ab8ce" stopOpacity="0.55" />
+            </linearGradient>
+            <linearGradient id="mn-holo-hair" x1="0" y1="0" x2="0" y2="1">
+              <stop offset="0%" stopColor="#5fe8c0" stopOpacity="0.9" />
+              <stop offset="55%" stopColor="#2fb9a8" stopOpacity="0.7" />
+              <stop offset="100%" stopColor="#0c6da4" stopOpacity="0.35" />
+            </linearGradient>
+            <linearGradient id="mn-holo-body" x1="0" y1="0" x2="0" y2="1">
+              <stop offset="0%" stopColor="#8df0d8" stopOpacity="0.85" />
+              <stop offset="100%" stopColor="#0c6da4" stopOpacity="0.25" />
+            </linearGradient>
+            <linearGradient id="mn-holo-leaf" x1="0" y1="0" x2="1" y2="1">
+              <stop offset="0%" stopColor="#b8ffdf" stopOpacity="0.95" />
+              <stop offset="100%" stopColor="#2dd4a0" stopOpacity="0.75" />
+            </linearGradient>
+          </defs>
+
+          {/* Flowing hair falling on both sides */}
+          <path
+            fill="url(#mn-holo-hair)"
+            d="M100 16 C60 16 42 46 44 80 C46 110 58 130 50 158 C45 175 34 187 24 195 C54 203 76 192 84 172 L84 96 C80 88 78 78 79 66 C81 44 89 34 100 34 C111 34 119 44 121 66 C122 78 120 88 116 96 L116 172 C124 192 146 203 176 195 C166 187 155 175 150 158 C142 130 154 110 156 80 C158 46 140 16 100 16 Z"
+          />
+          {/* Face */}
+          <ellipse cx="100" cy="74" rx="24" ry="30" fill="url(#mn-holo-skin)" />
+          {/* Serene closed eyes + soft smile */}
+          <g stroke="rgba(10,60,70,0.55)" strokeWidth="2" strokeLinecap="round" fill="none">
+            <path d="M86 72 Q91 77 96 72" />
+            <path d="M104 72 Q109 77 114 72" />
+            <path d="M94 92 Q100 97 106 92" />
+          </g>
+          {/* Neck + shoulders/bust */}
+          <path
+            fill="url(#mn-holo-body)"
+            d="M92 100 L92 116 C78 118 64 128 55 142 C46 156 41 171 40 188 L160 188 C159 171 154 156 145 142 C136 128 122 118 108 116 L108 100 C104 104 96 104 92 100 Z"
+          />
+          {/* Leaves woven into the hair tips — subtle, no crown */}
+          <g fill="url(#mn-holo-leaf)" opacity="0.85">
+            <path d="M36 176 C28 168 16 168 10 176 C18 184 30 184 36 176 Z" />
+            <path d="M164 176 C172 168 184 168 190 176 C182 184 170 184 164 176 Z" />
+            <path d="M52 130 C46 122 36 120 30 126 C36 134 46 136 52 130 Z" />
+            <path d="M148 130 C154 122 164 120 170 126 C164 134 154 136 148 130 Z" />
+          </g>
+        </svg>
+      </div>
+
+      {/* Drifting leaves rising through the projection */}
+      {[0, 1, 2].map((i) => (
+        <span
+          key={i}
+          className="absolute holo-leaf"
+          style={{
+            left: `${30 + i * 20}%`, bottom: 18,
+            width: 9, height: 9,
+            animationDelay: `${i * 1.6}s`,
+            background: 'radial-gradient(ellipse at 30% 30%, rgba(184,255,223,0.95), rgba(45,212,160,0.55))',
+            clipPath: 'polygon(50% 0%, 95% 40%, 50% 100%, 5% 40%)',
+          }}
+        />
+      ))}
+
+      {/* Hologram scanlines + moving scan bar */}
+      <div
+        className="absolute inset-0"
+        style={{ background: 'repeating-linear-gradient(0deg, rgba(140,255,230,0.07) 0px, rgba(140,255,230,0.07) 1px, transparent 1px, transparent 3px)' }}
+      />
+      <div
+        className="absolute left-0 right-0 holo-scanbar"
+        style={{ height: 22, background: 'linear-gradient(to bottom, transparent, rgba(160,255,235,0.14), transparent)' }}
+      />
+
+      {/* Emitter base — the light source she's projected from */}
+      <div
+        className="absolute"
+        style={{
+          left: '50%', bottom: 4, transform: 'translateX(-50%)',
+          width: 110, height: 10, borderRadius: '50%',
+          background: 'radial-gradient(ellipse at center, rgba(160,255,235,0.9), rgba(74,184,206,0.35) 60%, transparent 75%)',
+          boxShadow: '0 0 18px rgba(120,255,220,0.8), 0 0 40px rgba(74,184,206,0.5)',
+          filter: 'blur(0.5px)',
+        }}
+      />
+    </div>
+  );
+}
+
 const GREETING: Msg = {
   role: 'assistant',
   content: "Hi, I'm Mother Nature 🌿 Ask me anything — I can check your schedule, add tasks and meetings, remember things for you, or open any page. Type below or tap the mic to talk.",
@@ -145,7 +263,7 @@ export default function JarvisFab() {
 
   return (
     <>
-      <style jsx>{`
+      <style jsx global>{`
         @keyframes nature-drift {
           0%   { transform: translate(0, 0); }
           25%  { transform: translate(10px, -14px); }
@@ -169,10 +287,40 @@ export default function JarvisFab() {
           from { opacity: 0; transform: translateY(12px) scale(0.97); }
           to   { opacity: 1; transform: translateY(0) scale(1); }
         }
+        /* Hologram: flicker, gentle float, moving scan bar, rising leaves */
+        @keyframes holo-flicker {
+          0%, 100% { opacity: 1; }
+          89% { opacity: 1; }
+          90% { opacity: 0.78; }
+          91% { opacity: 1; }
+          95% { opacity: 0.9; }
+          96% { opacity: 1; }
+        }
+        @keyframes holo-bob {
+          0%, 100% { transform: translateX(-50%) translateY(0); }
+          50%      { transform: translateX(-50%) translateY(-4px); }
+        }
+        @keyframes holo-scan {
+          0%   { top: -12%; opacity: 0; }
+          12%  { opacity: 1; }
+          88%  { opacity: 1; }
+          100% { top: 104%; opacity: 0; }
+        }
+        @keyframes holo-leaf-rise {
+          0%   { transform: translateY(0) rotate(0deg); opacity: 0; }
+          15%  { opacity: 0.9; }
+          80%  { opacity: 0.5; }
+          100% { transform: translateY(-110px) rotate(200deg); opacity: 0; }
+        }
         .nature-orb-wrap { animation: nature-drift 8s ease-in-out infinite; }
         .nature-inner    { animation: nature-spin 60s linear infinite; }
         .nature-halo     { animation: nature-breathe 3.2s ease-in-out infinite; }
         .nature-panel    { animation: nature-pop 0.22s ease-out; }
+        .holo-flicker    { animation: holo-flicker 5s linear infinite; }
+        .holo-bob        { animation: holo-bob 6s ease-in-out infinite; }
+        .holo-flicker.holo-bob { animation: holo-flicker 5s linear infinite, holo-bob 6s ease-in-out infinite; }
+        .holo-scanbar    { animation: holo-scan 4.5s linear infinite; }
+        .holo-leaf       { animation: holo-leaf-rise 5.2s ease-out infinite; }
       `}</style>
 
       <div
@@ -191,33 +339,34 @@ export default function JarvisFab() {
               backdropFilter: 'blur(24px) saturate(160%)',
             }}
           >
-            {/* Header */}
+            {/* Hologram stage — she materializes when the world is clicked */}
             <div
-              className="flex items-center gap-2.5 px-4 py-3 shrink-0"
-              style={{ background: 'linear-gradient(135deg, rgba(12,109,164,0.5), rgba(74,184,206,0.25))', borderBottom: '1px solid rgba(255,255,255,0.1)' }}
+              className="relative shrink-0"
+              style={{
+                height: 158,
+                background: 'radial-gradient(ellipse at 50% 90%, rgba(12,109,164,0.35), rgba(6,16,28,0.2) 70%), linear-gradient(to bottom, rgba(6,16,28,0.4), rgba(10,24,38,0))',
+                borderBottom: '1px solid rgba(74,184,206,0.2)',
+              }}
             >
-              <span
-                className="rounded-full shrink-0"
-                style={{
-                  width: 26, height: 26,
-                  backgroundImage: 'url(/ai/earth.jpg)',
-                  backgroundSize: 'cover', backgroundPosition: 'center',
-                  boxShadow: '0 0 10px rgba(74,184,206,0.8)',
-                }}
-              />
-              <div className="min-w-0">
-                <div className="text-white font-bold text-[13px] leading-tight">Mother Nature</div>
-                <div className="text-[10px] text-cyan-200/70 leading-tight">
-                  {busy ? 'thinking…' : listening ? 'listening…' : 'your agency assistant'}
-                </div>
-              </div>
+              <MotherNatureHologram mode={busy ? 'thinking' : mode} />
               <button
                 onClick={() => { cancelSpeak(); if (listening) stop(); setOpen(false); setMode('idle'); }}
-                className="ml-auto text-white/50 hover:text-white"
+                className="absolute top-2.5 right-2.5 text-white/50 hover:text-white z-10"
                 aria-label="Close Mother Nature"
               >
                 <span className="material-symbols-outlined" style={{ fontSize: 20 }}>close</span>
               </button>
+              <div className="absolute bottom-1.5 left-0 right-0 text-center pointer-events-none">
+                <span
+                  className="text-[10px] font-bold uppercase"
+                  style={{ letterSpacing: '0.28em', color: 'rgba(190,255,238,0.85)', textShadow: '0 0 12px rgba(120,255,220,0.7)' }}
+                >
+                  Mother Nature
+                </span>
+                <span className="block text-[9px] text-cyan-200/60 tracking-wide mt-0.5">
+                  {busy ? 'thinking…' : listening ? 'listening…' : mode === 'speaking' ? 'speaking…' : 'your agency assistant'}
+                </span>
+              </div>
             </div>
 
             {/* Messages */}
