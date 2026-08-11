@@ -3,6 +3,7 @@ import { ensureSchema, query } from '@/lib/db';
 import { clients as staticClients } from '@/lib/clients';
 import { postformePublish, postformeRawAccounts, platformsFor, platformBase, mediaFor, isVideoUrl, isVideoOnlyPlatform } from '@/lib/postforme';
 import { clientTimezone, slotTimeUtc } from '@/lib/social-schedule';
+import { applyMergeVars, effectiveVars, deriveLocation, type MergeVars } from '@/lib/merge-vars';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -74,6 +75,14 @@ export async function GET(req: NextRequest) {
     }
     return tzCache.get(clientId)!;
   }
+  const mvCache = new Map<string, MergeVars>();
+  async function varsFor(clientId: string, clientName: string) {
+    if (!mvCache.has(clientId)) {
+      const { rows } = await query<{ value: any }>(`select value from client_kv where client_id = $1 and key = 'merge_vars'`, [clientId]);
+      mvCache.set(clientId, effectiveVars(rows[0]?.value, { location: deriveLocation(clientName) }));
+    }
+    return mvCache.get(clientId)!;
+  }
 
   // Resolve each post's client, then index same-day posts per location so we
   // can stagger them across the day's best windows.
@@ -105,7 +114,9 @@ export async function GET(req: NextRequest) {
     const inFuture = target.getTime() > now + 60_000; // >1 min out → hand off to Post for Me
     const scheduleISO = inFuture ? target.toISOString() : undefined;
 
-    const result = await postformePublish({ accountIds, caption: (post.caption || '').toString(), mediaUrls: media, scheduleISO });
+    const vars = await varsFor(clientId, post.client_name);
+    const caption = applyMergeVars((post.caption || '').toString(), vars);
+    const result = await postformePublish({ accountIds, caption, mediaUrls: media, scheduleISO });
     if (result.ok) {
       if (inFuture) {
         await query(`update content_calendar set publish_status='scheduled', scheduled_for=$1, publish_ref=$2, publish_error=null where id=$3`, [target.toISOString(), String(result.id), post.id]);

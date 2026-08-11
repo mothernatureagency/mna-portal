@@ -4,6 +4,7 @@ import { useClient } from '@/context/ClientContext';
 import { createClient } from '@/lib/supabase/client';
 import { driveThumbnailUrl, driveViewUrl } from '@/lib/drive';
 import { extractFolderId, type DriveFile } from '@/lib/google-drive-shared';
+import { KNOWN_MERGE_FIELDS } from '@/lib/merge-vars';
 
 // Resolve a preview src for a stored photo URL. Google Drive links go through
 // the thumbnail endpoint; uploaded images (Supabase public URLs, or any plain
@@ -250,6 +251,9 @@ export default function ContentPage() {
   const [socialSelected, setSocialSelected] = useState<Set<string>>(new Set());
   const [socialConfigured, setSocialConfigured] = useState(false);
   const [connecting, setConnecting] = useState<string | null>(null);
+  const [mergeVars, setMergeVars] = useState<Record<string, string>>({});
+  const [showMerge, setShowMerge] = useState(false);
+  const [mergeSaved, setMergeSaved] = useState(false);
   const [isStaff, setIsStaff] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editDraft, setEditDraft] = useState<{ post_date: string; platform: string; content_type: string; title: string }>({ post_date: '', platform: '', content_type: '', title: '' });
@@ -393,6 +397,22 @@ export default function ContentPage() {
       .catch(() => { setSocialAccounts([]); setSocialConfigured(false); setSocialSelected(new Set()); });
   }
   useEffect(() => { loadSocialAccounts(); /* eslint-disable-next-line react-hooks/exhaustive-deps */ }, [activeClient?.id]);
+
+  // Per-location merge fields (auto-fill caption tokens like {{linktree}}).
+  useEffect(() => {
+    if (!activeClient?.id) return;
+    fetch(`/api/client-kv?clientId=${encodeURIComponent(activeClient.id)}&key=merge_vars`)
+      .then((r) => r.json())
+      .then((d) => setMergeVars(d.value && typeof d.value === 'object' && !Array.isArray(d.value) ? d.value : {}))
+      .catch(() => setMergeVars({}));
+  }, [activeClient?.id]);
+  function saveMergeVars(next: Record<string, string>) {
+    if (!activeClient?.id) return;
+    setMergeVars(next);
+    fetch('/api/client-kv', { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ clientId: activeClient.id, key: 'merge_vars', value: next }) })
+      .then(() => { setMergeSaved(true); setTimeout(() => setMergeSaved(false), 1200); })
+      .catch(() => {});
+  }
   // Re-check the pool when the user returns from the Post for Me connect tab.
   useEffect(() => {
     const onFocus = () => loadSocialAccounts();
@@ -892,6 +912,52 @@ export default function ContentPage() {
               {socialSelected.size === 0 && socialAccounts.length > 0 && (
                 <div className="text-[10px] text-amber-300/80 mt-1">Nothing ticked — this client won&apos;t auto-post anywhere (safe default).</div>
               )}
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* Location merge fields — auto-fill caption tokens per client (staff) */}
+      {isStaff && (
+        <div className="glass-card p-3">
+          <button onClick={() => setShowMerge((s) => !s)} className="w-full flex items-center gap-2 text-left">
+            <span className="material-symbols-outlined text-cyan-400 shrink-0" style={{ fontSize: 18 }}>alternate_email</span>
+            <span className="text-[11px] text-white/55">Location fields ({activeClient?.shortName}) — auto-fill caption tags like <code className="text-cyan-200">{'{{linktree}}'}</code></span>
+            {mergeSaved && <span className="text-[10px] text-emerald-300">Saved</span>}
+            <span className="ml-auto text-white/40 text-[11px]">{showMerge ? '▲' : '▼'}</span>
+          </button>
+          {showMerge && (
+            <div className="mt-3 space-y-2.5">
+              <div className="text-[10px] text-white/45">
+                In any caption, type a tag like <code className="text-cyan-200">{'{{linktree}}'}</code> or <code className="text-cyan-200">{'{{location}}'}</code>. When this location posts, the tag is swapped for its value below — so one brand caption localizes itself per location.
+              </div>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                {KNOWN_MERGE_FIELDS.map((f) => (
+                  <label key={f.key} className="flex flex-col gap-1">
+                    <span className="text-[10px] font-semibold text-white/50">{f.label} <code className="text-cyan-300/70">{`{{${f.key}}}`}</code></span>
+                    <input
+                      defaultValue={mergeVars[f.key] || ''}
+                      placeholder={f.placeholder}
+                      onBlur={(e) => { const v = e.target.value.trim(); if (v !== (mergeVars[f.key] || '')) saveMergeVars({ ...mergeVars, [f.key]: v }); }}
+                      className="text-[12px] px-2.5 py-1.5 rounded-lg bg-white/5 border border-white/10 text-white outline-none placeholder:text-white/25"
+                    />
+                  </label>
+                ))}
+                {Object.keys(mergeVars).filter((k) => !KNOWN_MERGE_FIELDS.some((f) => f.key === k)).map((k) => (
+                  <label key={k} className="flex flex-col gap-1">
+                    <span className="text-[10px] font-semibold text-white/50 capitalize">{k} <code className="text-cyan-300/70">{`{{${k}}}`}</code></span>
+                    <input
+                      defaultValue={mergeVars[k] || ''}
+                      onBlur={(e) => { const v = e.target.value.trim(); if (v !== (mergeVars[k] || '')) saveMergeVars({ ...mergeVars, [k]: v }); }}
+                      className="text-[12px] px-2.5 py-1.5 rounded-lg bg-white/5 border border-white/10 text-white outline-none"
+                    />
+                  </label>
+                ))}
+              </div>
+              <button
+                onClick={() => { const key = prompt('Custom field name (letters/numbers only), e.g. "promo":')?.trim().toLowerCase().replace(/[^a-z0-9_]/g, ''); if (key && !mergeVars[key]) saveMergeVars({ ...mergeVars, [key]: '' }); }}
+                className="text-[11px] font-semibold text-cyan-300/80 hover:text-cyan-200"
+              >+ Add custom field</button>
             </div>
           )}
         </div>

@@ -1,7 +1,9 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { ensureSchema, query } from '@/lib/db';
 import { createClient } from '@/lib/supabase/server';
+import { clients as staticClients } from '@/lib/clients';
 import { postformePublish, platformsFor, platformBase, mediaFor, isVideoUrl, isVideoOnlyPlatform } from '@/lib/postforme';
+import { applyMergeVars, effectiveVars, deriveLocation } from '@/lib/merge-vars';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -68,7 +70,15 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: `No ${platforms.join('/')} account is assigned to this client. Tick the right account in the Content Tracker's Social auto-post bar first.` }, { status: 400 });
   }
 
-  const caption = (post.caption || '').toString();
+  // Localize the caption for this client (swap {{linktree}}, {{location}}, …).
+  let displayName = staticClients.find((c) => c.id === clientId)?.name || '';
+  if (!displayName) {
+    const { rows: cc } = await query<{ name: string }>(`select name from custom_clients where id = $1`, [clientId]);
+    displayName = cc[0]?.name || '';
+  }
+  const { rows: mv } = await query<{ value: any }>(`select value from client_kv where client_id = $1 and key = 'merge_vars'`, [clientId]);
+  const vars = effectiveVars(mv[0]?.value, { location: deriveLocation(displayName) });
+  const caption = applyMergeVars((post.caption || '').toString(), vars);
   const result = await postformePublish({ accountIds, caption, mediaUrls: media });
 
   if (!result.ok) {
