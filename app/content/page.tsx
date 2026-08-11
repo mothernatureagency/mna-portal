@@ -1473,7 +1473,20 @@ export default function ContentPage() {
                             {fmtDate(activeItem.post_date)}
                           </button>
                         )}
-                        <span>· {activeItem.platform} · {activeItem.content_type || 'Post'}</span>
+                        <span>·&nbsp;</span>
+                        {isStaff && !pdm ? (
+                          <select
+                            value={activeItem.platform}
+                            onChange={async (e) => { try { await patchItem(activeItem.id, { platform: e.target.value }); } catch (err: any) { alert(err.message); } }}
+                            title="Change platform — Meta posts to Facebook + Instagram together"
+                            className="text-[11px] font-bold uppercase tracking-wider bg-white/10 border border-white/25 rounded px-1.5 py-0.5 text-white outline-none cursor-pointer hover:bg-white/15"
+                          >
+                            {PLATFORMS.map((p) => <option key={p} value={p} className="bg-slate-800 text-white">{p}</option>)}
+                          </select>
+                        ) : (
+                          <span>{activeItem.platform}</span>
+                        )}
+                        <span>&nbsp;· {activeItem.content_type || 'Post'}</span>
                       </div>
                       <div className="flex items-center gap-1">
                         {isStaff && (
