@@ -31,6 +31,28 @@ export default function ReviewResponsesPage() {
   const [copied, setCopied] = useState<string | null>(null);
   const [error, setError] = useState('');
 
+  // Automated responder queue (reviews synced from Google via Make.com).
+  const [queue, setQueue] = useState<any[]>([]);
+  const [queueEdits, setQueueEdits] = useState<Record<string, string>>({});
+  function loadQueue() {
+    if (!clientId) return;
+    fetch(`/api/google-reviews-sync?clientId=${encodeURIComponent(clientId)}&limit=100`)
+      .then((r) => r.json())
+      .then((d) => setQueue(Array.isArray(d.reviews) ? d.reviews : []))
+      .catch(() => setQueue([]));
+  }
+  useEffect(() => { loadQueue(); /* eslint-disable-next-line react-hooks/exhaustive-deps */ }, [clientId]);
+  async function actOnReview(gid: string, action: 'approve' | 'reject' | 'save', replyText?: string) {
+    if (!clientId) return;
+    try {
+      const res = await fetch('/api/reviews/approve', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ clientId, googleReviewId: gid, action, replyText }) });
+      if (!res.ok) throw new Error((await res.json()).error || 'Failed');
+      setQueue((prev) => prev.map((x) => x.google_review_id === gid
+        ? { ...x, reply_status: action === 'approve' ? 'approved' : action === 'reject' ? 'rejected' : x.reply_status, reply_text: replyText ?? x.reply_text }
+        : x));
+    } catch (e: any) { setError(e.message); }
+  }
+
   // Try to pull public reviews; silently no-ops if the Places key is down.
   useEffect(() => {
     if (!clientId) return;
@@ -103,6 +125,60 @@ export default function ReviewResponsesPage() {
       </div>
 
       {error && <div className="text-[12px] text-rose-300 bg-rose-500/10 border border-rose-500/30 rounded-lg px-3 py-2">{error}</div>}
+
+      {/* Automated responder — needs approval queue (from synced Google reviews) */}
+      {(() => {
+        const flagged = queue.filter((r) => r.reply_status === 'flagged');
+        const autoReady = queue.filter((r) => r.reply_status === 'auto').length;
+        const approved = queue.filter((r) => r.reply_status === 'approved').length;
+        const sent = queue.filter((r) => r.reply_status === 'sent').length;
+        if (queue.length === 0) return null;
+        return (
+          <div className="rounded-2xl p-5" style={{ background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(139,92,246,0.25)' }}>
+            <div className="flex items-center justify-between flex-wrap gap-2 mb-3">
+              <div className="text-[11px] font-bold uppercase tracking-wider text-white/55">Automated replies</div>
+              <div className="flex items-center gap-2 text-[10px]">
+                <span className="px-2 py-0.5 rounded-full bg-emerald-500/15 text-emerald-300">{autoReady} auto-queued (5★)</span>
+                <span className="px-2 py-0.5 rounded-full bg-violet-500/15 text-violet-300">{flagged.length} need approval</span>
+                <span className="px-2 py-0.5 rounded-full bg-sky-500/15 text-sky-300">{approved} approved</span>
+                <span className="px-2 py-0.5 rounded-full bg-white/10 text-white/50">{sent} sent</span>
+                <button onClick={loadQueue} className="text-white/40 hover:text-white/80 px-1" title="Refresh">↻</button>
+              </div>
+            </div>
+            <div className="text-[11px] text-white/45 mb-3">5★ replies auto-post via Make.com. Anything under 5★ is drafted here for your OK first.</div>
+            {flagged.length === 0 ? (
+              <div className="text-[12px] text-white/40">Nothing waiting on you. 🎉</div>
+            ) : (
+              <div className="flex flex-col gap-3">
+                {flagged.map((r) => {
+                  const gid = r.google_review_id;
+                  const val = queueEdits[gid] ?? r.reply_text ?? '';
+                  return (
+                    <div key={gid} className="rounded-xl p-3" style={{ background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.08)' }}>
+                      <div className="flex items-center gap-2 text-[12px] mb-1">
+                        <span className="text-amber-300">{'★'.repeat(Math.round(r.rating))}{'☆'.repeat(Math.max(0, 5 - Math.round(r.rating)))}</span>
+                        <span className="text-white/70 font-semibold">{r.author_name || 'Anonymous'}</span>
+                      </div>
+                      {r.review_text && <div className="text-[12px] text-white/55 italic mb-2">“{r.review_text}”</div>}
+                      <textarea
+                        value={val}
+                        onChange={(e) => setQueueEdits((p) => ({ ...p, [gid]: e.target.value }))}
+                        rows={3}
+                        className="w-full text-[13px] text-white/90 bg-white/5 rounded-lg p-2.5 border border-white/15 outline-none leading-relaxed"
+                      />
+                      <div className="flex gap-2 mt-2">
+                        <button onClick={() => actOnReview(gid, 'approve', val)} className="text-[11px] font-bold px-3 py-1.5 rounded-lg bg-emerald-500/20 text-emerald-200 hover:bg-emerald-500/30">Approve &amp; send</button>
+                        <button onClick={() => actOnReview(gid, 'save', val)} className="text-[11px] font-semibold px-3 py-1.5 rounded-lg bg-white/10 text-white/70 hover:bg-white/15">Save draft</button>
+                        <button onClick={() => actOnReview(gid, 'reject')} className="text-[11px] font-semibold px-3 py-1.5 rounded-lg bg-white/5 text-rose-300/80 hover:bg-rose-500/10">Skip</button>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+          </div>
+        );
+      })()}
 
       {/* Paste a review */}
       <div className="rounded-2xl p-5" style={{ background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.07)' }}>

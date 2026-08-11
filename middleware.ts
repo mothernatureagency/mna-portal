@@ -18,6 +18,8 @@ function isPublicRoute(pathname: string) {
     pathname.startsWith('/api/notifications') ||
     pathname.startsWith('/api/social/run') ||
     pathname.startsWith('/api/meta/refresh-kpis') ||
+    pathname.startsWith('/api/reviews/run') ||
+    pathname.startsWith('/api/reviews/pending') ||
     pathname.startsWith('/book') ||
     pathname.startsWith('/api/booking') ||
     pathname.startsWith('/_next') ||

@@ -154,6 +154,11 @@ async function initSchema() {
                         synced_at timestamptz not null default now(),
                         unique (client_id, google_review_id)
                   )`,
+                  // Auto-responder status: null/'pending' (new) → 'auto' (5★,
+                  // ready to send) | 'flagged' (<5★, needs human OK) →
+                  // 'approved' (human OK'd) → 'sent' (posted to Google).
+                  `alter table google_reviews add column if not exists reply_status text`,
+                  `alter table google_reviews add column if not exists reply_drafted_at timestamptz`,
                   // TikTok profile snapshots — one row per (owner_key, date).
                   // owner_key is a client_id (e.g. 'prime-iv') or creator email.
                   // Lets us track follower growth + aggregate view velocity over

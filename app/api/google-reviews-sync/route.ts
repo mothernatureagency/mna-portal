@@ -112,7 +112,8 @@ export async function GET(req: NextRequest) {
 
   const { rows: reviews } = await query(
     `select google_review_id, author_name, author_photo_url, rating, review_text,
-            review_date, reply_text, reply_date, location_name, synced_at
+            review_date, reply_text, reply_date, reply_status, reply_drafted_at,
+            location_name, synced_at
        from google_reviews
       where client_id = $1
       order by review_date desc nulls last, synced_at desc
