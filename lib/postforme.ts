@@ -99,12 +99,8 @@ export async function postformeRawAccounts(): Promise<{ ok: boolean; httpStatus:
     const raw: any = await res.json().catch(() => ({}));
     if (!res.ok) return { ok: false, httpStatus: res.status, count: 0, items: [], errorBody: raw };
     const items = Array.isArray(raw?.data) ? raw.data : Array.isArray(raw) ? raw : raw?.items || [];
-    return {
-      ok: res.ok,
-      httpStatus: res.status,
-      count: items.length,
-      items: items.map((a: any) => ({ id: a.id, platform: a.platform, status: a.status, username: a.username ?? a.display_name ?? null, external_id: a.external_id })),
-    };
+    // Return full raw objects so we can see every identifying field available.
+    return { ok: res.ok, httpStatus: res.status, count: items.length, items };
   } catch (e: any) {
     return { ok: false, httpStatus: -1, count: 0, items: [{ error: e?.message }] };
   }
