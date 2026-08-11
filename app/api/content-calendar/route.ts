@@ -29,13 +29,14 @@ function dayOffsetDate(startDate: string, day: number): string {
 
 // PATCH — update a single content item.
 // Supports post_date, platform, content_type, title, caption, status,
-// client_approval_status, client_comments, mna_comments, photo_drive_url.
+// client_approval_status, client_comments, mna_comments, photo_drive_url,
+// photo_urls (the full photo list; photo_drive_url mirrors its first entry).
 // When client_approval_status transitions to 'approved', approved_at is stamped.
 export async function PATCH(req: NextRequest) {
   await ensureSchema();
   let body: any;
   try { body = await req.json(); } catch { return NextResponse.json({ error: 'Invalid JSON' }, { status: 400 }); }
-  const { id, post_date, platform, content_type, title, caption, status, client_approval_status, client_comments, mna_comments, photo_drive_url, auto_post } = body || {};
+  const { id, post_date, platform, content_type, title, caption, status, client_approval_status, client_comments, mna_comments, photo_drive_url, photo_urls, auto_post } = body || {};
   if (!id) return NextResponse.json({ error: 'id required' }, { status: 400 });
   const fields: string[] = [];
   const values: any[] = [];
@@ -54,7 +55,31 @@ export async function PATCH(req: NextRequest) {
   }
   if (client_comments !== undefined) { values.push(client_comments); fields.push(`client_comments = $${values.length}`); }
   if (mna_comments !== undefined) { values.push(mna_comments); fields.push(`mna_comments = $${values.length}`); }
-  if (photo_drive_url !== undefined) { values.push(photo_drive_url); fields.push(`photo_drive_url = $${values.length}`); }
+  if (photo_urls !== undefined) {
+    const list = Array.isArray(photo_urls)
+      ? photo_urls.filter((u: unknown) => typeof u === 'string' && u.trim()).map((u: string) => u.trim())
+      : [];
+    values.push(JSON.stringify(list));
+    fields.push(`photo_urls = $${values.length}::jsonb`);
+    // Keep the legacy single-photo column pointing at the cover (first photo).
+    if (photo_drive_url === undefined) {
+      values.push(list[0] || null);
+      fields.push(`photo_drive_url = $${values.length}`);
+    }
+  }
+  if (photo_drive_url !== undefined) {
+    values.push(photo_drive_url); fields.push(`photo_drive_url = $${values.length}`);
+    if (photo_urls === undefined) {
+      // Legacy single-photo edit (e.g. dashboard calendar) — mirror it into the
+      // first slot of photo_urls so the list and the cover never disagree.
+      values.push(photo_drive_url || null);
+      const n = values.length;
+      fields.push(`photo_urls = case
+        when $${n}::text is null then case when jsonb_array_length(coalesce(photo_urls, '[]'::jsonb)) > 1 then photo_urls - 0 else '[]'::jsonb end
+        when jsonb_array_length(coalesce(photo_urls, '[]'::jsonb)) >= 1 then jsonb_set(photo_urls, '{0}', to_jsonb($${n}::text))
+        else jsonb_build_array($${n}::text) end`);
+    }
+  }
   if (auto_post !== undefined) { values.push(auto_post); fields.push(`auto_post = $${values.length}`); }
   const client_visible = body?.client_visible;
   if (client_visible !== undefined) {

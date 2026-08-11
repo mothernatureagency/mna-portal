@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { ensureSchema, query } from '@/lib/db';
 import { clients as staticClients } from '@/lib/clients';
-import { postformePublish, postformeRawAccounts, platformsFor, platformBase, mediaFor, isVideoUrl, isVideoOnlyPlatform } from '@/lib/postforme';
+import { postformePublish, postformeRawAccounts, platformsFor, platformBase, mediaForPost, isVideoUrl, isVideoOnlyPlatform } from '@/lib/postforme';
 import { clientTimezone, slotTimeUtc } from '@/lib/social-schedule';
 import { applyMergeVars, effectiveVars, deriveLocation, type MergeVars } from '@/lib/merge-vars';
 
@@ -52,7 +52,7 @@ export async function GET(req: NextRequest) {
   const pdmOptIn = new Set(optRows.map((r) => r.client_id));
 
   const { rows: normal } = await query<any>(
-    `select cc.id, cc.platform, cc.caption, cc.photo_drive_url,
+    `select cc.id, cc.platform, cc.caption, cc.photo_drive_url, cc.photo_urls,
             to_char(cc.post_date, 'YYYY-MM-DD') as post_date, p.client_name, false as is_pdm
        from content_calendar cc
        join projects p on p.id = cc.project_id
@@ -69,7 +69,7 @@ export async function GET(req: NextRequest) {
   // These are brand-mandated, so no per-post auto_post/approval toggle needed.
   const pdm = pdmOptIn.size
     ? (await query<any>(
-        `select cc.id, cc.platform, cc.caption, cc.photo_drive_url,
+        `select cc.id, cc.platform, cc.caption, cc.photo_drive_url, cc.photo_urls,
                 to_char(cc.post_date, 'YYYY-MM-DD') as post_date, p.client_name, true as is_pdm
            from content_calendar cc
            join projects p on p.id = cc.project_id
@@ -118,7 +118,7 @@ export async function GET(req: NextRequest) {
 
   for (const post of due) {
     const platforms = platformsFor(post.platform);
-    const media = mediaFor(post.photo_drive_url);
+    const media = mediaForPost(post);
     if (platforms.length === 0 || (platforms.includes('instagram') && media.length === 0)) { skipped++; continue; }
     // TikTok / YouTube need a video — skip if there isn't one.
     if (platforms.some(isVideoOnlyPlatform) && !media.some(isVideoUrl)) { skipped++; continue; }
