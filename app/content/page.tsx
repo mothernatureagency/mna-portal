@@ -302,6 +302,8 @@ export default function ContentPage() {
   const [pickerLoading, setPickerLoading] = useState(false);
   const [pickerError, setPickerError] = useState<string | null>(null);
   const [pickerQuery, setPickerQuery] = useState('');
+  // Subfolder navigation inside the picker — breadcrumb trail from the root.
+  const [pickerPath, setPickerPath] = useState<{ id: string; name: string }[]>([]);
   const [newPost, setNewPost] = useState({ post_date: '', platform: 'Instagram', content_type: 'Post', title: '', caption: '' });
   // Monthly Specials Planner — enter the month's specials, AI drafts the plan
   const [showPlanner, setShowPlanner] = useState(false);
@@ -603,13 +605,31 @@ export default function ContentPage() {
     setPickerError(null);
     setPickerQuery('');
     setPickerFiles([]);
+    setPickerPath([]);
     const folderId = extractFolderId(driveFolderUrl);
     // No folder yet → the picker modal shows an inline folder prompt instead
     // of a dead-end alert.
     if (folderId) await loadPickerFiles(folderId);
   }
 
+  // Click a subfolder in the picker → browse into it (not attach it).
+  function enterPickerFolder(f: DriveFile) {
+    setPickerPath((p) => [...p, { id: f.id, name: f.name }]);
+    setPickerQuery('');
+    loadPickerFiles(f.id);
+  }
+  // Breadcrumb click — idx -1 is the root client folder.
+  function gotoPickerCrumb(idx: number) {
+    const next = idx < 0 ? [] : pickerPath.slice(0, idx + 1);
+    setPickerPath(next);
+    setPickerQuery('');
+    const fid = next.length > 0 ? next[next.length - 1].id : extractFolderId(driveFolderUrl);
+    if (fid) loadPickerFiles(fid);
+  }
+
   async function attachDriveFile(postId: string, file: DriveFile) {
+    // Folders are for navigation, never attachment.
+    if (file.mimeType === 'application/vnd.google-apps.folder') { enterPickerFolder(file); return; }
     const url = file.webViewLink || `https://drive.google.com/file/d/${file.id}/view`;
     try {
       const item = items.find((i) => i.id === postId);
@@ -2361,6 +2381,26 @@ export default function ContentPage() {
               </div>
             ) : (
             <>
+            <div className="px-4 pt-2.5 flex items-center gap-1 flex-wrap text-[11px]">
+              <button
+                onClick={() => gotoPickerCrumb(-1)}
+                className={`font-semibold inline-flex items-center gap-1 ${pickerPath.length === 0 ? 'text-white' : 'text-cyan-300 hover:text-cyan-200'}`}
+              >
+                <span className="material-symbols-outlined" style={{ fontSize: 13 }}>home</span>
+                {activeClient?.shortName || 'Main'} folder
+              </button>
+              {pickerPath.map((p, i) => (
+                <React.Fragment key={`${p.id}-${i}`}>
+                  <span className="text-white/30">/</span>
+                  <button
+                    onClick={() => gotoPickerCrumb(i)}
+                    className={`font-semibold max-w-[160px] truncate ${i === pickerPath.length - 1 ? 'text-white' : 'text-cyan-300 hover:text-cyan-200'}`}
+                  >
+                    {p.name}
+                  </button>
+                </React.Fragment>
+              ))}
+            </div>
             <div className="p-3 border-b border-white/10">
               <input
                 type="text"
@@ -2387,9 +2427,37 @@ export default function ContentPage() {
               )}
               {!pickerError && !pickerLoading && pickerFiles.length > 0 && (
                 <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3">
-                  {pickerFiles
+                  {[...pickerFiles]
+                    .sort((a, b) => {
+                      // Folders first, then keep Drive's modified-desc order
+                      const af = a.mimeType === 'application/vnd.google-apps.folder' ? 0 : 1;
+                      const bf = b.mimeType === 'application/vnd.google-apps.folder' ? 0 : 1;
+                      return af - bf;
+                    })
                     .filter((f) => !pickerQuery || f.name.toLowerCase().includes(pickerQuery.toLowerCase()))
                     .map((f) => {
+                      const isFolder = f.mimeType === 'application/vnd.google-apps.folder';
+                      if (isFolder) {
+                        return (
+                          <button
+                            key={f.id}
+                            onClick={() => enterPickerFolder(f)}
+                            className="group text-left rounded-xl overflow-hidden border border-white/10 bg-white/5 hover:border-cyan-300/40 hover:bg-white/10 transition"
+                            title="Open folder"
+                          >
+                            <div className="aspect-video bg-black/30 flex items-center justify-center">
+                              <span className="material-symbols-outlined text-amber-300/80 group-hover:text-amber-200 transition" style={{ fontSize: 42 }}>folder</span>
+                            </div>
+                            <div className="p-2">
+                              <div className="text-white text-[11px] font-semibold truncate">{f.name}</div>
+                              <div className="text-cyan-300/70 text-[9px] font-semibold inline-flex items-center gap-0.5">
+                                Open folder
+                                <span className="material-symbols-outlined" style={{ fontSize: 10 }}>chevron_right</span>
+                              </div>
+                            </div>
+                          </button>
+                        );
+                      }
                       const thumb = driveThumbnailUrl(`https://drive.google.com/file/d/${f.id}/view`, 400);
                       return (
                         <button
