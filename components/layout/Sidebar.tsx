@@ -26,6 +26,7 @@ const NAV = [
     { label: 'Clients', href: '/clients', e: 'add_business' },
     { label: 'Accounts', href: '/accounts', e: 'manage_accounts' },
     { label: 'Onboarding', href: '/onboarding', e: 'rocket_launch' },
+    { label: 'Pricing & Info', href: '/knowledge', e: 'menu_book' },
     { label: 'Market Research', href: '/market-research', e: 'travel_explore' },
     { label: 'Review Responses', href: '/review-responses', e: 'reviews' },
     { label: 'Task Manager', href: '/client-tasks', e: 'checklist' },

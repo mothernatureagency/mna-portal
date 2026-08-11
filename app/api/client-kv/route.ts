@@ -61,7 +61,7 @@ export async function PUT(req: NextRequest) {
   }
 
   // Clients can only write to their own client_id and only specific keys
-  const CLIENT_WRITABLE_KEYS = ['revenue_projections'];
+  const CLIENT_WRITABLE_KEYS = ['revenue_projections', 'knowledge_base'];
   if (role === 'client') {
     if (clientId !== userClientId) {
       return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
