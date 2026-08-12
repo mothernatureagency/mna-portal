@@ -16,7 +16,7 @@
  * No fabricated metrics.
  */
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import type { Client } from '@/lib/clients';
 import UserBanner from './UserBanner';
 import MonthlyContentCalendar from './MonthlyContentCalendar';
@@ -33,7 +33,7 @@ import YouTubeAnalytics from './YouTubeAnalytics';
 
 // ─── REAL DATA ────────────────────────────────────────────────────────────
 // Source: client provided directly on 2026-04-08
-const REVENUE_HISTORY = [
+const REVENUE_HISTORY_DEFAULT = [
   { month: 'Jan 2026', value: 49_400, real: true },
   { month: 'Feb 2026', value: 52_500, real: true },
   { month: 'Mar 2026', value: 54_500, real: true },
@@ -65,21 +65,26 @@ function computeProjections(history: { month: string; value: number }[]) {
 // - MNA ads: $20/day × 30 days = $600/mo, all Meta (Facebook/Instagram)
 // - PDM (Prime Digital Marketing): $1,290/mo, all Meta
 // - No Google Ads running
-const AD_SPEND_BREAKDOWN = [
+const AD_SPEND_DEFAULT = [
   { agency: 'Mother Nature Agency', channel: 'Meta', monthly: 600, note: '$20/day daily budget' },
   { agency: 'PDM', channel: 'Meta', monthly: 1_290, note: 'Managed separately' },
 ];
 
 // GHL Last 30 Days snapshot (manual pull 2026-04-08)
-const GHL_SNAPSHOT = {
+const GHL_DEFAULT = {
   totalOpportunities: 464,   // REAL
   openOpportunities: 346,    // REAL
   wonOpportunities: 77,      // REAL (booked & closed)
   lostOpportunities: 41,     // REAL
   conversionRate: 16.59,     // REAL
+  conversionTarget: 14,      // target %
   pipelineValue: 160_620,    // REAL ($160.62K)
-  wonRevenue: 72_990,        // REAL ($72.99K Won from GHL — different from actual spa revenue because not all appts come through GHL)
+  wonRevenue: 72_990,        // REAL ($72.99K Won from GHL)
 };
+
+type RevRow = { month: string; value: number; real?: boolean };
+type AdRow = { agency: string; channel: string; monthly: number; note: string };
+type OverviewStats = { ghl: typeof GHL_DEFAULT; revenue: RevRow[]; adSpend: AdRow[] };
 
 function fmtUSD(n: number) {
   return new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD', maximumFractionDigits: 0 }).format(n);
@@ -98,11 +103,44 @@ function SectionLabel({ children }: { children: React.ReactNode }) {
 
 export default function NicevilleDashboard({ client }: { client: Client }) {
   const { gradientFrom, gradientTo } = client.branding;
-  const projections = computeProjections(REVENUE_HISTORY);
-  const totalAdSpend = AD_SPEND_BREAKDOWN.reduce((sum, r) => sum + r.monthly, 0);
+
+  // Editable overview stats (persist per client to client_kv 'overview_stats').
+  const [ghl, setGhl] = useState(GHL_DEFAULT);
+  const [revenue, setRevenue] = useState<RevRow[]>(REVENUE_HISTORY_DEFAULT);
+  const [adSpend, setAdSpend] = useState<AdRow[]>(AD_SPEND_DEFAULT);
+  const [editing, setEditing] = useState(false);
+  const [savedFlash, setSavedFlash] = useState(false);
+
+  useEffect(() => {
+    fetch(`/api/client-kv?clientId=${encodeURIComponent(client.id)}&key=overview_stats`)
+      .then((r) => r.json())
+      .then((d) => {
+        const v = d?.value as Partial<OverviewStats> | null;
+        if (v && typeof v === 'object') {
+          if (v.ghl) setGhl({ ...GHL_DEFAULT, ...v.ghl });
+          if (Array.isArray(v.revenue) && v.revenue.length) setRevenue(v.revenue);
+          if (Array.isArray(v.adSpend) && v.adSpend.length) setAdSpend(v.adSpend);
+        }
+      })
+      .catch(() => {});
+  }, [client.id]);
+
+  async function saveStats() {
+    await fetch('/api/client-kv', {
+      method: 'PUT', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ clientId: client.id, key: 'overview_stats', value: { ghl, revenue, adSpend } }),
+    }).catch(() => {});
+    setSavedFlash(true); setTimeout(() => setSavedFlash(false), 1500);
+    setEditing(false);
+  }
+
+  const projections = computeProjections(revenue);
+  const totalAdSpend = adSpend.reduce((sum, r) => sum + r.monthly, 0);
   const q2Total = projections.reduce((sum, p) => sum + p.value, 0);
   const avgGrowth = projections.length > 0 ? projections[0].growth : 0;
-  const maxHistoryValue = Math.max(...REVENUE_HISTORY.map((h) => h.value), ...projections.map((p) => p.value));
+  const maxHistoryValue = Math.max(...revenue.map((h) => h.value), ...projections.map((p) => p.value), 1);
+  const lastRev = revenue[revenue.length - 1] || { month: '—', value: 0 };
+  const prevRev = revenue[revenue.length - 2] || { month: '—', value: 0 };
 
   return (
     <div className="space-y-8 max-w-[1400px]">
@@ -122,7 +160,28 @@ export default function NicevilleDashboard({ client }: { client: Client }) {
             Revenue actuals through March 2026 · Ad data verified with PDM split · GHL metrics manual pull
           </p>
         </div>
+        <div className="flex items-center gap-2">
+          {savedFlash && <span className="text-[11px] text-emerald-300">Saved ✓</span>}
+          <button
+            onClick={() => setEditing((e) => !e)}
+            className="text-[12px] font-semibold px-3 py-1.5 rounded-lg border border-white/15 text-white/80 hover:text-white hover:bg-white/10 inline-flex items-center gap-1"
+          >
+            <span className="material-symbols-outlined" style={{ fontSize: 15 }}>{editing ? 'close' : 'edit'}</span>
+            {editing ? 'Close editor' : 'Edit stats'}
+          </button>
+        </div>
       </div>
+
+      {/* Editable stats panel */}
+      {editing && (
+        <StatsEditor
+          ghl={ghl} setGhl={setGhl}
+          revenue={revenue} setRevenue={setRevenue}
+          adSpend={adSpend} setAdSpend={setAdSpend}
+          onSave={saveStats}
+          gradientFrom={gradientFrom} gradientTo={gradientTo}
+        />
+      )}
 
       {/* Meta Ads Account — editable */}
       <MetaAdsCard client={client} accent={gradientFrom} />
@@ -212,26 +271,26 @@ export default function NicevilleDashboard({ client }: { client: Client }) {
           <div className="glass-card p-5 relative overflow-hidden">
             <div className="absolute top-0 left-0 right-0 h-1 rounded-t-[20px]" style={{ background: '#0ea5e9' }} />
             <span className="text-[10px] font-bold uppercase text-white/60">Total Leads</span>
-            <div className="text-[30px] font-black text-white leading-none my-2">{GHL_SNAPSHOT.totalOpportunities}</div>
-            <div className="text-[11px] text-white/70">Open {GHL_SNAPSHOT.openOpportunities} · Won {GHL_SNAPSHOT.wonOpportunities} · Lost {GHL_SNAPSHOT.lostOpportunities}</div>
+            <div className="text-[30px] font-black text-white leading-none my-2">{ghl.totalOpportunities}</div>
+            <div className="text-[11px] text-white/70">Open {ghl.openOpportunities} · Won {ghl.wonOpportunities} · Lost {ghl.lostOpportunities}</div>
           </div>
           <div className="glass-card p-5 relative overflow-hidden">
             <div className="absolute top-0 left-0 right-0 h-1 rounded-t-[20px]" style={{ background: '#8b5cf6' }} />
             <span className="text-[10px] font-bold uppercase text-white/60">Conversion Rate</span>
-            <div className="text-[30px] font-black text-white leading-none my-2">{GHL_SNAPSHOT.conversionRate}%</div>
-            <div className="text-[11px] font-bold" style={{ color: '#7c3aed' }}>Target 14% · Exceeded ✦</div>
+            <div className="text-[30px] font-black text-white leading-none my-2">{ghl.conversionRate}%</div>
+            <div className="text-[11px] font-bold" style={{ color: '#7c3aed' }}>Target {ghl.conversionTarget}% · {ghl.conversionRate >= ghl.conversionTarget ? 'Exceeded ✦' : 'Below'}</div>
           </div>
           <div className="glass-card p-5 relative overflow-hidden">
             <div className="absolute top-0 left-0 right-0 h-1 rounded-t-[20px]" style={{ background: '#ec4899' }} />
             <span className="text-[10px] font-bold uppercase text-white/60">Booked Appts</span>
-            <div className="text-[30px] font-black text-white leading-none my-2">{GHL_SNAPSHOT.wonOpportunities}</div>
+            <div className="text-[30px] font-black text-white leading-none my-2">{ghl.wonOpportunities}</div>
             <div className="text-[11px] text-white/70">Won opportunities</div>
           </div>
           <div className="glass-card p-5 relative overflow-hidden">
             <div className="absolute top-0 left-0 right-0 h-1 rounded-t-[20px]" style={{ background: '#06b6d4' }} />
-            <span className="text-[10px] font-bold uppercase text-white/60">March Revenue</span>
-            <div className="text-[30px] font-black text-white leading-none my-2">{fmtUSD(REVENUE_HISTORY[2].value)}</div>
-            <div className="text-[11px] font-bold" style={{ color: '#059669' }}>+{Math.round((REVENUE_HISTORY[2].value / REVENUE_HISTORY[1].value - 1) * 100)}% vs Feb</div>
+            <span className="text-[10px] font-bold uppercase text-white/60">{lastRev.month.split(' ')[0]} Revenue</span>
+            <div className="text-[30px] font-black text-white leading-none my-2">{fmtUSD(lastRev.value)}</div>
+            <div className="text-[11px] font-bold" style={{ color: '#059669' }}>{prevRev.value ? `${(lastRev.value / prevRev.value - 1) >= 0 ? '+' : ''}${Math.round((lastRev.value / prevRev.value - 1) * 100)}% vs ${prevRev.month.split(' ')[0]}` : ''}</div>
           </div>
         </div>
 
@@ -246,7 +305,7 @@ export default function NicevilleDashboard({ client }: { client: Client }) {
           <div className="glass-card p-5 relative overflow-hidden opacity-60">
             <div className="absolute top-0 left-0 right-0 h-1 rounded-t-[20px]" style={{ background: '#94a3b8' }} />
             <span className="text-[10px] font-bold uppercase text-white/60">Pipeline Value</span>
-            <div className="text-[28px] font-black text-white/70 leading-none my-2">{fmtUSD(GHL_SNAPSHOT.pipelineValue)}</div>
+            <div className="text-[28px] font-black text-white/70 leading-none my-2">{fmtUSD(ghl.pipelineValue)}</div>
             <div className="text-[11px] text-white/70">GHL snapshot only · live API pending</div>
           </div>
           <div className="glass-card p-5 relative overflow-hidden opacity-60">
@@ -275,7 +334,7 @@ export default function NicevilleDashboard({ client }: { client: Client }) {
             </div>
           </div>
           <div className="flex items-end gap-3 h-40 mb-4">
-            {[...REVENUE_HISTORY, ...projections.map((p) => ({ ...p, real: false }))].map((m, i) => (
+            {[...revenue, ...projections.map((p) => ({ ...p, real: false }))].map((m, i) => (
               <div key={i} className="flex-1 flex flex-col items-center gap-1.5">
                 <div className="text-[11px] font-bold text-white/85">{fmtUSD(m.value)}</div>
                 <div
@@ -312,7 +371,7 @@ export default function NicevilleDashboard({ client }: { client: Client }) {
         <SectionLabel>Ad Spend · {fmtUSD(totalAdSpend)}/mo blended</SectionLabel>
         <div className="glass-card p-6">
           <div className="space-y-3">
-            {AD_SPEND_BREAKDOWN.map((row) => {
+            {adSpend.map((row) => {
               const pct = (row.monthly / totalAdSpend) * 100;
               return (
                 <div key={row.agency}>
@@ -364,7 +423,7 @@ export default function NicevilleDashboard({ client }: { client: Client }) {
           <InsightRow
             color="#f59e0b"
             title="Revenue pacing is healthy but ad spend is low"
-            body={`March closed at ${fmtUSD(REVENUE_HISTORY[2].value)} on just ${fmtUSD(totalAdSpend)}/mo in total ad spend across MNA and PDM. That is a strong implied return, but it also means we are leaving pipeline on the table. Recommend raising MNA daily from $20 to $35-50/day once the Niceville ad account is fully added to our system user.`}
+            body={`${lastRev.month.split(' ')[0]} closed at ${fmtUSD(lastRev.value)} on just ${fmtUSD(totalAdSpend)}/mo in total ad spend across MNA and PDM. That is a strong implied return, but it also means we are leaving pipeline on the table. Recommend raising MNA daily from $20 to $35-50/day once the Niceville ad account is fully added to our system user.`}
           />
           <InsightRow
             color="#0ea5e9"
@@ -378,6 +437,84 @@ export default function NicevilleDashboard({ client }: { client: Client }) {
           />
         </div>
       </div>
+    </div>
+  );
+}
+
+function StatsEditor({
+  ghl, setGhl, revenue, setRevenue, adSpend, setAdSpend, onSave, gradientFrom, gradientTo,
+}: {
+  ghl: typeof GHL_DEFAULT; setGhl: (v: typeof GHL_DEFAULT) => void;
+  revenue: RevRow[]; setRevenue: (v: RevRow[]) => void;
+  adSpend: AdRow[]; setAdSpend: (v: AdRow[]) => void;
+  onSave: () => void; gradientFrom: string; gradientTo: string;
+}) {
+  const inp = 'text-[13px] px-2.5 py-1.5 rounded-lg bg-white/5 border border-white/10 text-white outline-none w-full';
+  const num = (v: string) => Number(v.replace(/[^0-9.-]/g, '')) || 0;
+  const GHL_FIELDS: { k: keyof typeof GHL_DEFAULT; label: string }[] = [
+    { k: 'totalOpportunities', label: 'Total Leads' },
+    { k: 'openOpportunities', label: 'Open' },
+    { k: 'wonOpportunities', label: 'Won / Booked' },
+    { k: 'lostOpportunities', label: 'Lost' },
+    { k: 'conversionRate', label: 'Conversion %' },
+    { k: 'conversionTarget', label: 'Conversion target %' },
+    { k: 'pipelineValue', label: 'Pipeline value ($)' },
+    { k: 'wonRevenue', label: 'Won revenue ($)' },
+  ];
+  return (
+    <div className="glass-card p-5 space-y-5" style={{ borderLeft: `3px solid ${gradientFrom}` }}>
+      <div className="text-[11px] font-bold uppercase tracking-wider text-white/60">Edit Overview stats</div>
+
+      {/* Key metrics */}
+      <div>
+        <div className="text-[10px] font-bold uppercase text-white/45 mb-2">Key metrics (GHL)</div>
+        <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+          {GHL_FIELDS.map((f) => (
+            <label key={f.k} className="flex flex-col gap-1">
+              <span className="text-[10px] text-white/50">{f.label}</span>
+              <input className={inp} value={String(ghl[f.k])} onChange={(e) => setGhl({ ...ghl, [f.k]: num(e.target.value) })} />
+            </label>
+          ))}
+        </div>
+      </div>
+
+      {/* Revenue history */}
+      <div>
+        <div className="flex items-center justify-between mb-2">
+          <div className="text-[10px] font-bold uppercase text-white/45">Monthly revenue (actuals)</div>
+          <button className="text-[11px] text-cyan-300/80 hover:text-cyan-200" onClick={() => setRevenue([...revenue, { month: 'New 2026', value: 0, real: true }])}>+ Add month</button>
+        </div>
+        <div className="flex flex-col gap-2">
+          {revenue.map((r, i) => (
+            <div key={i} className="flex gap-2">
+              <input className={inp + ' flex-1'} value={r.month} onChange={(e) => setRevenue(revenue.map((x, j) => j === i ? { ...x, month: e.target.value } : x))} placeholder="Month (e.g. Apr 2026)" />
+              <input className={inp + ' w-40'} value={String(r.value)} onChange={(e) => setRevenue(revenue.map((x, j) => j === i ? { ...x, value: num(e.target.value) } : x))} placeholder="Revenue $" />
+              <button className="text-white/30 hover:text-rose-300 px-1" onClick={() => setRevenue(revenue.filter((_, j) => j !== i))}><span className="material-symbols-outlined" style={{ fontSize: 16 }}>close</span></button>
+            </div>
+          ))}
+        </div>
+      </div>
+
+      {/* Ad spend */}
+      <div>
+        <div className="flex items-center justify-between mb-2">
+          <div className="text-[10px] font-bold uppercase text-white/45">Ad spend breakdown</div>
+          <button className="text-[11px] text-cyan-300/80 hover:text-cyan-200" onClick={() => setAdSpend([...adSpend, { agency: 'New', channel: 'Meta', monthly: 0, note: '' }])}>+ Add row</button>
+        </div>
+        <div className="flex flex-col gap-2">
+          {adSpend.map((r, i) => (
+            <div key={i} className="flex gap-2">
+              <input className={inp + ' flex-1'} value={r.agency} onChange={(e) => setAdSpend(adSpend.map((x, j) => j === i ? { ...x, agency: e.target.value } : x))} placeholder="Agency" />
+              <input className={inp + ' w-24'} value={r.channel} onChange={(e) => setAdSpend(adSpend.map((x, j) => j === i ? { ...x, channel: e.target.value } : x))} placeholder="Channel" />
+              <input className={inp + ' w-28'} value={String(r.monthly)} onChange={(e) => setAdSpend(adSpend.map((x, j) => j === i ? { ...x, monthly: num(e.target.value) } : x))} placeholder="$/mo" />
+              <input className={inp + ' flex-1'} value={r.note} onChange={(e) => setAdSpend(adSpend.map((x, j) => j === i ? { ...x, note: e.target.value } : x))} placeholder="Note" />
+              <button className="text-white/30 hover:text-rose-300 px-1" onClick={() => setAdSpend(adSpend.filter((_, j) => j !== i))}><span className="material-symbols-outlined" style={{ fontSize: 16 }}>close</span></button>
+            </div>
+          ))}
+        </div>
+      </div>
+
+      <button onClick={onSave} className="text-[13px] font-bold px-5 py-2 rounded-xl text-white" style={{ background: `linear-gradient(135deg, ${gradientFrom}, ${gradientTo})` }}>Save stats</button>
     </div>
   );
 }
