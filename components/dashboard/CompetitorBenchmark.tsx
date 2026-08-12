@@ -254,7 +254,8 @@ export default function CompetitorBenchmark({
     }
     return c;
   }), [metaComps, pageAuto, clientName]);
-  const client = data.find((c) => c.isClient)!;
+  // Always have a client row, even if saved data somehow lacks one.
+  const client = data.find((c) => c.isClient) || data[0] || { id: 'mine', name: clientName || 'Your location', isClient: true, followers: 0, newFollows: 0, publishedContent: 0 };
   const competitors = data.filter((c) => !c.isClient);
 
   const totals = useMemo(() => ({
@@ -265,9 +266,9 @@ export default function CompetitorBenchmark({
 
   const clientPostShare = pct(client.publishedContent, totals.posts);
   const clientGrowthShare = pct(client.newFollows, totals.follows);
-  const maxFollowers = Math.max(...data.map((c) => c.followers));
-  const maxPosts = Math.max(...data.map((c) => c.publishedContent));
-  const maxFollows = Math.max(...data.map((c) => c.newFollows));
+  const maxFollowers = Math.max(1, ...data.map((c) => c.followers));
+  const maxPosts = Math.max(1, ...data.map((c) => c.publishedContent));
+  const maxFollows = Math.max(1, ...data.map((c) => c.newFollows));
 
   return (
     <div className="glass-card p-6">
