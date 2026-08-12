@@ -42,16 +42,21 @@ type Msg = { role: 'user' | 'assistant'; content: string };
  */
 function GoddessHologram({ mode }: { mode: Mode }) {
   const [imgOk, setImgOk] = useState(true);
+  const [hasClosed, setHasClosed] = useState(true); // goddess-closed.png present?
   if (!imgOk) return <MotherNatureHologram mode={mode} />;
   return (
     <div className={`goddess ${mode === 'speaking' ? 'speaking' : ''}`}>
       <div className="goddess-figure">
         {/* eslint-disable-next-line @next/next/no-img-element */}
-        <img src="/hologram/goddess.png" alt="" className="goddess-img" draggable={false} onError={() => setImgOk(false)} />
+        <img src="/hologram/goddess.png" alt="" className="goddess-img base" draggable={false} onError={() => setImgOk(false)} />
+        {/* Real blink: a closed-eyes frame cross-fades in for a split second.
+            If goddess-closed.png isn't uploaded, she just rests with open eyes. */}
+        {hasClosed && (
+          // eslint-disable-next-line @next/next/no-img-element
+          <img src="/hologram/goddess-closed.png" alt="" className="goddess-img blink" draggable={false} onError={() => setHasClosed(false)} />
+        )}
         <div className="goddess-scan" />
         <div className="goddess-glow" />
-        <span className="goddess-lid l" />
-        <span className="goddess-lid r" />
         <span className="goddess-mouth" />
       </div>
     </div>
@@ -387,28 +392,23 @@ export default function JarvisFab() {
         .goddess-img {
           display: block; height: 100%; width: auto; max-width: 100%;
           filter: drop-shadow(0 0 26px rgba(74,184,206,0.45)) drop-shadow(0 0 48px rgba(74,184,206,0.25));
-          animation: goddess-float 6.5s ease-in-out infinite;
         }
+        .goddess-img.base { animation: goddess-float 6.5s ease-in-out infinite; }
+        /* Closed-eyes frame stacked exactly over the base; fades in for a real,
+           natural blink. Without goddess-closed.png it never renders (no fake lid). */
+        .goddess-img.blink { position: absolute; inset: 0; margin: auto; opacity: 0;
+          animation: goddess-blink 5.4s ease-in-out infinite, goddess-float 6.5s ease-in-out infinite; }
         .goddess-figure > .goddess-scan, .goddess-figure > .goddess-glow { position: absolute; inset: 0; pointer-events: none; }
         .goddess-glow { mix-blend-mode: screen;
           background: radial-gradient(ellipse at 50% 36%, rgba(120,220,255,0.12), transparent 52%); animation: nature-breathe 3.4s ease-in-out infinite; }
         .goddess-scan { opacity: 0.5;
           background: repeating-linear-gradient(0deg, rgba(140,255,235,0.05) 0px, rgba(140,255,235,0.05) 1px, transparent 1px, transparent 3px); }
-        /* Her eyes are OPEN in the art, so blinking = a skin-toned lid that
-           briefly sweeps down. Eyes ~32% down at ~44%/58% across; mouth ~44% down. */
-        .goddess-lid { position: absolute; top: 30.5%; width: 8.5%; height: 4.2%;
-          border-radius: 48% 48% 45% 45%; transform-origin: center top; transform: scaleY(0);
-          background: linear-gradient(180deg, rgba(150,196,236,0.98), rgba(116,164,214,0.94));
-          box-shadow: inset 0 1px 2px rgba(200,230,255,0.4);
-          animation: goddess-blink 4.6s ease-in-out infinite; }
-        .goddess-lid.l { left: 39.5%; }
-        .goddess-lid.r { left: 53.5%; }
         .goddess-mouth { position: absolute; top: 42.5%; left: 45.5%; width: 9%; height: 1.9%;
-          border-radius: 50%; background: radial-gradient(ellipse, rgba(180,255,245,0.75), rgba(74,184,206,0.28));
-          box-shadow: 0 0 12px rgba(120,255,220,0.6); opacity: 0; transform-origin: center; }
-        .goddess.speaking .goddess-mouth { opacity: 0.8; animation: goddess-talk 200ms ease-in-out infinite; }
-        /* Blink: lid closed only for a split second each cycle. */
-        @keyframes goddess-blink { 0%, 93%, 100% { transform: scaleY(0); } 96%, 97.5% { transform: scaleY(1.1); } }
+          border-radius: 50%; background: radial-gradient(ellipse, rgba(180,255,245,0.7), rgba(74,184,206,0.25));
+          box-shadow: 0 0 12px rgba(120,255,220,0.55); opacity: 0; transform-origin: center; }
+        .goddess.speaking .goddess-mouth { opacity: 0.75; animation: goddess-talk 200ms ease-in-out infinite; }
+        /* Blink: closed frame visible only ~120ms each cycle, quick ease. */
+        @keyframes goddess-blink { 0%, 92%, 100% { opacity: 0; } 95%, 96.5% { opacity: 1; } }
         @keyframes goddess-talk { 0%, 100% { transform: scaleY(0.5); } 50% { transform: scaleY(2.2); } }
         @keyframes goddess-float { 0%, 100% { transform: translateY(0); } 50% { transform: translateY(-7px); } }
       `}</style>
