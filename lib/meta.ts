@@ -63,6 +63,19 @@ async function metaFetch<T>(
 }
 
 // ───────────────────────────────────────────────────────────────
+// Ad accounts (for the picker — every account the token can see)
+// ───────────────────────────────────────────────────────────────
+export type MetaAdAccountStub = { id: string; accountId: string; name: string; status: number; currency?: string };
+
+export async function fetchAdAccounts(): Promise<MetaAdAccountStub[]> {
+  const data = await metaFetch<{ data: Array<{ id: string; account_id: string; name: string; account_status: number; currency?: string }> }>(
+    `/me/adaccounts`,
+    { fields: 'id,account_id,name,account_status,currency', limit: '200' },
+  );
+  return (data.data || []).map((a) => ({ id: a.id, accountId: a.account_id, name: a.name, status: a.account_status, currency: a.currency }));
+}
+
+// ───────────────────────────────────────────────────────────────
 // Campaigns
 // ───────────────────────────────────────────────────────────────
 export type MetaCampaign = {

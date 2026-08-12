@@ -65,6 +65,43 @@ export default function MetaAdsDashboardPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
+  // The account the user selected for this client (client_kv 'meta_ads') takes
+  // priority over the static lib/clients.ts config.
+  const [metaKv, setMetaKv] = useState<any>(null);
+  const [kvLoaded, setKvLoaded] = useState(false);
+  const [accounts, setAccounts] = useState<{ id: string; accountId: string; name: string; status: number }[]>([]);
+  const [showPicker, setShowPicker] = useState(false);
+  const [loadingAccounts, setLoadingAccounts] = useState(false);
+  const [savingSel, setSavingSel] = useState(false);
+
+  useEffect(() => {
+    setKvLoaded(false); setShowPicker(false);
+    fetch(`/api/client-kv?clientId=${encodeURIComponent(activeClient.id)}&key=meta_ads`)
+      .then((r) => r.json())
+      .then((d) => setMetaKv(d?.value && typeof d.value === 'object' ? d.value : null))
+      .catch(() => setMetaKv(null))
+      .finally(() => setKvLoaded(true));
+  }, [activeClient.id]);
+
+  async function openPicker() {
+    setShowPicker(true);
+    if (accounts.length === 0) {
+      setLoadingAccounts(true);
+      try {
+        const d = await fetch('/api/meta/accounts').then((r) => r.json());
+        setAccounts(Array.isArray(d.accounts) ? d.accounts : []);
+      } catch { setAccounts([]); } finally { setLoadingAccounts(false); }
+    }
+  }
+  async function selectAccount(acctId: string) {
+    setSavingSel(true);
+    const value = { ...(metaKv || {}), adAccountId: acctId };
+    try {
+      await fetch('/api/client-kv', { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ clientId: activeClient.id, key: 'meta_ads', value }) });
+      setMetaKv(value); setShowPicker(false);
+    } finally { setSavingSel(false); }
+  }
+
   // Resolve which ad account to pull from:
   //  1. If the active client has metaAds.adAccountId saved → use that
   //  2. Otherwise fall back to undefined, which makes the API use the
@@ -72,7 +109,7 @@ export default function MetaAdsDashboardPage() {
   //
   // Graph requires the "act_" prefix. We save IDs without it on some clients
   // so we normalize here.
-  const rawId = activeClient.metaAds?.adAccountId;
+  const rawId = metaKv?.adAccountId || activeClient.metaAds?.adAccountId;
   const clientAdAccountId = rawId
     ? rawId.startsWith('act_') ? rawId : `act_${rawId}`
     : undefined;
@@ -87,6 +124,7 @@ export default function MetaAdsDashboardPage() {
     : `MNA house account · ${activeClient.shortName} has no Meta account on file`;
 
   useEffect(() => {
+    if (!kvLoaded) return; // wait until we know the client's selected account
     let cancelled = false;
     (async () => {
       setLoading(true);
@@ -109,7 +147,7 @@ export default function MetaAdsDashboardPage() {
       }
     })();
     return () => { cancelled = true; };
-  }, [datePreset, accountQuery]);
+  }, [datePreset, accountQuery, kvLoaded]);
 
   const kpis = insights ? [
     { label: 'Total Spend',       value: formatUSD(insights.totals.totalSpend),       color: '#f59e0b' },
@@ -131,10 +169,48 @@ export default function MetaAdsDashboardPage() {
           <p className="text-white/60 mt-1 text-sm">
             {accountLabel} · Live Graph API pull
           </p>
-          {!hasClientAccount && activeClient.id !== 'mna' && (
-            <p className="text-amber-300/80 mt-1 text-xs">
-              ⚠ No Meta ad account configured for {activeClient.name}. Showing the MNA house account instead. Add metaAds.adAccountId in lib/clients.ts to fix.
-            </p>
+          {/* Account picker — collapsed to the selected account; expand to change/add */}
+          <div className="mt-2 flex items-center gap-2 flex-wrap">
+            {hasClientAccount ? (
+              <span className="text-[11px] px-2 py-1 rounded-lg bg-white/10 text-white/80 font-mono">{clientAdAccountId}</span>
+            ) : activeClient.id !== 'mna' ? (
+              <span className="text-[11px] text-amber-300/80">No account selected — showing MNA house account</span>
+            ) : null}
+            {activeClient.id !== 'mna' && (
+              <button
+                onClick={() => (showPicker ? setShowPicker(false) : openPicker())}
+                className="text-[11px] font-semibold text-cyan-300/80 hover:text-cyan-200"
+              >
+                {showPicker ? 'Hide accounts' : hasClientAccount ? 'Change / add another account' : 'Select an account'}
+              </button>
+            )}
+          </div>
+          {showPicker && (
+            <div className="mt-2 glass-card p-2 max-w-xl max-h-72 overflow-y-auto flex flex-col gap-1">
+              {loadingAccounts ? (
+                <div className="text-[12px] text-white/50 px-2 py-2">Loading your ad accounts…</div>
+              ) : accounts.length === 0 ? (
+                <div className="text-[12px] text-white/50 px-2 py-2">No ad accounts returned (check META_ACCESS_TOKEN).</div>
+              ) : (
+                accounts.map((a) => {
+                  const selected = (metaKv?.adAccountId || '').replace(/^act_/, '') === a.accountId;
+                  return (
+                    <button
+                      key={a.id}
+                      disabled={savingSel}
+                      onClick={() => selectAccount(a.accountId)}
+                      className={`flex items-center justify-between gap-2 text-left px-2.5 py-1.5 rounded-lg text-[12px] ${selected ? 'bg-emerald-500/15 text-emerald-200' : 'text-white/75 hover:bg-white/5'}`}
+                    >
+                      <span className="truncate flex items-center gap-2">
+                        {a.status !== 1 && <span className="text-[9px] px-1.5 py-0.5 rounded bg-amber-500/20 text-amber-300 shrink-0">inactive</span>}
+                        {a.name}
+                      </span>
+                      <span className="font-mono text-white/45 shrink-0">act_{a.accountId}{selected ? ' ✓' : ''}</span>
+                    </button>
+                  );
+                })
+              )}
+            </div>
           )}
         </div>
         <select
