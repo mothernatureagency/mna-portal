@@ -89,7 +89,7 @@ const GHL_BLANK: GhlStats = {
 
 type RevRow = { month: string; value: number; real?: boolean };
 type AdRow = { agency: string; channel: string; monthly: number; note: string };
-type OverviewStats = { ghl: GhlStats; revenue: RevRow[]; adSpend: AdRow[] };
+type OverviewStats = { ghl: GhlStats; revenue: RevRow[]; adSpend: AdRow[]; revenueGoal?: number | null };
 
 function fmtUSD(n: number) {
   return new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD', maximumFractionDigits: 0 }).format(n);
@@ -121,6 +121,7 @@ export default function NicevilleDashboard({ client }: { client: Client }) {
   const [revenue, setRevenue] = useState<RevRow[]>([]);
   const [adSpend, setAdSpend] = useState<AdRow[]>([]);
   const [hasStats, setHasStats] = useState(false);
+  const [revenueGoal, setRevenueGoal] = useState<number | null>(null);
   const [editing, setEditing] = useState(false);
   const [savedFlash, setSavedFlash] = useState(false);
 
@@ -142,6 +143,7 @@ export default function NicevilleDashboard({ client }: { client: Client }) {
           setAdSpend(Array.isArray(v!.adSpend) ? v!.adSpend : []);
           setHasStats(true);
         } else { seedNiceville(); }
+        if (v && typeof v.revenueGoal === 'number') setRevenueGoal(v.revenueGoal);
       })
       .catch(() => { if (!cancel) seedNiceville(); });
     return () => { cancel = true; };
@@ -150,7 +152,7 @@ export default function NicevilleDashboard({ client }: { client: Client }) {
   async function saveStats() {
     await fetch('/api/client-kv', {
       method: 'PUT', headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ clientId: client.id, key: 'overview_stats', value: { ghl, revenue, adSpend } }),
+      body: JSON.stringify({ clientId: client.id, key: 'overview_stats', value: { ghl, revenue, adSpend, revenueGoal } }),
     }).catch(() => {});
     setSavedFlash(true); setTimeout(() => setSavedFlash(false), 1500);
     setEditing(false);
@@ -200,6 +202,7 @@ export default function NicevilleDashboard({ client }: { client: Client }) {
           ghl={ghl} setGhl={setGhl}
           revenue={revenue} setRevenue={setRevenue}
           adSpend={adSpend} setAdSpend={setAdSpend}
+          revenueGoal={revenueGoal} setRevenueGoal={setRevenueGoal}
           onSave={saveStats}
           gradientFrom={gradientFrom} gradientTo={gradientTo}
         />
@@ -343,18 +346,32 @@ export default function NicevilleDashboard({ client }: { client: Client }) {
       <div>
         <SectionLabel>Revenue · Actuals and Q2 projections</SectionLabel>
         <div className="glass-card p-6">
-          <div className="flex items-center justify-between mb-4">
+          <div className="flex items-center justify-between mb-4 flex-wrap gap-3">
             <div>
               <div className="text-[15px] font-bold text-white">Monthly revenue</div>
               <div className="text-[11px] text-white/70">
                 {revenue.length >= 2 ? `Actuals + projection at ${fmtPct(avgGrowth)} MoM` : 'Add monthly revenue in Edit stats'}
               </div>
             </div>
-            <div className="text-right">
-              <div className="text-[10px] font-bold uppercase tracking-wider text-white/60">Projected next-quarter total</div>
-              <div className="text-[22px] font-black text-white">{revenue.length >= 2 ? fmtUSD(q2Total) : DASH}</div>
+            <div className="flex items-center gap-6">
+              {revenueGoal != null && revenueGoal > 0 && (
+                <div className="text-right">
+                  <div className="text-[10px] font-bold uppercase tracking-wider text-white/60">Monthly goal</div>
+                  <div className="text-[22px] font-black" style={{ color: gradientFrom }}>{fmtUSD(revenueGoal)}</div>
+                  {revenue.length > 0 && <div className="text-[10px] text-white/70">{Math.round((lastRev.value / revenueGoal) * 100)}% of goal · {lastRev.month.split(' ')[0]}</div>}
+                </div>
+              )}
+              <div className="text-right">
+                <div className="text-[10px] font-bold uppercase tracking-wider text-white/60">Projected next-quarter total</div>
+                <div className="text-[22px] font-black text-white">{revenue.length >= 2 ? fmtUSD(q2Total) : DASH}</div>
+              </div>
             </div>
           </div>
+          {revenueGoal != null && revenueGoal > 0 && revenue.length > 0 && (
+            <div className="h-2 rounded-full overflow-hidden bg-white/10 mb-4">
+              <div className="h-full rounded-full" style={{ width: `${Math.min(100, Math.round((lastRev.value / revenueGoal) * 100))}%`, background: `linear-gradient(90deg, ${gradientFrom}, ${gradientTo})` }} />
+            </div>
+          )}
           {revenue.length === 0 ? (
             <div className="h-40 mb-4 grid place-items-center text-[12px] text-white/40 border border-dashed border-white/10 rounded-xl">
               No revenue entered yet — click <span className="text-white/70 font-semibold mx-1">Edit stats</span> to add monthly figures.
@@ -482,11 +499,12 @@ export default function NicevilleDashboard({ client }: { client: Client }) {
 }
 
 function StatsEditor({
-  ghl, setGhl, revenue, setRevenue, adSpend, setAdSpend, onSave, gradientFrom, gradientTo,
+  ghl, setGhl, revenue, setRevenue, adSpend, setAdSpend, revenueGoal, setRevenueGoal, onSave, gradientFrom, gradientTo,
 }: {
   ghl: GhlStats; setGhl: (v: GhlStats) => void;
   revenue: RevRow[]; setRevenue: (v: RevRow[]) => void;
   adSpend: AdRow[]; setAdSpend: (v: AdRow[]) => void;
+  revenueGoal: number | null; setRevenueGoal: (v: number | null) => void;
   onSave: () => void; gradientFrom: string; gradientTo: string;
 }) {
   const inp = 'text-[13px] px-2.5 py-1.5 rounded-lg bg-white/5 border border-white/10 text-white outline-none w-full';
@@ -504,6 +522,14 @@ function StatsEditor({
   return (
     <div className="glass-card p-5 space-y-5" style={{ borderLeft: `3px solid ${gradientFrom}` }}>
       <div className="text-[11px] font-bold uppercase tracking-wider text-white/60">Edit Overview stats</div>
+
+      {/* Monthly revenue goal */}
+      <label className="flex items-center gap-2 flex-wrap">
+        <span className="text-[10px] font-bold uppercase text-white/45">Monthly revenue goal ($)</span>
+        <input className={inp + ' w-40'} value={revenueGoal == null ? '' : String(revenueGoal)} placeholder="e.g. 150000"
+          onChange={(e) => { const s = e.target.value.replace(/[^0-9.]/g, ''); setRevenueGoal(s === '' ? null : (Number(s) || 0)); }} />
+        <span className="text-[10px] text-white/40">shows a progress bar + % to goal on the revenue chart</span>
+      </label>
 
       {/* Key metrics */}
       <div>
