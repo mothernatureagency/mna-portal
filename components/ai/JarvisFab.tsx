@@ -198,9 +198,12 @@ export default function JarvisFab() {
     speakingTimeoutRef.current = window.setTimeout(() => setMode('idle'), ms);
   }
 
-  // Speak in a natural ElevenLabs voice (Rachel), slower + calmer. Optionally
-  // start listening once she finishes (so the mic never fights her audio).
-  const MOTHER_VOICE = '21m00Tcm4TlvDq8ikWAM';
+  // Speak in a natural ElevenLabs voice, slower + calmer. Optionally start
+  // listening once she finishes (so the mic never fights her audio).
+  // British, cool/angelic — "Alice". Alternatives to swap in:
+  //   Lily (softer British) pFZP5JQG7iQjIQuC4Bku · Charlotte (ethereal) XB0fDUnXU5powFXDhCwa
+  //   Dorothy (British, pleasant) ThT5KcBeYPX3keUQqHPh · Rachel (US warm) 21m00Tcm4TlvDq8ikWAM
+  const MOTHER_VOICE = 'Xb7hH8MSUJpSbSDYk0k2';
   const startListenRef = useRef<(() => void) | null>(null);
   const speakHer = useCallback(async (text: string, thenListen = false) => {
     const clean = sanitizeForDisplay(text) || text;
