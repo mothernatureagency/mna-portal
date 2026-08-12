@@ -260,8 +260,8 @@ export default function NicevilleDashboard({ client }: { client: Client }) {
           <TikTokContentPlan
             ownerKey={client.id}
             kvClientId={client.id}
-            label="Prime IV Niceville"
-            niche="IV therapy / wellness / local Niceville FL"
+            label={client.name}
+            niche={`IV therapy / wellness / ${client.shortName}`}
             gradientFrom={gradientFrom}
             gradientTo={gradientTo}
           />

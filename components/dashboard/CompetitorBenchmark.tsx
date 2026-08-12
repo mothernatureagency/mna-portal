@@ -37,11 +37,19 @@ type GoogleComp = {
 
 // ─── DATA ────────────────────────────────────────────────────────────
 // Source: Meta Business Suite Benchmarking, Mar 19 – Apr 15, 2026 (28d)
+// Niceville's confirmed seed data — used ONLY for the Niceville client. Every
+// other client starts blank (their own row + no competitors) so no one ever
+// sees "Niceville" or "Destin" on their dashboard.
 const COMPETITORS_28D: Competitor[] = [
   { id: 'niceville',  name: 'Prime IV Niceville',    isClient: true, followers: 387,  newFollows: 15, publishedContent: 15 },
   { id: 'destin',     name: 'Prime IV Destin',                       followers: 504,  newFollows: 3,  publishedContent: 7  },
   { id: 'aqua-vitae', name: 'Aqua Vitae IV Drip Bar',                followers: 1100, newFollows: 8,  publishedContent: 5  },
 ];
+
+function defaultComps(clientId?: string, clientName?: string): Competitor[] {
+  if (clientId === 'prime-iv') return COMPETITORS_28D;
+  return [{ id: 'mine', name: clientName || 'Your location', isClient: true, followers: 0, newFollows: 0, publishedContent: 0 }];
+}
 
 // ─── HELPERS ─────────────────────────────────────────────────────────
 function pct(v: number, total: number) {
@@ -77,12 +85,14 @@ export default function CompetitorBenchmark({
   editable?: boolean;
 }) {
   const [tab, setTab] = useState<Tab>('meta');
+  // The client's own row id ('niceville' only for the Niceville client; 'mine' otherwise).
+  const ownId = clientId === 'prime-iv' ? 'niceville' : 'mine';
 
   // Meta competitor numbers — manual, persisted in client_kv (key
   // `meta_competitors`). Seeded from the hand-fed defaults until saved values
   // load. The client's own row is auto-filled from the connected Page when
   // available (see pageAuto below).
-  const [metaComps, setMetaComps] = useState<Competitor[]>(COMPETITORS_28D);
+  const [metaComps, setMetaComps] = useState<Competitor[]>(() => defaultComps(clientId, clientName));
   const [metaEditing, setMetaEditing] = useState(false);
   const [pageAuto, setPageAuto] = useState<{ followers: number | null; publishedContent: number | null } | null>(null);
 
@@ -116,6 +126,8 @@ export default function CompetitorBenchmark({
   function updateComp(idx: number, patch: Partial<Competitor>) {
     setMetaComps((prev) => prev.map((c, i) => (i === idx ? { ...c, ...patch } : c)));
   }
+  function addComp() { saveMetaComps([...metaComps, { id: `c_${Date.now().toString(36)}`, name: 'New competitor', followers: 0, newFollows: 0, publishedContent: 0 }]); }
+  function removeComp(idx: number) { saveMetaComps(metaComps.filter((_, i) => i !== idx)); }
   // Google place IDs per competitor slot — stored in client_kv so both
   // staff + client portal can see them. Keyed by competitor id.
   const [placeIds, setPlaceIds] = useState<Record<string, string>>({});
@@ -157,7 +169,7 @@ export default function CompetitorBenchmark({
       ]);
       // Seed the client's own place id from the main reviews card
       const next = { ...comps };
-      if (clientOwn) next.niceville = clientOwn;
+      if (clientOwn) next[ownId] = clientOwn;
       setPlaceIds(next);
 
       // Fetch live data + snapshot each
@@ -193,7 +205,7 @@ export default function CompetitorBenchmark({
       method: 'PUT', headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ clientId, key: 'google_competitor_place_ids', value: next }),
     }).catch(() => {});
-    if (compId === 'niceville') {
+    if (compId === ownId) {
       await fetch('/api/client-kv', {
         method: 'PUT', headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ clientId, key: 'google_place_id', value: id }),
@@ -339,13 +351,20 @@ export default function CompetitorBenchmark({
                     const numStyle = { background: 'rgba(0,0,0,0.35)', borderColor: 'rgba(255,255,255,0.18)' } as React.CSSProperties;
                     return (
                       <div key={c.id} className="grid grid-cols-[1.6fr_1fr_1fr_1fr] gap-2 items-center">
-                        <input
-                          value={c.name}
-                          onChange={(e) => updateComp(idx, { name: e.target.value })}
-                          onBlur={() => saveMetaComps(metaComps)}
-                          className="w-full px-2 py-1.5 rounded-lg border text-white text-[12px] focus:outline-none"
-                          style={numStyle}
-                        />
+                        <div className="flex items-center gap-1">
+                          <input
+                            value={c.name}
+                            onChange={(e) => updateComp(idx, { name: e.target.value })}
+                            onBlur={() => saveMetaComps(metaComps)}
+                            className="w-full px-2 py-1.5 rounded-lg border text-white text-[12px] focus:outline-none"
+                            style={numStyle}
+                          />
+                          {!c.isClient && (
+                            <button onClick={() => removeComp(idx)} className="text-white/30 hover:text-rose-300 shrink-0" title="Remove competitor">
+                              <span className="material-symbols-outlined" style={{ fontSize: 15 }}>close</span>
+                            </button>
+                          )}
+                        </div>
                         <input
                           type="number" inputMode="numeric"
                           value={followersAuto ? (pageAuto!.followers ?? 0) : c.followers}
@@ -374,6 +393,7 @@ export default function CompetitorBenchmark({
                       </div>
                     );
                   })}
+                  <button onClick={addComp} className="text-[11px] font-semibold text-cyan-300/80 hover:text-cyan-200 pt-1">+ Add competitor</button>
                   <div className="text-[9px] text-white/40 pt-1">
                     Numbers save as you type. Greyed cells are pulled live from your connected Page and can't be overwritten.
                   </div>

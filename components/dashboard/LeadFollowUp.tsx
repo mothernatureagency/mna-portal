@@ -5,7 +5,7 @@ import Card from '@/components/ui/Card';
 
 const tasks = [
   { name: 'Sarah M. — Spring Lead Gen', detail: 'Consultation booked, no follow-up sent. High-intent signal.', label: '72h overdue', color: '#ef4444', bg: '#fef2f2', border: '#ef4444' },
-  { name: 'Prime IV Niceville — Retargeting', detail: 'Opened pricing page 3x. Send case study + promo now.', label: '48h overdue', color: '#ef4444', bg: '#fef2f2', border: '#ef4444' },
+  { name: 'High-Intent Retargeting', detail: 'Opened pricing page 3x. Send case study + promo now.', label: '48h overdue', color: '#ef4444', bg: '#fef2f2', border: '#ef4444' },
   { name: '6 Email Re-engage Leads', detail: 'Re-engage sequence day 3 — 32% open rate on last send.', label: 'Due today', color: '#d97706', bg: '#fffbeb', border: '#f59e0b' },
   { name: 'LinkedIn Hot Prospects (4)', detail: 'Organic +34% MoM — personalized DM outreach window open.', label: 'Due today', color: '#d97706', bg: '#fffbeb', border: '#f59e0b' },
   { name: 'New Leads Intake (47)', detail: 'Initial welcome sequence queued. Review & personalize top 10.', label: 'This week', color: '#16a34a', bg: '#f0fdf4', border: '#22c55e' },
@@ -13,7 +13,7 @@ const tasks = [
 
 const appointments = [
   { time: '10:00 AM', name: 'Discovery Call — J. Torres', sub: 'Spring Lead Gen • Zoom', dot: '#22c55e', bg: '#eff6ff', color: '#3b82f6' },
-  { time: '2:00 PM', name: 'Strategy Review — Prime IV', sub: 'Retargeting Q1 • In-person', dot: '#f59e0b', bg: '#f5f3ff', color: '#7c3aed' },
+  { time: '2:00 PM', name: 'Strategy Review', sub: 'Retargeting Q1 • In-person', dot: '#f59e0b', bg: '#f5f3ff', color: '#7c3aed' },
   { time: '4:30 PM', name: 'Onboarding Call — New Client', sub: 'Email Re-engage • Zoom', dot: '#22c55e', bg: '#fdf2f8', color: '#be185d' },
 ];
 
