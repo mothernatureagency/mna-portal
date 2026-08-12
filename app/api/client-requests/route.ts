@@ -22,7 +22,9 @@ export async function GET(req: NextRequest) {
   const assignedTo = req.nextUrl.searchParams.get('assignedTo') || '';
 
   if (role === 'client') {
-    clientId = userClientId || 'prime-iv';
+    // A client only ever sees their own location's tasks. If their account has
+    // no client_id set, show nothing — never fall back to Niceville ('prime-iv').
+    clientId = userClientId || '__no_client__';
   }
 
   // Build query dynamically
