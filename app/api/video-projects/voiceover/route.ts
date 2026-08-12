@@ -30,11 +30,13 @@ export async function POST(req: NextRequest) {
   }
 
   let b: any; try { b = await req.json(); } catch { return NextResponse.json({ error: 'Invalid JSON' }, { status: 400 }); }
-  const { script, voiceId, modelId } = b || {};
+  const { script, voiceId, modelId, speed, stability, style } = b || {};
   if (!script) return NextResponse.json({ error: 'script required' }, { status: 400 });
 
   const useVoice = voiceId || DEFAULT_VOICE_ID;
   const useModel = modelId || DEFAULT_MODEL;
+  // ElevenLabs speed: 0.7 (slower) … 1.2 (faster). Default 1.0.
+  const useSpeed = typeof speed === 'number' ? Math.min(1.2, Math.max(0.7, speed)) : undefined;
 
   try {
     const r = await fetch(`https://api.elevenlabs.io/v1/text-to-speech/${useVoice}`, {
@@ -48,10 +50,11 @@ export async function POST(req: NextRequest) {
         text: String(script).slice(0, 5000),
         model_id: useModel,
         voice_settings: {
-          stability: 0.5,
+          stability: typeof stability === 'number' ? stability : 0.5,
           similarity_boost: 0.75,
-          style: 0.3,
+          style: typeof style === 'number' ? style : 0.3,
           use_speaker_boost: true,
+          ...(useSpeed !== undefined ? { speed: useSpeed } : {}),
         },
       }),
     });

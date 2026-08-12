@@ -198,27 +198,31 @@ export default function JarvisFab() {
     speakingTimeoutRef.current = window.setTimeout(() => setMode('idle'), ms);
   }
 
-  // Speak in a natural ElevenLabs voice (Rachel); fall back to browser TTS.
+  // Speak in a natural ElevenLabs voice (Rachel), slower + calmer. Optionally
+  // start listening once she finishes (so the mic never fights her audio).
   const MOTHER_VOICE = '21m00Tcm4TlvDq8ikWAM';
-  const speakHer = useCallback(async (text: string) => {
+  const startListenRef = useRef<(() => void) | null>(null);
+  const speakHer = useCallback(async (text: string, thenListen = false) => {
     const clean = sanitizeForDisplay(text) || text;
     try { audioRef.current?.pause(); } catch {}
     try { cancelSpeak(); } catch {}
     setMode('speaking');
+    const listenAfter = () => { if (thenListen) window.setTimeout(() => { try { startListenRef.current?.(); } catch {} }, 300); };
     try {
       const res = await fetch('/api/video-projects/voiceover', {
         method: 'POST', headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ script: clean.slice(0, 900), voiceId: MOTHER_VOICE }),
+        body: JSON.stringify({ script: clean.slice(0, 900), voiceId: MOTHER_VOICE, speed: 0.85, stability: 0.6, style: 0.15 }),
       });
       if (!res.ok) throw new Error('tts');
       const url = URL.createObjectURL(await res.blob());
       const a = new Audio(url);
       audioRef.current = a;
-      a.onended = () => { setMode('idle'); URL.revokeObjectURL(url); };
-      a.onerror = () => setMode('idle');
+      a.onended = () => { setMode('idle'); URL.revokeObjectURL(url); listenAfter(); };
+      a.onerror = () => { setMode('idle'); listenAfter(); };
       await a.play();
     } catch {
       speak(clean); // browser fallback if the key/endpoint isn't available
+      if (thenListen) window.setTimeout(listenAfter, Math.min(9000, 1200 + clean.length * 55));
     }
   }, []);
 
@@ -255,7 +259,7 @@ export default function JarvisFab() {
         const displayed = sanitizeForDisplay(reply) || reply;
         setMsgs((m) => [...m, { role: 'assistant', content: displayed }]);
         if (viaVoice) {
-          speakHer(reply);
+          speakHer(reply, true); // speak, then listen again for a natural back-and-forth
         } else {
           setMode('idle');
         }
@@ -278,6 +282,8 @@ export default function JarvisFab() {
     onFinalResult: onVoiceFinal,
     continuous: false,
   });
+  // Let speakHer() trigger listening once she finishes talking.
+  useEffect(() => { startListenRef.current = () => { try { audioRef.current?.pause(); } catch {} start(); }; }, [start]);
 
   // Orb pulses in sync with any speech playing anywhere in the app.
   useEffect(() => {
@@ -295,13 +301,11 @@ export default function JarvisFab() {
 
   useEffect(() => { if (listening) setMode('listening'); }, [listening]);
 
-  // Open + greet aloud + start listening — used by the orb tap and the wake word.
+  // Open + greet aloud, then start listening once she finishes (no mic/audio clash).
   const activate = useCallback(() => {
     setOpen(true);
-    const greet = "I'm here — what do you need?";
-    speakHer(greet);
-    window.setTimeout(() => { if (supported) { try { start(); } catch {} } }, 1100);
-  }, [supported, start]);
+    speakHer("I'm here — what do you need?", true);
+  }, [speakHer]);
 
   // Wake word — while the panel is closed, listen for "mother / mother nature /
   // mother earth" and open her automatically. Needs mic permission + a prior
@@ -520,6 +524,7 @@ export default function JarvisFab() {
                   <button
                     onClick={() => {
                       if (listening) { stop(); setMode('idle'); return; }
+                      try { audioRef.current?.pause(); } catch {}
                       cancelSpeak();
                       start();
                     }}
