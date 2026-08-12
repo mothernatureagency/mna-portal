@@ -16,6 +16,7 @@ export async function GET(req: NextRequest) {
   const meta = (user?.user_metadata || {}) as Record<string, unknown>;
   const role = (meta.role as string) || 'staff';
   const userClientId = (meta.client_id as string) || '';
+  const userEmail = (user?.email || '').toLowerCase();
 
   let clientId = req.nextUrl.searchParams.get('clientId') || '';
   const assignedTo = req.nextUrl.searchParams.get('assignedTo') || '';
@@ -36,6 +37,19 @@ export async function GET(req: NextRequest) {
   if (assignedTo) {
     params.push(assignedTo);
     conditions.push(`assigned_to = $${params.length}`);
+  }
+
+  // Privacy: only the owner sees everyone's tasks. Other staff see just their
+  // own tasks plus shared team/unassigned ones — never tasks assigned to a
+  // specific other person. (Clients are already scoped to their client_id.)
+  const isOwner = role === 'owner' || userEmail === 'mn@mothernatureagency.com';
+  if (!isOwner && role !== 'client') {
+    if (userEmail) {
+      params.push(userEmail);
+      conditions.push(`(assigned_to IS NULL OR assigned_to = 'team' OR lower(assigned_to) = $${params.length})`);
+    } else {
+      conditions.push(`(assigned_to IS NULL OR assigned_to = 'team')`);
+    }
   }
 
   const where = conditions.length > 0 ? `WHERE ${conditions.join(' AND ')}` : '';
