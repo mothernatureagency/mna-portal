@@ -50,8 +50,8 @@ function GoddessHologram({ mode }: { mode: Mode }) {
         <img src="/hologram/goddess.png" alt="" className="goddess-img" draggable={false} onError={() => setImgOk(false)} />
         <div className="goddess-scan" />
         <div className="goddess-glow" />
-        <span className="goddess-lid l" />
-        <span className="goddess-lid r" />
+        <span className="goddess-eye l" />
+        <span className="goddess-eye r" />
         <span className="goddess-mouth" />
       </div>
     </div>
@@ -268,6 +268,39 @@ export default function JarvisFab() {
 
   useEffect(() => { if (listening) setMode('listening'); }, [listening]);
 
+  // Open + greet aloud + start listening — used by the orb tap and the wake word.
+  const activate = useCallback(() => {
+    setOpen(true);
+    try { cancelSpeak(); } catch {}
+    const greet = "I'm here — what do you need?";
+    setMode('speaking');
+    try { speak(greet); } catch {}
+    scheduleIdle(2600);
+    window.setTimeout(() => { if (supported) { try { start(); } catch {} } }, 1100);
+  }, [supported, start]);
+
+  // Wake word — while the panel is closed, listen for "mother / mother nature /
+  // mother earth" and open her automatically. Needs mic permission + a prior
+  // page interaction (browsers block auto-listen before the first gesture).
+  useEffect(() => {
+    if (open) return;
+    const SR: any = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
+    if (!SR) return;
+    let stopped = false;
+    const r = new SR();
+    r.lang = 'en-US'; r.continuous = true; r.interimResults = true;
+    const WAKE = /\bmother(\s*(nature|earth))?\b/i;
+    r.onresult = (e: any) => {
+      for (let i = e.resultIndex; i < e.results.length; i++) {
+        if (WAKE.test(e.results[i][0].transcript)) { stopped = true; try { r.stop(); } catch {} activate(); return; }
+      }
+    };
+    r.onerror = () => {};
+    r.onend = () => { if (!stopped && !open) { try { r.start(); } catch {} } };
+    try { r.start(); } catch {}
+    return () => { stopped = true; try { r.stop(); } catch {} };
+  }, [open, activate]);
+
   // Keep the conversation scrolled to the newest message.
   useEffect(() => {
     if (scrollRef.current) scrollRef.current.scrollTop = scrollRef.current.scrollHeight;
@@ -361,18 +394,21 @@ export default function JarvisFab() {
           background: radial-gradient(ellipse at 50% 36%, rgba(120,220,255,0.12), transparent 52%); animation: nature-breathe 3.4s ease-in-out infinite; }
         .goddess-scan { opacity: 0.5;
           background: repeating-linear-gradient(0deg, rgba(140,255,235,0.05) 0px, rgba(140,255,235,0.05) 1px, transparent 1px, transparent 3px); }
-        /* Eyes ~35% down, at ~42% and ~56% across; mouth ~48% down, centered. */
-        .goddess-lid { position: absolute; top: 33.5%; width: 8%; height: 3.4%;
-          border-radius: 50%; background: radial-gradient(ellipse, rgba(20,58,92,0.96), rgba(14,40,68,0.55));
-          box-shadow: 0 0 6px rgba(20,58,92,0.7); transform: scaleY(0); transform-origin: center top;
-          animation: goddess-blink 5.4s infinite; }
-        .goddess-lid.l { left: 37.5%; }
-        .goddess-lid.r { left: 53%; }
+        /* Eyes glow OPEN over her closed lids (~35% down, at ~42%/56% across) and
+           blink naturally (brief close). Mouth ~48% down, centered. */
+        .goddess-eye { position: absolute; top: 33%; width: 7.5%; height: 3.6%;
+          border-radius: 50%; transform-origin: center;
+          background: radial-gradient(ellipse, rgba(225,250,255,0.95), rgba(130,225,255,0.6) 55%, transparent 78%);
+          box-shadow: 0 0 14px rgba(150,230,255,0.9), 0 0 26px rgba(120,220,255,0.5);
+          opacity: 0.9; animation: goddess-eyeblink 5s ease-in-out infinite; }
+        .goddess-eye.l { left: 38%; }
+        .goddess-eye.r { left: 54.5%; }
         .goddess-mouth { position: absolute; top: 47%; left: 45%; width: 9%; height: 1.7%;
           border-radius: 50%; background: radial-gradient(ellipse, rgba(180,255,245,0.8), rgba(74,184,206,0.3));
           box-shadow: 0 0 12px rgba(120,255,220,0.7); opacity: 0; transform-origin: center; }
         .goddess.speaking .goddess-mouth { opacity: 0.85; animation: goddess-talk 200ms ease-in-out infinite; }
-        @keyframes goddess-blink { 0%, 91%, 100% { transform: scaleY(0); } 94%, 97% { transform: scaleY(1); } }
+        /* Eyes stay open + glowing, then blink (dim + squish) briefly. */
+        @keyframes goddess-eyeblink { 0%, 92%, 100% { opacity: 0.92; transform: scaleY(1); } 95%, 97% { opacity: 0.15; transform: scaleY(0.12); } }
         @keyframes goddess-talk { 0%, 100% { transform: scaleY(0.5); } 50% { transform: scaleY(2.2); } }
         @keyframes goddess-float { 0%, 100% { transform: translateY(0); } 50% { transform: translateY(-7px); } }
       `}</style>
@@ -497,7 +533,7 @@ export default function JarvisFab() {
             type="button"
             onClick={() => {
               if (open) { cancelSpeak(); if (listening) stop(); setOpen(false); setMode('idle'); }
-              else setOpen(true);
+              else activate();
             }}
             title={open ? 'Close Mother Nature' : 'Talk to Mother Nature'}
             aria-label="Mother Nature assistant"

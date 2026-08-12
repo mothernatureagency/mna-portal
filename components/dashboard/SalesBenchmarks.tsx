@@ -24,7 +24,8 @@ type Entry = {
 };
 
 type Metric = 'leads' | 'bookings' | 'revenue' | 'conversion' | 'memberships';
-type CompKey = 'mine' | 'destin' | 'corporate';
+type CompKey = string;
+type Comp = { key: CompKey; label: string; sub: string };
 
 const METRICS: { key: Metric; label: string; fmt: (n: number) => string; icon: string }[] = [
   { key: 'revenue',     label: 'Revenue',       fmt: (n) => `$${Math.round(n).toLocaleString()}`, icon: 'payments' },
@@ -34,9 +35,9 @@ const METRICS: { key: Metric; label: string; fmt: (n: number) => string; icon: s
   { key: 'memberships', label: 'Memberships',   fmt: (n) => n.toLocaleString(),                   icon: 'card_membership' },
 ];
 
-const COMPETITORS: { key: CompKey; label: string; sub: string }[] = [
-  { key: 'mine',      label: 'Niceville',      sub: 'Your location' },
-  { key: 'destin',    label: 'Destin',         sub: 'Area developer' },
+const COMPETITORS_DEFAULT: Comp[] = [
+  { key: 'mine',      label: 'Your location',  sub: 'This spa' },
+  { key: 'destin',    label: 'Competitor A',   sub: 'Area developer' },
   { key: 'corporate', label: 'Corporate avg',  sub: 'Prime IV main' },
 ];
 
@@ -72,13 +73,29 @@ export default function SalesBenchmarks({
   const [editingKey, setEditingKey] = useState<string | null>(null);  // `${comp}-${metric}`
   const [draftValue, setDraftValue] = useState<string>('');
 
+  // Editable competitor columns (persist per client to client_kv).
+  const [competitors, setCompetitors] = useState<Comp[]>(COMPETITORS_DEFAULT);
+  const [editingComps, setEditingComps] = useState(false);
+
   useEffect(() => {
     fetch(`/api/sales-benchmarks?clientId=${encodeURIComponent(clientId)}`)
       .then((r) => r.json())
       .then((d) => setEntries(d.entries || []))
       .catch(() => {})
       .finally(() => setLoading(false));
+    fetch(`/api/client-kv?clientId=${encodeURIComponent(clientId)}&key=sales_competitors`)
+      .then((r) => r.json())
+      .then((d) => { if (Array.isArray(d.value) && d.value.length) setCompetitors(d.value); else setCompetitors(COMPETITORS_DEFAULT); })
+      .catch(() => setCompetitors(COMPETITORS_DEFAULT));
   }, [clientId]);
+
+  function saveCompetitors(next: Comp[]) {
+    setCompetitors(next);
+    fetch('/api/client-kv', { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ clientId, key: 'sales_competitors', value: next }) }).catch(() => {});
+  }
+  function setComp(i: number, patch: Partial<Comp>) { saveCompetitors(competitors.map((c, j) => (j === i ? { ...c, ...patch } : c))); }
+  function addComp() { saveCompetitors([...competitors, { key: `comp_${Date.now().toString(36)}`, label: 'New competitor', sub: '' }]); }
+  function removeComp(i: number) { saveCompetitors(competitors.filter((_, j) => j !== i)); }
 
   // Index by key/metric for fast lookup.
   // Coerce value to Number here — Postgres returns `numeric` columns as
@@ -144,7 +161,33 @@ export default function SalesBenchmarks({
             <option key={m} value={m} className="bg-slate-900">{labelYM(m)}</option>
           ))}
         </select>
+        <button
+          onClick={() => setEditingComps((e) => !e)}
+          className="ml-2 text-[11px] font-semibold px-2.5 py-1.5 rounded-lg border border-white/20 text-white/70 hover:text-white hover:bg-white/10"
+        >
+          {editingComps ? 'Done' : 'Edit competitors'}
+        </button>
       </div>
+
+      {editingComps && (
+        <div className="rounded-xl p-3 mb-3" style={{ background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.1)' }}>
+          <div className="text-[10px] font-bold uppercase tracking-wider text-white/45 mb-2">Competitor columns</div>
+          <div className="flex flex-col gap-2">
+            {competitors.map((c, i) => (
+              <div key={c.key} className="flex gap-2 items-center">
+                <input value={c.label} onChange={(e) => setComp(i, { label: e.target.value })} placeholder="Name"
+                  className="flex-1 text-[12px] px-2.5 py-1.5 rounded-lg bg-white/5 border border-white/15 text-white outline-none" />
+                <input value={c.sub} onChange={(e) => setComp(i, { sub: e.target.value })} placeholder="Subtitle (optional)"
+                  className="flex-1 text-[12px] px-2.5 py-1.5 rounded-lg bg-white/5 border border-white/15 text-white outline-none" />
+                <button onClick={() => removeComp(i)} disabled={competitors.length <= 1} className="text-white/30 hover:text-rose-300 disabled:opacity-30 px-1" title="Remove column">
+                  <span className="material-symbols-outlined" style={{ fontSize: 16 }}>close</span>
+                </button>
+              </div>
+            ))}
+          </div>
+          <button onClick={addComp} className="mt-2 text-[11px] font-semibold text-cyan-300/80 hover:text-cyan-200">+ Add competitor</button>
+        </div>
+      )}
 
       {loading ? (
         <div className="text-[12px] text-white/55 py-8 text-center">Loading…</div>
@@ -154,7 +197,7 @@ export default function SalesBenchmarks({
             <thead>
               <tr className="text-white/45 uppercase text-[9px] tracking-wider">
                 <th className="text-left font-semibold px-2 py-2">Metric</th>
-                {COMPETITORS.map((c) => (
+                {competitors.map((c) => (
                   <th key={c.key} className={`text-right font-semibold px-2 py-2 ${c.key === 'mine' ? 'text-white' : ''}`}>
                     <div className="flex flex-col items-end">
                       <span>{c.label}</span>
@@ -173,7 +216,7 @@ export default function SalesBenchmarks({
                       <span className="font-semibold text-white">{m.label}</span>
                     </div>
                   </td>
-                  {COMPETITORS.map((c) => {
+                  {competitors.map((c) => {
                     const entryKey = `${c.key}|${m.key}|${ym}`;
                     const entry = byKey[entryKey];
                     const prev = byKey[`${c.key}|${m.key}|${prevYm}`];
