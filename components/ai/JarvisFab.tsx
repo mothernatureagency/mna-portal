@@ -202,12 +202,15 @@ export default function JarvisFab() {
     speakingTimeoutRef.current = window.setTimeout(() => setMode('idle'), ms);
   }
 
-  // Speak in a natural ElevenLabs voice, slower + calmer. Optionally start
-  // listening once she finishes (so the mic never fights her audio).
-  // British, cool/angelic — "Alice". Alternatives to swap in:
-  //   Lily (softer British) pFZP5JQG7iQjIQuC4Bku · Charlotte (ethereal) XB0fDUnXU5powFXDhCwa
-  //   Dorothy (British, pleasant) ThT5KcBeYPX3keUQqHPh · Rachel (US warm) 21m00Tcm4TlvDq8ikWAM
-  const MOTHER_VOICE = 'Xb7hH8MSUJpSbSDYk0k2';
+  // Speak in a natural ElevenLabs voice, slower + calmer. Voice is selectable
+  // (dropdown loads the user's ElevenLabs library); default = "Sarah" (soft,
+  // gentle, angelic — not British). Pick "Brittney" or any voice from the list.
+  const DEFAULT_VOICE = 'EXAVITQu4vr4xnSDxMaL'; // Sarah
+  const [voiceId, setVoiceId] = useState<string>(DEFAULT_VOICE);
+  const [voices, setVoices] = useState<{ voice_id: string; name: string }[]>([]);
+  const voiceIdRef = useRef(voiceId);
+  useEffect(() => { const s = typeof window !== 'undefined' ? localStorage.getItem('mn_voice_id') : null; if (s) { setVoiceId(s); voiceIdRef.current = s; } }, []);
+  function pickVoice(id: string) { setVoiceId(id); voiceIdRef.current = id; try { localStorage.setItem('mn_voice_id', id); } catch {} }
   const startListenRef = useRef<(() => void) | null>(null);
   const speakHer = useCallback(async (text: string, thenListen = false) => {
     const clean = sanitizeForDisplay(text) || text;
@@ -218,7 +221,7 @@ export default function JarvisFab() {
     try {
       const res = await fetch('/api/video-projects/voiceover', {
         method: 'POST', headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ script: clean.slice(0, 900), voiceId: MOTHER_VOICE, speed: 0.85, stability: 0.6, style: 0.15 }),
+        body: JSON.stringify({ script: clean.slice(0, 900), voiceId: voiceIdRef.current, speed: 0.9, stability: 0.7, style: 0.1 }),
       });
       if (!res.ok) throw new Error('tts');
       const url = URL.createObjectURL(await res.blob());
@@ -284,13 +287,18 @@ export default function JarvisFab() {
 
   const onVoiceFinal = useCallback((text: string) => { handleSend(text, true); }, [handleSend]);
 
-  // One utterance per mic tap — the transcript lands in the chat as a message.
+  // Push-to-talk: listens the whole time the mic is held, stops on release.
   const { supported, listening, transcript, start, stop } = useVoiceRecognition({
     onFinalResult: onVoiceFinal,
-    continuous: false,
+    continuous: true,
   });
   // Let speakHer() trigger listening once she finishes talking.
   useEffect(() => { startListenRef.current = () => { try { audioRef.current?.pause(); } catch {} start(); }; }, [start]);
+  // Load the ElevenLabs voice library once she's opened.
+  useEffect(() => {
+    if (!open || voices.length) return;
+    fetch('/api/video-projects/voiceover').then((r) => r.json()).then((d) => setVoices(Array.isArray(d.voices) ? d.voices : [])).catch(() => {});
+  }, [open, voices.length]);
 
   // Orb pulses in sync with any speech playing anywhere in the app.
   useEffect(() => {
@@ -534,9 +542,22 @@ export default function JarvisFab() {
 
             {/* Input row */}
             <div className="px-3 pb-3 pt-1 shrink-0">
-              {listening && (
-                <div className="text-[11px] text-cyan-200/80 px-1 pb-1 truncate">{transcript || 'Listening — speak now…'}</div>
+              {voices.length > 0 && (
+                <div className="flex items-center gap-1.5 px-1 pb-1.5">
+                  <span className="material-symbols-outlined text-white/40" style={{ fontSize: 14 }}>graphic_eq</span>
+                  <select
+                    value={voiceId}
+                    onChange={(e) => pickVoice(e.target.value)}
+                    className="text-[11px] bg-white/5 border border-white/12 rounded-md px-1.5 py-1 text-white/75 outline-none max-w-[180px]"
+                    title="Her voice"
+                  >
+                    {voices.map((v) => <option key={v.voice_id} value={v.voice_id} className="bg-slate-900">{v.name}</option>)}
+                  </select>
+                </div>
               )}
+              {listening
+                ? <div className="text-[11px] text-cyan-200/80 px-1 pb-1 truncate">{transcript || 'Listening — keep holding…'}</div>
+                : <div className="text-[10px] text-white/35 px-1 pb-1">Hold the mic to talk · or type below</div>}
               <div className="flex items-center gap-2">
                 <input
                   value={input}
@@ -547,19 +568,17 @@ export default function JarvisFab() {
                 />
                 {supported && (
                   <button
-                    onClick={() => {
-                      if (listening) { stop(); setMode('idle'); return; }
-                      try { audioRef.current?.pause(); } catch {}
-                      cancelSpeak();
-                      start();
-                    }}
-                    title={listening ? 'Stop listening' : 'Talk to Mother Nature'}
-                    className="shrink-0 w-10 h-10 rounded-xl flex items-center justify-center transition-colors"
+                    onPointerDown={(e) => { e.preventDefault(); try { audioRef.current?.pause(); } catch {} cancelSpeak(); if (!listening) start(); }}
+                    onPointerUp={(e) => { e.preventDefault(); if (listening) stop(); }}
+                    onPointerLeave={() => { if (listening) stop(); }}
+                    onContextMenu={(e) => e.preventDefault()}
+                    title="Hold to talk"
+                    className="shrink-0 w-10 h-10 rounded-xl flex items-center justify-center transition-colors select-none touch-none"
                     style={listening
-                      ? { background: 'rgba(244,63,94,0.85)', color: '#fff', boxShadow: '0 0 14px rgba(244,63,94,0.6)' }
+                      ? { background: 'rgba(244,63,94,0.9)', color: '#fff', boxShadow: '0 0 16px rgba(244,63,94,0.7)' }
                       : { background: 'rgba(255,255,255,0.08)', color: 'rgba(255,255,255,0.75)', border: '1px solid rgba(255,255,255,0.12)' }}
                   >
-                    <span className="material-symbols-outlined" style={{ fontSize: 19 }}>{listening ? 'stop' : 'mic'}</span>
+                    <span className="material-symbols-outlined" style={{ fontSize: 19 }}>mic</span>
                   </button>
                 )}
                 <button
