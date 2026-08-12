@@ -14,6 +14,7 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { usePathname, useRouter } from 'next/navigation';
 import { useVoiceRecognition, speak, cancelSpeak, sanitizeForDisplay } from '@/lib/voice';
+import { createClient } from '@/lib/supabase/client';
 
 const NAV_PHRASES: { match: RegExp; path: string; label: string }[] = [
   { match: /open (?:the )?content calendar|show (?:me )?content/i, path: '/content-calendar', label: 'content calendar' },
@@ -187,6 +188,9 @@ export default function JarvisFab() {
   const [msgs, setMsgs] = useState<Msg[]>([GREETING]);
   const [input, setInput] = useState('');
   const [busy, setBusy] = useState(false);
+  const [email, setEmail] = useState<string | null>(null);
+  const briefedRef = useRef(false); // only run the full briefing once per session
+  useEffect(() => { try { createClient().auth.getUser().then(({ data }) => setEmail(data.user?.email || null)).catch(() => {}); } catch {} }, []);
   const speakingTimeoutRef = useRef<number | null>(null);
   const scrollRef = useRef<HTMLDivElement>(null);
   const audioRef = useRef<HTMLAudioElement | null>(null);
@@ -254,7 +258,7 @@ export default function JarvisFab() {
       const res = await fetch('/api/assistant', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ messages: history, context: { page: pathname || '/' } }),
+        body: JSON.stringify({ messages: history, email, context: { page: pathname || '/' } }),
       });
       const data = await res.json();
       const reply = data?.reply || data?.message || data?.content || '';
@@ -276,7 +280,7 @@ export default function JarvisFab() {
     } finally {
       setBusy(false);
     }
-  }, [busy, pathname, router]);
+  }, [busy, pathname, router, email, speakHer]);
 
   const onVoiceFinal = useCallback((text: string) => { handleSend(text, true); }, [handleSend]);
 
@@ -304,11 +308,29 @@ export default function JarvisFab() {
 
   useEffect(() => { if (listening) setMode('listening'); }, [listening]);
 
-  // Open + greet aloud, then start listening once she finishes (no mic/audio clash).
-  const activate = useCallback(() => {
+  // Open + give a personable, time-aware briefing (tasks, calls today), then
+  // listen. The full briefing runs once per session; after that she just greets.
+  const activate = useCallback(async () => {
     setOpen(true);
-    speakHer("I'm here — what do you need?", true);
-  }, [speakHer]);
+    const h = new Date().getHours();
+    const part = h < 12 ? 'Good morning' : h < 18 ? 'Good afternoon' : 'Good evening';
+    if (briefedRef.current) { speakHer(`${part}. What do you need?`, true); return; }
+    briefedRef.current = true;
+    setBusy(true); setMode('thinking');
+    try {
+      const prompt = `${part}. Give me a short, warm spoken briefing to start my day. In order: (1) my tasks or deadlines due today, (2) my calls and meetings scheduled today. Use my schedule and memory. Open with "${part}" and my name if you know it. Keep it under 6 sentences, natural and conversational — no lists or markdown. If a section has nothing, skip it.`;
+      const res = await fetch('/api/assistant', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ messages: [{ role: 'user', content: prompt }], email, context: { page: pathname || '/' } }),
+      });
+      const data = await res.json();
+      const reply = (data?.reply || data?.message || `${part}. I'm here — what do you need?`).toString();
+      setMsgs((m) => [...m, { role: 'assistant', content: sanitizeForDisplay(reply) || reply }]);
+      speakHer(reply, true);
+    } catch {
+      speakHer(`${part}. I'm here — what do you need?`, true);
+    } finally { setBusy(false); }
+  }, [speakHer, email, pathname]);
 
   // Wake word — while the panel is closed, listen for "mother / mother nature /
   // mother earth" and open her automatically. Needs mic permission + a prior
