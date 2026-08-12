@@ -57,7 +57,6 @@ function GoddessHologram({ mode }: { mode: Mode }) {
         )}
         <div className="goddess-scan" />
         <div className="goddess-glow" />
-        <span className="goddess-mouth" />
       </div>
     </div>
   );
@@ -190,6 +189,7 @@ export default function JarvisFab() {
   const [busy, setBusy] = useState(false);
   const speakingTimeoutRef = useRef<number | null>(null);
   const scrollRef = useRef<HTMLDivElement>(null);
+  const audioRef = useRef<HTMLAudioElement | null>(null);
   const msgsRef = useRef<Msg[]>(msgs);
   msgsRef.current = msgs;
 
@@ -197,6 +197,30 @@ export default function JarvisFab() {
     if (speakingTimeoutRef.current) window.clearTimeout(speakingTimeoutRef.current);
     speakingTimeoutRef.current = window.setTimeout(() => setMode('idle'), ms);
   }
+
+  // Speak in a natural ElevenLabs voice (Rachel); fall back to browser TTS.
+  const MOTHER_VOICE = '21m00Tcm4TlvDq8ikWAM';
+  const speakHer = useCallback(async (text: string) => {
+    const clean = sanitizeForDisplay(text) || text;
+    try { audioRef.current?.pause(); } catch {}
+    try { cancelSpeak(); } catch {}
+    setMode('speaking');
+    try {
+      const res = await fetch('/api/video-projects/voiceover', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ script: clean.slice(0, 900), voiceId: MOTHER_VOICE }),
+      });
+      if (!res.ok) throw new Error('tts');
+      const url = URL.createObjectURL(await res.blob());
+      const a = new Audio(url);
+      audioRef.current = a;
+      a.onended = () => { setMode('idle'); URL.revokeObjectURL(url); };
+      a.onerror = () => setMode('idle');
+      await a.play();
+    } catch {
+      speak(clean); // browser fallback if the key/endpoint isn't available
+    }
+  }, []);
 
   const handleSend = useCallback(async (raw: string, viaVoice: boolean) => {
     const text = raw.trim();
@@ -209,7 +233,7 @@ export default function JarvisFab() {
     if (nav) {
       const reply = `Opening the ${nav.label}.`;
       setMsgs((m) => [...m, { role: 'assistant', content: reply }]);
-      if (viaVoice) { setMode('speaking'); speak(reply); }
+      if (viaVoice) { speakHer(reply); }
       router.push(nav.path);
       scheduleIdle(1500);
       return;
@@ -231,9 +255,7 @@ export default function JarvisFab() {
         const displayed = sanitizeForDisplay(reply) || reply;
         setMsgs((m) => [...m, { role: 'assistant', content: displayed }]);
         if (viaVoice) {
-          setMode('speaking');
-          speak(reply);
-          scheduleIdle(Math.min(20000, Math.max(2500, displayed.length * 75)));
+          speakHer(reply);
         } else {
           setMode('idle');
         }
@@ -276,11 +298,8 @@ export default function JarvisFab() {
   // Open + greet aloud + start listening — used by the orb tap and the wake word.
   const activate = useCallback(() => {
     setOpen(true);
-    try { cancelSpeak(); } catch {}
     const greet = "I'm here — what do you need?";
-    setMode('speaking');
-    try { speak(greet); } catch {}
-    scheduleIdle(2600);
+    speakHer(greet);
     window.setTimeout(() => { if (supported) { try { start(); } catch {} } }, 1100);
   }, [supported, start]);
 
@@ -403,14 +422,14 @@ export default function JarvisFab() {
           background: radial-gradient(ellipse at 50% 36%, rgba(120,220,255,0.12), transparent 52%); animation: nature-breathe 3.4s ease-in-out infinite; }
         .goddess-scan { opacity: 0.5;
           background: repeating-linear-gradient(0deg, rgba(140,255,235,0.05) 0px, rgba(140,255,235,0.05) 1px, transparent 1px, transparent 3px); }
-        .goddess-mouth { position: absolute; top: 42.5%; left: 45.5%; width: 9%; height: 1.9%;
-          border-radius: 50%; background: radial-gradient(ellipse, rgba(180,255,245,0.7), rgba(74,184,206,0.25));
-          box-shadow: 0 0 12px rgba(120,255,220,0.55); opacity: 0; transform-origin: center; }
-        .goddess.speaking .goddess-mouth { opacity: 0.75; animation: goddess-talk 200ms ease-in-out infinite; }
+        /* Speaking: she glows/pulses (no fake mouth) — a clean "she's talking" cue. */
+        .goddess.speaking .goddess-glow { animation: goddess-speakglow 0.9s ease-in-out infinite; }
+        .goddess.speaking .goddess-img.base { animation: goddess-float 6.5s ease-in-out infinite, goddess-speakpulse 1.1s ease-in-out infinite; }
         /* Blink: closed frame visible only ~120ms each cycle, quick ease. */
         @keyframes goddess-blink { 0%, 92%, 100% { opacity: 0; } 95%, 96.5% { opacity: 1; } }
-        @keyframes goddess-talk { 0%, 100% { transform: scaleY(0.5); } 50% { transform: scaleY(2.2); } }
         @keyframes goddess-float { 0%, 100% { transform: translateY(0); } 50% { transform: translateY(-7px); } }
+        @keyframes goddess-speakglow { 0%, 100% { opacity: 0.6; } 50% { opacity: 1; } }
+        @keyframes goddess-speakpulse { 0%, 100% { filter: drop-shadow(0 0 26px rgba(74,184,206,0.45)) drop-shadow(0 0 48px rgba(74,184,206,0.25)); } 50% { filter: drop-shadow(0 0 34px rgba(120,220,255,0.7)) drop-shadow(0 0 60px rgba(74,184,206,0.4)); } }
       `}</style>
 
       <div
