@@ -34,6 +34,28 @@ type Msg = { role: 'user' | 'assistant'; content: string };
  * flicker, a projector beam rising from the emitter base, and drifting
  * leaves. Glow intensity follows the assistant's mode.
  */
+/**
+ * Image-based Mother Nature hologram. Uses /hologram/goddess.png (drop the
+ * artwork there) with animated eyelids that blink and a mouth that moves while
+ * she speaks. Falls back to the SVG hologram if the image isn't present.
+ * Eye/mouth positions are CSS variables so they can be nudged to fit the art.
+ */
+function GoddessHologram({ mode }: { mode: Mode }) {
+  const [imgOk, setImgOk] = useState(true);
+  if (!imgOk) return <MotherNatureHologram mode={mode} />;
+  return (
+    <div className={`goddess ${mode === 'speaking' ? 'speaking' : ''}`}>
+      {/* eslint-disable-next-line @next/next/no-img-element */}
+      <img src="/hologram/goddess.png" alt="" className="goddess-img" draggable={false} onError={() => setImgOk(false)} />
+      <div className="goddess-scan" />
+      <div className="goddess-glow" />
+      <span className="goddess-lid l" />
+      <span className="goddess-lid r" />
+      <span className="goddess-mouth" />
+    </div>
+  );
+}
+
 function MotherNatureHologram({ mode }: { mode: Mode }) {
   const hot = mode === 'speaking' || mode === 'listening';
   const glow = hot
@@ -321,6 +343,36 @@ export default function JarvisFab() {
         .holo-flicker.holo-bob { animation: holo-flicker 5s linear infinite, holo-bob 6s ease-in-out infinite; }
         .holo-scanbar    { animation: holo-scan 4.5s linear infinite; }
         .holo-leaf       { animation: holo-leaf-rise 5.2s ease-out infinite; }
+
+        /* ── Image-based goddess hologram ── */
+        /* Eye/mouth positions are % of the stage — tweak these to fit the art. */
+        .goddess {
+          position: absolute; inset: 0; display: grid; place-items: center; overflow: hidden;
+          --eye-y: 39%; --eye-l: 43.5%; --eye-r: 52.5%; --eye-w: 4%; --eye-h: 2.2%;
+          --mouth-y: 48.5%; --mouth-x: 48%; --mouth-w: 4%;
+        }
+        .goddess-img {
+          height: 100%; width: auto; max-width: 100%; object-fit: contain;
+          filter: drop-shadow(0 0 26px rgba(74,184,206,0.5)) drop-shadow(0 0 48px rgba(74,184,206,0.28));
+          animation: goddess-float 6.5s ease-in-out infinite;
+        }
+        .goddess-glow { position: absolute; inset: 0; pointer-events: none; mix-blend-mode: screen;
+          background: radial-gradient(ellipse at 50% 40%, rgba(120,220,255,0.14), transparent 55%); animation: nature-breathe 3.4s ease-in-out infinite; }
+        .goddess-scan { position: absolute; inset: 0; pointer-events: none; opacity: 0.55;
+          background: repeating-linear-gradient(0deg, rgba(140,255,235,0.05) 0px, rgba(140,255,235,0.05) 1px, transparent 1px, transparent 3px); }
+        .goddess-lid { position: absolute; top: var(--eye-y); width: var(--eye-w); height: var(--eye-h);
+          border-radius: 50%; background: radial-gradient(ellipse, rgba(26,74,110,0.95), rgba(16,48,78,0.5));
+          box-shadow: 0 0 8px rgba(26,74,110,0.7); transform: scaleY(0); transform-origin: center top;
+          animation: goddess-blink 5.4s infinite; }
+        .goddess-lid.l { left: var(--eye-l); }
+        .goddess-lid.r { left: var(--eye-r); }
+        .goddess-mouth { position: absolute; top: var(--mouth-y); left: var(--mouth-x); width: var(--mouth-w); height: 1.4%;
+          border-radius: 50%; background: radial-gradient(ellipse, rgba(170,255,240,0.85), rgba(74,184,206,0.35));
+          box-shadow: 0 0 12px rgba(120,255,220,0.7); opacity: 0; transform-origin: center; }
+        .goddess.speaking .goddess-mouth { opacity: 0.9; animation: goddess-talk 220ms ease-in-out infinite; }
+        @keyframes goddess-blink { 0%, 91%, 100% { transform: scaleY(0); } 94%, 97% { transform: scaleY(1); } }
+        @keyframes goddess-talk { 0%, 100% { transform: scaleY(0.6); } 50% { transform: scaleY(2); } }
+        @keyframes goddess-float { 0%, 100% { transform: translateY(0); } 50% { transform: translateY(-7px); } }
       `}</style>
 
       <div
@@ -332,23 +384,21 @@ export default function JarvisFab() {
           <div
             className="nature-panel pointer-events-auto mb-3 flex flex-col rounded-2xl shadow-2xl overflow-hidden"
             style={{
-              width: 'min(380px, calc(100vw - 48px))',
-              maxHeight: 'min(560px, calc(100vh - 160px))',
-              background: 'rgba(10,24,38,0.96)',
-              border: '1px solid rgba(74,184,206,0.35)',
-              backdropFilter: 'blur(24px) saturate(160%)',
+              width: 'min(400px, calc(100vw - 48px))',
+              maxHeight: 'min(620px, calc(100vh - 140px))',
+              background: 'transparent',
+              border: 'none',
             }}
           >
             {/* Hologram stage — she materializes when the world is clicked */}
             <div
               className="relative shrink-0"
               style={{
-                height: 158,
-                background: 'radial-gradient(ellipse at 50% 90%, rgba(12,109,164,0.35), rgba(6,16,28,0.2) 70%), linear-gradient(to bottom, rgba(6,16,28,0.4), rgba(10,24,38,0))',
-                borderBottom: '1px solid rgba(74,184,206,0.2)',
+                height: 320,
+                background: 'radial-gradient(ellipse at 50% 88%, rgba(12,109,164,0.22), transparent 70%)',
               }}
             >
-              <MotherNatureHologram mode={busy ? 'thinking' : mode} />
+              <GoddessHologram mode={busy ? 'thinking' : mode} />
               <button
                 onClick={() => { cancelSpeak(); if (listening) stop(); setOpen(false); setMode('idle'); }}
                 className="absolute top-2.5 right-2.5 text-white/50 hover:text-white z-10"
