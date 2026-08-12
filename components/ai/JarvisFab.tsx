@@ -45,13 +45,15 @@ function GoddessHologram({ mode }: { mode: Mode }) {
   if (!imgOk) return <MotherNatureHologram mode={mode} />;
   return (
     <div className={`goddess ${mode === 'speaking' ? 'speaking' : ''}`}>
-      {/* eslint-disable-next-line @next/next/no-img-element */}
-      <img src="/hologram/goddess.png" alt="" className="goddess-img" draggable={false} onError={() => setImgOk(false)} />
-      <div className="goddess-scan" />
-      <div className="goddess-glow" />
-      <span className="goddess-lid l" />
-      <span className="goddess-lid r" />
-      <span className="goddess-mouth" />
+      <div className="goddess-figure">
+        {/* eslint-disable-next-line @next/next/no-img-element */}
+        <img src="/hologram/goddess.png" alt="" className="goddess-img" draggable={false} onError={() => setImgOk(false)} />
+        <div className="goddess-scan" />
+        <div className="goddess-glow" />
+        <span className="goddess-lid l" />
+        <span className="goddess-lid r" />
+        <span className="goddess-mouth" />
+      </div>
     </div>
   );
 }
@@ -345,33 +347,33 @@ export default function JarvisFab() {
         .holo-leaf       { animation: holo-leaf-rise 5.2s ease-out infinite; }
 
         /* ── Image-based goddess hologram ── */
-        /* Eye/mouth positions are % of the stage — tweak these to fit the art. */
-        .goddess {
-          position: absolute; inset: 0; display: grid; place-items: center; overflow: hidden;
-          --eye-y: 39%; --eye-l: 43.5%; --eye-r: 52.5%; --eye-w: 4%; --eye-h: 2.2%;
-          --mouth-y: 48.5%; --mouth-x: 48%; --mouth-w: 4%;
-        }
+        /* Overlays are positioned relative to the IMAGE box (.goddess-figure),
+           so % values map straight onto the artwork regardless of stage size. */
+        .goddess { position: absolute; inset: 0; display: grid; place-items: center; overflow: hidden; }
+        .goddess-figure { position: relative; height: 100%; }
         .goddess-img {
-          height: 100%; width: auto; max-width: 100%; object-fit: contain;
-          filter: drop-shadow(0 0 26px rgba(74,184,206,0.5)) drop-shadow(0 0 48px rgba(74,184,206,0.28));
+          display: block; height: 100%; width: auto; max-width: 100%;
+          filter: drop-shadow(0 0 26px rgba(74,184,206,0.45)) drop-shadow(0 0 48px rgba(74,184,206,0.25));
           animation: goddess-float 6.5s ease-in-out infinite;
         }
-        .goddess-glow { position: absolute; inset: 0; pointer-events: none; mix-blend-mode: screen;
-          background: radial-gradient(ellipse at 50% 40%, rgba(120,220,255,0.14), transparent 55%); animation: nature-breathe 3.4s ease-in-out infinite; }
-        .goddess-scan { position: absolute; inset: 0; pointer-events: none; opacity: 0.55;
+        .goddess-figure > .goddess-scan, .goddess-figure > .goddess-glow { position: absolute; inset: 0; pointer-events: none; }
+        .goddess-glow { mix-blend-mode: screen;
+          background: radial-gradient(ellipse at 50% 36%, rgba(120,220,255,0.12), transparent 52%); animation: nature-breathe 3.4s ease-in-out infinite; }
+        .goddess-scan { opacity: 0.5;
           background: repeating-linear-gradient(0deg, rgba(140,255,235,0.05) 0px, rgba(140,255,235,0.05) 1px, transparent 1px, transparent 3px); }
-        .goddess-lid { position: absolute; top: var(--eye-y); width: var(--eye-w); height: var(--eye-h);
-          border-radius: 50%; background: radial-gradient(ellipse, rgba(26,74,110,0.95), rgba(16,48,78,0.5));
-          box-shadow: 0 0 8px rgba(26,74,110,0.7); transform: scaleY(0); transform-origin: center top;
+        /* Eyes ~35% down, at ~42% and ~56% across; mouth ~48% down, centered. */
+        .goddess-lid { position: absolute; top: 33.5%; width: 8%; height: 3.4%;
+          border-radius: 50%; background: radial-gradient(ellipse, rgba(20,58,92,0.96), rgba(14,40,68,0.55));
+          box-shadow: 0 0 6px rgba(20,58,92,0.7); transform: scaleY(0); transform-origin: center top;
           animation: goddess-blink 5.4s infinite; }
-        .goddess-lid.l { left: var(--eye-l); }
-        .goddess-lid.r { left: var(--eye-r); }
-        .goddess-mouth { position: absolute; top: var(--mouth-y); left: var(--mouth-x); width: var(--mouth-w); height: 1.4%;
-          border-radius: 50%; background: radial-gradient(ellipse, rgba(170,255,240,0.85), rgba(74,184,206,0.35));
+        .goddess-lid.l { left: 37.5%; }
+        .goddess-lid.r { left: 53%; }
+        .goddess-mouth { position: absolute; top: 47%; left: 45%; width: 9%; height: 1.7%;
+          border-radius: 50%; background: radial-gradient(ellipse, rgba(180,255,245,0.8), rgba(74,184,206,0.3));
           box-shadow: 0 0 12px rgba(120,255,220,0.7); opacity: 0; transform-origin: center; }
-        .goddess.speaking .goddess-mouth { opacity: 0.9; animation: goddess-talk 220ms ease-in-out infinite; }
+        .goddess.speaking .goddess-mouth { opacity: 0.85; animation: goddess-talk 200ms ease-in-out infinite; }
         @keyframes goddess-blink { 0%, 91%, 100% { transform: scaleY(0); } 94%, 97% { transform: scaleY(1); } }
-        @keyframes goddess-talk { 0%, 100% { transform: scaleY(0.6); } 50% { transform: scaleY(2); } }
+        @keyframes goddess-talk { 0%, 100% { transform: scaleY(0.5); } 50% { transform: scaleY(2.2); } }
         @keyframes goddess-float { 0%, 100% { transform: translateY(0); } 50% { transform: translateY(-7px); } }
       `}</style>
 
