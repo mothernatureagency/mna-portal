@@ -157,7 +157,7 @@ export default function NicevilleDashboard({ client }: { client: Client }) {
             </span>
           </div>
           <p className="text-[12px] text-white/60 pl-3.5">
-            Revenue actuals through March 2026 · Ad data verified with PDM split · GHL metrics manual pull
+            Live metrics · click <span className="text-white/80 font-semibold">Edit stats</span> to update any box as it changes
           </p>
         </div>
         <div className="flex items-center gap-2">
@@ -191,7 +191,7 @@ export default function NicevilleDashboard({ client }: { client: Client }) {
         <SectionLabel>Performance KPIs</SectionLabel>
         <KPISection
           clientId={client.id}
-          title="Niceville · Performance KPIs"
+          title={`${client.shortName} · Performance KPIs`}
           gradientFrom={gradientFrom}
           gradientTo={gradientTo}
           adAccountId={client.metaAds?.adAccountId}
@@ -225,12 +225,12 @@ export default function NicevilleDashboard({ client }: { client: Client }) {
 
       {/* ── TIKTOK ANALYTICS ── */}
       <div>
-        <SectionLabel>TikTok · Niceville</SectionLabel>
+        <SectionLabel>TikTok · {client.shortName}</SectionLabel>
         <TikTokAnalytics
           ownerKey={client.id}
           kvClientId={client.id}
-          label="Prime IV Niceville"
-          niche="IV therapy / wellness / local Niceville FL"
+          label={client.name}
+          niche={`IV therapy / wellness / ${client.shortName}`}
           gradientFrom={gradientFrom}
           gradientTo={gradientTo}
         />
@@ -248,11 +248,11 @@ export default function NicevilleDashboard({ client }: { client: Client }) {
 
       {/* ── YOUTUBE ANALYTICS ── */}
       <div>
-        <SectionLabel>YouTube · Niceville</SectionLabel>
+        <SectionLabel>YouTube · {client.shortName}</SectionLabel>
         <YouTubeAnalytics
           ownerKey={client.id}
           kvClientId={client.id}
-          label="Prime IV Niceville"
+          label={client.name}
           gradientFrom={gradientFrom}
           gradientTo={gradientTo}
         />
@@ -396,7 +396,7 @@ export default function NicevilleDashboard({ client }: { client: Client }) {
             })}
           </div>
           <div className="mt-5 pt-4 border-t border-white/10 text-[11px] text-white/70 leading-relaxed">
-            💡 All Niceville ad spend is currently on <strong>Meta</strong>. No Google Ads running today. When the Revive / HighLevel lead source API lands, this panel will split Meta spend between MNA and PDM automatically by UTM + ad account ID.
+            💡 Edit any row above with the pencil/Edit stats to keep the split current. When the Revive / HighLevel lead-source API lands, this panel can split spend automatically by UTM + ad account ID.
           </div>
         </div>
       </div>
@@ -411,29 +411,26 @@ export default function NicevilleDashboard({ client }: { client: Client }) {
         />
       </div>
 
-      {/* ── INTELLIGENCE (Niceville specific, real signals) ── */}
+      {/* ── INTELLIGENCE (derived from the editable stats above) ── */}
       <div>
-        <SectionLabel>AI Intelligence · Niceville</SectionLabel>
+        <SectionLabel>AI Intelligence · {client.shortName}</SectionLabel>
         <div className="glass-card p-6 space-y-4">
           <InsightRow
-            color="#10b981"
-            title="Conversion rate is 18% above target"
-            body={`GHL shows 16.59% vs 14% target. Of 464 opportunities in the last 30 days, 77 converted. The playbook that is working: After Hours event + Spring Reset Bundle. Keep doubling down on those rituals.`}
-          />
-          <InsightRow
-            color="#f59e0b"
-            title="Revenue pacing is healthy but ad spend is low"
-            body={`${lastRev.month.split(' ')[0]} closed at ${fmtUSD(lastRev.value)} on just ${fmtUSD(totalAdSpend)}/mo in total ad spend across MNA and PDM. That is a strong implied return, but it also means we are leaving pipeline on the table. Recommend raising MNA daily from $20 to $35-50/day once the Niceville ad account is fully added to our system user.`}
+            color={ghl.conversionRate >= ghl.conversionTarget ? '#10b981' : '#f59e0b'}
+            title={ghl.conversionRate >= ghl.conversionTarget
+              ? `Conversion is beating target — ${ghl.conversionRate}% vs ${ghl.conversionTarget}%`
+              : `Conversion is below target — ${ghl.conversionRate}% vs ${ghl.conversionTarget}%`}
+            body={`Of ${ghl.totalOpportunities} leads in the last 30 days, ${ghl.wonOpportunities} converted (${ghl.openOpportunities} still open, ${ghl.lostOpportunities} lost). ${ghl.conversionRate >= ghl.conversionTarget ? 'Keep doubling down on what is working.' : 'Tighten follow-up speed and offer clarity to close the gap.'}`}
           />
           <InsightRow
             color="#0ea5e9"
-            title="Google Ads is a zero today"
-            body={`All paid spend is on Meta. For a wellness clinic in a military town like Niceville, high-intent search ("iv therapy niceville fl", "nad+ niceville") typically converts 2-3× better than social. Recommend scoping a $300-500/mo Google Ads pilot targeting 5 mile radius around the spa.`}
+            title="Revenue vs ad spend"
+            body={`${lastRev.month.split(' ')[0]} revenue was ${fmtUSD(lastRev.value)} on ${fmtUSD(totalAdSpend)}/mo in ad spend${prevRev.value ? `, ${lastRev.value >= prevRev.value ? 'up' : 'down'} ${Math.abs(Math.round((lastRev.value / prevRev.value - 1) * 100))}% vs ${prevRev.month.split(' ')[0]}` : ''}. Update any figure with “Edit stats” as the month changes.`}
           />
           <InsightRow
             color="#8b5cf6"
-            title="Lead source attribution is blocking CPL"
-            body={`We cannot compute a real Cost Per Lead because GHL does not break down paid vs walk-in vs referral. The fastest unlock is pulling lead_source from the Revive or HighLevel API and tagging each contact. Once that is live, every KPI on this page gets more precise.`}
+            title="Pipeline snapshot"
+            body={`${fmtUSD(ghl.pipelineValue)} in open pipeline · ${fmtUSD(ghl.wonRevenue)} won (GHL). Pull lead_source from Revive / HighLevel to compute a true cost-per-lead.`}
           />
         </div>
       </div>

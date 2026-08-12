@@ -2,7 +2,6 @@
 import React from 'react';
 import { useClient } from '@/context/ClientContext';
 import NicevilleDashboard from '@/components/dashboard/NicevilleDashboard';
-import PinecrestDashboard from '@/components/dashboard/PinecrestDashboard';
 import SerenityDashboard from '@/components/dashboard/SerenityDashboard';
 import AgencyOverview from '@/components/dashboard/AgencyOverview';
 import MNADashboard from '@/components/dashboard/MNADashboard';
@@ -162,20 +161,14 @@ export default function DashboardPage() {
     return <PersonalDashboard />;
   }
 
-  if (activeClient.id === 'prime-iv') {
+  // All Prime IV locations share one full, editable dashboard layout
+  // (KPIs, content, memberships, competitor, TikTok, YouTube, sales, key
+  // metrics, revenue, ad spend, lead sources, AI intelligence).
+  if (activeClient.id.startsWith('prime-iv')) {
     return (
       <>
         <DailyBriefing />
         <NicevilleDashboard client={activeClient} />
-      </>
-    );
-  }
-
-  if (activeClient.id === 'prime-iv-pinecrest') {
-    return (
-      <>
-        <DailyBriefing />
-        <PinecrestDashboard client={activeClient} />
       </>
     );
   }
