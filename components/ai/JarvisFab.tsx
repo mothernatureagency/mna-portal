@@ -43,19 +43,12 @@ type Msg = { role: 'user' | 'assistant'; content: string };
  */
 function GoddessHologram({ mode }: { mode: Mode }) {
   const [imgOk, setImgOk] = useState(true);
-  const [hasClosed, setHasClosed] = useState(true); // goddess-closed.png present?
   if (!imgOk) return <MotherNatureHologram mode={mode} />;
   return (
     <div className={`goddess ${mode === 'speaking' ? 'speaking' : ''}`}>
       <div className="goddess-figure">
         {/* eslint-disable-next-line @next/next/no-img-element */}
         <img src="/hologram/goddess.png" alt="" className="goddess-img base" draggable={false} onError={() => setImgOk(false)} />
-        {/* Real blink: a closed-eyes frame cross-fades in for a split second.
-            If goddess-closed.png isn't uploaded, she just rests with open eyes. */}
-        {hasClosed && (
-          // eslint-disable-next-line @next/next/no-img-element
-          <img src="/hologram/goddess-closed.png" alt="" className="goddess-img blink" draggable={false} onError={() => setHasClosed(false)} />
-        )}
         <div className="goddess-scan" />
         <div className="goddess-glow" />
       </div>
@@ -205,7 +198,7 @@ export default function JarvisFab() {
   // Speak in a natural ElevenLabs voice, slower + calmer. Voice is selectable
   // (dropdown loads the user's ElevenLabs library); default = "Sarah" (soft,
   // gentle, angelic — not British). Pick "Brittney" or any voice from the list.
-  const DEFAULT_VOICE = 'EXAVITQu4vr4xnSDxMaL'; // Sarah
+  const DEFAULT_VOICE = 'pFZP5JQG7iQjIQuC4Bku'; // Lily
   const [voiceId, setVoiceId] = useState<string>(DEFAULT_VOICE);
   const [voices, setVoices] = useState<{ voice_id: string; name: string }[]>([]);
   const voiceIdRef = useRef(voiceId);
@@ -340,27 +333,10 @@ export default function JarvisFab() {
     } finally { setBusy(false); }
   }, [speakHer, email, pathname]);
 
-  // Wake word — while the panel is closed, listen for "mother / mother nature /
-  // mother earth" and open her automatically. Needs mic permission + a prior
-  // page interaction (browsers block auto-listen before the first gesture).
-  useEffect(() => {
-    if (open) return;
-    const SR: any = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
-    if (!SR) return;
-    let stopped = false;
-    const r = new SR();
-    r.lang = 'en-US'; r.continuous = true; r.interimResults = true;
-    const WAKE = /\bmother(\s*(nature|earth))?\b/i;
-    r.onresult = (e: any) => {
-      for (let i = e.resultIndex; i < e.results.length; i++) {
-        if (WAKE.test(e.results[i][0].transcript)) { stopped = true; try { r.stop(); } catch {} activate(); return; }
-      }
-    };
-    r.onerror = () => {};
-    r.onend = () => { if (!stopped && !open) { try { r.start(); } catch {} } };
-    try { r.start(); } catch {}
-    return () => { stopped = true; try { r.stop(); } catch {} };
-  }, [open, activate]);
+  // Wake word disabled for now — the always-on background recognizer fought the
+  // conversation mic (only one SpeechRecognition can hold the mic at a time).
+  // The orb click opens + briefs her instead. Can be re-added with a dedicated
+  // wake engine (Porcupine) that doesn't block the Web Speech mic.
 
   // Keep the conversation scrolled to the newest message.
   useEffect(() => {
@@ -557,7 +533,7 @@ export default function JarvisFab() {
               )}
               {listening
                 ? <div className="text-[11px] text-cyan-200/80 px-1 pb-1 truncate">{transcript || 'Listening — keep holding…'}</div>
-                : <div className="text-[10px] text-white/35 px-1 pb-1">Hold the mic to talk · or type below</div>}
+                : <div className="text-[10px] text-white/35 px-1 pb-1">Tap the mic to talk · or type below</div>}
               <div className="flex items-center gap-2">
                 <input
                   value={input}
@@ -568,17 +544,19 @@ export default function JarvisFab() {
                 />
                 {supported && (
                   <button
-                    onPointerDown={(e) => { e.preventDefault(); try { audioRef.current?.pause(); } catch {} cancelSpeak(); if (!listening) start(); }}
-                    onPointerUp={(e) => { e.preventDefault(); if (listening) stop(); }}
-                    onPointerLeave={() => { if (listening) stop(); }}
-                    onContextMenu={(e) => e.preventDefault()}
-                    title="Hold to talk"
-                    className="shrink-0 w-10 h-10 rounded-xl flex items-center justify-center transition-colors select-none touch-none"
+                    onClick={() => {
+                      if (listening) { stop(); setMode('idle'); return; }
+                      try { audioRef.current?.pause(); } catch {}
+                      cancelSpeak();
+                      start();
+                    }}
+                    title={listening ? 'Tap to stop' : 'Tap to talk'}
+                    className="shrink-0 w-10 h-10 rounded-xl flex items-center justify-center transition-colors"
                     style={listening
                       ? { background: 'rgba(244,63,94,0.9)', color: '#fff', boxShadow: '0 0 16px rgba(244,63,94,0.7)' }
                       : { background: 'rgba(255,255,255,0.08)', color: 'rgba(255,255,255,0.75)', border: '1px solid rgba(255,255,255,0.12)' }}
                   >
-                    <span className="material-symbols-outlined" style={{ fontSize: 19 }}>mic</span>
+                    <span className="material-symbols-outlined" style={{ fontSize: 19 }}>{listening ? 'stop' : 'mic'}</span>
                   </button>
                 )}
                 <button
