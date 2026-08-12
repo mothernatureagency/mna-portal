@@ -2,7 +2,7 @@
 import React, { useState } from 'react';
 import Sidebar from './Sidebar';
 import Header from './Header';
-import JarvisFab from '@/components/ai/JarvisFab';
+import HologramAssistant from '@/components/HologramAssistant';
 
 export default function DashboardLayout({ children }: { children: React.ReactNode }) {
   const [mobileOpen, setMobileOpen] = useState(false);
@@ -47,7 +47,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
         </div>
       </div>
       {/* Floating voice assistant — available on every staff page */}
-      <JarvisFab />
+      <HologramAssistant />
     </div>
   );
 }
