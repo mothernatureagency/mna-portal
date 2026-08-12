@@ -227,7 +227,7 @@ export default function NicevilleDashboard({ client }: { client: Client }) {
           <SectionLabel>Content Calendar</SectionLabel>
           <CorporateSeedButton clientName={client.name} gradientFrom={gradientFrom} gradientTo={gradientTo} />
         </div>
-        <MonthlyContentCalendar clientName={client.name} gradientFrom={gradientFrom} gradientTo={gradientTo} />
+        <MonthlyContentCalendar clientName={client.name} gradientFrom={gradientFrom} gradientTo={gradientTo} interactive />
         <div className="mt-3">
           <ConceptsPanel clientId={client.id} gradientFrom={gradientFrom} gradientTo={gradientTo} />
         </div>
