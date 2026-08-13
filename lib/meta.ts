@@ -134,6 +134,143 @@ export async function fetchInsights(
 }
 
 // ───────────────────────────────────────────────────────────────
+// Lead extraction from the Graph `actions` array.
+// Meta reports several overlapping lead action types (e.g. `lead`,
+// `onsite_conversion.lead_grouped`, `leadgen_grouped`,
+// `offsite_conversion.fb_pixel_lead`). Summing them double-counts. Prefer the
+// canonical `lead` total (matches Meta's `cost_per_lead`); if absent, take the
+// single largest lead-type value rather than the sum.
+// ───────────────────────────────────────────────────────────────
+type MetaAction = { action_type: string; value: string };
+
+export function extractLeadCount(actions: MetaAction[] | undefined): number {
+  const leadActions = (actions || []).filter((a) => /lead/i.test(a.action_type));
+  const exactLead = leadActions.find((a) => a.action_type === 'lead');
+  return exactLead
+    ? Number(exactLead.value || 0)
+    : leadActions.reduce((m, a) => Math.max(m, Number(a.value || 0)), 0);
+}
+
+// ───────────────────────────────────────────────────────────────
+// Account-level summary — one row of totals for the whole account
+// over the preset window, including reach/frequency and leads.
+// ───────────────────────────────────────────────────────────────
+export type MetaAccountSummary = {
+  spend: number;
+  impressions: number;
+  clicks: number;
+  cpc: number;
+  ctr: number;      // percentage as Meta reports it (e.g. 1.23)
+  reach: number;
+  frequency: number;
+  leads: number;
+  cpl: number;
+  dateStart: string | null;
+  dateStop: string | null;
+};
+
+export async function fetchAccountSummary(
+  adAccountId: string,
+  datePreset: DatePreset = 'last_30d'
+): Promise<MetaAccountSummary> {
+  const data = await metaFetch<{ data: Array<Record<string, any>> }>(`/${adAccountId}/insights`, {
+    level: 'account',
+    fields: 'spend,impressions,clicks,cpc,ctr,reach,frequency,actions',
+    date_preset: datePreset,
+  });
+  const row = (data.data || [])[0] || {};
+  const spend = Number(row.spend || 0);
+  const leads = extractLeadCount(row.actions);
+  return {
+    spend,
+    impressions: Number(row.impressions || 0),
+    clicks: Number(row.clicks || 0),
+    cpc: Number(row.cpc || 0),
+    ctr: Number(row.ctr || 0),
+    reach: Number(row.reach || 0),
+    frequency: Number(row.frequency || 0),
+    leads,
+    cpl: leads > 0 ? spend / leads : 0,
+    dateStart: row.date_start || null,
+    dateStop: row.date_stop || null,
+  };
+}
+
+// ───────────────────────────────────────────────────────────────
+// Daily account-level series (time_increment=1) for trend charts.
+// ───────────────────────────────────────────────────────────────
+export type MetaDailyRow = {
+  date: string;
+  spend: number;
+  impressions: number;
+  clicks: number;
+  leads: number;
+};
+
+export async function fetchDailyInsights(
+  adAccountId: string,
+  datePreset: DatePreset = 'last_30d'
+): Promise<MetaDailyRow[]> {
+  const data = await metaFetch<{ data: Array<Record<string, any>> }>(`/${adAccountId}/insights`, {
+    level: 'account',
+    fields: 'spend,impressions,clicks,actions',
+    date_preset: datePreset,
+    time_increment: '1',
+    limit: '100',
+  });
+  return (data.data || []).map((r) => ({
+    date: r.date_start,
+    spend: Number(r.spend || 0),
+    impressions: Number(r.impressions || 0),
+    clicks: Number(r.clicks || 0),
+    leads: extractLeadCount(r.actions),
+  }));
+}
+
+// ───────────────────────────────────────────────────────────────
+// Campaign-level insights including lead actions (the older
+// fetchInsights keeps its narrower field list for existing callers).
+// ───────────────────────────────────────────────────────────────
+export type MetaCampaignRow = {
+  campaignId: string;
+  campaignName: string;
+  spend: number;
+  impressions: number;
+  clicks: number;
+  cpc: number;
+  ctr: number;
+  leads: number;
+  cpl: number;
+};
+
+export async function fetchCampaignInsights(
+  adAccountId: string,
+  datePreset: DatePreset = 'last_30d'
+): Promise<MetaCampaignRow[]> {
+  const data = await metaFetch<{ data: Array<Record<string, any>> }>(`/${adAccountId}/insights`, {
+    level: 'campaign',
+    fields: 'campaign_id,campaign_name,spend,impressions,clicks,cpc,ctr,actions',
+    date_preset: datePreset,
+    limit: '100',
+  });
+  return (data.data || []).map((r) => {
+    const spend = Number(r.spend || 0);
+    const leads = extractLeadCount(r.actions);
+    return {
+      campaignId: r.campaign_id,
+      campaignName: r.campaign_name,
+      spend,
+      impressions: Number(r.impressions || 0),
+      clicks: Number(r.clicks || 0),
+      cpc: Number(r.cpc || 0),
+      ctr: Number(r.ctr || 0),
+      leads,
+      cpl: leads > 0 ? spend / leads : 0,
+    };
+  });
+}
+
+// ───────────────────────────────────────────────────────────────
 // Aggregation — turns the raw row array into the card metrics the
 // dashboard wants. All numeric fields in Graph come back as strings,
 // so we parse carefully and default to 0.

@@ -1,11 +1,14 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { ensureSchema, query } from '@/lib/db';
+import { getPortalAuth, canAccessClient, type PortalAuth } from '@/lib/portal-auth';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
 
 /**
- * Per-client content concepts bucket.
+ * Per-client content concepts bucket. Now also surfaced in the client portal's
+ * Content Studio tab, so every method authenticates: staff can act on any
+ * client, client-role users only on their own client_id(s).
  *
  * GET    /api/content-concepts?clientId=prime-iv
  * POST   /api/content-concepts            { clientId, title, body?, suggestedDate?, tags? }
@@ -13,10 +16,26 @@ export const dynamic = 'force-dynamic';
  * DELETE /api/content-concepts?id=...
  */
 
+async function guardConcept(auth: PortalAuth, id: string): Promise<NextResponse | null> {
+  const { rows } = await query<{ client_id: string }>(
+    `select client_id from content_concepts where id = $1`, [id],
+  );
+  if (!rows.length) return NextResponse.json({ error: 'Not found' }, { status: 404 });
+  if (!canAccessClient(auth, rows[0].client_id)) {
+    return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
+  }
+  return null;
+}
+
 export async function GET(req: NextRequest) {
   await ensureSchema();
+  const auth = await getPortalAuth();
+  if (!auth) return NextResponse.json({ error: 'Not authenticated' }, { status: 401 });
+
   const clientId = req.nextUrl.searchParams.get('clientId');
   if (!clientId) return NextResponse.json({ error: 'clientId required' }, { status: 400 });
+  if (!canAccessClient(auth, clientId)) return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
+
   const { rows } = await query(
     `select id, title, body, suggested_date, tags, used_at, created_at
        from content_concepts
@@ -29,10 +48,15 @@ export async function GET(req: NextRequest) {
 
 export async function POST(req: NextRequest) {
   await ensureSchema();
+  const auth = await getPortalAuth();
+  if (!auth) return NextResponse.json({ error: 'Not authenticated' }, { status: 401 });
+
   let b: any;
   try { b = await req.json(); } catch { return NextResponse.json({ error: 'Invalid JSON' }, { status: 400 }); }
   const { clientId, title, body, suggestedDate, tags } = b || {};
   if (!clientId || !title) return NextResponse.json({ error: 'clientId and title required' }, { status: 400 });
+  if (!canAccessClient(auth, clientId)) return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
+
   const { rows } = await query(
     `insert into content_concepts (client_id, title, body, suggested_date, tags)
      values ($1, $2, $3, $4, $5) returning *`,
@@ -43,10 +67,17 @@ export async function POST(req: NextRequest) {
 
 export async function PATCH(req: NextRequest) {
   await ensureSchema();
+  const auth = await getPortalAuth();
+  if (!auth) return NextResponse.json({ error: 'Not authenticated' }, { status: 401 });
+
   let b: any;
   try { b = await req.json(); } catch { return NextResponse.json({ error: 'Invalid JSON' }, { status: 400 }); }
   const { id, title, body, suggestedDate, tags, usedAt } = b || {};
   if (!id) return NextResponse.json({ error: 'id required' }, { status: 400 });
+
+  const denied = await guardConcept(auth, id);
+  if (denied) return denied;
+
   const fields: string[] = [];
   const values: any[] = [];
   if (title !== undefined)         { values.push(title); fields.push(`title = $${values.length}`); }
@@ -65,8 +96,15 @@ export async function PATCH(req: NextRequest) {
 
 export async function DELETE(req: NextRequest) {
   await ensureSchema();
+  const auth = await getPortalAuth();
+  if (!auth) return NextResponse.json({ error: 'Not authenticated' }, { status: 401 });
+
   const id = req.nextUrl.searchParams.get('id');
   if (!id) return NextResponse.json({ error: 'id required' }, { status: 400 });
+
+  const denied = await guardConcept(auth, id);
+  if (denied) return denied;
+
   await query('delete from content_concepts where id = $1', [id]);
   return NextResponse.json({ ok: true });
 }

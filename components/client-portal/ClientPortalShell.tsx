@@ -40,8 +40,10 @@ export default function ClientPortalShell({
 
   const nav = [
     { href: '/client', label: 'Overview', icon: 'dashboard' },
+    { href: '/client/stats', label: 'Ad Performance', icon: 'monitoring' },
     { href: '/client/agenda', label: 'Agenda', icon: 'event_note' },
     { href: '/client/calendar', label: 'Content Calendar', icon: 'calendar_month' },
+    { href: '/client/content', label: 'Content Studio', icon: 'movie_edit' },
     { href: '/client/campaigns', label: 'Email & SMS', icon: 'forward_to_inbox' },
     { href: '/client/notes', label: 'Meeting Notes', icon: 'description' },
     { href: '/client/tasks', label: 'Tasks', icon: 'checklist' },

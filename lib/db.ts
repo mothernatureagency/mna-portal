@@ -248,6 +248,22 @@ async function initSchema() {
                         used_at timestamptz,
                         created_at timestamptz not null default now()
                   )`,
+                  // Client-facing shot list — the concrete photo/video assets a
+                  // client (or MNA) plans to capture. Surfaced in the portal's
+                  // Content Studio tab; clients can add items and mark them
+                  // scheduled/captured, so shoots stay a shared checklist.
+                  `create table if not exists shot_list_items (
+                        id uuid primary key default uuid_generate_v4(),
+                        client_id text not null,
+                        title text not null,
+                        description text,
+                        shot_type text,
+                        platform text,
+                        priority text default 'medium',
+                        status text not null default 'needed',
+                        created_at timestamptz not null default now(),
+                        updated_at timestamptz not null default now()
+                  )`,
                   // Daily snapshots of Google Places metrics per competitor.
                   // One row per (client_id, competitor_key, snapshot_date).
                   // Velocity = latest total - total N days ago.
