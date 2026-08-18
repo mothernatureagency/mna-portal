@@ -18,6 +18,7 @@ import Card from '@/components/ui/Card';
 import DailyBriefing from '@/components/dashboard/DailyBriefing';
 import PersonalDashboard from '@/components/dashboard/PersonalDashboard';
 import DashboardStats from '@/components/dashboard/DashboardStats';
+import SectionBoundary from '@/components/ui/SectionBoundary';
 
 // ─────────────────────────────────────────────────────────────────
 // Client-specific KPI data
@@ -167,7 +168,7 @@ export default function DashboardPage() {
   if (activeClient.id.startsWith('prime-iv')) {
     return (
       <>
-        <DailyBriefing />
+        <SectionBoundary name="Daily briefing"><DailyBriefing /></SectionBoundary>
         <NicevilleDashboard client={activeClient} />
       </>
     );
@@ -176,13 +177,15 @@ export default function DashboardPage() {
   if (activeClient.id === 'serenity-bayfront') {
     return (
       <>
-        <DailyBriefing />
+        <SectionBoundary name="Daily briefing"><DailyBriefing /></SectionBoundary>
         <SerenityDashboard client={activeClient} />
       </>
     );
   }
 
-  const { gradientFrom, gradientTo } = activeClient.branding;
+  // A client row added through the admin UI always carries branding, but don't
+  // let a malformed one blank the whole page.
+  const { gradientFrom, gradientTo } = activeClient.branding || { gradientFrom: '#0c6da4', gradientTo: '#4ab8ce' };
   const data = getDashboardData(activeClient.id);
   const leadsPct = Math.min(100, Math.round((data.totalLeads / data.totalLeadsTarget) * 1000) / 10);
   const leadsMax = data.sparkline.length > 0 ? Math.max(...data.sparkline) : 1;
@@ -191,7 +194,7 @@ export default function DashboardPage() {
     <div className="space-y-8 max-w-[1400px]">
 
       {/* Daily Briefing alert */}
-      <DailyBriefing />
+      <SectionBoundary name="Daily briefing"><DailyBriefing /></SectionBoundary>
 
       {/* ── User Session Banner ──────────────────────────── */}
       <UserBanner />

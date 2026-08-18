@@ -309,10 +309,13 @@ export default function MonthlyContentCalendar({
       weeksOut.push(days.slice(i, i + 7));
     }
 
-    // Index items by date
+    // Index items by date. post_date is NOT NULL in the table, but a row that
+    // arrives without one (partial API payload, hand-inserted row) used to
+    // throw here and take the whole dashboard down — skip it instead.
     const byDayOut: Record<string, ContentItem[]> = {};
     for (const it of items) {
-      const key = it.post_date.slice(0, 10);
+      if (!it?.post_date) continue;
+      const key = String(it.post_date).slice(0, 10);
       if (!byDayOut[key]) byDayOut[key] = [];
       byDayOut[key].push(it);
     }
@@ -672,7 +675,7 @@ export default function MonthlyContentCalendar({
               <div className="flex items-start justify-between gap-3 mb-3">
                 <div>
                   <div className="text-[11px] font-bold uppercase tracking-wider text-white/55">
-                    {new Date(`${p.post_date.slice(0, 10)}T12:00:00`).toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' })}
+                    {p.post_date ? new Date(`${String(p.post_date).slice(0, 10)}T12:00:00`).toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' }) : 'No date'}
                     {' · '}{PLATFORM_EMOJI[p.platform] || ''} {p.platform}
                   </div>
                   <div className="text-white font-bold text-[15px] mt-0.5 leading-tight">{parseTitle(p.title) || 'Untitled'}</div>

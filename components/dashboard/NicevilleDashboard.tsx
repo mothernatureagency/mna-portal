@@ -19,6 +19,7 @@
 import React, { useState, useEffect } from 'react';
 import type { Client } from '@/lib/clients';
 import UserBanner from './UserBanner';
+import SectionBoundary from '@/components/ui/SectionBoundary';
 import MonthlyContentCalendar from './MonthlyContentCalendar';
 import LeadSourceSplitEditor from './LeadSourceSplitEditor';
 import CompetitorBenchmark from './CompetitorBenchmark';
@@ -112,7 +113,9 @@ function SectionLabel({ children }: { children: React.ReactNode }) {
 }
 
 export default function NicevilleDashboard({ client }: { client: Client }) {
-  const { gradientFrom, gradientTo } = client.branding;
+  // Destructuring a missing `branding` throws before any boundary inside this
+  // component can catch it, so fall back to the Prime IV palette.
+  const { gradientFrom, gradientTo } = client.branding || { gradientFrom: '#1c3d6e', gradientTo: '#3a7ab5' };
 
   // Editable overview stats (persist per client to client_kv 'overview_stats').
   // Start BLANK — never show fabricated numbers. Real data comes from either the
@@ -209,19 +212,21 @@ export default function NicevilleDashboard({ client }: { client: Client }) {
       )}
 
       {/* Meta Ads Account — editable */}
-      <MetaAdsCard client={client} accent={gradientFrom} />
+      <SectionBoundary name="Meta Ads account"><MetaAdsCard client={client} accent={gradientFrom} /></SectionBoundary>
 
       {/* ── KPIs ── */}
       <div>
         <SectionLabel>Performance KPIs</SectionLabel>
-        <KPISection
-          clientId={client.id}
-          title={`${client.shortName} · Performance KPIs`}
-          gradientFrom={gradientFrom}
-          gradientTo={gradientTo}
-          adAccountId={client.metaAds?.adAccountId}
-          editable
-        />
+        <SectionBoundary name="Performance KPIs">
+          <KPISection
+            clientId={client.id}
+            title={`${client.shortName} · Performance KPIs`}
+            gradientFrom={gradientFrom}
+            gradientTo={gradientTo}
+            adAccountId={client.metaAds?.adAccountId}
+            editable
+          />
+        </SectionBoundary>
       </div>
 
       {/* ── CONTENT CALENDAR (moved to top per client request) ── */}
@@ -230,37 +235,29 @@ export default function NicevilleDashboard({ client }: { client: Client }) {
           <SectionLabel>Content Calendar</SectionLabel>
           <CorporateSeedButton clientName={client.name} gradientFrom={gradientFrom} gradientTo={gradientTo} />
         </div>
-        <MonthlyContentCalendar clientName={client.name} gradientFrom={gradientFrom} gradientTo={gradientTo} />
+        <SectionBoundary name="Content calendar"><MonthlyContentCalendar clientName={client.name} gradientFrom={gradientFrom} gradientTo={gradientTo} /></SectionBoundary>
         <div className="mt-3">
-          <ConceptsPanel clientId={client.id} gradientFrom={gradientFrom} gradientTo={gradientTo} />
+          <SectionBoundary name="Concepts"><ConceptsPanel clientId={client.id} gradientFrom={gradientFrom} gradientTo={gradientTo} /></SectionBoundary>
         </div>
       </div>
 
       {/* ── MEMBERSHIP TIERS (pamphlet reference) ── */}
       <div>
         <SectionLabel>Prime IV Memberships · Pamphlet Reference</SectionLabel>
-        <PrimeIVMembershipCard gradientFrom={gradientFrom} gradientTo={gradientTo} pricingTier="tier2" />
+        <SectionBoundary name="Membership tiers"><PrimeIVMembershipCard gradientFrom={gradientFrom} gradientTo={gradientTo} pricingTier="tier2" /></SectionBoundary>
       </div>
 
       {/* ── COMPETITOR BENCHMARK (Meta + Google Reviews) ── */}
       <div>
         <SectionLabel>Competitive Position</SectionLabel>
-        <CompetitorBenchmark gradientFrom={gradientFrom} gradientTo={gradientTo} clientId={client.id} clientName={client.shortName} editable />
+        <SectionBoundary name="Competitive position"><CompetitorBenchmark gradientFrom={gradientFrom} gradientTo={gradientTo} clientId={client.id} clientName={client.shortName} editable /></SectionBoundary>
       </div>
 
       {/* ── TIKTOK ANALYTICS ── */}
       <div>
         <SectionLabel>TikTok · {client.shortName}</SectionLabel>
-        <TikTokAnalytics
-          ownerKey={client.id}
-          kvClientId={client.id}
-          label={client.name}
-          niche={`IV therapy / wellness / ${client.shortName}`}
-          gradientFrom={gradientFrom}
-          gradientTo={gradientTo}
-        />
-        <div className="mt-3">
-          <TikTokContentPlan
+        <SectionBoundary name="TikTok analytics">
+          <TikTokAnalytics
             ownerKey={client.id}
             kvClientId={client.id}
             label={client.name}
@@ -268,25 +265,39 @@ export default function NicevilleDashboard({ client }: { client: Client }) {
             gradientFrom={gradientFrom}
             gradientTo={gradientTo}
           />
+        </SectionBoundary>
+        <div className="mt-3">
+          <SectionBoundary name="TikTok content plan">
+            <TikTokContentPlan
+              ownerKey={client.id}
+              kvClientId={client.id}
+              label={client.name}
+              niche={`IV therapy / wellness / ${client.shortName}`}
+              gradientFrom={gradientFrom}
+              gradientTo={gradientTo}
+            />
+          </SectionBoundary>
         </div>
       </div>
 
       {/* ── YOUTUBE ANALYTICS ── */}
       <div>
         <SectionLabel>YouTube · {client.shortName}</SectionLabel>
-        <YouTubeAnalytics
-          ownerKey={client.id}
-          kvClientId={client.id}
-          label={client.name}
-          gradientFrom={gradientFrom}
-          gradientTo={gradientTo}
-        />
+        <SectionBoundary name="YouTube analytics">
+          <YouTubeAnalytics
+            ownerKey={client.id}
+            kvClientId={client.id}
+            label={client.name}
+            gradientFrom={gradientFrom}
+            gradientTo={gradientTo}
+          />
+        </SectionBoundary>
       </div>
 
       {/* ── SALES BENCHMARKS (manual entry: Niceville vs Destin vs Corporate) ── */}
       <div>
         <SectionLabel>Sales Benchmarks</SectionLabel>
-        <SalesBenchmarks clientId={client.id} gradientFrom={gradientFrom} gradientTo={gradientTo} />
+        <SectionBoundary name="Sales benchmarks"><SalesBenchmarks clientId={client.id} gradientFrom={gradientFrom} gradientTo={gradientTo} /></SectionBoundary>
       </div>
 
       {/* ── KEY METRICS (honest — only values we actually have) ── */}
@@ -452,11 +463,13 @@ export default function NicevilleDashboard({ client }: { client: Client }) {
       {/* ── LEAD SOURCE SPLIT (manual, editable by staff) ── */}
       <div>
         <SectionLabel>Lead Sources</SectionLabel>
-        <LeadSourceSplitEditor
-          clientId={client.id}
-          gradientFrom={gradientFrom}
-          gradientTo={gradientTo}
-        />
+        <SectionBoundary name="Lead sources">
+          <LeadSourceSplitEditor
+            clientId={client.id}
+            gradientFrom={gradientFrom}
+            gradientTo={gradientTo}
+          />
+        </SectionBoundary>
       </div>
 
       {/* ── INTELLIGENCE (derived from the editable stats above) ── */}
