@@ -6,17 +6,19 @@ import { createClient } from '@/lib/supabase/client';
 import { getTimeGreeting, getDateDisplay, DEFAULT_TIMEZONE } from '@/lib/timezone';
 import { getDisplayName } from '@/lib/display-names';
 
+// Every field is optional on purpose: this is whatever the API handed back,
+// not a guarantee. The component normalises it before rendering.
 type BriefingData = {
-  events: any[];
-  overdue: any[];
-  campaigns: any[];
-  pendingContent: any[];
-  summary: {
-    todayEvents: number;
-    tomorrowEvents: number;
-    overdueCount: number;
-    campaignDeadlines: number;
-    pendingApprovals: number;
+  events?: any[];
+  overdue?: any[];
+  campaigns?: any[];
+  pendingContent?: any[];
+  summary?: {
+    todayEvents?: number;
+    tomorrowEvents?: number;
+    overdueCount?: number;
+    campaignDeadlines?: number;
+    pendingApprovals?: number;
   };
 };
 
@@ -70,8 +72,27 @@ export default function DailyBriefing() {
   if (dismissed || loading) return null;
   if (!data) return null;
 
-  const { summary, events, overdue, campaigns, pendingContent } = data;
-  const totalAlerts = summary.todayEvents + summary.overdueCount + summary.campaignDeadlines + summary.pendingApprovals;
+  // /api/schedule/reminders can answer with something other than the happy
+  // shape (an auth redirect body, an error payload, a partial response), and
+  // `data` is truthy in every one of those cases. Destructuring it blind and
+  // reading `summary.todayEvents` threw during render, which took the whole
+  // dashboard down. Normalise instead: missing pieces just mean nothing to show.
+  const events = Array.isArray(data.events) ? data.events : [];
+  const overdue = Array.isArray(data.overdue) ? data.overdue : [];
+  const campaigns = Array.isArray(data.campaigns) ? data.campaigns : [];
+  const pendingContent = Array.isArray(data.pendingContent) ? data.pendingContent : [];
+  const summary = data.summary || {
+    todayEvents: 0,
+    tomorrowEvents: 0,
+    overdueCount: overdue.length,
+    campaignDeadlines: campaigns.length,
+    pendingApprovals: pendingContent.length,
+  };
+  const totalAlerts =
+    (summary.todayEvents || 0) +
+    (summary.overdueCount || 0) +
+    (summary.campaignDeadlines || 0) +
+    (summary.pendingApprovals || 0);
 
   // Nothing to show
   if (totalAlerts === 0) return null;
@@ -202,7 +223,7 @@ export default function DailyBriefing() {
                   <span className={`text-[9px] font-bold px-1.5 py-0.5 rounded-full shrink-0 ${
                     c.status === 'pending_review' ? 'bg-amber-400/20 text-amber-300' : 'bg-white/10 text-white/50'
                   }`}>
-                    {c.status.replace('_', ' ')}
+                    {(c.status || 'draft').replace('_', ' ')}
                   </span>
                 </div>
               ))}

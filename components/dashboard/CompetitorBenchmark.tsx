@@ -266,6 +266,15 @@ export default function CompetitorBenchmark({
 
   const clientPostShare = pct(client.publishedContent, totals.posts);
   const clientGrowthShare = pct(client.newFollows, totals.follows);
+  // Busiest / fastest-growing competitor we actually have numbers for. Either
+  // can be undefined (a client with no competitors saved yet) — the headline
+  // insight below handles that case rather than indexing blind.
+  const postsLeader = competitors
+    .filter((c) => c.publishedContent > 0)
+    .sort((a, b) => b.publishedContent - a.publishedContent)[0];
+  const followsLeader = competitors
+    .filter((c) => c.newFollows > 0)
+    .sort((a, b) => b.newFollows - a.newFollows)[0];
   const maxFollowers = Math.max(1, ...data.map((c) => c.followers));
   const maxPosts = Math.max(1, ...data.map((c) => c.publishedContent));
   const maxFollows = Math.max(1, ...data.map((c) => c.newFollows));
@@ -314,12 +323,35 @@ export default function CompetitorBenchmark({
             <div className="text-[10px] font-bold uppercase tracking-wider text-emerald-300 mb-1.5">
               ✦ Activity & Growth Leader
             </div>
-            <div className="text-white text-[13px] leading-relaxed">
-              {client.name} is publishing <span className="font-bold">{fmtMultiple(client.publishedContent, competitors[1].publishedContent)} more</span> than Aqua Vitae and{' '}
-              <span className="font-bold">{fmtMultiple(client.publishedContent, competitors[0].publishedContent)} more</span> than the Destin location, while gaining{' '}
-              <span className="font-bold">{fmtMultiple(client.newFollows, competitors[0].newFollows)} the new follows</span> of Destin and{' '}
-              <span className="font-bold">{fmtMultiple(client.newFollows, competitors[1].newFollows)}</span> Aqua Vitae's. We have the smallest base but the strongest momentum.
-            </div>
+            {/* Derived from whichever competitors this client actually has.
+                This used to index competitors[0] and competitors[1] directly
+                and name "Destin" / "Aqua Vitae" in the copy — every client
+                except Niceville seeds with no competitors at all, so the index
+                threw and took the whole dashboard down with a client-side
+                exception. */}
+            {postsLeader || followsLeader ? (
+              <div className="text-white text-[13px] leading-relaxed">
+                {postsLeader && (
+                  <>
+                    {client.name} is publishing{' '}
+                    <span className="font-bold">{fmtMultiple(client.publishedContent, postsLeader.publishedContent)} more</span>{' '}
+                    than {postsLeader.name}
+                    {followsLeader ? ', ' : '. '}
+                  </>
+                )}
+                {followsLeader && (
+                  <>
+                    {postsLeader ? 'while gaining ' : `${client.name} is gaining `}
+                    <span className="font-bold">{fmtMultiple(client.newFollows, followsLeader.newFollows)} the new follows</span>{' '}
+                    of {followsLeader.name}.
+                  </>
+                )}
+              </div>
+            ) : (
+              <div className="text-white/60 text-[13px] leading-relaxed">
+                Add a competitor below to see how {client.name} compares on posting cadence and follower growth.
+              </div>
+            )}
           </div>
 
           {/* ── Editable numbers (staff) ── */}

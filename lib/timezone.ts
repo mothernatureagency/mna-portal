@@ -48,33 +48,49 @@ export function getTimeGreeting(tz: string = DEFAULT_TIMEZONE): string {
 
 /**
  * Get today's date string (YYYY-MM-DD) in a specific timezone.
+ *
+ * Intl throws `RangeError: Invalid time zone specified` for any string it does
+ * not recognise, and `tz` here comes from a saved user preference — a stale or
+ * hand-edited value would throw mid-render and take the page down. Every
+ * formatter below falls back to local time instead, the same way
+ * getHourInTimezone already did.
  */
 export function getTodayInTimezone(tz: string): string {
-  const now = new Date();
-  const parts = now.toLocaleDateString('en-CA', { timeZone: tz }); // en-CA gives YYYY-MM-DD
-  return parts;
+  try {
+    return new Date().toLocaleDateString('en-CA', { timeZone: tz }); // en-CA gives YYYY-MM-DD
+  } catch {
+    return new Date().toLocaleDateString('en-CA');
+  }
 }
 
 /**
  * Get a formatted date display in a specific timezone.
  */
 export function getDateDisplay(tz: string): string {
-  return new Date().toLocaleDateString('en-US', {
-    timeZone: tz,
+  const opts: Intl.DateTimeFormatOptions = {
     weekday: 'long',
     month: 'long',
     day: 'numeric',
-  });
+  };
+  try {
+    return new Date().toLocaleDateString('en-US', { ...opts, timeZone: tz });
+  } catch {
+    return new Date().toLocaleDateString('en-US', opts);
+  }
 }
 
 /**
  * Get the current time display in a specific timezone.
  */
 export function getTimeDisplay(tz: string): string {
-  return new Date().toLocaleTimeString('en-US', {
-    timeZone: tz,
+  const opts: Intl.DateTimeFormatOptions = {
     hour: 'numeric',
     minute: '2-digit',
     hour12: true,
-  });
+  };
+  try {
+    return new Date().toLocaleTimeString('en-US', { ...opts, timeZone: tz });
+  } catch {
+    return new Date().toLocaleTimeString('en-US', opts);
+  }
 }
