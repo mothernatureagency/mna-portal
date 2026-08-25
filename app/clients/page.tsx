@@ -115,6 +115,15 @@ export default function ClientsPage() {
     }
   }
 
+  /**
+   * Jump into this client's portal with the Sharing & access panel open, so
+   * staff can curate pages/sections and edit content from the admin side.
+   */
+  function openPortalSharing(clientId: string) {
+    document.cookie = `mna_portal_client=${clientId};path=/;max-age=${60 * 60 * 24 * 365}`;
+    window.location.href = '/client?share=1';
+  }
+
   async function removeClient(id: string, label: string) {
     if (!confirm(`Remove ${label} from the client list? Content already created for it stays in the database.`)) return;
     try {

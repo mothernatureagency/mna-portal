@@ -557,7 +557,7 @@ export default function SerenityDashboard({ client }: { client: Client }) {
 
       {/* ── INTELLIGENCE ── */}
       <div>
-        <SectionLabel>AI Intelligence · Serenity Bayfront</SectionLabel>
+        <SectionLabel>AI Intelligence</SectionLabel>
         <div className="glass-card p-6 space-y-4">
           <InsightRow
             color="#059669"

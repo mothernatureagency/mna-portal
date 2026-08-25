@@ -15,6 +15,8 @@ import type { Client } from '@/lib/clients';
 
 export const PORTAL_LAYOUT_KEY = 'portal_layout';
 export const PORTAL_CONTENT_KEY = 'portal_content';
+/** Per-client overrides for the code defaults in lib/clients.ts. */
+export const KPI_TARGETS_KEY = 'kpi_targets';
 
 // ── Registry ──────────────────────────────────────────────────
 
@@ -188,6 +190,21 @@ export function defaultAdSpend(client: Client): AdSpendRow[] {
 
 export function defaultTopPosts(client: Client): TopPostRow[] {
   return KNOWN_TOP_POSTS[client.id] || [];
+}
+
+/**
+ * Merge a client_kv `kpi_targets` override onto a client's code defaults, so a
+ * location's revenue goal / ad budget can be changed without a deploy.
+ */
+export function applyKpiTargets(client: Client, raw: unknown): Client {
+  if (!raw || typeof raw !== 'object') return client;
+  const o = raw as Partial<Client['kpiTargets']>;
+  const merged = { ...client.kpiTargets };
+  for (const k of Object.keys(merged) as (keyof Client['kpiTargets'])[]) {
+    const v = o[k];
+    if (typeof v === 'number' && Number.isFinite(v)) merged[k] = v;
+  }
+  return { ...client, kpiTargets: merged };
 }
 
 export function normalizeContent(raw: unknown): PortalContent {

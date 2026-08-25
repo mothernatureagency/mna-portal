@@ -6,8 +6,10 @@ import { query } from '@/lib/db';
 import ClientPortalShell from '@/components/client-portal/ClientPortalShell';
 import {
   EMPTY_LAYOUT,
+  KPI_TARGETS_KEY,
   PORTAL_CONTENT_KEY,
   PORTAL_LAYOUT_KEY,
+  applyKpiTargets,
   normalizeContent,
   normalizeLayout,
   type PortalContent,
@@ -39,19 +41,22 @@ async function getAllClients(): Promise<Client[]> {
  * staff-authored content overrides. Loaded server-side so the sidebar renders
  * with the right nav on first paint (no flash of hidden pages).
  */
-async function getPortalConfig(clientId: string): Promise<{ layout: PortalLayout; content: PortalContent }> {
+async function getPortalConfig(
+  clientId: string,
+): Promise<{ layout: PortalLayout; content: PortalContent; targets: unknown }> {
   try {
     const { rows } = await query<{ key: string; value: unknown }>(
       `select key, value from client_kv where client_id = $1 and key = any($2::text[])`,
-      [clientId, [PORTAL_LAYOUT_KEY, PORTAL_CONTENT_KEY]],
+      [clientId, [PORTAL_LAYOUT_KEY, PORTAL_CONTENT_KEY, KPI_TARGETS_KEY]],
     );
     const byKey = new Map(rows.map((r) => [r.key, r.value]));
     return {
       layout: normalizeLayout(byKey.get(PORTAL_LAYOUT_KEY)),
       content: normalizeContent(byKey.get(PORTAL_CONTENT_KEY)),
+      targets: byKey.get(KPI_TARGETS_KEY) ?? null,
     };
   } catch {
-    return { layout: EMPTY_LAYOUT, content: {} };
+    return { layout: EMPTY_LAYOUT, content: {}, targets: null };
   }
 }
 
@@ -127,11 +132,12 @@ export default async function ClientPortalLayout({
   // Staff sees all non-mna clients, owners/clients see only their assigned
   const clientList = isStaff ? clients.filter((c) => c.id !== 'mna') : accessibleClients;
 
-  const { layout: portalLayout, content: portalContent } = await getPortalConfig(activeClient.id);
+  const { layout: portalLayout, content: portalContent, targets } = await getPortalConfig(activeClient.id);
+  const clientWithTargets = applyKpiTargets(activeClient, targets);
 
   return (
     <ClientPortalShell
-      client={activeClient}
+      client={clientWithTargets}
       userEmail={user.email || ''}
       isStaffPreview={isStaff || isOwner}
       accessibleClients={clientList}

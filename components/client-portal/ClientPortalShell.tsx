@@ -2,7 +2,7 @@
 
 import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { createClient } from '@/lib/supabase/client';
 import type { Client } from '@/lib/clients';
 import { ClientPortalProvider } from './ClientPortalContext';
@@ -86,6 +86,21 @@ function ShellBody({
 
   const { canEdit, editMode, setEditMode, pageShared, togglePage, paused, saving, error } = usePortalEdit();
   const [sharingOpen, setSharingOpen] = useState(false);
+
+  // /client?share=1 — deep link from the Clients admin page.
+  useEffect(() => {
+    if (!canEdit) return;
+    const params = new URLSearchParams(window.location.search);
+    if (params.get('share') === '1') {
+      setSharingOpen(true);
+      setEditMode(true);
+      params.delete('share');
+      const qs = params.toString();
+      window.history.replaceState({}, '', window.location.pathname + (qs ? `?${qs}` : ''));
+    }
+    // canEdit/setEditMode are stable for the life of the shell
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [canEdit]);
 
   // In edit mode staff see every page (so they can re-share one); otherwise the
   // nav is exactly what this client is allowed to see.
@@ -372,6 +387,32 @@ function ShellBody({
           </div>
           <div className="text-[13px] font-bold text-white truncate">{client.name}</div>
         </div>
+
+        {canEdit && !editMode && !paused && (
+          <div
+            className="flex flex-wrap items-center gap-2 px-4 md:px-8 py-2"
+            style={{ background: 'rgba(74,184,206,.12)', borderBottom: '1px solid rgba(74,184,206,.28)' }}
+          >
+            <span className="material-symbols-outlined text-[#7fd4e6]" style={{ fontSize: 16 }}>visibility</span>
+            <span className="text-[11px] font-bold text-white/85">
+              You&apos;re viewing {client.name}&apos;s portal as they see it
+            </span>
+            <button
+              onClick={() => setSharingOpen(true)}
+              className="ml-auto text-[11px] font-bold px-2.5 py-1 rounded-lg bg-white/12 text-white hover:bg-white/25 inline-flex items-center gap-1"
+            >
+              <span className="material-symbols-outlined" style={{ fontSize: 14 }}>tune</span>
+              Choose what they see
+            </button>
+            <button
+              onClick={() => setEditMode(true)}
+              className="text-[11px] font-bold px-2.5 py-1 rounded-lg bg-amber-400/25 text-amber-100 hover:bg-amber-400/40 inline-flex items-center gap-1"
+            >
+              <span className="material-symbols-outlined" style={{ fontSize: 14 }}>edit_note</span>
+              Edit sections
+            </button>
+          </div>
+        )}
 
         {canEdit && paused && (
           <div

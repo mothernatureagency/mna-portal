@@ -63,7 +63,7 @@ export default function PinecrestDashboard({ client }: { client: Client }) {
 
       {/* ── TIKTOK ANALYTICS ── */}
       <div>
-        <SectionLabel>TikTok · Pinecrest</SectionLabel>
+        <SectionLabel>TikTok</SectionLabel>
         <TikTokAnalytics
           ownerKey={client.id}
           kvClientId={client.id}
@@ -86,7 +86,7 @@ export default function PinecrestDashboard({ client }: { client: Client }) {
 
       {/* ── YOUTUBE ANALYTICS ── */}
       <div>
-        <SectionLabel>YouTube · Pinecrest</SectionLabel>
+        <SectionLabel>YouTube</SectionLabel>
         <YouTubeAnalytics
           ownerKey={client.id}
           kvClientId={client.id}

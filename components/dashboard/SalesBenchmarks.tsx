@@ -145,7 +145,7 @@ export default function SalesBenchmarks({
         <div>
           <h3 className="text-[15px] font-bold text-white flex items-center gap-2">
             <span className="material-symbols-outlined" style={{ fontSize: 20 }}>equalizer</span>
-            Sales Benchmarks · Niceville vs Destin vs Corporate
+            Sales Benchmarks
           </h3>
           <p className="text-[11px] text-white/55 mt-0.5">
             Type a number to save. Deltas vs last month shown automatically.
@@ -315,7 +315,7 @@ export default function SalesBenchmarks({
             style={{ background: `linear-gradient(135deg, ${gradientFrom}22, ${gradientTo}11)`, border: `1px solid ${gradientFrom}55` }}
           >
             <div className="text-[10px] font-bold uppercase tracking-wider text-white/55 mb-1">
-              ✦ Where Niceville stands ({labelYM(ym)})
+              ✦ Where you stand ({labelYM(ym)})
             </div>
             <div className="text-[12px] text-white/85">{parts.join(' · ')}</div>
           </div>
