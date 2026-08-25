@@ -13,6 +13,10 @@ const SCOPES = [
   // Drive read-only — used by the content tracker's "Pick from Drive" picker.
   // Adding this scope requires staff to reconnect Google so consent re-prompts.
   'https://www.googleapis.com/auth/drive.readonly',
+  // Read-only reporting for the client portal's Google Performance card.
+  // Also requires a reconnect for consent to re-prompt.
+  'https://www.googleapis.com/auth/analytics.readonly',
+  'https://www.googleapis.com/auth/webmasters.readonly',
 ];
 
 /**

@@ -58,17 +58,17 @@ const METRICS: MetricDef[] = [
   { key: 'gads_cost_per_conv', label: 'Cost / Conv.',    group: 'gads', fmt: (n) => `$${n.toFixed(2)}`,                    icon: 'request_quote', goodWhenUp: false },
 
   // ── GA4 ──
-  { key: 'ga4_sessions',       label: 'Sessions',        group: 'ga4',  fmt: (n) => Math.round(n).toLocaleString(),        icon: 'trending_up' },
-  { key: 'ga4_users',          label: 'Users',           group: 'ga4',  fmt: (n) => Math.round(n).toLocaleString(),        icon: 'group' },
-  { key: 'ga4_engaged',        label: 'Engaged Sessions',group: 'ga4',  fmt: (n) => Math.round(n).toLocaleString(),        icon: 'bolt' },
-  { key: 'ga4_conversions',    label: 'Conversions',     group: 'ga4',  fmt: (n) => Math.round(n).toLocaleString(),        icon: 'flag' },
-  { key: 'ga4_avg_engagement', label: 'Avg. Time (s)',   group: 'ga4',  fmt: (n) => `${Math.round(n)}s`,                   icon: 'timer' },
+  { key: 'ga4_sessions', auto: true,       label: 'Sessions',        group: 'ga4',  fmt: (n) => Math.round(n).toLocaleString(),        icon: 'trending_up' },
+  { key: 'ga4_users', auto: true,          label: 'Users',           group: 'ga4',  fmt: (n) => Math.round(n).toLocaleString(),        icon: 'group' },
+  { key: 'ga4_engaged', auto: true,        label: 'Engaged Sessions',group: 'ga4',  fmt: (n) => Math.round(n).toLocaleString(),        icon: 'bolt' },
+  { key: 'ga4_conversions', auto: true,    label: 'Conversions',     group: 'ga4',  fmt: (n) => Math.round(n).toLocaleString(),        icon: 'flag' },
+  { key: 'ga4_avg_engagement', auto: true, label: 'Avg. Time (s)',   group: 'ga4',  fmt: (n) => `${Math.round(n)}s`,                   icon: 'timer' },
 
   // ── Search Console ──
-  { key: 'gsc_impressions',    label: 'Search Impressions', group: 'gsc', fmt: (n) => Math.round(n).toLocaleString(),      icon: 'visibility' },
-  { key: 'gsc_clicks',         label: 'Search Clicks',   group: 'gsc',  fmt: (n) => Math.round(n).toLocaleString(),        icon: 'ads_click' },
-  { key: 'gsc_ctr',            label: 'Search CTR',      group: 'gsc',  fmt: (n) => `${n.toFixed(2)}%`,                    icon: 'percent' },
-  { key: 'gsc_position',       label: 'Avg. Position',   group: 'gsc',  fmt: (n) => n.toFixed(1),                          icon: 'format_list_numbered', goodWhenUp: false },
+  { key: 'gsc_impressions', auto: true,    label: 'Search Impressions', group: 'gsc', fmt: (n) => Math.round(n).toLocaleString(),      icon: 'visibility' },
+  { key: 'gsc_clicks', auto: true,         label: 'Search Clicks',   group: 'gsc',  fmt: (n) => Math.round(n).toLocaleString(),        icon: 'ads_click' },
+  { key: 'gsc_ctr', auto: true,            label: 'Search CTR',      group: 'gsc',  fmt: (n) => `${n.toFixed(2)}%`,                    icon: 'percent' },
+  { key: 'gsc_position', auto: true,       label: 'Avg. Position',   group: 'gsc',  fmt: (n) => n.toFixed(1),                          icon: 'format_list_numbered', goodWhenUp: false },
 ];
 
 function ymOf(d: Date) {
@@ -84,6 +84,9 @@ function labelYM(ym: string) {
 }
 
 type LiveGbp = { rating: number | null; total: number | null; newThisMonth: number | null; responseRate: number | null };
+type LiveGa4 = { sessions: number; users: number; engaged: number; conversions: number; avgEngagement: number };
+type LiveGsc = { impressions: number; clicks: number; ctr: number; position: number };
+type Insights = { ga4: LiveGa4 | null; gsc: LiveGsc | null; configured: boolean; connected: boolean | null };
 
 export default function GoogleOverview({
   clientId,
@@ -102,6 +105,11 @@ export default function GoogleOverview({
   const [ym, setYm] = useState(realCurrentYM);
   const [manual, setManual] = useState<Record<string, Record<string, number>>>({});
   const [live, setLive] = useState<LiveGbp | null>(null);
+  const [insights, setInsights] = useState<Record<string, Insights>>({}); // ym → insights
+  const [setupOpen, setSetupOpen] = useState(false);
+  const [ga4Prop, setGa4Prop] = useState('');
+  const [gscSite, setGscSite] = useState('');
+  const [setupSaved, setSetupSaved] = useState(false);
   const [loading, setLoading] = useState(true);
   const [editingKey, setEditingKey] = useState<string | null>(null);
   const [draft, setDraft] = useState('');
@@ -187,8 +195,79 @@ export default function GoogleOverview({
     return () => { cancelled = true; };
   }, [clientId, ym]);
 
+  // GA4 + Search Console for the selected month and the one before it, so the
+  // MoM deltas have something to compare against.
+  useEffect(() => {
+    let cancelled = false;
+    const wanted = [ym, prevYearMonth(ym)];
+    for (const target of wanted) {
+      if (insights[target]) continue;
+      fetch(`/api/google/insights?clientId=${encodeURIComponent(clientId)}&ym=${target}`)
+        .then((r) => (r.ok ? r.json() : null))
+        .then((d) => {
+          if (cancelled || !d) return;
+          setInsights((prev) => ({ ...prev, [target]: d }));
+        })
+        .catch(() => {});
+    }
+    return () => { cancelled = true; };
+    // `insights` is intentionally omitted — it's the cache this effect fills.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [clientId, ym]);
+
+  // Load the saved GA4 / Search Console identifiers for the setup panel.
+  useEffect(() => {
+    if (!editable) return;
+    Promise.all([
+      fetch(`/api/client-kv?clientId=${encodeURIComponent(clientId)}&key=ga4_property_id`).then((r) => r.json()).catch(() => null),
+      fetch(`/api/client-kv?clientId=${encodeURIComponent(clientId)}&key=gsc_site_url`).then((r) => r.json()).catch(() => null),
+    ]).then(([a, b]) => {
+      if (typeof a?.value === 'string') setGa4Prop(a.value);
+      if (typeof b?.value === 'string') setGscSite(b.value);
+    });
+  }, [clientId, editable]);
+
+  async function saveSetup() {
+    await Promise.all([
+      fetch('/api/client-kv', {
+        method: 'PUT', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ clientId, key: 'ga4_property_id', value: ga4Prop.trim() }),
+      }),
+      fetch('/api/client-kv', {
+        method: 'PUT', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ clientId, key: 'gsc_site_url', value: gscSite.trim() }),
+      }),
+    ]).catch(() => {});
+    setInsights({});      // drop the cache so the new property is queried
+    setSetupSaved(true);
+    setTimeout(() => setSetupSaved(false), 2500);
+  }
+
   function autoVal(m: MetricDef, forYm: string): number | null {
-    if (!m.auto || !live) return null;
+    if (!m.auto) return null;
+
+    if (m.group === 'ga4') {
+      const g = insights[forYm]?.ga4;
+      if (!g) return null;
+      if (m.key === 'ga4_sessions') return g.sessions;
+      if (m.key === 'ga4_users') return g.users;
+      if (m.key === 'ga4_engaged') return g.engaged;
+      if (m.key === 'ga4_conversions') return g.conversions;
+      if (m.key === 'ga4_avg_engagement') return g.avgEngagement;
+      return null;
+    }
+
+    if (m.group === 'gsc') {
+      const g = insights[forYm]?.gsc;
+      if (!g) return null;
+      if (m.key === 'gsc_impressions') return g.impressions;
+      if (m.key === 'gsc_clicks') return g.clicks;
+      if (m.key === 'gsc_ctr') return g.ctr;
+      if (m.key === 'gsc_position') return g.position;
+      return null;
+    }
+
+    if (!live) return null;
     // Rating and lifetime totals are point-in-time, so only current month.
     if (forYm !== realCurrentYM && (m.key === 'gbp_rating' || m.key === 'gbp_reviews_total' || m.key === 'gbp_response_rate')) {
       return null;
@@ -257,17 +336,75 @@ export default function GoogleOverview({
               : <>Your Google results{clientName ? ` for ${clientName}` : ''}, compared with {labelYM(prevYm)}.</>}
           </p>
         </div>
-        <select
-          value={ym}
-          onChange={(e) => setYm(e.target.value)}
-          className="text-[12px] font-semibold px-3 py-1.5 rounded-lg border text-white focus:outline-none"
-          style={{ background: 'rgba(0,0,0,0.35)', borderColor: 'rgba(255,255,255,0.2)' }}
-        >
-          {months.map((m) => (
-            <option key={m} value={m} className="bg-slate-900">{labelYM(m)}</option>
-          ))}
-        </select>
+        <div className="flex items-center gap-2">
+          {editable && (
+            <button
+              onClick={() => setSetupOpen((o) => !o)}
+              title="Connect this client's GA4 property and Search Console site"
+              className="text-[11px] font-semibold px-2.5 py-1.5 rounded-lg text-white/70 hover:text-white hover:bg-white/10 inline-flex items-center gap-1"
+              style={{ border: '1px solid rgba(255,255,255,0.15)' }}
+            >
+              <span className="material-symbols-outlined" style={{ fontSize: 14 }}>link</span>
+              Connect
+            </button>
+          )}
+          <select
+            value={ym}
+            onChange={(e) => setYm(e.target.value)}
+            className="text-[12px] font-semibold px-3 py-1.5 rounded-lg border text-white focus:outline-none"
+            style={{ background: 'rgba(0,0,0,0.35)', borderColor: 'rgba(255,255,255,0.2)' }}
+          >
+            {months.map((m) => (
+              <option key={m} value={m} className="bg-slate-900">{labelYM(m)}</option>
+            ))}
+          </select>
+        </div>
       </div>
+
+      {editable && setupOpen && (
+        <div className="rounded-xl p-4 mb-5" style={{ background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.1)' }}>
+          <div className="text-[12px] font-bold text-white mb-1">Connect Google reporting</div>
+          <p className="text-[10.5px] text-white/50 mb-3">
+            Website and search numbers pull automatically once these are set. They use the agency&apos;s Google
+            connection — if nothing appears, reconnect Google under Settings so the new reporting permissions apply.
+          </p>
+          <div className="grid gap-3 sm:grid-cols-2">
+            <label className="block">
+              <span className="text-[10px] font-bold uppercase tracking-wider text-white/50">GA4 Property ID</span>
+              <input
+                value={ga4Prop}
+                onChange={(e) => setGa4Prop(e.target.value)}
+                placeholder="e.g. 123456789"
+                className="w-full mt-1 px-2.5 py-1.5 rounded-lg text-white text-[12px] outline-none"
+                style={{ background: 'rgba(0,0,0,0.4)', border: '1px solid rgba(255,255,255,0.15)' }}
+              />
+            </label>
+            <label className="block">
+              <span className="text-[10px] font-bold uppercase tracking-wider text-white/50">Search Console Site</span>
+              <input
+                value={gscSite}
+                onChange={(e) => setGscSite(e.target.value)}
+                placeholder="https://example.com/ or sc-domain:example.com"
+                className="w-full mt-1 px-2.5 py-1.5 rounded-lg text-white text-[12px] outline-none"
+                style={{ background: 'rgba(0,0,0,0.4)', border: '1px solid rgba(255,255,255,0.15)' }}
+              />
+            </label>
+          </div>
+          <div className="flex items-center gap-2 mt-3">
+            <button
+              onClick={saveSetup}
+              className="text-[11px] font-bold px-3 py-1.5 rounded-lg text-white"
+              style={{ background: `linear-gradient(135deg, ${gradientFrom}, ${gradientTo})` }}
+            >
+              Save &amp; refresh
+            </button>
+            {setupSaved && <span className="text-[11px] font-semibold text-emerald-400">Saved</span>}
+            {insights[ym]?.connected === false && (
+              <span className="text-[11px] text-amber-300">Google isn&apos;t connected — reconnect it in Settings.</span>
+            )}
+          </div>
+        </div>
+      )}
 
       {loading ? (
         <div className="text-[12px] text-white/55 py-8 text-center">Loading…</div>
