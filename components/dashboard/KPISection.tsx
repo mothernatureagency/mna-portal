@@ -162,7 +162,9 @@ export default function KPISection({
             {title}
           </h3>
           <p className="text-[11px] text-white/55 mt-0.5">
-            Ad metrics auto-pull from Meta{metaErr ? ' (not connected — enter manually)' : ''}. {editable ? 'Click any tile to override.' : 'Pipeline numbers entered by your team.'} MoM deltas vs {labelYM(prevYm)}.
+            {editable
+              ? <>Ad metrics auto-pull from Meta{metaErr ? ' (not connected — enter manually)' : ''}. Click any tile to override. MoM deltas vs {labelYM(prevYm)}.</>
+              : <>Compared with {labelYM(prevYm)}.</>}
           </p>
         </div>
         <select
@@ -215,7 +217,7 @@ export default function KPISection({
                     <span className="material-symbols-outlined text-white/40" style={{ fontSize: 13 }}>{m.icon}</span>
                     {m.label}
                   </span>
-                  {value != null && (
+                  {editable && value != null && (
                     isAuto
                       ? <span className="text-[8px] px-1.5 py-0.5 rounded-full bg-sky-500/15 text-sky-300 font-bold uppercase tracking-wide">auto</span>
                       : hasOverride && m.source === 'meta'

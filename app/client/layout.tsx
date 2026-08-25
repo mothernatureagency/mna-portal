@@ -4,6 +4,15 @@ import { cookies } from 'next/headers';
 import { clients as staticClients, makeCustomClient, type Client } from '@/lib/clients';
 import { query } from '@/lib/db';
 import ClientPortalShell from '@/components/client-portal/ClientPortalShell';
+import {
+  EMPTY_LAYOUT,
+  PORTAL_CONTENT_KEY,
+  PORTAL_LAYOUT_KEY,
+  normalizeContent,
+  normalizeLayout,
+  type PortalContent,
+  type PortalLayout,
+} from '@/lib/portal-layout';
 
 export const dynamic = 'force-dynamic';
 
@@ -22,6 +31,27 @@ async function getAllClients(): Promise<Client[]> {
     return [...staticClients, ...custom.filter((c) => !seen.has(c.id))];
   } catch {
     return staticClients;
+  }
+}
+
+/**
+ * Per-client portal configuration: which pages/sections are shared, plus the
+ * staff-authored content overrides. Loaded server-side so the sidebar renders
+ * with the right nav on first paint (no flash of hidden pages).
+ */
+async function getPortalConfig(clientId: string): Promise<{ layout: PortalLayout; content: PortalContent }> {
+  try {
+    const { rows } = await query<{ key: string; value: unknown }>(
+      `select key, value from client_kv where client_id = $1 and key = any($2::text[])`,
+      [clientId, [PORTAL_LAYOUT_KEY, PORTAL_CONTENT_KEY]],
+    );
+    const byKey = new Map(rows.map((r) => [r.key, r.value]));
+    return {
+      layout: normalizeLayout(byKey.get(PORTAL_LAYOUT_KEY)),
+      content: normalizeContent(byKey.get(PORTAL_CONTENT_KEY)),
+    };
+  } catch {
+    return { layout: EMPTY_LAYOUT, content: {} };
   }
 }
 
@@ -97,12 +127,16 @@ export default async function ClientPortalLayout({
   // Staff sees all non-mna clients, owners/clients see only their assigned
   const clientList = isStaff ? clients.filter((c) => c.id !== 'mna') : accessibleClients;
 
+  const { layout: portalLayout, content: portalContent } = await getPortalConfig(activeClient.id);
+
   return (
     <ClientPortalShell
       client={activeClient}
       userEmail={user.email || ''}
       isStaffPreview={isStaff || isOwner}
       accessibleClients={clientList}
+      portalLayout={portalLayout}
+      portalContent={portalContent}
     >
       {children}
     </ClientPortalShell>

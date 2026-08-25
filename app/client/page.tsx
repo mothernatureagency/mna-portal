@@ -10,9 +10,21 @@ import { getPerformanceForClient } from '@/lib/data/performance';
 import PerformanceOverview from '@/components/client-portal/PerformanceOverview';
 import CompetitorBenchmark from '@/components/dashboard/CompetitorBenchmark';
 import KPISection from '@/components/dashboard/KPISection';
+import PortalSection from '@/components/client-portal/PortalSection';
+import { usePortalEdit } from '@/components/client-portal/PortalEditContext';
+import { EditableText, EditableNumber, EditButton } from '@/components/client-portal/PortalEditable';
+import {
+  DEFAULT_LEAD_SOURCES,
+  KPI_COLORS,
+  defaultAdSpend,
+  defaultKpis,
+  defaultTopPosts,
+  type AdSpendRow,
+  type KpiTile,
+  type LeadSourceRow,
+  type TopPostRow,
+} from '@/lib/portal-layout';
 import { driveThumbnailUrl, driveViewUrl } from '@/lib/drive';
-
-type KPI = { label: string; value: string; sub?: string; color: string };
 
 type MonthData = {
   month: string; // 'Jan', 'Feb', etc.
@@ -97,31 +109,6 @@ const KNOWN_Q_PROJECTIONS: Record<string, Record<string, number>> = {
   },
 };
 
-const KNOWN_KPIS: Record<string, KPI[]> = {
-  'prime-iv': [
-    { label: 'Total Leads (30d)', value: '464', sub: 'GHL pipeline', color: '#0ea5e9' },
-    { label: 'Conversion Rate', value: '16.59%', sub: 'Above 14% target', color: '#8b5cf6' },
-    { label: 'Booked Appointments', value: '77', sub: 'Won opportunities', color: '#ec4899' },
-    { label: 'March Revenue', value: '$54.5K', sub: '+3.8% vs February', color: '#06b6d4' },
-  ],
-};
-
-// Ad spend data per client
-const AD_SPEND_BY_CLIENT: Record<string, { agency: string; channel: string; monthly: number; note: string }[]> = {
-  'prime-iv': [
-    { agency: 'Mother Nature Agency', channel: 'Meta', monthly: 600, note: '$20/day daily budget' },
-    { agency: 'PDM', channel: 'Meta', monthly: 1290, note: 'Managed separately' },
-  ],
-};
-
-// Lead source category definitions
-const LEAD_CATEGORIES = [
-  { key: 'fb', label: 'Facebook / Instagram', sub: 'Paid ads' },
-  { key: 'google', label: 'Google', sub: 'Organic + paid' },
-  { key: 'walkin', label: 'Walk-in', sub: 'In-person' },
-  { key: 'referral', label: 'Referral', sub: 'Word of mouth' },
-] as const;
-
 // Calendar types for the overview preview
 type CalendarApprovalStatus = 'drafting' | 'pending_review' | 'approved' | 'changes_requested' | 'scheduled';
 type CalendarItem = {
@@ -163,20 +150,18 @@ function parseCalTitle(raw: string | null) {
   return hookIdx >= 0 ? rest.slice(0, hookIdx) : rest;
 }
 
+/** Shown in edit mode where a data-driven section has nothing to render yet. */
+function SectionPlaceholder({ text }: { text: string }) {
+  return <div className="glass-card p-5 text-[12px] text-white/40 italic">{text}</div>;
+}
+
 function fmtUSD(n: number) {
   return new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD', maximumFractionDigits: 0 }).format(n);
 }
 
-const TOP_POSTS_BY_CLIENT: Record<string, { platform: string; title: string; engagement: number; reach: number; type: string }[]> = {
-  'prime-iv': [
-    { platform: 'Instagram', title: 'Spa walkthrough reel', engagement: 4820, reach: 28400, type: 'Reel' },
-    { platform: 'Instagram', title: 'After Hours giveaway', engagement: 3210, reach: 18600, type: 'Post' },
-    { platform: 'Instagram', title: 'Real client review', engagement: 2670, reach: 14100, type: 'Reel' },
-  ],
-};
-
 export default function ClientOverviewPage() {
   const { client, isStaffPreview } = useClientPortal();
+  const { editMode, content, updateContent, title, setTitle } = usePortalEdit();
   const [projections, setProjections] = useState<MonthData[]>([]);
   const [editingMonth, setEditingMonth] = useState<string | null>(null);
   const [editValues, setEditValues] = useState({ actual: '', projected: '' });
@@ -327,13 +312,61 @@ export default function ClientOverviewPage() {
   }
 
   const { gradientFrom, gradientTo } = client.branding;
-  const kpis = KNOWN_KPIS[client.id] || [
-    { label: 'Monthly Revenue Target', value: `$${(client.kpiTargets.revenue / 1000).toFixed(0)}K`, sub: 'From your plan', color: '#0ea5e9' },
-    { label: 'Lead Target', value: `${client.kpiTargets.leads}`, sub: 'Monthly goal', color: '#8b5cf6' },
-    { label: 'Conversion Target', value: `${client.kpiTargets.conversionRate}%`, sub: 'Goal', color: '#ec4899' },
-    { label: 'Ad Spend', value: `$${(client.kpiTargets.adSpend / 1000).toFixed(1)}K`, sub: 'Monthly budget', color: '#06b6d4' },
-  ];
-  const topPosts = TOP_POSTS_BY_CLIENT[client.id] || [];
+
+  // Editable section content — staff overrides from portal_content, otherwise
+  // the per-client defaults. Every setter writes straight back to the store.
+  const kpis: KpiTile[] = content.kpis ?? defaultKpis(client);
+  const adSpend: AdSpendRow[] = content.adSpend ?? defaultAdSpend(client);
+  const topPosts: TopPostRow[] = content.topPosts ?? defaultTopPosts(client);
+  const leadSources: LeadSourceRow[] =
+    content.leadSources ??
+    DEFAULT_LEAD_SOURCES.map((c) => ({ ...c, pct: leadSplit?.[c.key] ?? 0 }));
+
+  function setKpi(i: number, patch: Partial<KpiTile>) {
+    updateContent({ kpis: kpis.map((k, idx) => (idx === i ? { ...k, ...patch } : k)) });
+  }
+  function addKpi() {
+    updateContent({
+      kpis: [...kpis, { label: 'New metric', value: '—', sub: '', color: KPI_COLORS[kpis.length % KPI_COLORS.length] }],
+    });
+  }
+  function removeKpi(i: number) {
+    updateContent({ kpis: kpis.filter((_, idx) => idx !== i) });
+  }
+  function cycleKpiColor(i: number) {
+    const cur = KPI_COLORS.indexOf(kpis[i].color);
+    setKpi(i, { color: KPI_COLORS[(cur + 1) % KPI_COLORS.length] });
+  }
+  function setAdRow(i: number, patch: Partial<AdSpendRow>) {
+    updateContent({ adSpend: adSpend.map((r, idx) => (idx === i ? { ...r, ...patch } : r)) });
+  }
+  function addAdRow() {
+    updateContent({ adSpend: [...adSpend, { agency: 'Mother Nature Agency', channel: 'Meta', monthly: 0, note: '' }] });
+  }
+  function removeAdRow(i: number) {
+    updateContent({ adSpend: adSpend.filter((_, idx) => idx !== i) });
+  }
+  function setLeadRow(i: number, patch: Partial<LeadSourceRow>) {
+    updateContent({ leadSources: leadSources.map((r, idx) => (idx === i ? { ...r, ...patch } : r)) });
+  }
+  function addLeadRow() {
+    updateContent({
+      leadSources: [...leadSources, { key: `src-${Date.now()}`, label: 'New source', sub: '', pct: 0 }],
+    });
+  }
+  function removeLeadRow(i: number) {
+    updateContent({ leadSources: leadSources.filter((_, idx) => idx !== i) });
+  }
+  function setPost(i: number, patch: Partial<TopPostRow>) {
+    updateContent({ topPosts: topPosts.map((r, idx) => (idx === i ? { ...r, ...patch } : r)) });
+  }
+  function addPost() {
+    updateContent({ topPosts: [...topPosts, { platform: 'Instagram', title: 'New post', type: 'Reel', engagement: 0, reach: 0 }] });
+  }
+  function removePost(i: number) {
+    updateContent({ topPosts: topPosts.filter((_, idx) => idx !== i) });
+  }
+  const adSpendTotal = adSpend.reduce((sum, r) => sum + (r.monthly || 0), 0);
 
   // Calculate growth rate from actuals for display
   const withActuals = projections.filter((m) => m.actual > 0);
@@ -385,10 +418,17 @@ export default function ClientOverviewPage() {
           </span>
         </div>
         <p className="text-[12px] text-white/60 pl-3.5">
-          Your top-line results, projections, and content performance.
+          <EditableText
+            value={content.subtitle ?? 'Your top-line results, projections, and content performance.'}
+            onChange={(v) => updateContent({ subtitle: v })}
+            className="text-[12px] text-white/60"
+            placeholder="Intro line for this client"
+            fullWidth={editMode}
+          />
         </p>
       </div>
 
+      <PortalSection id="overview.calendar">
       {/* Monthly Content Calendar Preview */}
       <div className="glass-card p-4 md:p-6">
         <div className="flex flex-col sm:flex-row sm:items-center justify-between mb-4 gap-2">
@@ -509,20 +549,30 @@ export default function ClientOverviewPage() {
         <div className="text-[11px] text-white/50 mt-2">{calMonthItems.length} posts this month</div>
       </div>
 
+      </PortalSection>
+
+      <PortalSection id="overview.kpis-live" titleKey="overview.kpis-live" defaultTitle="Performance KPIs">
       {/* Performance KPIs — auto-pull Meta ad metrics, manual pipeline numbers */}
       <KPISection
         clientId={client.id}
-        title="Performance KPIs"
+        title={title('overview.kpis-live', 'Performance KPIs')}
         gradientFrom={gradientFrom}
         gradientTo={gradientTo}
         adAccountId={client.metaAds?.adAccountId}
         editable={isStaffPreview}
       />
 
+      </PortalSection>
+
+      <PortalSection id="overview.competitors">
       {/* Competitor Benchmark — currently only wired with data for Prime IV Niceville */}
-      {client.id === 'prime-iv' && (
+      {client.id === 'prime-iv' ? (
         <CompetitorBenchmark gradientFrom={gradientFrom} gradientTo={gradientTo} clientId={client.id} clientName={client.shortName} editable={isStaffPreview} />
-      )}
+      ) : editMode ? (
+        <SectionPlaceholder text="No competitor benchmark data wired up for this client yet." />
+      ) : null}
+
+      </PortalSection>
 
       {/* Calendar post preview modal */}
       {activeCalId && (() => {
@@ -589,24 +639,79 @@ export default function ClientOverviewPage() {
         );
       })()}
 
+      <PortalSection id="overview.kpi-tiles">
       {/* KPIs */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-3 md:gap-4">
-        {kpis.map((k) => (
-          <div key={k.label} className="glass-card p-4 md:p-5 relative overflow-hidden">
+        {kpis.map((k, i) => (
+          <div key={i} className="glass-card p-4 md:p-5 relative overflow-hidden">
             <div className="absolute top-0 left-0 right-0 h-1 rounded-t-[22px]" style={{ background: k.color }} />
-            <div className="text-[10px] font-bold uppercase tracking-wider text-white/60">{k.label}</div>
-            <div className="text-[26px] md:text-[34px] font-black text-white leading-none my-2">{k.value}</div>
-            {k.sub && <div className="text-[11px] text-white/70">{k.sub}</div>}
+            {editMode && (
+              <div className="flex items-center gap-1 mb-1.5">
+                <button
+                  type="button"
+                  onClick={() => cycleKpiColor(i)}
+                  title="Change accent colour"
+                  className="w-4 h-4 rounded-full border border-white/30"
+                  style={{ background: k.color }}
+                />
+                <EditButton icon="delete" label="" tone="danger" onClick={() => removeKpi(i)} />
+              </div>
+            )}
+            <EditableText
+              value={k.label}
+              onChange={(v) => setKpi(i, { label: v })}
+              className="text-[10px] font-bold uppercase tracking-wider text-white/60 block"
+              placeholder="Metric"
+              fullWidth={editMode}
+            />
+            <EditableText
+              value={k.value}
+              onChange={(v) => setKpi(i, { value: v })}
+              className="text-[26px] md:text-[34px] font-black text-white leading-none my-2 block"
+              placeholder="—"
+              fullWidth={editMode}
+            />
+            {(k.sub || editMode) && (
+              <EditableText
+                value={k.sub || ''}
+                onChange={(v) => setKpi(i, { sub: v })}
+                className="text-[11px] text-white/70 block"
+                placeholder="Context line"
+                fullWidth={editMode}
+              />
+            )}
           </div>
         ))}
+        {editMode && (
+          <button
+            type="button"
+            onClick={addKpi}
+            className="glass-card p-4 md:p-5 flex flex-col items-center justify-center gap-1 text-white/50 hover:text-white hover:bg-white/5 transition-colors"
+          >
+            <span className="material-symbols-outlined" style={{ fontSize: 22 }}>add</span>
+            <span className="text-[11px] font-semibold">Add tile</span>
+          </button>
+        )}
       </div>
 
+      </PortalSection>
+
+      <PortalSection id="overview.revenue">
       {/* Revenue Projections — Monthly */}
       <div className="glass-card p-4 md:p-6">
         <div className="flex flex-col md:flex-row md:items-center justify-between mb-4 gap-2">
           <div>
             <div className="flex items-center gap-2 flex-wrap">
-              <div className="text-[14px] md:text-[15px] font-bold text-white">Revenue Projections · {CURRENT_YEAR}</div>
+              <div className="text-[14px] md:text-[15px] font-bold text-white">
+                <EditableText
+                  value={title('overview.revenue', 'Revenue Projections')}
+                  onChange={(v) => setTitle('overview.revenue', v)}
+                  className="text-[14px] md:text-[15px] font-bold text-white"
+                  placeholder="Section title"
+                  minCh={14}
+                />
+                {' · '}{CURRENT_YEAR}
+              </div>
               {avgGrowthPct > 0 && (
                 <span className="text-[11px] font-bold px-2 py-0.5 rounded-full bg-emerald-500/20 text-emerald-400">
                   +{avgGrowthPct.toFixed(1)}% avg MoM growth
@@ -734,6 +839,9 @@ export default function ClientOverviewPage() {
         </div>
       </div>
 
+      </PortalSection>
+
+      <PortalSection id="overview.quarters">
       {/* Quarterly Breakdown */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-3 md:gap-4">
         {quarters.map((q) => (
@@ -789,40 +897,98 @@ export default function ClientOverviewPage() {
         ))}
       </div>
 
+      </PortalSection>
+
+      <PortalSection id="overview.performance">
       {/* Performance Overview (Q1 vs April) */}
       {(() => {
         const perfData = getPerformanceForClient(client.id);
         return perfData ? (
           <PerformanceOverview data={perfData} gradientFrom={gradientFrom} gradientTo={gradientTo} isStaff={isStaffPreview} />
+        ) : editMode ? (
+          <SectionPlaceholder text="No period-over-period performance data for this client yet." />
         ) : null;
       })()}
 
+      </PortalSection>
+
+      <PortalSection id="overview.attribution">
       {/* Attribution Overview */}
       {(() => {
         const attrData = getAttributionForClient(client.id);
         return attrData ? (
           <AttributionOverview data={attrData} gradientFrom={gradientFrom} gradientTo={gradientTo} />
+        ) : editMode ? (
+          <SectionPlaceholder text="No attribution data for this client yet." />
         ) : null;
       })()}
 
+      </PortalSection>
+
+      <PortalSection id="overview.ad-spend">
       {/* Ad Spend Breakdown */}
-      {(AD_SPEND_BY_CLIENT[client.id] || []).length > 0 && (
+      {(adSpend.length > 0 || editMode) && (
         <div className="glass-card p-6">
-          <div className="text-[15px] font-bold text-white mb-4">Ad Spend Breakdown</div>
+          <div className="flex items-center justify-between gap-2 mb-4">
+            <EditableText
+              value={title('overview.ad-spend', 'Ad Spend Breakdown')}
+              onChange={(v) => setTitle('overview.ad-spend', v)}
+              className="text-[15px] font-bold text-white"
+              placeholder="Section title"
+              minCh={12}
+            />
+            {editMode && <EditButton icon="add" label="Add budget line" tone="accent" onClick={addAdRow} />}
+          </div>
           <div className="space-y-3">
-            {(AD_SPEND_BY_CLIENT[client.id] || []).map((item, i) => {
-              const total = (AD_SPEND_BY_CLIENT[client.id] || []).reduce((s, x) => s + x.monthly, 0);
-              const pct = (item.monthly / total) * 100;
+            {adSpend.map((item, i) => {
+              const pct = adSpendTotal > 0 ? (item.monthly / adSpendTotal) * 100 : 0;
               return (
                 <div key={i}>
-                  <div className="flex flex-col sm:flex-row sm:items-center justify-between mb-1.5 gap-0.5">
-                    <div>
-                      <span className="text-[13px] font-bold text-white">{item.agency}</span>
-                      <span className="text-[11px] text-white/70 ml-2">· {item.channel}</span>
+                  <div className="flex flex-col sm:flex-row sm:items-start justify-between mb-1.5 gap-1">
+                    <div className="flex items-center gap-1.5 flex-wrap">
+                      <EditableText
+                        value={item.agency}
+                        onChange={(v) => setAdRow(i, { agency: v })}
+                        className="text-[13px] font-bold text-white"
+                        placeholder="Agency"
+                        minCh={10}
+                      />
+                      <span className="text-[11px] text-white/70">·</span>
+                      <EditableText
+                        value={item.channel}
+                        onChange={(v) => setAdRow(i, { channel: v })}
+                        className="text-[11px] text-white/70"
+                        placeholder="Channel"
+                        minCh={6}
+                      />
+                      {editMode && (
+                        <EditButton icon="delete" label="Remove" tone="danger" onClick={() => removeAdRow(i)} />
+                      )}
                     </div>
                     <div className="sm:text-right">
-                      <div className="text-[14px] font-bold text-white">{fmtUSD(item.monthly)}/mo</div>
-                      <div className="text-[10px] text-white/70">{item.note}</div>
+                      <div className="text-[14px] font-bold text-white">
+                        {editMode ? (
+                          <>
+                            <EditableNumber
+                              value={item.monthly}
+                              onChange={(v) => setAdRow(i, { monthly: v })}
+                              prefix="$"
+                              step={50}
+                              min={0}
+                            />
+                            /mo
+                          </>
+                        ) : (
+                          `${fmtUSD(item.monthly)}/mo`
+                        )}
+                      </div>
+                      <EditableText
+                        value={item.note}
+                        onChange={(v) => setAdRow(i, { note: v })}
+                        className="text-[10px] text-white/70"
+                        placeholder="Note — e.g. $20/day daily budget"
+                        minCh={14}
+                      />
                     </div>
                   </div>
                   <div className="h-2 rounded-full overflow-hidden bg-white/10">
@@ -831,51 +997,103 @@ export default function ClientOverviewPage() {
                 </div>
               );
             })}
+            {adSpend.length === 0 && (
+              <div className="text-[12px] text-white/40 italic">
+                No budget lines yet — add one and it appears in this client&apos;s portal.
+              </div>
+            )}
           </div>
           <div className="mt-4 pt-3 border-t border-white/10 flex items-center justify-between">
             <div className="text-[12px] font-bold text-white/50 uppercase tracking-wider">Total monthly ad spend</div>
-            <div className="text-[20px] font-black text-white">
-              {fmtUSD((AD_SPEND_BY_CLIENT[client.id] || []).reduce((s, i) => s + i.monthly, 0))}
-            </div>
+            <div className="text-[20px] font-black text-white">{fmtUSD(adSpendTotal)}</div>
           </div>
         </div>
       )}
 
+      </PortalSection>
+
+      <PortalSection id="overview.lead-sources">
       {/* Lead Sources */}
-      {leadSplit && (
+      {(leadSplit || content.leadSources || editMode) && (
         <div className="glass-card p-6">
-          <div className="text-[15px] font-bold text-white mb-4">Lead Sources</div>
-          <div className="grid gap-3">
-            {LEAD_CATEGORIES.map((cat) => {
-              const pct = leadSplit[cat.key] || 0;
-              return (
-                <div key={cat.key}>
-                  <div className="flex items-center justify-between mb-1">
-                    <div>
-                      <span className="text-[13px] font-semibold text-white">{cat.label}</span>
-                      <span className="text-[11px] text-white/50 ml-2">{cat.sub}</span>
-                    </div>
-                    <span className="text-[14px] font-black text-white">{pct}%</span>
-                  </div>
-                  <div className="h-2 rounded-full bg-white/10 overflow-hidden">
-                    <div
-                      className="h-full rounded-full transition-all"
-                      style={{ width: `${pct}%`, background: `linear-gradient(90deg, ${gradientFrom}, ${gradientTo})` }}
-                    />
-                  </div>
-                </div>
-              );
-            })}
+          <div className="flex items-center justify-between gap-2 mb-4">
+            <EditableText
+              value={title('overview.lead-sources', 'Lead Sources')}
+              onChange={(v) => setTitle('overview.lead-sources', v)}
+              className="text-[15px] font-bold text-white"
+              placeholder="Section title"
+              minCh={12}
+            />
+            {editMode && <EditButton icon="add" label="Add source" tone="accent" onClick={addLeadRow} />}
           </div>
+          <div className="grid gap-3">
+            {leadSources.map((cat, i) => (
+              <div key={cat.key}>
+                <div className="flex items-center justify-between gap-2 mb-1">
+                  <div className="flex items-center gap-1.5 flex-wrap min-w-0">
+                    <EditableText
+                      value={cat.label}
+                      onChange={(v) => setLeadRow(i, { label: v })}
+                      className="text-[13px] font-semibold text-white"
+                      placeholder="Source"
+                      minCh={10}
+                    />
+                    <EditableText
+                      value={cat.sub}
+                      onChange={(v) => setLeadRow(i, { sub: v })}
+                      className="text-[11px] text-white/50"
+                      placeholder="Detail"
+                      minCh={8}
+                    />
+                    {editMode && (
+                      <EditButton icon="delete" label="Remove" tone="danger" onClick={() => removeLeadRow(i)} />
+                    )}
+                  </div>
+                  <span className="text-[14px] font-black text-white shrink-0">
+                    <EditableNumber
+                      value={cat.pct}
+                      onChange={(v) => setLeadRow(i, { pct: v })}
+                      suffix="%"
+                      min={0}
+                      max={100}
+                    />
+                  </span>
+                </div>
+                <div className="h-2 rounded-full bg-white/10 overflow-hidden">
+                  <div
+                    className="h-full rounded-full transition-all"
+                    style={{ width: `${Math.min(100, Math.max(0, cat.pct))}%`, background: `linear-gradient(90deg, ${gradientFrom}, ${gradientTo})` }}
+                  />
+                </div>
+              </div>
+            ))}
+          </div>
+          {editMode && (
+            <div className="mt-3 pt-3 border-t border-white/10 text-[11px] text-white/45">
+              Total {leadSources.reduce((sum, r) => sum + (r.pct || 0), 0)}%
+            </div>
+          )}
         </div>
       )}
 
+      </PortalSection>
+
+      <PortalSection id="overview.top-content">
       {/* Content performance */}
-      {topPosts.length > 0 && (
+      {(topPosts.length > 0 || editMode) && (
         <div className="glass-card p-6">
-          <div className="flex items-center justify-between mb-4">
-            <div className="text-[15px] font-bold text-white">Top performing content</div>
-            <span className="text-[11px] text-white/50">Last 30 days</span>
+          <div className="flex items-center justify-between gap-2 mb-4">
+            <EditableText
+              value={title('overview.top-content', 'Top performing content')}
+              onChange={(v) => setTitle('overview.top-content', v)}
+              className="text-[15px] font-bold text-white"
+              placeholder="Section title"
+              minCh={14}
+            />
+            <div className="flex items-center gap-2">
+              <span className="text-[11px] text-white/50">Last 30 days</span>
+              {editMode && <EditButton icon="add" label="Add post" tone="accent" onClick={addPost} />}
+            </div>
           </div>
           <div className="grid gap-3">
             {topPosts.map((p, i) => (
@@ -885,40 +1103,86 @@ export default function ClientOverviewPage() {
                     className="w-9 h-9 shrink-0 rounded-lg flex items-center justify-center text-white text-[11px] font-bold"
                     style={{ background: `linear-gradient(135deg, ${gradientFrom}, ${gradientTo})` }}
                   >
-                    {p.platform.charAt(0)}
+                    {(p.platform || '?').charAt(0)}
                   </div>
                   <div className="min-w-0">
-                    <div className="text-[13px] font-semibold text-white truncate">{p.title}</div>
-                    <div className="text-[10px] text-white/50">{p.platform} · {p.type}</div>
+                    <EditableText
+                      value={p.title}
+                      onChange={(v) => setPost(i, { title: v })}
+                      className="text-[13px] font-semibold text-white block truncate"
+                      placeholder="Post title"
+                      fullWidth={editMode}
+                    />
+                    <div className="text-[10px] text-white/50 flex items-center gap-1.5 flex-wrap">
+                      <EditableText
+                        value={p.platform}
+                        onChange={(v) => setPost(i, { platform: v })}
+                        className="text-[10px] text-white/50"
+                        placeholder="Platform"
+                        minCh={8}
+                      />
+                      <span>·</span>
+                      <EditableText
+                        value={p.type}
+                        onChange={(v) => setPost(i, { type: v })}
+                        className="text-[10px] text-white/50"
+                        placeholder="Type"
+                        minCh={5}
+                      />
+                    </div>
                   </div>
                 </div>
                 <div className="flex items-center gap-5 pl-12 sm:pl-0 sm:text-right">
                   <div>
                     <div className="text-[10px] text-white/50">Engagement</div>
-                    <div className="text-[13px] font-bold text-white">{p.engagement.toLocaleString()}</div>
+                    <div className="text-[13px] font-bold text-white">
+                      <EditableNumber value={p.engagement} onChange={(v) => setPost(i, { engagement: v })} min={0} />
+                    </div>
                   </div>
                   <div>
                     <div className="text-[10px] text-white/50">Reach</div>
-                    <div className="text-[13px] font-bold text-white">{p.reach.toLocaleString()}</div>
+                    <div className="text-[13px] font-bold text-white">
+                      <EditableNumber value={p.reach} onChange={(v) => setPost(i, { reach: v })} min={0} />
+                    </div>
                   </div>
+                  {editMode && <EditButton icon="delete" label="Remove" tone="danger" onClick={() => removePost(i)} />}
                 </div>
               </div>
             ))}
+            {topPosts.length === 0 && (
+              <div className="text-[12px] text-white/40 italic">
+                No posts listed yet — add one to highlight this client&apos;s best content.
+              </div>
+            )}
           </div>
         </div>
       )}
 
-      {topPosts.length === 0 && (
+      {topPosts.length === 0 && !editMode && (
         <div className="glass-card p-6 text-center">
-          <div className="text-[14px] font-semibold text-white/60">Content performance</div>
+          <div className="text-[14px] font-semibold text-white/60">
+            {title('overview.top-content', 'Top performing content')}
+          </div>
           <div className="text-[12px] text-white/40 mt-1">We&apos;ll show your top posts here once we have engagement data.</div>
         </div>
       )}
 
+      </PortalSection>
+
+      <PortalSection id="overview.meta-account">
       {/* Meta Ads Account card */}
+      {!client.metaAds && editMode && (
+        <SectionPlaceholder text="No Meta ad account is linked to this client yet." />
+      )}
       {client.metaAds && (
         <div className="glass-card p-6">
-          <div className="text-[15px] font-bold text-white mb-4">Meta Ads Account</div>
+          <EditableText
+            value={title('overview.meta-account', 'Meta Ads Account')}
+            onChange={(v) => setTitle('overview.meta-account', v)}
+            className="text-[15px] font-bold text-white mb-4 block"
+            placeholder="Section title"
+            minCh={12}
+          />
           <div className="grid gap-4 grid-cols-1 sm:grid-cols-3">
             <div>
               <div className="text-[10px] font-bold uppercase tracking-wider text-white/60">Business Portfolio</div>
@@ -957,6 +1221,7 @@ export default function ClientOverviewPage() {
           </div>
         </div>
       )}
+      </PortalSection>
     </div>
   );
 }

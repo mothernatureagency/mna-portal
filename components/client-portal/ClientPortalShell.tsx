@@ -6,6 +6,16 @@ import { useState } from 'react';
 import { createClient } from '@/lib/supabase/client';
 import type { Client } from '@/lib/clients';
 import { ClientPortalProvider } from './ClientPortalContext';
+import { PortalEditProvider, usePortalEdit } from './PortalEditContext';
+import PortalSharingPanel from './PortalSharingPanel';
+import {
+  EMPTY_LAYOUT,
+  PORTAL_PAGES,
+  pageHrefForPathname,
+  pageForHref,
+  type PortalContent,
+  type PortalLayout,
+} from '@/lib/portal-layout';
 
 /**
  * Client-facing shell — dark glass theme matching the staff dashboard.
@@ -14,6 +24,42 @@ import { ClientPortalProvider } from './ClientPortalContext';
  * and glass-card styling throughout. Sidebar collapses to hamburger on mobile.
  */
 export default function ClientPortalShell({
+  client,
+  userEmail,
+  isStaffPreview,
+  accessibleClients,
+  portalLayout,
+  portalContent,
+  children,
+}: {
+  client: Client;
+  userEmail: string;
+  isStaffPreview: boolean;
+  accessibleClients?: Client[];
+  portalLayout?: PortalLayout;
+  portalContent?: PortalContent;
+  children: React.ReactNode;
+}) {
+  return (
+    <PortalEditProvider
+      client={client}
+      canEdit={isStaffPreview}
+      initialLayout={portalLayout || EMPTY_LAYOUT}
+      initialContent={portalContent || {}}
+    >
+      <ShellBody
+        client={client}
+        userEmail={userEmail}
+        isStaffPreview={isStaffPreview}
+        accessibleClients={accessibleClients}
+      >
+        {children}
+      </ShellBody>
+    </PortalEditProvider>
+  );
+}
+
+function ShellBody({
   client,
   userEmail,
   isStaffPreview,
@@ -38,16 +84,18 @@ export default function ClientPortalShell({
     router.refresh();
   }
 
-  const nav = [
-    { href: '/client', label: 'Overview', icon: 'dashboard' },
-    { href: '/client/agenda', label: 'Agenda', icon: 'event_note' },
-    { href: '/client/calendar', label: 'Content Calendar', icon: 'calendar_month' },
-    { href: '/client/campaigns', label: 'Email & SMS', icon: 'forward_to_inbox' },
-    { href: '/client/notes', label: 'Meeting Notes', icon: 'description' },
-    { href: '/client/tasks', label: 'Tasks', icon: 'checklist' },
-    { href: '/client/invoices', label: 'Invoices', icon: 'receipt_long' },
-    { href: '/client/booking', label: 'Book Meeting', icon: 'event_available' },
-  ];
+  const { canEdit, editMode, setEditMode, pageShared, togglePage, paused, saving, error } = usePortalEdit();
+  const [sharingOpen, setSharingOpen] = useState(false);
+
+  // In edit mode staff see every page (so they can re-share one); otherwise the
+  // nav is exactly what this client is allowed to see.
+  const nav = PORTAL_PAGES.filter((p) => editMode || pageShared(p.href));
+
+  // Direct navigation to an un-shared page falls back to a notice instead of
+  // the page body.
+  const currentPageHref = pageHrefForPathname(pathname);
+  const pageBlocked = !!currentPageHref && !pageShared(currentPageHref) && !canEdit;
+  const portalPaused = paused && !canEdit;
 
   const active = (href: string) =>
     href === '/client' ? pathname === '/client' : pathname.startsWith(href);
@@ -124,33 +172,110 @@ export default function ClientPortalShell({
 
       {/* Navigation */}
       <nav className="flex-1 overflow-y-auto px-2.5 py-3">
-        <div className="text-[9.5px] font-bold text-white/30 uppercase tracking-widest px-2.5 mb-2">Navigation</div>
+        <div className="flex items-center justify-between px-2.5 mb-2">
+          <span className="text-[9.5px] font-bold text-white/30 uppercase tracking-widest">Navigation</span>
+          {editMode && (
+            <span className="text-[9px] font-bold text-white/35 uppercase tracking-wider">
+              {nav.filter((p) => pageShared(p.href)).length}/{nav.length} shared
+            </span>
+          )}
+        </div>
         {nav.map((item) => {
           const on = active(item.href);
+          const shared = pageShared(item.href);
+          const locked = !!pageForHref(item.href)?.locked;
           return (
-            <Link
-              key={item.href}
-              href={item.href}
-              onClick={() => setMobileOpen(false)}
-              className="flex items-center gap-2.5 px-2.5 py-2 rounded-xl mb-0.5 transition-colors"
-              style={{
-                background: on ? 'rgba(255,255,255,.1)' : 'transparent',
-                color: on ? '#fff' : 'rgba(255,255,255,.6)',
-                fontWeight: on ? 600 : 400,
-                fontSize: 13,
-              }}
-            >
-              <span className="material-symbols-outlined" style={{ fontSize: 18 }}>
-                {item.icon}
-              </span>
-              {item.label}
-            </Link>
+            <div key={item.href} className="flex items-center gap-1 mb-0.5">
+              <Link
+                href={item.href}
+                onClick={() => setMobileOpen(false)}
+                className="flex-1 min-w-0 flex items-center gap-2.5 px-2.5 py-2 rounded-xl transition-colors"
+                style={{
+                  background: on ? 'rgba(255,255,255,.1)' : 'transparent',
+                  color: on ? '#fff' : 'rgba(255,255,255,.6)',
+                  fontWeight: on ? 600 : 400,
+                  fontSize: 13,
+                  opacity: editMode && !shared ? 0.45 : 1,
+                }}
+              >
+                <span className="material-symbols-outlined" style={{ fontSize: 18 }}>
+                  {item.icon}
+                </span>
+                <span className="truncate">{item.label}</span>
+              </Link>
+              {editMode && (
+                <button
+                  type="button"
+                  disabled={locked}
+                  onClick={() => togglePage(item.href, !shared)}
+                  title={
+                    locked
+                      ? 'The Overview page is always shared'
+                      : shared
+                      ? 'Shared with this client — click to hide'
+                      : 'Hidden from this client — click to share'
+                  }
+                  className={`w-7 h-7 shrink-0 rounded-lg flex items-center justify-center transition-colors ${
+                    locked
+                      ? 'text-white/20 cursor-not-allowed'
+                      : shared
+                      ? 'text-emerald-400 hover:bg-emerald-500/20'
+                      : 'text-rose-400 hover:bg-rose-500/20'
+                  }`}
+                >
+                  <span className="material-symbols-outlined" style={{ fontSize: 16 }}>
+                    {locked ? 'lock' : shared ? 'visibility' : 'visibility_off'}
+                  </span>
+                </button>
+              )}
+            </div>
           );
         })}
       </nav>
 
       {/* Bottom actions */}
       <div className="px-2.5 pb-4 pt-2" style={{ borderTop: '1px solid rgba(255,255,255,.07)' }}>
+        {canEdit && (
+          <>
+            <button
+              onClick={() => { setSharingOpen(true); setMobileOpen(false); }}
+              className="w-full flex items-center gap-2.5 px-2.5 py-2 rounded-xl text-[13px] text-white/60 hover:text-white hover:bg-white/10 transition-colors mb-0.5"
+            >
+              <span className="material-symbols-outlined" style={{ fontSize: 18 }}>tune</span>
+              Sharing &amp; access
+              {paused ? (
+                <span className="ml-auto text-[8.5px] font-bold uppercase tracking-wider px-1.5 py-0.5 rounded-full bg-rose-500/25 text-rose-200">
+                  Paused
+                </span>
+              ) : (
+                <span className="ml-auto text-[9px] font-bold text-white/35">
+                  {nav.filter((p) => pageShared(p.href)).length}/{PORTAL_PAGES.length}
+                </span>
+              )}
+            </button>
+            <button
+              onClick={() => setEditMode(!editMode)}
+              className={`w-full flex items-center gap-2.5 px-2.5 py-2 rounded-xl text-[13px] mb-0.5 transition-colors ${
+                editMode
+                  ? 'bg-amber-400/20 text-amber-200 font-semibold'
+                  : 'text-white/60 hover:text-white hover:bg-white/10'
+              }`}
+            >
+              <span className="material-symbols-outlined" style={{ fontSize: 18 }}>
+                {editMode ? 'edit_off' : 'edit_note'}
+              </span>
+              {editMode ? 'Done editing' : 'Edit portal'}
+            </button>
+            {editMode && (
+              <div className="px-2.5 pb-2 text-[9.5px] leading-snug text-white/40">
+                Editing <span className="text-white/70 font-semibold">{client.shortName}</span>. Changes save
+                automatically and apply to this client only.
+                {saving && <span className="block text-amber-300 mt-0.5">Saving…</span>}
+                {error && <span className="block text-rose-300 mt-0.5">{error}</span>}
+              </div>
+            )}
+          </>
+        )}
         <Link
           href="/client/security"
           onClick={() => setMobileOpen(false)}
@@ -248,10 +373,83 @@ export default function ClientPortalShell({
           <div className="text-[13px] font-bold text-white truncate">{client.name}</div>
         </div>
 
+        {canEdit && paused && (
+          <div
+            className="flex flex-wrap items-center gap-2 px-4 md:px-8 py-2"
+            style={{ background: 'rgba(244,63,94,.18)', borderBottom: '1px solid rgba(244,63,94,.4)' }}
+          >
+            <span className="material-symbols-outlined text-rose-300" style={{ fontSize: 16 }}>pause_circle</span>
+            <span className="text-[11px] font-bold text-rose-100">
+              Sharing is paused — {client.name} can&apos;t see their portal right now.
+            </span>
+            <button
+              onClick={() => setSharingOpen(true)}
+              className="ml-auto text-[11px] font-bold px-2.5 py-1 rounded-lg bg-rose-400/25 text-rose-100 hover:bg-rose-400/40"
+            >
+              Resume
+            </button>
+          </div>
+        )}
+
+        {editMode && (
+          <div
+            className="sticky top-0 z-20 flex flex-wrap items-center gap-2 px-4 md:px-8 py-2"
+            style={{ background: 'rgba(245,158,11,.16)', borderBottom: '1px solid rgba(245,158,11,.35)', backdropFilter: 'blur(10px)' }}
+          >
+            <span className="material-symbols-outlined text-amber-300" style={{ fontSize: 16 }}>tune</span>
+            <span className="text-[11px] font-bold text-amber-100">
+              Editing {client.name}&apos;s portal
+            </span>
+            <span className="text-[11px] text-amber-100/70">
+              Click any value to edit it · use the Shared / Hidden pills to choose what this client sees
+            </span>
+            <button
+              onClick={() => setSharingOpen(true)}
+              className="ml-auto text-[11px] font-bold px-2.5 py-1 rounded-lg bg-amber-400/25 text-amber-100 hover:bg-amber-400/40"
+            >
+              Sharing &amp; access
+            </button>
+            <button
+              onClick={() => setEditMode(false)}
+              className="text-[11px] font-bold px-2.5 py-1 rounded-lg bg-amber-400/25 text-amber-100 hover:bg-amber-400/40"
+            >
+              Done
+            </button>
+          </div>
+        )}
+
         <ClientPortalProvider client={client} userEmail={userEmail} isStaffPreview={isStaffPreview}>
-          <div className="max-w-[1400px] mx-auto px-4 py-5 md:px-8 md:py-8">{children}</div>
+          <div className="max-w-[1400px] mx-auto px-4 py-5 md:px-8 md:py-8">
+            {portalPaused ? (
+              <div className="glass-card p-10 text-center">
+                <span className="material-symbols-outlined text-white/30" style={{ fontSize: 34 }}>pause_circle</span>
+                <div className="text-[15px] font-bold text-white mt-2">Your portal is being updated</div>
+                <div className="text-[12px] text-white/50 mt-1">
+                  Your Mother Nature Agency team has paused access while they refresh your reporting. It&apos;ll be back shortly.
+                </div>
+              </div>
+            ) : pageBlocked ? (
+              <div className="glass-card p-10 text-center">
+                <span className="material-symbols-outlined text-white/30" style={{ fontSize: 34 }}>visibility_off</span>
+                <div className="text-[15px] font-bold text-white mt-2">This section isn&apos;t part of your portal</div>
+                <div className="text-[12px] text-white/50 mt-1">
+                  Reach out to your Mother Nature Agency contact if you need access.
+                </div>
+                <Link
+                  href="/client"
+                  className="inline-block mt-4 text-[12px] font-semibold px-3.5 py-2 rounded-lg bg-white/10 text-white hover:bg-white/20"
+                >
+                  Back to Overview
+                </Link>
+              </div>
+            ) : (
+              children
+            )}
+          </div>
         </ClientPortalProvider>
       </main>
+
+      {sharingOpen && <PortalSharingPanel onClose={() => setSharingOpen(false)} />}
     </div>
   );
 }
