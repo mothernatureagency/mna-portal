@@ -9,6 +9,7 @@ import AttributionOverview from '@/components/client-portal/AttributionOverview'
 import { getPerformanceForClient } from '@/lib/data/performance';
 import PerformanceOverview from '@/components/client-portal/PerformanceOverview';
 import CompetitorBenchmark from '@/components/dashboard/CompetitorBenchmark';
+import GoogleOverview from '@/components/client-portal/GoogleOverview';
 import KPISection from '@/components/dashboard/KPISection';
 import PortalSection from '@/components/client-portal/PortalSection';
 import { usePortalEdit } from '@/components/client-portal/PortalEditContext';
@@ -562,6 +563,17 @@ export default function ClientOverviewPage() {
         editable={isStaffPreview}
       />
 
+      </PortalSection>
+
+      <PortalSection id="overview.google">
+      {/* Google Performance — Business Profile (live) + Ads / GA4 / Search Console */}
+      <GoogleOverview
+        clientId={client.id}
+        clientName={client.shortName}
+        gradientFrom={gradientFrom}
+        gradientTo={gradientTo}
+        editable={isStaffPreview}
+      />
       </PortalSection>
 
       <PortalSection id="overview.competitors">

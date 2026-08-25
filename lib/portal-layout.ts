@@ -44,6 +44,7 @@ export const PORTAL_PAGES: PortalPageDef[] = [
       { id: 'overview.calendar', label: 'Content Calendar preview', note: 'Month grid of approved posts' },
       { id: 'overview.kpis-live', label: 'Performance KPIs', note: 'Auto-pulled Meta metrics + manual pipeline numbers' },
       { id: 'overview.competitors', label: 'Competitor Benchmark' },
+      { id: 'overview.google', label: 'Google Performance', note: 'Business Profile, Ads, website and search' },
       { id: 'overview.kpi-tiles', label: 'Headline KPI tiles', note: 'Four editable summary tiles' },
       { id: 'overview.revenue', label: 'Revenue Projections' },
       { id: 'overview.quarters', label: 'Quarterly Breakdown' },
