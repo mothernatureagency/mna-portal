@@ -43,17 +43,19 @@ async function getAllClients(): Promise<Client[]> {
  */
 async function getPortalConfig(
   clientId: string,
-): Promise<{ layout: PortalLayout; content: PortalContent; targets: unknown }> {
+): Promise<{ layout: PortalLayout; content: PortalContent; targets: unknown; metaAdAccountId?: string }> {
   try {
     const { rows } = await query<{ key: string; value: unknown }>(
       `select key, value from client_kv where client_id = $1 and key = any($2::text[])`,
-      [clientId, [PORTAL_LAYOUT_KEY, PORTAL_CONTENT_KEY, KPI_TARGETS_KEY]],
+      [clientId, [PORTAL_LAYOUT_KEY, PORTAL_CONTENT_KEY, KPI_TARGETS_KEY, 'meta_ads']],
     );
     const byKey = new Map(rows.map((r) => [r.key, r.value]));
+    const metaRaw = (byKey.get('meta_ads') as any)?.adAccountId;
     return {
       layout: normalizeLayout(byKey.get(PORTAL_LAYOUT_KEY)),
       content: normalizeContent(byKey.get(PORTAL_CONTENT_KEY)),
       targets: byKey.get(KPI_TARGETS_KEY) ?? null,
+      metaAdAccountId: typeof metaRaw === 'string' && metaRaw ? metaRaw : undefined,
     };
   } catch {
     return { layout: EMPTY_LAYOUT, content: {}, targets: null };
@@ -132,7 +134,7 @@ export default async function ClientPortalLayout({
   // Staff sees all non-mna clients, owners/clients see only their assigned
   const clientList = isStaff ? clients.filter((c) => c.id !== 'mna') : accessibleClients;
 
-  const { layout: portalLayout, content: portalContent, targets } = await getPortalConfig(activeClient.id);
+  const { layout: portalLayout, content: portalContent, targets, metaAdAccountId } = await getPortalConfig(activeClient.id);
   const clientWithTargets = applyKpiTargets(activeClient, targets);
 
   return (
@@ -143,6 +145,7 @@ export default async function ClientPortalLayout({
       accessibleClients={clientList}
       portalLayout={portalLayout}
       portalContent={portalContent}
+      metaAdAccountId={metaAdAccountId || activeClient.metaAds?.adAccountId}
     >
       {children}
     </ClientPortalShell>

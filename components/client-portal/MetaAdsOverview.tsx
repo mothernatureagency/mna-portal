@@ -57,60 +57,62 @@ function fmtPct(n: number) {
 }
 
 export default function MetaAdsOverview({
-  clientId,
   adAccountId,
   gradientFrom,
   gradientTo,
+  isStaff = false,
 }: {
-  clientId: string;
+  /** Resolved server-side for the client being viewed. */
   adAccountId?: string;
   gradientFrom: string;
   gradientTo: string;
+  isStaff?: boolean;
 }) {
   const [datePreset, setDatePreset] = useState('last_30d');
   const [insights, setInsights] = useState<InsightsResponse | null>(null);
   const [loading, setLoading] = useState(true);
-  const [failed, setFailed] = useState(false);
+  const [failure, setFailure] = useState<string | null>(null);
 
-  // The account saved for this client takes priority over the static config.
-  const [kvAccount, setKvAccount] = useState<string | null>(null);
-  const [kvLoaded, setKvLoaded] = useState(false);
-
-  useEffect(() => {
-    setKvLoaded(false);
-    fetch(`/api/client-kv?clientId=${encodeURIComponent(clientId)}&key=meta_ads`)
-      .then((r) => r.json())
-      .then((d) => setKvAccount(d?.value?.adAccountId || null))
-      .catch(() => setKvAccount(null))
-      .finally(() => setKvLoaded(true));
-  }, [clientId]);
-
+  // Graph wants the act_ prefix; the stored ID may or may not carry it.
   const account = useMemo(() => {
-    const raw = kvAccount || adAccountId;
-    if (!raw) return undefined;
-    return raw.startsWith('act_') ? raw : `act_${raw}`;
-  }, [kvAccount, adAccountId]);
+    if (!adAccountId) return undefined;
+    return adAccountId.startsWith('act_') ? adAccountId : `act_${adAccountId}`;
+  }, [adAccountId]);
 
   useEffect(() => {
-    if (!kvLoaded) return;
     let cancelled = false;
     setLoading(true);
-    setFailed(false);
-    const q = account ? `&adAccountId=${encodeURIComponent(account)}` : '';
-    fetch(`/api/meta/insights?datePreset=${datePreset}${q}`)
-      .then((r) => (r.ok ? r.json() : Promise.reject(new Error(String(r.status)))))
-      .then((d) => {
-        if (cancelled) return;
-        if (d?.error) { setFailed(true); return; }
-        setInsights(d);
+    setFailure(null);
+    if (!account) {
+      setLoading(false);
+      setFailure('No Meta ad account is linked to this client yet.');
+      return;
+    }
+    fetch(`/api/meta/insights?datePreset=${datePreset}&adAccountId=${encodeURIComponent(account)}`)
+      .then(async (r) => {
+        const body = await r.json().catch(() => ({}));
+        if (!r.ok || body?.error) throw new Error(body?.error || `Meta returned ${r.status}`);
+        return body;
       })
-      .catch(() => { if (!cancelled) setFailed(true); })
+      .then((d) => { if (!cancelled) setInsights(d); })
+      .catch((e) => { if (!cancelled) setFailure(e?.message || 'Could not load Meta data'); })
       .finally(() => { if (!cancelled) setLoading(false); });
     return () => { cancelled = true; };
-  }, [account, datePreset, kvLoaded]);
+  }, [account, datePreset]);
 
-  // Nothing to show and nothing pending — stay out of the client's way.
-  if (!loading && (failed || !insights)) return null;
+  // Clients never see a broken card; staff see why it's broken so it can be fixed.
+  if (!loading && (failure || !insights)) {
+    if (!isStaff) return null;
+    return (
+      <div className="glass-card p-5">
+        <div className="text-[13px] font-bold text-white mb-1">Meta Ads Performance</div>
+        <div className="text-[11.5px] text-amber-300">{failure || 'No data returned.'}</div>
+        <div className="text-[10.5px] text-white/40 mt-1">
+          Clients see nothing here until this resolves. Set the ad account on the Meta Ads page.
+        </div>
+      </div>
+    );
+  }
 
   const t = insights?.totals;
   const kpis = t

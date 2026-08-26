@@ -162,7 +162,7 @@ function fmtUSD(n: number) {
 }
 
 export default function ClientOverviewPage() {
-  const { client, isStaffPreview } = useClientPortal();
+  const { client, isStaffPreview, metaAdAccountId } = useClientPortal();
   const { editMode, content, updateContent, title, setTitle } = usePortalEdit();
   const [projections, setProjections] = useState<MonthData[]>([]);
   const [editingMonth, setEditingMonth] = useState<string | null>(null);
@@ -560,7 +560,7 @@ export default function ClientOverviewPage() {
         title={title('overview.kpis-live', 'Performance KPIs')}
         gradientFrom={gradientFrom}
         gradientTo={gradientTo}
-        adAccountId={client.metaAds?.adAccountId}
+        adAccountId={metaAdAccountId}
         editable={isStaffPreview}
       />
 
@@ -569,10 +569,10 @@ export default function ClientOverviewPage() {
       <PortalSection id="overview.meta-ads">
       {/* Meta Ads Performance — live campaign numbers, no account IDs */}
       <MetaAdsOverview
-        clientId={client.id}
-        adAccountId={client.metaAds?.adAccountId}
+        adAccountId={metaAdAccountId}
         gradientFrom={gradientFrom}
         gradientTo={gradientTo}
+        isStaff={isStaffPreview}
       />
       </PortalSection>
 

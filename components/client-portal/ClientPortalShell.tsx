@@ -30,6 +30,7 @@ export default function ClientPortalShell({
   accessibleClients,
   portalLayout,
   portalContent,
+  metaAdAccountId,
   children,
 }: {
   client: Client;
@@ -38,6 +39,7 @@ export default function ClientPortalShell({
   accessibleClients?: Client[];
   portalLayout?: PortalLayout;
   portalContent?: PortalContent;
+  metaAdAccountId?: string;
   children: React.ReactNode;
 }) {
   return (
@@ -52,6 +54,7 @@ export default function ClientPortalShell({
         userEmail={userEmail}
         isStaffPreview={isStaffPreview}
         accessibleClients={accessibleClients}
+        metaAdAccountId={metaAdAccountId}
       >
         {children}
       </ShellBody>
@@ -64,12 +67,14 @@ function ShellBody({
   userEmail,
   isStaffPreview,
   accessibleClients,
+  metaAdAccountId,
   children,
 }: {
   client: Client;
   userEmail: string;
   isStaffPreview: boolean;
   accessibleClients?: Client[];
+  metaAdAccountId?: string;
   children: React.ReactNode;
 }) {
   const pathname = usePathname();
@@ -459,7 +464,7 @@ function ShellBody({
           </div>
         )}
 
-        <ClientPortalProvider client={client} userEmail={userEmail} isStaffPreview={isStaffPreview}>
+        <ClientPortalProvider client={client} userEmail={userEmail} isStaffPreview={isStaffPreview} metaAdAccountId={metaAdAccountId}>
           <div className="max-w-[1400px] mx-auto px-4 py-5 md:px-8 md:py-8">
             {portalPaused ? (
               <div className="glass-card p-10 text-center">

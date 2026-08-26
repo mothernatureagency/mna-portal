@@ -2,6 +2,21 @@ import { NextRequest, NextResponse } from 'next/server';
 import { ensureSchema, query } from '@/lib/db';
 import { createClient } from '@/lib/supabase/server';
 
+/**
+ * Every client this user may act on. Multi-client accounts carry a
+ * comma-separated `client_ids`; single-client accounts carry `client_id`.
+ * Checking only the latter locks multi-client users out of their own data.
+ */
+function accessibleClientIds(meta: Record<string, unknown>): string[] {
+  const ids = String((meta.client_ids as string) || '')
+    .split(',')
+    .map((s) => s.trim())
+    .filter(Boolean);
+  const single = (meta.client_id as string) || '';
+  if (single && !ids.includes(single)) ids.push(single);
+  return ids;
+}
+
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
 
@@ -20,13 +35,12 @@ export async function GET(req: NextRequest) {
 
   const meta = (user.user_metadata || {}) as Record<string, unknown>;
   const role = (meta.role as string) || 'staff';
-  const userClientId = (meta.client_id as string) || '';
 
   const clientId = req.nextUrl.searchParams.get('clientId') || '';
   const key = req.nextUrl.searchParams.get('key') || '';
   if (!clientId || !key) return NextResponse.json({ error: 'clientId and key required' }, { status: 400 });
 
-  if (role === 'client' && clientId !== userClientId) {
+  if (role === 'client' && !accessibleClientIds(meta).includes(clientId)) {
     return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
   }
 
@@ -51,7 +65,6 @@ export async function PUT(req: NextRequest) {
 
   const meta = (user.user_metadata as Record<string, unknown> | null) || {};
   const role = (meta.role as string) || 'staff';
-  const userClientId = (meta.client_id as string) || '';
 
   let body: any;
   try { body = await req.json(); } catch { return NextResponse.json({ error: 'Invalid JSON' }, { status: 400 }); }
@@ -63,7 +76,7 @@ export async function PUT(req: NextRequest) {
   // Clients can only write to their own client_id and only specific keys
   const CLIENT_WRITABLE_KEYS = ['revenue_projections', 'knowledge_base'];
   if (role === 'client') {
-    if (clientId !== userClientId) {
+    if (!accessibleClientIds(meta).includes(clientId)) {
       return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
     }
     if (!CLIENT_WRITABLE_KEYS.includes(key)) {
