@@ -61,6 +61,16 @@ export const PORTAL_PAGES: PortalPageDef[] = [
       { id: 'overview.meta-account', label: 'Meta Ads Account' },
     ],
   },
+  {
+    href: '/client/content',
+    label: 'Content',
+    icon: 'photo_camera',
+    sections: [
+      { id: 'content.shot-list', label: 'Shot list', note: 'What we need captured at the location' },
+      { id: 'content.ideas', label: 'Content ideas', note: 'Client types a topic, gets shots + scripts' },
+      { id: 'content.analytics', label: 'Video performance', note: 'Top TikTok and YouTube videos' },
+    ],
+  },
   { href: '/client/agenda', label: 'Agenda', icon: 'event_note', sections: [] },
   { href: '/client/calendar', label: 'Content Calendar', icon: 'calendar_month', sections: [] },
   { href: '/client/campaigns', label: 'Email & SMS', icon: 'forward_to_inbox', sections: [] },
@@ -168,12 +178,43 @@ export const DEFAULT_LEAD_SOURCES: LeadSourceRow[] = [
   { key: 'referral', label: 'Referral', sub: 'Word of mouth', pct: 0 },
 ];
 
+/** Shot list — what we ask the client to capture on site. */
+export type ShotItem = {
+  id: string;
+  label: string;
+  detail: string;
+  /** photo | video | drone | interview — drives the icon and grouping. */
+  kind: string;
+  done: boolean;
+};
+
+export const SHOT_LIST_KEY = 'shot_list';
+
+export const DEFAULT_SHOT_LIST: ShotItem[] = [
+  { id: 'stock-no-people', label: 'Stock-style images — no people', detail: 'Clean product, space and detail shots we can use anywhere', kind: 'photo', done: false },
+  { id: 'member-room-empty', label: 'Member room — empty', detail: 'Wide and detail shots with nobody in frame', kind: 'photo', done: false },
+  { id: 'member-room-people', label: 'Member room — in use', detail: 'Same room with a member in the chair', kind: 'photo', done: false },
+  { id: 'drone-exterior', label: 'Drone — exterior', detail: 'Approach to the building, signage, parking, surrounding area', kind: 'drone', done: false },
+  { id: 'drone-interior', label: 'Drone — interior (if possible)', detail: 'Slow fly-through of the main space, only where it is safe', kind: 'drone', done: false },
+  { id: 'testimonial', label: 'Client testimonial', detail: 'A real member on camera, 30-60 seconds, in their own words', kind: 'interview', done: false },
+];
+
+export const SHOT_KINDS: Record<string, { icon: string; label: string }> = {
+  photo: { icon: 'photo_camera', label: 'Photo' },
+  video: { icon: 'videocam', label: 'Video' },
+  drone: { icon: 'flight', label: 'Drone' },
+  interview: { icon: 'record_voice_over', label: 'Interview' },
+};
+
 export const DEFAULT_SECTION_TITLES: Record<string, string> = {
   'overview.kpi-tiles': 'Highlights',
   'overview.ad-spend': 'Ad Spend Breakdown',
   'overview.lead-sources': 'Lead Sources',
   'overview.top-content': 'Top performing content',
   'overview.meta-account': 'Meta Ads Account',
+  'content.shot-list': 'Shot list',
+  'content.ideas': 'Content ideas',
+  'content.analytics': 'Video performance',
   'overview.revenue': 'Revenue Projections',
   'overview.quarters': 'Quarterly Breakdown',
 };

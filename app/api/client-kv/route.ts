@@ -68,19 +68,39 @@ export async function PUT(req: NextRequest) {
 
   let body: any;
   try { body = await req.json(); } catch { return NextResponse.json({ error: 'Invalid JSON' }, { status: 400 }); }
-  const { clientId, key, value } = body || {};
-  if (!clientId || !key || value === undefined) {
+  const { clientId, key, value: rawValue } = body || {};
+  if (!clientId || !key || rawValue === undefined) {
     return NextResponse.json({ error: 'clientId, key, and value required' }, { status: 400 });
   }
 
-  // Clients can only write to their own client_id and only specific keys
-  const CLIENT_WRITABLE_KEYS = ['revenue_projections', 'knowledge_base'];
+  // Clients can only write to their own clients, and only specific keys
+  const CLIENT_WRITABLE_KEYS = ['revenue_projections', 'knowledge_base', 'shot_list'];
+  let value = rawValue;
+
   if (role === 'client') {
     if (!accessibleClientIds(meta).includes(clientId)) {
       return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
     }
     if (!CLIENT_WRITABLE_KEYS.includes(key)) {
       return NextResponse.json({ error: 'Only staff can write this setting' }, { status: 403 });
+    }
+    // The shot list is authored by staff — a client ticking items off may only
+    // move the `done` flags, never relabel or drop a row.
+    if (key === 'shot_list') {
+      const { rows: existing } = await query<{ value: unknown }>(
+        `select value from client_kv where client_id = $1 and key = 'shot_list'`,
+        [clientId],
+      );
+      const stored = existing[0]?.value;
+      if (Array.isArray(stored)) {
+        const doneById = new Map(
+          (Array.isArray(value) ? value : []).map((r: any) => [String(r?.id), r?.done === true]),
+        );
+        value = stored.map((row: any) => ({
+          ...row,
+          done: doneById.has(String(row?.id)) ? doneById.get(String(row?.id)) : row?.done === true,
+        }));
+      }
     }
   }
 
