@@ -302,7 +302,10 @@ export default function SalesBenchmarks({
         const parts: string[] = [];
         if (destinRev) {
           const ratio = (mineRev / destinRev) * 100;
-          parts.push(`${ratio.toFixed(0)}% of Destin's volume`);
+          // Use whatever this client named the comparison column, not a
+          // hardcoded location — every client sees this card.
+          const compLabel = competitors.find((c) => c.key === 'destin')?.label || 'the competitor';
+          parts.push(`${ratio.toFixed(0)}% of ${compLabel}'s volume`);
         }
         if (corpRev) {
           const ratio = (mineRev / corpRev) * 100;

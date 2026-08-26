@@ -53,11 +53,14 @@ function fmtDate(d?: string | null) {
 
 export default function GoogleReviewsCard({
   clientId,
+  clientName,
   gradientFrom,
   gradientTo,
   editable = true,
 }: {
   clientId: string;
+  /** Used in the setup copy so it names this client, not another location. */
+  clientName?: string;
   gradientFrom: string;
   gradientTo: string;
   editable?: boolean;       // gate the "Capture this month" button (default true)
@@ -291,7 +294,7 @@ export default function GoogleReviewsCard({
               className="text-[10px] text-white/60 hover:text-white mt-2 inline-flex items-center gap-1"
             >
               <span className="material-symbols-outlined" style={{ fontSize: 12 }}>open_in_new</span>
-              Open Google's Place ID Finder (paste the Niceville address, copy the ID that pops up)
+              Open Google&apos;s Place ID Finder (paste this location&apos;s address, copy the ID that pops up)
             </a>
           </div>
 
@@ -309,7 +312,7 @@ export default function GoogleReviewsCard({
             <div className="flex gap-2">
               <input
                 type="text"
-                placeholder="Prime IV Niceville FL"
+                placeholder={clientName ? `${clientName}` : 'Business name + city'}
                 onChange={(e) => setLookupQuery(e.target.value)}
                 onKeyDown={(e) => { if (e.key === 'Enter') searchPlaces(); }}
                 className="flex-1 px-3 py-2 rounded-lg border text-white text-[13px] placeholder:text-white/55 focus:outline-none"
@@ -369,8 +372,8 @@ export default function GoogleReviewsCard({
           <div className="text-[13px] font-bold text-white mb-1">Pick the Google profile</div>
           <p className="text-[11px] text-white/55 max-w-md mx-auto leading-relaxed mb-3">
             Tap <span className="text-white font-semibold">Pick Profile</span> above and search
-            for the Niceville location. If there are two Prime IV profiles on the map, you'll see
-            both in the results — pick the one at your address.
+            for {clientName || 'this location'}. If more than one profile shows up on the map,
+            you&apos;ll see them all in the results — pick the one at your address.
           </p>
           <p className="text-[10px] text-white/35 max-w-md mx-auto">
             Requires <code className="text-white/60">GOOGLE_PLACES_API_KEY</code> in Vercel env vars.
