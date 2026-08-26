@@ -25,11 +25,8 @@ type AgendaItem = {
   task_id?: string; // links to client_requests id if pulled from checklist
 };
 
-const MNA_EMAILS = [
-  'mn@mothernatureagency.com',
-  'admin@mothernatureagency.com',
-  'info@mothernatureagency.com',
-];
+// Portal roles that get the read-only view. Everyone else on the team edits.
+const VIEW_ONLY_ROLES = ['client', 'contractor', 'student', 'creator'];
 
 // Order: MNA first, then alphabetical
 const CLIENT_TABS = [
@@ -75,11 +72,12 @@ export default function AgendaPage() {
   const [newItem, setNewItem] = useState({ date: todayStr(), time: '09:00', title: '', notes: '' });
   const [loading, setLoading] = useState(true);
 
-  // Detect user role
+  // Detect user role from the account's role, not a hardcoded email list —
+  // the old list silently locked out every teammate hired since it was written.
   useEffect(() => {
     createClient().auth.getUser().then(({ data: { user } }) => {
-      const email = user?.email || '';
-      setIsStaff(MNA_EMAILS.includes(email));
+      const role = ((user?.user_metadata as Record<string, unknown> | null)?.role as string) || 'staff';
+      setIsStaff(!!user && !VIEW_ONLY_ROLES.includes(role));
     });
   }, []);
 

@@ -35,11 +35,8 @@ type Campaign = {
   click_rate: number | null;
 };
 
-const MNA_EMAILS = [
-  'mn@mothernatureagency.com',
-  'admin@mothernatureagency.com',
-  'info@mothernatureagency.com',
-];
+// Portal roles that get the read-only view. Everyone else on the team edits.
+const VIEW_ONLY_ROLES = ['client', 'contractor', 'student', 'creator'];
 
 const STATUS_STYLES: Record<CampaignStatus, { label: string; bg: string; text: string }> = {
   drafting:          { label: 'Drafting',          bg: 'bg-white/5',        text: 'text-white/60 italic' },
@@ -98,10 +95,12 @@ export default function CampaignsPage() {
     audience_count: '',
   });
 
-  // Detect staff
+  // Detect staff from the account's role, not a hardcoded email list — the old
+  // list silently locked out every teammate hired since it was written.
   useEffect(() => {
     createClient().auth.getUser().then(({ data: { user } }) => {
-      setIsStaff(MNA_EMAILS.includes(user?.email || ''));
+      const role = ((user?.user_metadata as Record<string, unknown> | null)?.role as string) || 'staff';
+      setIsStaff(!!user && !VIEW_ONLY_ROLES.includes(role));
     });
   }, []);
 

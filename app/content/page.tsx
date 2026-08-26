@@ -143,11 +143,9 @@ type ContentItem = {
   scheduled_for?: string | null;
 };
 
-const MNA_EMAILS = [
-  'mn@mothernatureagency.com',
-  'admin@mothernatureagency.com',
-  'info@mothernatureagency.com',
-];
+// Portal roles that get the read-only Content Tracker (approve / request
+// changes, but no editing). Everyone else on the team can edit.
+const VIEW_ONLY_ROLES = ['client', 'contractor', 'student', 'creator'];
 
 const PLATFORMS = ['Instagram', 'Facebook', 'Meta', 'TikTok', 'LinkedIn', 'YouTube', 'Pinterest', 'X/Twitter'];
 const CONTENT_TYPES = ['Reel', 'Carousel', 'Post', 'Story', 'Live', 'Short', 'Video', 'Pin'];
@@ -357,11 +355,16 @@ export default function ContentPage() {
   const [bulkCrossTargets, setBulkCrossTargets] = useState<string[]>([]);
   const [bulkCrossPosting, setBulkCrossPosting] = useState<{ done: number; total: number } | null>(null);
 
-  // Detect user role
+  // Detect user role.
+  //
+  // This used to compare the email against a hardcoded list of three
+  // addresses, so any teammate hired since — socials@ included — silently got
+  // the read-only view with every edit control greyed out. Drive it off the
+  // account's actual role like the rest of the app does.
   useEffect(() => {
     createClient().auth.getUser().then(({ data: { user } }) => {
-      const email = user?.email || '';
-      setIsStaff(MNA_EMAILS.includes(email));
+      const role = ((user?.user_metadata as Record<string, unknown> | null)?.role as string) || 'staff';
+      setIsStaff(!!user && !VIEW_ONLY_ROLES.includes(role));
     });
   }, []);
 
