@@ -79,6 +79,31 @@ export default function ClientsPage() {
         : makePrimeIVClient({ name: name.trim() }))
     : null;
 
+  // Teammates that can be assigned to a client at onboarding. Pulled from the
+  // account list plus the custom roster, same sources as Team Assignments.
+  const [staffOptions, setStaffOptions] = useState<{ email: string; name: string }[]>([]);
+  const [assignEmails, setAssignEmails] = useState<string[]>([]);
+
+  useEffect(() => {
+    Promise.all([
+      fetch('/api/staff').then((r) => r.json()).catch(() => ({})),
+      fetch('/api/accounts').then((r) => r.json()).catch(() => ({})),
+    ]).then(([sRes, acctRes]) => {
+      const roster = new Map<string, string>();
+      for (const a of ((acctRes?.accounts || []) as any[])) {
+        if (a?.email && a.role !== 'client') roster.set(String(a.email).toLowerCase(), a.name || String(a.email).split('@')[0]);
+      }
+      for (const m of ((sRes?.staff || []) as any[])) {
+        if (m?.email) roster.set(String(m.email).toLowerCase(), m.name || String(m.email).split('@')[0]);
+      }
+      setStaffOptions(Array.from(roster, ([email, name]) => ({ email, name })).sort((a, b) => a.name.localeCompare(b.name)));
+    });
+  }, []);
+
+  function toggleAssign(email: string) {
+    setAssignEmails((prev) => (prev.includes(email) ? prev.filter((e) => e !== email) : [...prev, email]));
+  }
+
   async function addClient() {
     const n = name.trim();
     if (!n) return;
@@ -91,6 +116,7 @@ export default function ClientsPage() {
           name: n,
           logoUrl: logoUrl || undefined,
           ...(kind === 'other' ? { industry: industry || undefined, brandFrom, brandTo } : {}),
+          ...(assignEmails.length > 0 ? { staffEmails: assignEmails } : {}),
         }),
         cache: 'no-store',
       });
@@ -104,6 +130,7 @@ export default function ClientsPage() {
       if (!res.ok) throw new Error(data.error || 'Could not add client');
       setName('');
       setLogoUrl('');
+      setAssignEmails([]);
       setAdding(false);
       await loadCustom();
       refreshClients();
@@ -196,6 +223,42 @@ export default function ClientsPage() {
               <Plus size={16} /> {busy ? 'Adding…' : 'Add client'}
             </button>
           </div>
+
+          {/* Who works on this client */}
+          {staffOptions.length > 0 && (
+            <div className="mt-4">
+              <div className="text-[11px] font-bold uppercase tracking-wider text-gray-400 mb-1.5">
+                Assign teammates
+              </div>
+              <div className="flex flex-wrap gap-1.5">
+                {staffOptions.map((m) => {
+                  const on = assignEmails.includes(m.email);
+                  return (
+                    <button
+                      key={m.email}
+                      type="button"
+                      onClick={() => toggleAssign(m.email)}
+                      title={m.email}
+                      className={`text-[12px] font-semibold px-2.5 py-1.5 rounded-lg border transition-colors ${
+                        on
+                          ? 'bg-gray-900 text-white border-gray-900'
+                          : 'bg-white text-gray-500 border-gray-200 hover:border-gray-300'
+                      }`}
+                    >
+                      {on && '✓ '}{m.name}
+                    </button>
+                  );
+                })}
+              </div>
+              <p className="text-[11px] text-gray-400 mt-1.5">
+                {assignEmails.length > 0
+                  ? `${assignEmails.length} assigned — they'll show on this client from day one.`
+                  : kind === 'prime-iv'
+                    ? 'None picked — Prime IV locations default to Sable and Vanessa.'
+                    : 'None picked — nobody will be assigned to this client yet.'}
+              </p>
+            </div>
+          )}
 
           {kind === 'other' && (
             <div className="flex flex-col sm:flex-row gap-3 mt-3 items-start sm:items-center">

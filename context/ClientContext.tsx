@@ -23,14 +23,21 @@ export function ClientProvider({ children }: { children: ReactNode }) {
   const [customClients, setCustomClients] = useState<Client[]>([]);
 
   // Load dynamically-added Prime IV clients and merge them with the built-ins.
-  function loadCustomClients() {
+  //
+  // This used to fail silently: a request that raced session refresh got the
+  // login page's HTML, JSON.parse threw, and the catch swallowed it — leaving
+  // the switcher showing only the built-in clients with no way back except a
+  // reload. Retry a few times with backoff so a transient miss self-corrects.
+  function loadCustomClients(attempt = 0) {
     fetch('/api/clients')
-      .then((r) => { if (!r.ok) throw new Error('clients fetch failed'); return r.json(); })
+      .then((r) => { if (!r.ok) throw new Error(`clients fetch failed (${r.status})`); return r.json(); })
       .then((d) => {
         const rows = (d.items || []) as Array<{ id: string; name: string; short_name?: string; location?: string; logo_url?: string; industry?: string; brand_from?: string; brand_to?: string; notes?: string }>;
         setCustomClients(rows.map((r) => makeCustomClient({ id: r.id, name: r.name, shortName: r.short_name, location: r.location, logoUrl: r.logo_url, industry: r.industry, brandFrom: r.brand_from, brandTo: r.brand_to, notes: r.notes })));
       })
-      .catch(() => {});
+      .catch(() => {
+        if (attempt < 3) setTimeout(() => loadCustomClients(attempt + 1), 600 * (attempt + 1));
+      });
   }
   useEffect(() => { loadCustomClients(); }, []);
 
@@ -41,7 +48,10 @@ export function ClientProvider({ children }: { children: ReactNode }) {
   useEffect(() => {
     const supabase = createSupabaseClient();
     const { data: sub } = supabase.auth.onAuthStateChange((event) => {
-      if (event === 'SIGNED_IN') {
+      // TOKEN_REFRESHED / INITIAL_SESSION matter too — a returning user with a
+      // stale cookie never fires SIGNED_IN, so without these the first failed
+      // fetch would never be retried.
+      if (event === 'SIGNED_IN' || event === 'TOKEN_REFRESHED' || event === 'INITIAL_SESSION') {
         loadCustomClients();
         loadUser();
       }

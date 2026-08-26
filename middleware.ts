@@ -64,8 +64,15 @@ export async function middleware(request: NextRequest) {
   // Let public routes through
   if (isPublicRoute(pathname)) return supabaseResponse;
 
-  // No session → redirect to /login
+  // No session → redirect to /login.
+  // API routes get a 401 instead: a redirect returns the login page's HTML
+  // with a 200, so `fetch` looks successful and callers fail silently at
+  // JSON.parse. That silently emptied the client switcher whenever a request
+  // raced session refresh.
   if (!user) {
+    if (pathname.startsWith('/api/')) {
+      return NextResponse.json({ error: 'Not authenticated' }, { status: 401 });
+    }
     const url = request.nextUrl.clone();
     url.pathname = '/login';
     url.searchParams.set('next', pathname);

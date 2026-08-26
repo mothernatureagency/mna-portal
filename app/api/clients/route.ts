@@ -18,7 +18,8 @@ const DEFAULT_PRIME_STAFF = ['admin@mothernatureagency.com', 'info@mothernaturea
  * staff selector.
  *
  * GET    /api/clients      → list custom clients (raw rows)
- * POST   /api/clients      → { name }  create a new Prime IV client
+ * POST   /api/clients      → { name, staffEmails? }  create a new client and
+ *                            assign the chosen teammates to it
  * DELETE /api/clients?id=  → remove a custom client
  */
 
@@ -82,11 +83,18 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: `That client already exists (${client.name})` }, { status: 409 });
     }
 
-    // New Prime IV locations auto-assign the default Prime team (Sable +
-    // Vanessa) so they're covered from day one. Never blocks client creation.
-    if (!isGeneric) {
+    // Staff coverage from day one. The onboarding form can name who to
+    // assign; with nothing chosen, Prime IV locations fall back to the
+    // default Prime team. Never blocks client creation.
+    const chosen: string[] = Array.isArray(body?.staffEmails)
+      ? body.staffEmails
+          .map((e: unknown) => String(e || '').trim().toLowerCase())
+          .filter((e: string) => /^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(e))
+      : [];
+    const toAssign = chosen.length > 0 ? chosen : (isGeneric ? [] : DEFAULT_PRIME_STAFF);
+    if (toAssign.length > 0) {
       try {
-        for (const email of DEFAULT_PRIME_STAFF) {
+        for (const email of Array.from(new Set(toAssign))) {
           await query(`insert into staff_assignments (staff_email, client_id) values ($1, $2) on conflict do nothing`, [email, client.id]);
         }
       } catch { /* non-fatal */ }
