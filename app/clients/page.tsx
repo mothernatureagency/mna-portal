@@ -365,10 +365,13 @@ export default function ClientsPage() {
                     {isActive ? '✓ Viewing Now' : 'Switch to Client'}
                   </button>
                   <button
-                    className="px-4 py-2 rounded-xl text-[12px] font-semibold text-gray-500 transition-colors hover:bg-gray-50"
+                    onClick={() => openPortalSharing(client.id)}
+                    title="Choose what this client sees in their portal, and edit their sections"
+                    className="px-3 py-2 rounded-xl text-[12px] font-semibold text-gray-600 transition-colors hover:bg-gray-50 inline-flex items-center gap-1"
                     style={{ border: '1px solid rgba(0,0,0,0.08)' }}
                   >
-                    Edit
+                    <span className="material-symbols-outlined" style={{ fontSize: 14 }}>tune</span>
+                    Portal
                   </button>
                   {customIds.has(client.id) && (
                     <label
