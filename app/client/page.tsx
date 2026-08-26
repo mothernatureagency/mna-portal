@@ -10,6 +10,7 @@ import { getPerformanceForClient } from '@/lib/data/performance';
 import PerformanceOverview from '@/components/client-portal/PerformanceOverview';
 import CompetitorBenchmark from '@/components/dashboard/CompetitorBenchmark';
 import GoogleOverview from '@/components/client-portal/GoogleOverview';
+import MetaAdsOverview from '@/components/client-portal/MetaAdsOverview';
 import KPISection from '@/components/dashboard/KPISection';
 import PortalSection from '@/components/client-portal/PortalSection';
 import { usePortalEdit } from '@/components/client-portal/PortalEditContext';
@@ -563,6 +564,16 @@ export default function ClientOverviewPage() {
         editable={isStaffPreview}
       />
 
+      </PortalSection>
+
+      <PortalSection id="overview.meta-ads">
+      {/* Meta Ads Performance — live campaign numbers, no account IDs */}
+      <MetaAdsOverview
+        clientId={client.id}
+        adAccountId={client.metaAds?.adAccountId}
+        gradientFrom={gradientFrom}
+        gradientTo={gradientTo}
+      />
       </PortalSection>
 
       <PortalSection id="overview.google">
@@ -1199,7 +1210,9 @@ export default function ClientOverviewPage() {
             <div>
               <div className="text-[10px] font-bold uppercase tracking-wider text-white/60">Business Portfolio</div>
               <div className="text-[13px] font-bold text-white mt-1">{client.metaAds.businessPortfolioName}</div>
-              <div className="text-[10px] text-white/70 font-mono">{client.metaAds.businessPortfolioId}</div>
+              {isStaffPreview && (
+                <div className="text-[10px] text-white/70 font-mono">{client.metaAds.businessPortfolioId}</div>
+              )}
               {client.metaAds.verificationStatus && (
                 <span className={`mt-2 inline-block text-[10px] font-bold px-2 py-0.5 rounded-full ${
                   client.metaAds.verificationStatus === 'Verified'
@@ -1212,7 +1225,9 @@ export default function ClientOverviewPage() {
             </div>
             <div>
               <div className="text-[10px] font-bold uppercase tracking-wider text-white/60">Ad Account</div>
-              <div className="text-[13px] font-bold text-white mt-1 font-mono">{client.metaAds.adAccountId}</div>
+              <div className="text-[13px] font-bold text-white mt-1 font-mono">
+                {isStaffPreview ? client.metaAds.adAccountId : 'Connected'}
+              </div>
               {client.metaAds.partnerName && (
                 <div className="text-[10px] text-white/70 mt-1">Managed by {client.metaAds.partnerName}</div>
               )}

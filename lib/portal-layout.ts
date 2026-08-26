@@ -25,6 +25,8 @@ export type PortalSectionDef = {
   label: string;
   /** Sections that only render when their data source has rows. */
   note?: string;
+  /** Opt-in sections start hidden and are shared per client. Defaults true. */
+  defaultShared?: boolean;
 };
 
 export type PortalPageDef = {
@@ -47,6 +49,7 @@ export const PORTAL_PAGES: PortalPageDef[] = [
       { id: 'overview.kpis-live', label: 'Performance KPIs', note: 'Auto-pulled Meta metrics + manual pipeline numbers' },
       { id: 'overview.competitors', label: 'Competitor Benchmark' },
       { id: 'overview.google', label: 'Google Performance', note: 'Business Profile, Ads, website and search' },
+      { id: 'overview.meta-ads', label: 'Meta Ads Performance', note: 'Live campaign spend, clicks and CTR — off by default', defaultShared: false },
       { id: 'overview.kpi-tiles', label: 'Headline KPI tiles', note: 'Four editable summary tiles' },
       { id: 'overview.revenue', label: 'Revenue Projections' },
       { id: 'overview.quarters', label: 'Quarterly Breakdown' },
@@ -91,7 +94,9 @@ export function isPageShared(layout: PortalLayout, href: string): boolean {
 }
 
 export function isSectionShared(layout: PortalLayout, id: string): boolean {
-  return layout.sections[id] !== false;
+  const explicit = layout.sections[id];
+  if (typeof explicit === 'boolean') return explicit;
+  return ALL_SECTIONS.find((s) => s.id === id)?.defaultShared !== false;
 }
 
 /** Longest-prefix page match for an arbitrary pathname (e.g. /client/calendar/x). */
