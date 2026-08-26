@@ -234,6 +234,27 @@ function firstWeekday(key: string) {
 export default function ContentPage() {
   const ctx = useClient() as any;
   const activeClient = ctx?.activeClient;
+
+  /**
+   * Send the user through Google's consent screen and back. Drive access is
+   * per-user, so a teammate who has never connected (or connected before the
+   * Drive scope was added) has to do this themselves — there's nothing an
+   * admin can grant on their behalf.
+   */
+  const [connectingGoogle, setConnectingGoogle] = useState(false);
+  async function connectGoogle() {
+    const email = ctx?.userEmail;
+    if (!email) { alert('Sign in again, then retry connecting Google.'); return; }
+    setConnectingGoogle(true);
+    try {
+      const d = await fetch(`/api/google/connect?email=${encodeURIComponent(email)}`).then((r) => r.json());
+      if (d?.url) window.location.href = d.url;
+      else { alert(d?.error || 'Could not start the Google connection.'); setConnectingGoogle(false); }
+    } catch {
+      alert('Could not reach Google. Try again in a moment.');
+      setConnectingGoogle(false);
+    }
+  }
   // Other Prime IV locations this client can cross-post to (built-in + custom,
   // via context), filtered against the active client so we never offer self.
   const primeIvClients = (((ctx?.allClients as any[]) || ALL_CLIENTS) as typeof ALL_CLIENTS)
@@ -282,6 +303,14 @@ export default function ContentPage() {
   const [showPastMonths, setShowPastMonths] = useState(false);
   const [newPostPlatforms, setNewPostPlatforms] = useState<string[]>(['Instagram']);
   const [editPlatforms, setEditPlatforms] = useState<string[]>([]);
+  // Which platforms the open post goes to. Kept in sync with activeItem's
+  // sibling rows so the detail panel can add/remove platforms in place.
+  const [activePlatforms, setActivePlatforms] = useState<string[]>([]);
+  const [syncingPlatforms, setSyncingPlatforms] = useState(false);
+  // The account list stays folded once accounts are ticked, so a stray click
+  // can't silently retarget a client's auto-posting. Opens itself when nothing
+  // is ticked yet (i.e. this location still needs setting up).
+  const [showAccounts, setShowAccounts] = useState(false);
   const [viewMode, setViewMode] = useState<'cards' | 'calendar'>('calendar');
   const [activeId, setActiveId] = useState<string | null>(null);
   // When crossing over from the calendar to cards view, scroll to this card
@@ -430,6 +459,130 @@ export default function ContentPage() {
     setItems((prev) => prev.map((it) => (it.id === id ? { ...it, ...data.item } : it)));
   }
 
+  // A post that runs on several platforms is stored as one row per platform
+  // (same date + title), which is what the calendar, the platform filter, the
+  // duplicate cleanup and per-platform publish status all already assume.
+  // So the platform multi-select adds and removes sibling rows rather than
+  // writing a list into one field.
+  //
+  // `next` carries any edits made in the same save (date/title/type), so the
+  // siblings follow the anchor instead of drifting out of the group.
+  // Anything already published is never auto-deleted.
+  async function syncPlatforms(
+    anchor: ContentItem,
+    desired: string[],
+    next: { post_date: string; title: string | null; content_type: string | null },
+  ) {
+    const want = Array.from(new Set(desired.filter(Boolean)));
+    if (want.length === 0) throw new Error('Pick at least one platform.');
+
+    // Matched on the anchor's *current* date/title/type, before this save's edits.
+    const siblings = siblingsOf(anchor);
+    const bySibPlatform = new Map<string, ContentItem>();
+    for (const s of siblings) if (!bySibPlatform.has(s.platform)) bySibPlatform.set(s.platform, s);
+
+    const drop = siblings.filter((s) => !want.includes(s.platform));
+    const posted = drop.filter((s) => s.publish_status === 'posted');
+    if (posted.length > 0) {
+      throw new Error(
+        `Can't untick ${posted.map((s) => s.platform).join(', ')} — already published. Delete those posts directly if you really mean to.`,
+      );
+    }
+    if (
+      drop.length > 0 &&
+      !confirm(
+        `Remove this post from ${drop.map((s) => s.platform).join(', ')}? The ${want.join(', ')} cop${want.length === 1 ? 'y' : 'ies'} stay.`,
+      )
+    ) return;
+
+    // 1. The anchor row keeps the first platform and takes any edits.
+    await patchItem(anchor.id, { ...next, platform: want[0] });
+
+    // 2. Sibling rows for platforms that are still ticked follow the edit.
+    for (const p of want.slice(1)) {
+      const existing = bySibPlatform.get(p);
+      if (existing) await patchItem(existing.id, { ...next, platform: p });
+    }
+
+    // 3. Newly ticked platforms get their own row, copied from the anchor.
+    const fresh = want.slice(1).filter((p) => !bySibPlatform.has(p));
+    if (fresh.length > 0) {
+      if (!activeClient?.name) throw new Error('No active client.');
+      const res = await fetch('/api/content-calendar', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          clientName: activeClient.name,
+          items: fresh.map((p) => ({
+            post_date: next.post_date,
+            platform: p,
+            content_type: next.content_type,
+            title: next.title,
+            caption: anchor.caption,
+            status: anchor.status || 'Draft',
+            assigned_role: anchor.assigned_role || 'Social Media Manager',
+          })),
+        }),
+      });
+      const created = await res.json();
+      if (!res.ok) throw new Error(created.error || 'Failed to add the extra platform rows');
+      // The insert doesn't take photos, so carry the anchor's media across —
+      // it's the same post, it should go out with the same image.
+      if (anchor.photo_drive_url || (anchor.photo_urls && anchor.photo_urls.length > 0)) {
+        for (const row of created.inserted || []) {
+          await patchItem(row.id, {
+            photo_drive_url: anchor.photo_drive_url,
+            photo_urls: anchor.photo_urls ?? null,
+          }).catch(() => {});
+        }
+      }
+    }
+
+    // 4. Unticked rows go away.
+    for (const s of drop) {
+      await fetch(`/api/content-calendar?id=${s.id}`, { method: 'DELETE' });
+    }
+    if (drop.length > 0) {
+      const gone = new Set(drop.map((s) => s.id));
+      setItems((prev) => prev.filter((it) => !gone.has(it.id)));
+      if (activeId && gone.has(activeId)) setActiveId(anchor.id);
+    }
+
+    if (fresh.length > 0) await reloadItems();
+  }
+
+  // Sibling rows = the same post on another platform. Matched on date + title
+  // + type, which is exactly the tuple addPost writes when it fans one post out
+  // across platforms.
+  //
+  // Deliberately strict: a false match here would delete an unrelated post,
+  // whereas a missed match only means a newly ticked platform gets its own row
+  // instead of joining the group — visible and harmless. An untitled row never
+  // groups at all, so two blank drafts on one date can't swallow each other.
+  function siblingsOf(item: ContentItem): ContentItem[] {
+    if (!(item.title || '').trim()) return [];
+    return items.filter(
+      (it) =>
+        it.id !== item.id &&
+        it.post_date === item.post_date &&
+        (it.title || '') === (item.title || '') &&
+        (it.content_type || '') === (item.content_type || ''),
+    );
+  }
+
+  // Every platform a post currently runs on. Anchor's own platform comes first
+  // so it stays the primary row.
+  function platformsForPost(item: ContentItem): string[] {
+    return Array.from(new Set([item.platform, ...siblingsOf(item).map((it) => it.platform)]));
+  }
+
+  async function reloadItems() {
+    if (!activeClient?.name) return;
+    const res = await fetch(`/api/content-calendar?client=${encodeURIComponent(activeClient.name)}`);
+    const data = await res.json();
+    setItems(data.items || []);
+  }
+
   // ── Social auto-posting (Post for Me) ────────────────────────────
   function loadSocialAccounts() {
     if (!activeClient?.id) return;
@@ -439,7 +592,11 @@ export default function ContentPage() {
       .then((d) => {
         setSocialAccounts(Array.isArray(d.accounts) ? d.accounts : []);
         setSocialConfigured(!!d.configured);
-        setSocialSelected(new Set((Array.isArray(d.selected) ? d.selected : []).map((a: any) => a.id)));
+        const sel = new Set<string>((Array.isArray(d.selected) ? d.selected : []).map((a: any) => String(a.id)));
+        setSocialSelected(sel);
+        // Already set up → stay folded. Nothing ticked → open so it's obvious
+        // this location still needs accounts chosen.
+        setShowAccounts(sel.size === 0);
       })
       .catch(() => { setSocialAccounts([]); setSocialConfigured(false); setSocialSelected(new Set()); });
   }
@@ -687,7 +844,9 @@ export default function ContentPage() {
   function startEdit(item: ContentItem) {
     const parsed = parseTitle(item.title);
     setEditingId(item.id);
-    setEditPlatforms([item.platform]);
+    // Seed with every platform this post already runs on, so opening the editor
+    // shows the real set rather than just the row you happened to click.
+    setEditPlatforms(platformsForPost(item));
     setEditDraft({
       post_date: item.post_date,
       platform: item.platform,
@@ -697,13 +856,20 @@ export default function ContentPage() {
   }
 
   async function saveEdit(id: string) {
+    const anchor = items.find((it) => it.id === id);
+    if (!anchor) return;
     try {
-      await patchItem(id, {
-        post_date: editDraft.post_date,
-        platform: editPlatforms.length > 0 ? editPlatforms[0] : editDraft.platform,
-        content_type: editDraft.content_type || null,
-        title: editDraft.title || null,
-      });
+      // Every ticked platform is honoured — previously only the first was kept
+      // and the rest were dropped without a word.
+      await syncPlatforms(
+        anchor,
+        editPlatforms.length > 0 ? editPlatforms : [editDraft.platform],
+        {
+          post_date: editDraft.post_date,
+          title: editDraft.title || null,
+          content_type: editDraft.content_type || null,
+        },
+      );
       setEditingId(null);
     } catch (e: any) { alert(e.message); }
   }
@@ -957,6 +1123,11 @@ export default function ContentPage() {
   }, [shown, nowMonthKey, showPastMonths]);
 
   const activeItem = items.find((i) => i.id === activeId) || null;
+  // Reseed the detail panel's platform chips whenever a different post opens.
+  useEffect(() => {
+    setActivePlatforms(activeItem ? platformsForPost(activeItem) : []);
+    /* eslint-disable-next-line react-hooks/exhaustive-deps */
+  }, [activeId, items]);
 
   // Days in the planner's month that already have posts (planner fills around).
   const planTakenDays = useMemo(() => {
@@ -1046,10 +1217,33 @@ export default function ContentPage() {
 
           {socialConfigured && (
             <div className="pl-7">
-              <div className="text-[10px] text-white/50 mb-1.5">
-                Post <span className="font-semibold text-white/70">{activeClient?.shortName}</span>&apos;s content ONLY to the ticked account(s):
-              </div>
-              {socialAccounts.length === 0 ? (
+              <button
+                type="button"
+                onClick={() => setShowAccounts((s) => !s)}
+                className="w-full flex items-start gap-2 text-left mb-1.5"
+                title={showAccounts ? 'Collapse the account list' : 'Expand to change which accounts get posted to'}
+              >
+                <span className="text-[10px] text-white/50 flex-1">
+                  Post <span className="font-semibold text-white/70">{activeClient?.shortName}</span>&apos;s content ONLY to{' '}
+                  {socialSelected.size === 0 ? (
+                    <span className="text-amber-300/80">no accounts yet</span>
+                  ) : (
+                    <span className="font-semibold text-emerald-300">
+                      {socialSelected.size} account{socialSelected.size === 1 ? '' : 's'}
+                    </span>
+                  )}
+                  {!showAccounts && socialSelected.size > 0 && (
+                    <span className="block text-white/40 mt-0.5">
+                      {socialAccounts
+                        .filter((a) => socialSelected.has(a.id))
+                        .map((a) => `${a.platform.replace('_business', '')} ${a.username ? `@${a.username}` : a.id}`)
+                        .join(', ')}
+                    </span>
+                  )}
+                </span>
+                <span className="text-white/40 text-[11px] shrink-0">{showAccounts ? '▲' : '▼'}</span>
+              </button>
+              {showAccounts && (socialAccounts.length === 0 ? (
                 <div className="text-[10px] text-white/35">No accounts connected yet — use the buttons above, then hit ↻.</div>
               ) : (
                 <div className="flex flex-col gap-1 max-h-44 overflow-y-auto">
@@ -1071,7 +1265,7 @@ export default function ContentPage() {
                     );
                   })}
                 </div>
-              )}
+              ))}
               {socialSelected.size === 0 && socialAccounts.length > 0 && (
                 <div className="text-[10px] text-amber-300/80 mt-1">Nothing ticked — this client won&apos;t auto-post anywhere (safe default).</div>
               )}
@@ -1584,7 +1778,7 @@ export default function ContentPage() {
             )}
           </div>
           <div className="text-white/40 text-[10px] mt-2">
-            Tip · If "Pick from Drive" says you’re not connected, reconnect Google on the <a href="/schedule" className="underline text-white/60">Schedule</a> page so Drive permissions can be granted.
+            Tip · "Pick from Drive" needs your own Google account connected — Drive access is granted per person, not by an admin. Connect it from the Drive picker, or on the <a href="/schedule" className="underline text-white/60">Schedule</a> page.
           </div>
         </div>
       )}
@@ -2041,16 +2235,50 @@ export default function ContentPage() {
                         )}
                         <span>·&nbsp;</span>
                         {isStaff && (!pdm || pdmAutopost) ? (
-                          <select
-                            value={activeItem.platform}
-                            onChange={async (e) => { try { await patchItem(activeItem.id, { platform: e.target.value }); } catch (err: any) { alert(err.message); } }}
-                            title="Change platform — Meta posts to Facebook + Instagram together"
-                            className="text-[11px] font-bold uppercase tracking-wider bg-white/10 border border-white/25 rounded px-1.5 py-0.5 text-white outline-none cursor-pointer hover:bg-white/15"
-                          >
-                            {PLATFORMS.map((p) => <option key={p} value={p} className="bg-slate-800 text-white">{p}</option>)}
-                          </select>
+                          <span className="inline-flex flex-wrap items-center gap-1 align-middle">
+                            {PLATFORMS.map((p) => {
+                              const on = activePlatforms.includes(p);
+                              return (
+                                <button
+                                  key={p}
+                                  type="button"
+                                  disabled={syncingPlatforms}
+                                  onClick={async () => {
+                                    const next = on
+                                      ? activePlatforms.filter((x) => x !== p)
+                                      : [...activePlatforms, p];
+                                    if (next.length === 0) { alert('A post needs at least one platform.'); return; }
+                                    const before = activePlatforms;
+                                    setActivePlatforms(next);
+                                    setSyncingPlatforms(true);
+                                    try {
+                                      await syncPlatforms(activeItem, next, {
+                                        post_date: activeItem.post_date,
+                                        title: activeItem.title,
+                                        content_type: activeItem.content_type,
+                                      });
+                                    } catch (err: any) {
+                                      setActivePlatforms(before);
+                                      alert(err.message);
+                                    } finally { setSyncingPlatforms(false); }
+                                  }}
+                                  title={on
+                                    ? `Posting to ${p} — click to remove`
+                                    : `Also post this to ${p}`}
+                                  className={`text-[10px] font-bold uppercase tracking-wider rounded px-1.5 py-0.5 border transition-colors disabled:opacity-40 ${
+                                    on
+                                      ? 'bg-white/15 text-white border-white/30'
+                                      : 'bg-transparent text-white/30 border-white/10 hover:text-white/60 hover:border-white/25'
+                                  }`}
+                                >
+                                  {on && '✓ '}{p}
+                                </button>
+                              );
+                            })}
+                            {syncingPlatforms && <span className="text-[10px] text-white/40">saving…</span>}
+                          </span>
                         ) : (
-                          <span>{activeItem.platform}</span>
+                          <span>{activePlatforms.length > 1 ? activePlatforms.join(' · ') : activeItem.platform}</span>
                         )}
                         <span>&nbsp;· {activeItem.content_type || 'Post'}</span>
                       </div>
@@ -2414,9 +2642,24 @@ export default function ContentPage() {
               {pickerError && (
                 <div className="text-rose-300 text-sm bg-rose-500/10 border border-rose-500/30 rounded-lg p-3">
                   {pickerError}
-                  <div className="text-rose-200/70 text-[11px] mt-1">
-                    If this says Google isn’t connected, go to <a href="/schedule" className="underline">Schedule</a> and reconnect (the new Drive scope needs re-consent).
-                  </div>
+                  {/^Google (not connected|is connected without Drive)/i.test(pickerError) ? (
+                    <div className="mt-2">
+                      <button
+                        onClick={connectGoogle}
+                        disabled={connectingGoogle}
+                        className="text-[12px] font-bold px-3 py-1.5 rounded-lg bg-white/15 text-white hover:bg-white/25 disabled:opacity-50"
+                      >
+                        {connectingGoogle ? 'Opening Google…' : 'Connect Google'}
+                      </button>
+                      <div className="text-rose-200/70 text-[11px] mt-1.5">
+                        Drive access is granted per person — only you can approve it for your account.
+                      </div>
+                    </div>
+                  ) : (
+                    <div className="text-rose-200/70 text-[11px] mt-1">
+                      If this says Google isn’t connected, go to <a href="/schedule" className="underline">Schedule</a> and reconnect.
+                    </div>
+                  )}
                 </div>
               )}
               {!pickerError && pickerLoading && (
