@@ -18,6 +18,26 @@ export const dynamic = 'force-dynamic';
  *
  * GET → { gsc: [{ siteUrl, permissionLevel }], ga4: [{ property, displayName, account }], connected }
  */
+/**
+ * A 403 from these APIs means one of two very different things, and the
+ * distinction decides who fixes it: the API is switched off in our Google
+ * Cloud project (our job, one click), or the account genuinely lacks access
+ * (the client's or corporate's job). Read the reason rather than guessing.
+ */
+async function explain403(res: Response, label: string): Promise<string> {
+  let body: any = null;
+  try { body = await res.json(); } catch { /* non-JSON error */ }
+  const reason = body?.error?.details?.find((d: any) => d?.reason)?.reason;
+  const url = body?.error?.details?.find((d: any) => d?.metadata?.activationUrl)?.metadata?.activationUrl;
+  if (reason === 'SERVICE_DISABLED' || /has not been used in project|is disabled/i.test(body?.error?.message || '')) {
+    return `${label} API is turned off in our Google Cloud project — enable it${url ? ` (${url})` : ''}, then reopen this panel.`;
+  }
+  if (res.status === 403) {
+    return `${label}: this Google account doesn't have access yet — ask for it to be added as a user on the property.`;
+  }
+  return `${label}: ${body?.error?.message || `request failed (${res.status})`}`;
+}
+
 export async function GET() {
   await ensureSchema();
   const supabase = createClient();
@@ -43,8 +63,8 @@ export async function GET() {
         siteUrl: s.siteUrl,
         permissionLevel: s.permissionLevel || 'unknown',
       }));
-    } else if (r.status === 403) {
-      notes.push('Search Console permission missing — reconnect Google so the new scope is granted.');
+    } else {
+      notes.push(await explain403(r, 'Search Console'));
     }
   } catch { notes.push('Could not reach Search Console.'); }
 
@@ -63,8 +83,8 @@ export async function GET() {
           });
         }
       }
-    } else if (r.status === 403) {
-      notes.push('Analytics permission missing — reconnect Google so the new scope is granted.');
+    } else {
+      notes.push(await explain403(r, 'Google Analytics'));
     }
   } catch { notes.push('Could not reach Google Analytics.'); }
 
