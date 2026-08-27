@@ -4,7 +4,7 @@ import { useClient } from '@/context/ClientContext';
 import { createClient } from '@/lib/supabase/client';
 import { driveThumbnailUrl, driveViewUrl } from '@/lib/drive';
 import { extractFolderId, type DriveFile } from '@/lib/google-drive-shared';
-import { KNOWN_MERGE_FIELDS } from '@/lib/merge-vars';
+import { KNOWN_MERGE_FIELDS, tokenizeWithVars } from '@/lib/merge-vars';
 
 // Resolve a preview src for a stored photo URL. Google Drive links go through
 // the thumbnail endpoint; uploaded images (Supabase public URLs, or any plain
@@ -989,8 +989,14 @@ export default function ContentPage() {
   // copy in each target client's calendar (same date/platform/type/title/
   // caption), letting their team tweak/approve independently.
   async function crossPostItem(item: ContentItem, targetClientNames: string[]) {
-    if (targetClientNames.length === 0) return { sent: 0, skipped: 0 };
+    if (targetClientNames.length === 0) return { sent: 0, skipped: 0, tokenized: [] as string[] };
     let sent = 0, skipped = 0;
+
+    // Swap this location's own name/links back to {{tokens}} before the caption
+    // travels, so each target localizes it with its own values at publish time.
+    // Without this the source's literal "Niceville" lands in every calendar.
+    const { text: portableCaption, replaced: tokenized } = tokenizeWithVars(item.caption, mergeVars);
+
     for (const clientName of targetClientNames) {
       try {
         const res = await fetch('/api/content-calendar', {
@@ -1003,7 +1009,7 @@ export default function ContentPage() {
               platform: item.platform,
               content_type: item.content_type || null,
               title: item.title || null,
-              caption: item.caption || null,
+              caption: portableCaption || null,
               status: 'Draft',
               assigned_role: 'Social Media Manager',
             }],
@@ -1016,7 +1022,7 @@ export default function ContentPage() {
         }
       } catch {}
     }
-    return { sent, skipped };
+    return { sent, skipped, tokenized };
   }
 
   async function runCrossPost(id: string) {
@@ -1025,8 +1031,11 @@ export default function ContentPage() {
     setCrossPosting(true);
     try {
       const targets = primeIvClients.filter((c) => crossPostTargets.includes(c.id)).map((c) => c.name);
-      const { sent, skipped } = await crossPostItem(item, targets);
-      alert(`Cross-posted to ${sent} location${sent === 1 ? '' : 's'}.${skipped ? ` (${skipped} already existed and were skipped.)` : ''}`);
+      const { sent, skipped, tokenized } = await crossPostItem(item, targets);
+      const swapped = tokenized.length
+        ? `\n\nYour ${tokenized.join(', ')} ${tokenized.length === 1 ? 'was' : 'were'} swapped to merge tags, so each location publishes its own.`
+        : '';
+      alert(`Cross-posted to ${sent} location${sent === 1 ? '' : 's'}.${skipped ? ` (${skipped} already existed and were skipped.)` : ''}${swapped}`);
       setCrossPostId(null);
       setCrossPostTargets([]);
     } catch (e: any) {

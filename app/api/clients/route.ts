@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { ensureSchema, query } from '@/lib/db';
 import { createClient } from '@/lib/supabase/server';
 import { clients as staticClients, makePrimeIVClient, makeCustomClient, slugify } from '@/lib/clients';
+import { suggestMergeVars } from '@/lib/merge-vars';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -82,6 +83,25 @@ export async function POST(req: NextRequest) {
     if (rows.length === 0) {
       return NextResponse.json({ error: `That client already exists (${client.name})` }, { status: 409 });
     }
+
+    // Pre-fill caption merge fields so {{location}}, {{linktree}} and
+    // {{website}} resolve from the first post instead of publishing raw. These
+    // are guesses derived from the name — staff correct them in the Content
+    // Tracker. Only seeded when nothing is stored yet, so this never clobbers.
+    try {
+      const suggested = suggestMergeVars({
+        name: client.name,
+        location: client.location,
+        isPrimeIV: !isGeneric,
+        website: client.links?.website,
+      });
+      await query(
+        `insert into client_kv (client_id, key, value, updated_at)
+         values ($1, 'merge_vars', $2::jsonb, now())
+         on conflict (client_id, key) do nothing`,
+        [client.id, JSON.stringify(suggested)],
+      );
+    } catch { /* non-fatal */ }
 
     // Staff coverage from day one. The onboarding form can name who to
     // assign; with nothing chosen, Prime IV locations fall back to the
