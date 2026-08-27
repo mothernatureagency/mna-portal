@@ -181,7 +181,7 @@ const DEFAULT_ONBOARDING_STEPS: OnboardingStep[] = [
 // ─── MAIN COMPONENT ─────────────────────────────────────────────────
 
 export default function MNADashboard() {
-  const { activeClient } = useClient();
+  const { activeClient, allClients } = useClient();
   const { gradientFrom, gradientTo } = activeClient.branding;
   const [activeTab, setActiveTab] = useState<TabKey>('overview');
 
@@ -198,6 +198,24 @@ export default function MNADashboard() {
   // Template preview
   const [selectedTemplate, setSelectedTemplate] = useState<OutreachTemplate | null>(null);
   const [templatePreview, setTemplatePreview] = useState('');
+
+  // RFAD progress across every client — the onboarding tab leads with this now.
+  const [rfadAll, setRfadAll] = useState<Record<string, { done: number; total: number; pct: number }>>({});
+  useEffect(() => {
+    fetch('/api/rfad')
+      .then((r) => r.json())
+      .then((d) => {
+        const map: Record<string, { done: number; total: number; pct: number }> = {};
+        for (const row of (d?.all || [])) map[row.clientId] = row.progress;
+        setRfadAll(map);
+      })
+      .catch(() => {});
+  }, []);
+
+  function openClientRfad(clientId: string) {
+    document.cookie = `mna_portal_client=${clientId};path=/;max-age=${60 * 60 * 24 * 365}`;
+    window.location.href = '/client/onboarding';
+  }
 
   // Load prospects
   useEffect(() => {
@@ -683,19 +701,65 @@ export default function MNADashboard() {
             </p>
           </div>
 
+          {/* RFAD — access & deliverables progress per client */}
+          <div className="glass-card p-6">
+            <div className="flex items-center justify-between gap-2 mb-1">
+              <div className="text-[15px] font-bold text-white">Access &amp; Deliverables (RFAD)</div>
+              <span className="text-[11px] text-white/40">What each client still owes us</span>
+            </div>
+            <p className="text-[11px] text-white/45 mb-4">
+              Each item a client ticks files a task for Social, Manager or Ads automatically.
+            </p>
+
+            <div className="grid gap-2 sm:grid-cols-2">
+              {allClients
+                .filter((c: any) => c.id !== 'mna')
+                .map((c: any) => {
+                  const p = rfadAll[c.id] || { done: 0, total: 0, pct: 0 };
+                  const started = p.total > 0 && p.done > 0;
+                  const complete = p.total > 0 && p.done === p.total;
+                  return (
+                    <button
+                      key={c.id}
+                      onClick={() => openClientRfad(c.id)}
+                      className="text-left p-3 rounded-xl transition-colors hover:bg-white/10"
+                      style={{
+                        background: complete ? 'rgba(16,185,129,.10)' : 'rgba(255,255,255,0.04)',
+                        border: `1px solid ${complete ? 'rgba(16,185,129,.28)' : 'rgba(255,255,255,0.08)'}`,
+                      }}
+                    >
+                      <div className="flex items-center justify-between gap-2 mb-1.5">
+                        <span className="text-[12.5px] font-semibold text-white truncate">{c.shortName || c.name}</span>
+                        <span className="text-[11px] font-bold text-white/60 shrink-0">
+                          {complete ? 'Complete' : started ? `${p.pct}%` : 'Not started'}
+                        </span>
+                      </div>
+                      <div className="h-1.5 rounded-full bg-white/10 overflow-hidden">
+                        <div
+                          className="h-full rounded-full transition-all"
+                          style={{ width: `${p.pct}%`, background: `linear-gradient(90deg, ${gradientFrom}, ${gradientTo})` }}
+                        />
+                      </div>
+                      {p.total > 0 && (
+                        <div className="text-[10px] text-white/40 mt-1">{p.done} of {p.total} items</div>
+                      )}
+                    </button>
+                  );
+                })}
+            </div>
+          </div>
+
           {confirmedProspects.length === 0 && (
-            <div className="glass-card p-8 text-center">
-              <span className="material-symbols-outlined text-white/20 mb-3" style={{ fontSize: 48 }}>rocket_launch</span>
-              <div className="text-[14px] font-semibold text-white/60">No clients in onboarding</div>
-              <div className="text-[12px] text-white/40 mt-1">
-                Mark a prospect as &quot;Confirmed&quot; or &quot;Onboarding&quot; in the Outreach tab to start their onboarding here.
+            <div className="glass-card p-6 text-center">
+              <div className="text-[13px] font-semibold text-white/60">No prospects in the onboarding pipeline</div>
+              <div className="text-[11.5px] text-white/40 mt-1">
+                Mark a prospect &quot;Confirmed&quot; or &quot;Onboarding&quot; in Outreach to track their steps here too.
               </div>
               <button
                 onClick={() => setActiveTab('outreach')}
-                className="mt-4 text-[12px] font-semibold px-4 py-2 rounded-lg text-white"
-                style={{ background: `linear-gradient(135deg, ${gradientFrom}, ${gradientTo})` }}
+                className="mt-3 text-[11.5px] font-semibold px-3.5 py-1.5 rounded-lg bg-white/10 text-white/80 hover:bg-white/20"
               >
-                Go to Outreach
+                Open Outreach
               </button>
             </div>
           )}

@@ -102,9 +102,35 @@ export default function KPISection({
       .finally(() => setLoading(false));
   }, [clientId]);
 
+  // Resolve the ad account. Callers on the admin side pass the static
+  // lib/clients.ts config, which is empty for every location added through the
+  // Clients page — so without this fallback those dashboards silently queried
+  // the agency's default account instead of the client's.
+  const [kvAccount, setKvAccount] = useState<string | null>(null);
+  const [accountResolved, setAccountResolved] = useState(false);
+
+  useEffect(() => {
+    let cancelled = false;
+    if (adAccountId) { setAccountResolved(true); return; }
+    setAccountResolved(false);
+    fetch(`/api/client-kv?clientId=${encodeURIComponent(clientId)}&key=meta_ads`)
+      .then((r) => r.json())
+      .then((d) => { if (!cancelled) setKvAccount(d?.value?.adAccountId || null); })
+      .catch(() => { if (!cancelled) setKvAccount(null); })
+      .finally(() => { if (!cancelled) setAccountResolved(true); });
+    return () => { cancelled = true; };
+  }, [clientId, adAccountId]);
+
+  const account = useMemo(() => {
+    const raw = adAccountId || kvAccount;
+    if (!raw) return undefined;
+    return raw.startsWith('act_') ? raw : `act_${raw}`;
+  }, [adAccountId, kvAccount]);
+
   // Auto-pull Meta insights for this + last month
   useEffect(() => {
-    const q = adAccountId ? `&adAccountId=${encodeURIComponent(adAccountId)}` : '';
+    if (!accountResolved) return;
+    const q = account ? `&adAccountId=${encodeURIComponent(account)}` : '';
     Promise.all([
       fetch(`/api/meta/insights?datePreset=this_month${q}`).then((r) => r.json()),
       fetch(`/api/meta/insights?datePreset=last_month${q}`).then((r) => r.json()),
@@ -114,7 +140,7 @@ export default function KPISection({
         if (prev?.totals) setAutoPrev(prev.totals);
       })
       .catch(() => setMetaErr(true));
-  }, [adAccountId]);
+  }, [account, accountResolved]);
 
   // Auto value for a metric in a given month (only the real current/prev
   // months map to Meta presets).

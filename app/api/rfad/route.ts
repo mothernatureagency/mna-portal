@@ -58,7 +58,21 @@ export async function GET(req: NextRequest) {
   const meta = (user.user_metadata || {}) as Record<string, unknown>;
   const role = (meta.role as string) || 'staff';
   const clientId = req.nextUrl.searchParams.get('clientId') || '';
-  if (!clientId) return NextResponse.json({ error: 'clientId required' }, { status: 400 });
+
+  // Staff overview: progress for every client that has started an RFAD.
+  if (!clientId) {
+    if (role === 'client') return NextResponse.json({ error: 'clientId required' }, { status: 400 });
+    const { rows } = await query<{ client_id: string; value: unknown }>(
+      `select client_id, value from client_kv where key = $1`,
+      [RFAD_KEY],
+    );
+    return NextResponse.json({
+      all: rows.map((r) => {
+        const st = normalizeRfad(r.value);
+        return { clientId: r.client_id, progress: rfadProgress(st), completedAt: st.completedAt || null, startedAt: st.startedAt || null };
+      }),
+    });
+  }
   if (role === 'client' && !accessibleClientIds(meta).includes(clientId)) {
     return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
   }

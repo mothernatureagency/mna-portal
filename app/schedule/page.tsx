@@ -34,6 +34,7 @@ const EVENT_TYPES = [
   { value: 'review', label: 'Review', icon: 'rate_review', color: 'bg-amber-500/20 text-amber-300' },
   { value: 'personal', label: 'Personal', icon: 'person', color: 'bg-white/10 text-white/60' },
   { value: 'blocked', label: 'Blocked', icon: 'block', color: 'bg-red-500/20 text-red-300' },
+  { value: 'google', label: 'Google Calendar', icon: 'event', color: 'bg-sky-500/20 text-sky-300' },
 ];
 
 const PRIORITIES = [
@@ -126,7 +127,14 @@ export default function SchedulePage() {
     if (gcalConnected) {
       fetch(`/api/google/sync?email=${encodeURIComponent(userEmail)}&from=${from}&to=${to}`)
         .then(r => r.json())
-        .then(d => setGoogleEvents(d.events || []))
+        // /api/google/sync returns `date`, the rest of this page groups by
+        // `event_date` — normalize on arrival like the home dashboard does.
+        .then(d => setGoogleEvents((d.events || []).map((e: any) => ({
+          ...e,
+          event_date: e.date || e.event_date,
+          event_type: 'google',
+          completed: false,
+        }))))
         .catch(() => setGoogleEvents([]));
     }
 
@@ -231,14 +239,26 @@ export default function SchedulePage() {
   }, [selectedDate]);
 
   // Group events by date for week view
+  // Google events were being fetched into state and never rendered, so the
+  // Schedule page showed nothing while the home dashboard showed the same
+  // calendar fine. Merge them in, sorted by start time within each day.
+  const allEvents = useMemo(
+    () => [...events, ...(googleEvents as ScheduleEvent[])],
+    [events, googleEvents],
+  );
+
   const eventsByDate = useMemo(() => {
     const map: Record<string, ScheduleEvent[]> = {};
-    events.forEach((e) => {
+    allEvents.forEach((e) => {
+      if (!e?.event_date) return;
       if (!map[e.event_date]) map[e.event_date] = [];
       map[e.event_date].push(e);
     });
+    for (const day of Object.keys(map)) {
+      map[day].sort((a, b) => (a.start_time || '').localeCompare(b.start_time || ''));
+    }
     return map;
-  }, [events]);
+  }, [allEvents]);
 
   // Time slots for day view
   const hours = Array.from({ length: 16 }, (_, i) => i + 6); // 6 AM to 9 PM
@@ -254,7 +274,7 @@ export default function SchedulePage() {
           </div>
           <p className="text-white/60 mt-1">
             {fmtDate(selectedDate)} {isToday && <span className="text-emerald-300 font-semibold">· Today</span>}
-            {' · '}{events.filter((e) => !e.completed).length} active events
+            {' · '}{allEvents.filter((e) => !e.completed).length} active events
           </p>
         </div>
         <div className="flex items-center gap-2">
@@ -517,21 +537,25 @@ export default function SchedulePage() {
       {/* Day view */}
       {!loading && viewMode === 'day' && (
         <div className="glass-card overflow-hidden">
-          {events.length === 0 ? (
+          {allEvents.length === 0 ? (
             <div className="p-8 text-center text-white/40">
               <span className="material-symbols-outlined block mb-2" style={{ fontSize: 32 }}>event_available</span>
               No events for {fmtDate(selectedDate)}
             </div>
           ) : (
             <div className="divide-y divide-white/5">
-              {events.map((ev) => {
+              {allEvents.map((ev) => {
                 const type = EVENT_TYPES.find((t) => t.value === ev.event_type) || EVENT_TYPES[2];
                 const pri = PRIORITIES.find((p) => p.value === ev.priority) || PRIORITIES[1];
                 const clientName = allClients.find((c: any) => c.id === ev.client_id)?.shortName;
                 return (
                   <div key={ev.id} className={`flex items-start gap-3 p-4 transition-colors hover:bg-white/5 ${ev.completed ? 'opacity-50' : ''} ${ev.event_type === 'blocked' ? 'bg-red-500/5 border-l-2 border-l-red-500/40' : ''}`}>
                     {/* Checkbox (not for blocked) */}
-                    {ev.event_type === 'blocked' ? (
+                    {ev.event_type === 'google' ? (
+                      <span className="mt-0.5 w-5 h-5 rounded-md flex items-center justify-center shrink-0 bg-sky-500/20" title="From your Google Calendar">
+                        <span className="material-symbols-outlined text-sky-300" style={{ fontSize: 14 }}>event</span>
+                      </span>
+                    ) : ev.event_type === 'blocked' ? (
                       <span className="mt-0.5 w-5 h-5 rounded-md flex items-center justify-center shrink-0 bg-red-500/20">
                         <span className="material-symbols-outlined text-red-400" style={{ fontSize: 14 }}>block</span>
                       </span>
@@ -592,10 +616,14 @@ export default function SchedulePage() {
                       {ev.description && <div className="text-[11px] text-white/40 mt-0.5">{ev.description}</div>}
                     </div>
 
-                    {/* Delete */}
-                    <button onClick={() => deleteEvent(ev)} className="text-white/20 hover:text-rose-300 transition-colors shrink-0">
-                      <span className="material-symbols-outlined" style={{ fontSize: 16 }}>close</span>
-                    </button>
+                    {/* Delete — Google events aren't ours to remove */}
+                    {ev.event_type === 'google' ? (
+                      <span className="text-[9px] font-bold px-2 py-0.5 rounded-full bg-sky-500/15 text-sky-300 shrink-0">Google</span>
+                    ) : (
+                      <button onClick={() => deleteEvent(ev)} className="text-white/20 hover:text-rose-300 transition-colors shrink-0">
+                        <span className="material-symbols-outlined" style={{ fontSize: 16 }}>close</span>
+                      </button>
+                    )}
                   </div>
                 );
               })}
@@ -622,9 +650,15 @@ export default function SchedulePage() {
                   return (
                     <div key={ev.id} className={`mb-1.5 rounded-lg p-2 border border-white/10 ${ev.completed ? 'opacity-40' : ''}`} style={{ background: 'rgba(255,255,255,0.04)' }}>
                       <div className="flex items-center gap-1">
-                        <button onClick={() => toggleComplete(ev.id, !ev.completed)} className={`w-3.5 h-3.5 rounded border shrink-0 flex items-center justify-center ${ev.completed ? 'bg-emerald-500/30 border-emerald-400' : 'border-white/30'}`}>
-                          {ev.completed && <span className="material-symbols-outlined text-emerald-300" style={{ fontSize: 10 }}>check</span>}
-                        </button>
+                        {ev.event_type === 'google' ? (
+                          <span className="w-3.5 h-3.5 rounded shrink-0 flex items-center justify-center bg-sky-500/20" title="From your Google Calendar">
+                            <span className="material-symbols-outlined text-sky-300" style={{ fontSize: 10 }}>event</span>
+                          </span>
+                        ) : (
+                          <button onClick={() => toggleComplete(ev.id, !ev.completed)} className={`w-3.5 h-3.5 rounded border shrink-0 flex items-center justify-center ${ev.completed ? 'bg-emerald-500/30 border-emerald-400' : 'border-white/30'}`}>
+                            {ev.completed && <span className="material-symbols-outlined text-emerald-300" style={{ fontSize: 10 }}>check</span>}
+                          </button>
+                        )}
                         <span className={`text-[10px] font-semibold truncate ${ev.completed ? 'line-through text-white/40' : 'text-white/80'}`}>{ev.title}</span>
                       </div>
                       {ev.start_time && <div className="text-[9px] text-white/40 mt-0.5 ml-5">{fmtTime(ev.start_time)}</div>}
