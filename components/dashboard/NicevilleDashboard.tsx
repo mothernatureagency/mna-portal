@@ -27,6 +27,7 @@ import MetaAdsCard from './MetaAdsCard';
 import PrimeIVMembershipCard from './PrimeIVMembershipCard';
 import SalesBenchmarks from './SalesBenchmarks';
 import KPISection from './KPISection';
+import GoogleOverview from '@/components/client-portal/GoogleOverview';
 import ConceptsPanel from './ConceptsPanel';
 import TikTokAnalytics from './TikTokAnalytics';
 import TikTokContentPlan from './TikTokContentPlan';
@@ -224,6 +225,20 @@ export default function NicevilleDashboard({ client }: { client: Client }) {
             gradientFrom={gradientFrom}
             gradientTo={gradientTo}
             adAccountId={client.metaAds?.adAccountId}
+            editable
+          />
+        </SectionBoundary>
+      </div>
+
+      {/* ── Google performance — the Google-side counterpart to the Meta KPIs ── */}
+      <div>
+        <SectionLabel>Google Performance</SectionLabel>
+        <SectionBoundary name="Google Performance">
+          <GoogleOverview
+            clientId={client.id}
+            clientName={client.shortName}
+            gradientFrom={gradientFrom}
+            gradientTo={gradientTo}
             editable
           />
         </SectionBoundary>

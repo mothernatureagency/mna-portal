@@ -40,6 +40,8 @@ const NAV = [
   ]},
   { sec: 'ADVERTISING', items: [
     { label: 'Meta Ads (Live)', href: '/meta-ads', e: 'ads_click' },
+    { label: 'Google Performance', href: '/google-ads', e: 'travel_explore' },
+    { label: 'YouTube', href: '/youtube', e: 'smart_display' },
   ]},
   { sec: 'CRM', items: [
     { label: 'Pipeline', href: '/crm', e: 'task_alt' },
