@@ -110,6 +110,13 @@ export default function GoogleOverview({
   const [ga4Prop, setGa4Prop] = useState('');
   const [gscSite, setGscSite] = useState('');
   const [setupSaved, setSetupSaved] = useState(false);
+  const [props, setProps] = useState<{
+    gsc: { siteUrl: string; permissionLevel: string }[];
+    ga4: { property: string; displayName: string; account: string }[];
+    connected: boolean;
+    account?: string;
+    notes?: string[];
+  } | null>(null);
   const [loading, setLoading] = useState(true);
   const [editingKey, setEditingKey] = useState<string | null>(null);
   const [draft, setDraft] = useState('');
@@ -226,6 +233,14 @@ export default function GoogleOverview({
       if (typeof b?.value === 'string') setGscSite(b.value);
     });
   }, [clientId, editable]);
+
+  useEffect(() => {
+    if (!setupOpen || props) return;
+    fetch('/api/google/properties')
+      .then((r) => r.json())
+      .then((d) => setProps(d))
+      .catch(() => setProps({ gsc: [], ga4: [], connected: false }));
+  }, [setupOpen, props]);
 
   async function saveSetup() {
     await Promise.all([
@@ -368,28 +383,76 @@ export default function GoogleOverview({
             Website and search numbers pull automatically once these are set. They use the agency&apos;s Google
             connection — if nothing appears, reconnect Google under Settings so the new reporting permissions apply.
           </p>
-          <div className="grid gap-3 sm:grid-cols-2">
-            <label className="block">
-              <span className="text-[10px] font-bold uppercase tracking-wider text-white/50">GA4 Property ID</span>
-              <input
-                value={ga4Prop}
-                onChange={(e) => setGa4Prop(e.target.value)}
-                placeholder="e.g. 123456789"
-                className="w-full mt-1 px-2.5 py-1.5 rounded-lg text-white text-[12px] outline-none"
-                style={{ background: 'rgba(0,0,0,0.4)', border: '1px solid rgba(255,255,255,0.15)' }}
-              />
-            </label>
-            <label className="block">
-              <span className="text-[10px] font-bold uppercase tracking-wider text-white/50">Search Console Site</span>
-              <input
-                value={gscSite}
-                onChange={(e) => setGscSite(e.target.value)}
-                placeholder="https://example.com/ or sc-domain:example.com"
-                className="w-full mt-1 px-2.5 py-1.5 rounded-lg text-white text-[12px] outline-none"
-                style={{ background: 'rgba(0,0,0,0.4)', border: '1px solid rgba(255,255,255,0.15)' }}
-              />
-            </label>
-          </div>
+          {props === null ? (
+            <div className="text-[11.5px] text-white/50 py-2">Checking what your Google account can see…</div>
+          ) : (
+            <>
+              {!!props.notes?.length && (
+                <div className="text-[11px] text-amber-300 mb-2">{props.notes.join(' ')}</div>
+              )}
+              <div className="grid gap-3 sm:grid-cols-2">
+                <label className="block">
+                  <span className="text-[10px] font-bold uppercase tracking-wider text-white/50">GA4 Property</span>
+                  {props.ga4.length > 0 ? (
+                    <select
+                      value={ga4Prop}
+                      onChange={(e) => setGa4Prop(e.target.value)}
+                      className="w-full mt-1 px-2.5 py-1.5 rounded-lg text-white text-[12px] outline-none"
+                      style={{ background: 'rgba(0,0,0,0.4)', border: '1px solid rgba(255,255,255,0.15)' }}
+                    >
+                      <option value="" className="bg-slate-900">— none —</option>
+                      {props.ga4.map((p) => (
+                        <option key={p.property} value={p.property} className="bg-slate-900">
+                          {p.displayName} ({p.property}){p.account ? ` · ${p.account}` : ''}
+                        </option>
+                      ))}
+                    </select>
+                  ) : (
+                    <input
+                      value={ga4Prop}
+                      onChange={(e) => setGa4Prop(e.target.value)}
+                      placeholder="e.g. 123456789"
+                      className="w-full mt-1 px-2.5 py-1.5 rounded-lg text-white text-[12px] outline-none"
+                      style={{ background: 'rgba(0,0,0,0.4)', border: '1px solid rgba(255,255,255,0.15)' }}
+                    />
+                  )}
+                </label>
+
+                <label className="block">
+                  <span className="text-[10px] font-bold uppercase tracking-wider text-white/50">Search Console Site</span>
+                  {props.gsc.length > 0 ? (
+                    <select
+                      value={gscSite}
+                      onChange={(e) => setGscSite(e.target.value)}
+                      className="w-full mt-1 px-2.5 py-1.5 rounded-lg text-white text-[12px] outline-none"
+                      style={{ background: 'rgba(0,0,0,0.4)', border: '1px solid rgba(255,255,255,0.15)' }}
+                    >
+                      <option value="" className="bg-slate-900">— none —</option>
+                      {props.gsc.map((p) => (
+                        <option key={p.siteUrl} value={p.siteUrl} className="bg-slate-900">
+                          {p.siteUrl} · {p.permissionLevel.replace('site', '').toLowerCase()}
+                        </option>
+                      ))}
+                    </select>
+                  ) : (
+                    <input
+                      value={gscSite}
+                      onChange={(e) => setGscSite(e.target.value)}
+                      placeholder="https://example.com/ or sc-domain:example.com"
+                      className="w-full mt-1 px-2.5 py-1.5 rounded-lg text-white text-[12px] outline-none"
+                      style={{ background: 'rgba(0,0,0,0.4)', border: '1px solid rgba(255,255,255,0.15)' }}
+                    />
+                  )}
+                </label>
+              </div>
+              {props.connected && props.gsc.length === 0 && (
+                <div className="text-[10.5px] text-white/45 mt-2">
+                  No Search Console properties visible to {props.account}. Ask corporate to add that address
+                  as a user on the location&apos;s property, then reopen this panel.
+                </div>
+              )}
+            </>
+          )}
           <div className="flex items-center gap-2 mt-3">
             <button
               onClick={saveSetup}
