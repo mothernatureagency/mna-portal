@@ -62,6 +62,14 @@ export const PORTAL_PAGES: PortalPageDef[] = [
     ],
   },
   {
+    href: '/client/onboarding',
+    label: 'Onboarding',
+    icon: 'rocket_launch',
+    sections: [
+      { id: 'onboarding.rfad', label: 'Access & deliverables checklist', note: 'RFAD — each tick files a task for the right team' },
+    ],
+  },
+  {
     href: '/client/content',
     label: 'Content',
     icon: 'photo_camera',
