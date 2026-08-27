@@ -10,6 +10,7 @@ import { getDisplayName } from '@/lib/display-names';
 import { VoiceButton } from '@/components/ai/VoiceButton';
 import { speak } from '@/lib/voice';
 import StaffAssignments from '@/components/dashboard/StaffAssignments';
+import WelcomeHero from '@/components/dashboard/WelcomeHero';
 
 type ScheduleEvent = {
   id: string;
@@ -593,6 +594,9 @@ export default function PersonalDashboard() {
 
   return (
     <div className="space-y-6 max-w-[1400px]">
+
+      {/* ── Motherboard welcome ── */}
+      <WelcomeHero />
 
       {/* ── Greeting ── */}
       <div className="flex items-center justify-between">

@@ -11,12 +11,17 @@ const NAV = [
     { label: 'Schedule', href: '/schedule', e: 'calendar_today' },
     { label: 'Business Overview', href: '/overview', e: 'bar_chart' },
   ]},
+  // Agenda + tasks sit directly under MAIN so the day's work is the first
+  // thing seen, rather than buried under Content and Client Mgmt.
+  { sec: 'AGENDA & ASSIGNMENTS', items: [
+    { label: 'Agenda', href: '/agenda', e: 'event_note' },
+    { label: 'Task Manager', href: '/client-tasks', e: 'checklist' },
+  ]},
   { sec: 'CONTENT', items: [
     { label: 'Content Tracker', href: '/content', e: 'grid_view' },
     { label: 'LinkedIn', href: '/linkedin', e: 'business_center' },
     { label: 'Content Planner', href: '/planner', e: 'edit_calendar' },
     { label: 'Video Lab', href: '/video-lab', e: 'movie' },
-    { label: 'Agenda', href: '/agenda', e: 'event_note' },
   ]},
   { sec: 'EMAIL & SMS', items: [
     { label: 'Campaigns', href: '/campaigns', e: 'forward_to_inbox' },
@@ -29,7 +34,6 @@ const NAV = [
     { label: 'Pricing & Info', href: '/knowledge', e: 'menu_book' },
     { label: 'Market Research', href: '/market-research', e: 'travel_explore' },
     { label: 'Review Responses', href: '/review-responses', e: 'reviews' },
-    { label: 'Task Manager', href: '/client-tasks', e: 'checklist' },
     { label: 'Meeting Notes', href: '/meeting-notes', e: 'description' },
     { label: 'Invoices', href: '/invoices', e: 'receipt_long' },
     { label: 'Contacts', href: '/contacts', e: 'contacts' },
