@@ -344,8 +344,9 @@ export default function ContentPage() {
   const [pdmPushing, setPdmPushing] = useState<{ done: number; total: number } | null>(null);
   // Multi-select — tick posts on the calendar or the cards, then push the
   // whole selection to other locations in one go.
-  const [selectMode, setSelectMode] = useState(false);
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
+  // Ticks only make sense when there's somewhere to push to.
+  const canSelect = isStaff && primeIvClients.some((c) => c.id !== activeClient?.id);
   const [showSelectionPush, setShowSelectionPush] = useState(false);
   const [selectionTargets, setSelectionTargets] = useState<string[]>([]);
   const [selectionPushing, setSelectionPushing] = useState<{ done: number; total: number } | null>(null);
@@ -1121,8 +1122,7 @@ export default function ContentPage() {
       return next;
     });
   }
-  function exitSelectMode() {
-    setSelectMode(false);
+  function clearSelection() {
     setSelectedIds(new Set());
     setShowSelectionPush(false);
     setSelectionTargets([]);
@@ -1201,7 +1201,7 @@ export default function ContentPage() {
     const totals = await pushToLocations(selectedItems, targets, (done, total) => setSelectionPushing({ done, total }));
     setSelectionPushing(null);
     alert(pushSummary(totals, targets.length));
-    exitSelectMode();
+    clearSelection();
   }
 
   useEffect(() => {
@@ -2165,7 +2165,7 @@ export default function ContentPage() {
       )}
 
       {/* Multi-select action bar — floats above the calendar/cards while ticking */}
-      {isStaff && selectMode && (
+      {canSelect && selectedIds.size > 0 && (
         <div className="fixed bottom-4 left-1/2 -translate-x-1/2 z-40 w-[min(680px,calc(100vw-2rem))]">
           <div
             className="rounded-2xl px-4 py-3 flex items-center gap-3 flex-wrap shadow-2xl"
@@ -2181,29 +2181,20 @@ export default function ContentPage() {
             >
               Select all {shown.length} shown
             </button>
-            {selectedIds.size > 0 && (
-              <button
-                onClick={() => setSelectedIds(new Set())}
-                className="text-[11px] font-semibold text-white/60 hover:text-white underline"
-              >
-                Clear
-              </button>
-            )}
             <div className="ml-auto flex items-center gap-2">
               <button
                 onClick={() => { setShowSelectionPush(true); setSelectionTargets([]); }}
-                disabled={selectedIds.size === 0}
-                className="rounded-xl px-4 py-2 text-[13px] font-bold disabled:opacity-40 inline-flex items-center gap-1.5"
+                className="rounded-xl px-4 py-2 text-[13px] font-bold inline-flex items-center gap-1.5"
                 style={{ background: 'linear-gradient(135deg,#0891b2,#22d3ee)', color: '#062a35' }}
               >
                 <span className="material-symbols-outlined" style={{ fontSize: 16 }}>send</span>
                 Push to locations…
               </button>
               <button
-                onClick={exitSelectMode}
+                onClick={clearSelection}
                 className="text-[12px] font-semibold px-3 py-2 rounded-xl bg-white/5 text-white/60 border border-white/10"
               >
-                Done
+                Clear
               </button>
             </div>
           </div>
@@ -2423,20 +2414,6 @@ export default function ContentPage() {
           </button>
         ))}
         <div className="ml-auto flex items-center gap-2">
-          {isStaff && primeIvClients.some((c) => c.id !== activeClient?.id) && (
-            <button
-              onClick={() => (selectMode ? exitSelectMode() : setSelectMode(true))}
-              className={`flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs font-semibold border transition ${
-                selectMode ? 'bg-white/15 text-white border-white/30' : 'bg-white/5 text-white/60 border-white/10 hover:bg-white/10'
-              }`}
-              title="Tick posts on the calendar or cards, then push them to other locations"
-            >
-              <span className="material-symbols-outlined" style={{ fontSize: 16 }}>
-                {selectMode ? 'check_box' : 'checklist'}
-              </span>
-              {selectMode ? 'Done selecting' : 'Select posts'}
-            </button>
-          )}
           <button
             onClick={() => setSortAsc((v) => !v)}
             className="flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs font-semibold border bg-white/5 text-white/60 border-white/10 hover:bg-white/10 transition"
@@ -2561,27 +2538,38 @@ export default function ContentPage() {
                       return (
                         <button
                           key={p.id}
-                          draggable={isStaff && !selectMode}
-                          onDragStart={isStaff && !selectMode ? (e) => { setDraggingId(p.id); e.dataTransfer.effectAllowed = 'move'; } : undefined}
-                          onDragEnd={isStaff && !selectMode ? () => { setDraggingId(null); setDragOverIso(null); } : undefined}
-                          onClick={(e) => { e.stopPropagation(); if (selectMode) toggleSelected(p.id); else setActiveId(p.id); }}
-                          className={`group relative text-left rounded-lg overflow-hidden hover:ring-2 hover:ring-white/20 transition ${pdm ? '' : 'border border-white/10'} ${isStaff && !selectMode ? 'cursor-grab active:cursor-grabbing' : ''} ${selectMode && selectedIds.has(p.id) ? 'ring-2 ring-cyan-400' : ''}`}
+                          draggable={isStaff}
+                          onDragStart={isStaff ? (e) => { setDraggingId(p.id); e.dataTransfer.effectAllowed = 'move'; } : undefined}
+                          onDragEnd={isStaff ? () => { setDraggingId(null); setDragOverIso(null); } : undefined}
+                          onClick={(e) => { e.stopPropagation(); setActiveId(p.id); }}
+                          className={`group relative text-left rounded-lg overflow-hidden hover:ring-2 hover:ring-white/20 transition ${pdm ? '' : 'border border-white/10'} ${isStaff ? 'cursor-grab active:cursor-grabbing' : ''} ${selectedIds.has(p.id) ? 'ring-2 ring-cyan-400' : ''}`}
                           style={{
                             ...(pdm
                               ? { background: PDM_STYLE.chipBg, border: `1px solid ${PDM_STYLE.chipBorder}` }
                               : { background: 'rgba(255,255,255,0.06)' }),
                             opacity: draggingId === p.id ? 0.4 : 1,
                           }}
-                          title={selectMode ? 'Click to tick this post' : pdm ? 'PDM · Brand Cascade (reference only, no approval)' : isStaff ? 'Click to open, drag to reschedule' : undefined}
+                          title={pdm ? 'PDM · Brand Cascade (reference only, no approval)' : isStaff ? 'Click to open, drag to reschedule' : undefined}
                         >
-                          {selectMode && (
+                          {/* Always-on tick. Its own click target, so tapping the
+                              rest of the chip still opens the post. */}
+                          {canSelect && (
                             <span
-                              className="material-symbols-outlined absolute top-0.5 left-0.5 z-20 rounded"
+                              role="checkbox"
+                              aria-checked={selectedIds.has(p.id)}
+                              aria-label={`Select ${parsed.title || p.platform}`}
+                              tabIndex={0}
+                              onClick={(e) => { e.stopPropagation(); toggleSelected(p.id); }}
+                              onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); e.stopPropagation(); toggleSelected(p.id); } }}
+                              className={`material-symbols-outlined absolute top-0.5 left-0.5 z-20 rounded cursor-pointer transition-opacity ${
+                                selectedIds.has(p.id) ? 'opacity-100' : 'opacity-45 hover:opacity-100'
+                              }`}
                               style={{
-                                fontSize: 14,
-                                color: selectedIds.has(p.id) ? '#22d3ee' : 'rgba(255,255,255,0.55)',
-                                background: 'rgba(0,0,0,0.55)',
+                                fontSize: 15,
+                                color: selectedIds.has(p.id) ? '#22d3ee' : '#ffffff',
+                                background: 'rgba(0,0,0,0.6)',
                               }}
+                              title={selectedIds.has(p.id) ? 'Ticked — click to untick' : 'Tick to push this post to other locations'}
                             >
                               {selectedIds.has(p.id) ? 'check_box' : 'check_box_outline_blank'}
                             </span>
@@ -3264,21 +3252,21 @@ export default function ContentPage() {
               <div
                 key={it.id}
                 id={`card-${it.id}`}
-                className={`glass-card p-5 flex flex-col gap-3 group scroll-mt-24 ${selectMode && selectedIds.has(it.id) ? 'ring-2 ring-cyan-400' : ''}`}
+                className={`relative glass-card p-5 flex flex-col gap-3 group scroll-mt-24 ${selectedIds.has(it.id) ? 'ring-2 ring-cyan-400' : ''}`}
                 style={pdm ? { borderLeft: `3px solid ${PDM_STYLE.chipBorder}` } : undefined}
               >
-                {selectMode && (
+                {canSelect && (
                   <button
                     type="button"
                     onClick={() => toggleSelected(it.id)}
-                    className={`-mt-1 -mx-1 flex items-center gap-2 px-2 py-1.5 rounded-lg text-[11px] font-semibold transition-colors ${
-                      selectedIds.has(it.id) ? 'bg-cyan-400/15 text-cyan-200' : 'bg-white/5 text-white/50 hover:bg-white/10'
+                    aria-label={`Select ${parsed.title || it.platform}`}
+                    className={`absolute top-3 right-3 z-10 material-symbols-outlined rounded transition-opacity ${
+                      selectedIds.has(it.id) ? 'opacity-100' : 'opacity-40 hover:opacity-100'
                     }`}
+                    style={{ fontSize: 20, color: selectedIds.has(it.id) ? '#22d3ee' : '#ffffff' }}
+                    title={selectedIds.has(it.id) ? 'Ticked — click to untick' : 'Tick to push this post to other locations'}
                   >
-                    <span className="material-symbols-outlined" style={{ fontSize: 16 }}>
-                      {selectedIds.has(it.id) ? 'check_box' : 'check_box_outline_blank'}
-                    </span>
-                    {selectedIds.has(it.id) ? 'Selected' : 'Select'}
+                    {selectedIds.has(it.id) ? 'check_box' : 'check_box_outline_blank'}
                   </button>
                 )}
                 {/* Edit mode (staff only) */}
