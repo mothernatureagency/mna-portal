@@ -2,37 +2,16 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { useClient } from '@/context/ClientContext';
 import { createClient } from '@/lib/supabase/client';
-import { driveThumbnailUrl, driveViewUrl } from '@/lib/drive';
+import { driveThumbnailUrl, previewSrc, photoOpenUrl, photosOf, isVideoUrl } from '@/lib/drive';
 import { extractFolderId, type DriveFile } from '@/lib/google-drive-shared';
 import { KNOWN_MERGE_FIELDS, tokenizeWithVars } from '@/lib/merge-vars';
-
-// Resolve a preview src for a stored photo URL. Google Drive links go through
-// the thumbnail endpoint; uploaded images (Supabase public URLs, or any plain
-// http(s) image) render directly.
-function previewSrc(url: string | null | undefined): string | null {
-  const drive = driveThumbnailUrl(url, 600);
-  if (drive) return drive;
-  const t = (url || '').trim();
-  return /^https?:\/\//i.test(t) ? t : null;
-}
-// Link to open the full photo — Drive view page for Drive links, else the raw URL.
-function photoOpenUrl(url: string | null | undefined): string | null {
-  return driveViewUrl(url) || (url && /^https?:\/\//i.test(url.trim()) ? url.trim() : null);
-}
-
-// All photos on a post — the multi-photo list when present, else the legacy
-// single-photo column. First entry is the cover.
-function photosOf(i: { photo_urls?: string[] | null; photo_drive_url: string | null }): string[] {
-  if (Array.isArray(i.photo_urls) && i.photo_urls.length > 0) return i.photo_urls.filter(Boolean);
-  return i.photo_drive_url ? [i.photo_drive_url] : [];
-}
 
 /** Image with graceful fallback — hides itself if the source fails to load */
 function DriveThumb({ url, className }: { url: string | null | undefined; className?: string }) {
   const src = previewSrc(url);
   const [failed, setFailed] = useState(false);
   if (!src || failed) return null;
-  if (/\.(mp4|mov|m4v|webm|avi|mkv)(\?|$)/i.test(src) || /-video\./i.test(src)) {
+  if (isVideoUrl(src)) {
     // eslint-disable-next-line jsx-a11y/media-has-caption
     return <video src={src} className={className} controls playsInline muted preload="metadata" onError={() => setFailed(true)} />;
   }
@@ -352,6 +331,18 @@ export default function ContentPage() {
   const [crossPostTargets, setCrossPostTargets] = useState<string[]>([]);
   const [crossPosting, setCrossPosting] = useState(false);
   const [showBulkCrossPost, setShowBulkCrossPost] = useState(false);
+  // PDM cascade push — which month, which locations, and progress while it runs.
+  const [showPdmPush, setShowPdmPush] = useState(false);
+  const [pdmPushMonth, setPdmPushMonth] = useState<string>('all');
+  const [pdmPushTargets, setPdmPushTargets] = useState<string[]>([]);
+  const [pdmPushing, setPdmPushing] = useState<{ done: number; total: number } | null>(null);
+  // Multi-select — tick posts on the calendar or the cards, then push the
+  // whole selection to other locations in one go.
+  const [selectMode, setSelectMode] = useState(false);
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
+  const [showSelectionPush, setShowSelectionPush] = useState(false);
+  const [selectionTargets, setSelectionTargets] = useState<string[]>([]);
+  const [selectionPushing, setSelectionPushing] = useState<{ done: number; total: number } | null>(null);
   const [bulkCrossTargets, setBulkCrossTargets] = useState<string[]>([]);
   const [bulkCrossPosting, setBulkCrossPosting] = useState<{ done: number; total: number } | null>(null);
 
@@ -989,13 +980,18 @@ export default function ContentPage() {
   // copy in each target client's calendar (same date/platform/type/title/
   // caption), letting their team tweak/approve independently.
   async function crossPostItem(item: ContentItem, targetClientNames: string[]) {
-    if (targetClientNames.length === 0) return { sent: 0, skipped: 0, tokenized: [] as string[] };
-    let sent = 0, skipped = 0;
+    if (targetClientNames.length === 0) return { sent: 0, skipped: 0, synced: 0, tokenized: [] as string[] };
+    let sent = 0, skipped = 0, synced = 0;
 
     // Swap this location's own name/links back to {{tokens}} before the caption
     // travels, so each target localizes it with its own values at publish time.
     // Without this the source's literal "Niceville" lands in every calendar.
     const { text: portableCaption, replaced: tokenized } = tokenizeWithVars(item.caption, mergeVars);
+
+    // The artwork travels with the post — otherwise the copy lands with an
+    // empty photo slot and neither staff nor the client sees a preview.
+    const photos = photosOf(item);
+    const pdm = isPdmItem(item);
 
     for (const clientName of targetClientNames) {
       try {
@@ -1004,14 +1000,23 @@ export default function ContentPage() {
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
             clientName,
+            // Re-pushing after attaching photos refreshes the copies already
+            // sitting in the target calendars instead of doing nothing.
+            syncExisting: true,
             items: [{
               post_date: item.post_date,
               platform: item.platform,
               content_type: item.content_type || null,
               title: item.title || null,
               caption: portableCaption || null,
-              status: 'Draft',
-              assigned_role: 'Social Media Manager',
+              // A PDM brand post stays a PDM brand post at the target:
+              // reference-only, already scheduled, visible to that location's
+              // client. Anything else lands as a draft for their team.
+              status: pdm ? 'Reference' : 'Draft',
+              assigned_role: pdm ? 'PDM (Brand)' : 'Social Media Manager',
+              ...(pdm ? { client_approval_status: 'scheduled', client_visible: true } : {}),
+              photo_drive_url: item.photo_drive_url || photos[0] || null,
+              photo_urls: photos,
             }],
           }),
         });
@@ -1019,10 +1024,11 @@ export default function ContentPage() {
         if (res.ok) {
           sent += data.count || 0;
           skipped += data.skipped || 0;
+          synced += data.updated || 0;
         }
       } catch {}
     }
-    return { sent, skipped, tokenized };
+    return { sent, skipped, synced, tokenized };
   }
 
   async function runCrossPost(id: string) {
@@ -1031,11 +1037,11 @@ export default function ContentPage() {
     setCrossPosting(true);
     try {
       const targets = primeIvClients.filter((c) => crossPostTargets.includes(c.id)).map((c) => c.name);
-      const { sent, skipped, tokenized } = await crossPostItem(item, targets);
+      const { sent, skipped, synced, tokenized } = await crossPostItem(item, targets);
       const swapped = tokenized.length
         ? `\n\nYour ${tokenized.join(', ')} ${tokenized.length === 1 ? 'was' : 'were'} swapped to merge tags, so each location publishes its own.`
         : '';
-      alert(`Cross-posted to ${sent} location${sent === 1 ? '' : 's'}.${skipped ? ` (${skipped} already existed and were skipped.)` : ''}${swapped}`);
+      alert(`Cross-posted to ${sent} location${sent === 1 ? '' : 's'}.${synced ? ` ${synced} existing cop${synced === 1 ? 'y was' : 'ies were'} refreshed with the current photos.` : ''}${skipped ? ` (${skipped} already existed and were skipped.)` : ''}${swapped}`);
       setCrossPostId(null);
       setCrossPostTargets([]);
     } catch (e: any) {
@@ -1053,17 +1059,109 @@ export default function ContentPage() {
     if (!confirm(`Push all ${shown.length} visible post${shown.length === 1 ? '' : 's'} to ${bulkCrossTargets.length} location${bulkCrossTargets.length === 1 ? '' : 's'}? This creates copies — duplicates (same date+platform+title) are skipped automatically.`)) return;
     setBulkCrossPosting({ done: 0, total: shown.length });
     const targets = primeIvClients.filter((c) => bulkCrossTargets.includes(c.id)).map((c) => c.name);
-    let totalSent = 0, totalSkipped = 0;
+    let totalSent = 0, totalSkipped = 0, totalSynced = 0;
     for (const item of shown) {
-      const { sent, skipped } = await crossPostItem(item, targets);
+      const { sent, skipped, synced } = await crossPostItem(item, targets);
       totalSent += sent;
       totalSkipped += skipped;
+      totalSynced += synced;
       setBulkCrossPosting((p) => (p ? { done: p.done + 1, total: p.total } : p));
     }
     setBulkCrossPosting(null);
     setShowBulkCrossPost(false);
     setBulkCrossTargets([]);
-    alert(`Done. Created ${totalSent} post${totalSent === 1 ? '' : 's'} across ${targets.length} location${targets.length === 1 ? '' : 's'}.${totalSkipped ? ` ${totalSkipped} duplicates were skipped.` : ''}`);
+    alert(`Done. Created ${totalSent} post${totalSent === 1 ? '' : 's'} across ${targets.length} location${targets.length === 1 ? '' : 's'}.${totalSynced ? ` ${totalSynced} existing cop${totalSynced === 1 ? 'y was' : 'ies were'} refreshed with the current photos.` : ''}${totalSkipped ? ` ${totalSkipped} duplicates were skipped.` : ''}`);
+  }
+
+  // ── Selection ─────────────────────────────────────────────────────
+  function toggleSelected(id: string) {
+    setSelectedIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id); else next.add(id);
+      return next;
+    });
+  }
+  function exitSelectMode() {
+    setSelectMode(false);
+    setSelectedIds(new Set());
+    setShowSelectionPush(false);
+    setSelectionTargets([]);
+  }
+
+  // Walk a list of posts into the target locations, reporting progress as it
+  // goes. Shared by the PDM push and the multi-select push so both count and
+  // summarize identically.
+  async function pushToLocations(
+    list: ContentItem[],
+    targetClientNames: string[],
+    onProgress: (done: number, total: number) => void,
+  ) {
+    let sentTotal = 0, skippedTotal = 0, syncedTotal = 0, done = 0;
+    for (const item of list) {
+      const { sent, skipped, synced } = await crossPostItem(item, targetClientNames);
+      sentTotal += sent;
+      skippedTotal += skipped;
+      syncedTotal += synced;
+      onProgress(++done, list.length);
+    }
+    return { sentTotal, skippedTotal, syncedTotal };
+  }
+
+  function pushSummary(
+    totals: { sentTotal: number; skippedTotal: number; syncedTotal: number },
+    locationCount: number,
+  ) {
+    const { sentTotal, skippedTotal, syncedTotal } = totals;
+    return (
+      `Created ${sentTotal} post${sentTotal === 1 ? '' : 's'} across ${locationCount} location${locationCount === 1 ? '' : 's'}.` +
+      (syncedTotal ? ` Refreshed ${syncedTotal} existing cop${syncedTotal === 1 ? 'y' : 'ies'} with the current photos.` : '') +
+      (skippedTotal ? ` ${skippedTotal} were already up to date.` : '')
+    );
+  }
+
+  // ── Push PDM brand posts to the other locations ──────────────────
+  // The PDM cascade is loaded into one location first, photos get attached
+  // there, then it goes out to the rest of the group on the user's say-so.
+  // Re-running after attaching artwork refreshes the copies already pushed.
+  const pdmItems = useMemo(() => items.filter(isPdmItem), [items]);
+  const pdmMonths = useMemo(() => {
+    const set = new Set(pdmItems.map((i) => (i.post_date || '').slice(0, 7)).filter(Boolean));
+    return Array.from(set).sort().reverse();
+  }, [pdmItems]);
+  const pdmPushItems = useMemo(
+    () => (pdmPushMonth === 'all' ? pdmItems : pdmItems.filter((i) => (i.post_date || '').startsWith(pdmPushMonth))),
+    [pdmItems, pdmPushMonth],
+  );
+  const pdmMissingPhotos = pdmPushItems.filter((i) => photosOf(i).length === 0).length;
+
+  async function runPdmPush() {
+    if (pdmPushTargets.length === 0 || pdmPushItems.length === 0) return;
+    const targets = primeIvClients.filter((c) => pdmPushTargets.includes(c.id)).map((c) => c.name);
+    if (
+      !confirm(
+        `Push ${pdmPushItems.length} PDM brand post${pdmPushItems.length === 1 ? '' : 's'} to ${targets.length} location${targets.length === 1 ? '' : 's'}?\n\nThey land as PDM reference posts (already scheduled, visible to each client) with the photos attached. Copies that are already there get refreshed with the current photos.`,
+      )
+    ) return;
+    setPdmPushing({ done: 0, total: pdmPushItems.length });
+    const totals = await pushToLocations(pdmPushItems, targets, (done, total) => setPdmPushing({ done, total }));
+    setPdmPushing(null);
+    setShowPdmPush(false);
+    setPdmPushTargets([]);
+    alert(`PDM push done. ${pushSummary(totals, targets.length)}`);
+  }
+
+  // Push whatever is currently ticked. PDM posts keep their PDM identity at
+  // the target; everything else lands as a draft for that location's team.
+  const selectedItems = useMemo(() => items.filter((i) => selectedIds.has(i.id)), [items, selectedIds]);
+
+  async function runSelectionPush() {
+    if (selectionTargets.length === 0 || selectedItems.length === 0) return;
+    const targets = primeIvClients.filter((c) => selectionTargets.includes(c.id)).map((c) => c.name);
+    setSelectionPushing({ done: 0, total: selectedItems.length });
+    const totals = await pushToLocations(selectedItems, targets, (done, total) => setSelectionPushing({ done, total }));
+    setSelectionPushing(null);
+    alert(pushSummary(totals, targets.length));
+    exitSelectMode();
   }
 
   useEffect(() => {
@@ -1834,6 +1932,290 @@ export default function ContentPage() {
       )}
 
       {/* Cross-post to other Prime IV locations */}
+      {/* PDM cascade push — send the brand posts (with their artwork) to the
+          other Prime IV locations once this month's cascade is ready. */}
+      {isStaff && pdmItems.length > 0 && primeIvClients.some((c) => c.id !== activeClient?.id) && (
+        <div className="glass-card p-4 flex items-center justify-between gap-4 flex-wrap" style={{ borderLeft: `3px solid ${PDM_STYLE.chipBorder}` }}>
+          <div>
+            <div className="text-white font-semibold text-sm flex items-center gap-2">
+              <span className="material-symbols-outlined" style={{ fontSize: 18, color: PDM_STYLE.accent }}>hub</span>
+              Push PDM brand posts to the other locations
+            </div>
+            <div className="text-white/60 text-xs">
+              {pdmItems.length} PDM post{pdmItems.length === 1 ? '' : 's'} on {activeClient?.shortName || activeClient?.name}&apos;s calendar
+              {pdmItems.filter((i) => photosOf(i).length > 0).length > 0 && (
+                <> · <span className="text-white/80 font-semibold">{pdmItems.filter((i) => photosOf(i).length > 0).length} with photos</span></>
+              )}
+              . They arrive as PDM reference posts with the artwork attached, so every location&apos;s team and client see the same previews.
+            </div>
+          </div>
+          <button
+            onClick={() => { setShowPdmPush(true); setPdmPushTargets([]); setPdmPushMonth('all'); }}
+            className="rounded-xl px-4 py-2 text-sm font-semibold text-white shrink-0 inline-flex items-center gap-1.5"
+            style={{ background: PDM_STYLE.chipBg, border: `1px solid ${PDM_STYLE.chipBorder}` }}
+          >
+            <span className="material-symbols-outlined" style={{ fontSize: 16 }}>hub</span>
+            Push PDM posts…
+          </button>
+        </div>
+      )}
+
+      {/* PDM push modal: pick the month + the target locations */}
+      {isStaff && showPdmPush && (
+        <div className="fixed inset-0 bg-black/60 flex items-center justify-center p-4 z-50" onClick={() => !pdmPushing && setShowPdmPush(false)}>
+          <div
+            className="max-w-md w-full rounded-2xl p-6 space-y-4"
+            style={{ background: 'rgba(15,31,46,0.97)', border: `1px solid ${PDM_STYLE.chipBorder}`, backdropFilter: 'blur(24px)' }}
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="flex items-center justify-between">
+              <div className="text-white font-bold text-base flex items-center gap-2">
+                <span className="material-symbols-outlined" style={{ fontSize: 20, color: PDM_STYLE.accent }}>hub</span>
+                Push PDM brand posts
+              </div>
+              {!pdmPushing && (
+                <button onClick={() => setShowPdmPush(false)} className="text-white/40 hover:text-white">
+                  <span className="material-symbols-outlined">close</span>
+                </button>
+              )}
+            </div>
+
+            {pdmMonths.length > 1 && (
+              <div className="space-y-1.5">
+                <div className="text-[10px] font-bold uppercase tracking-wider text-white/40">Which month</div>
+                <select
+                  value={pdmPushMonth}
+                  onChange={(e) => setPdmPushMonth(e.target.value)}
+                  disabled={!!pdmPushing}
+                  className="w-full bg-white/5 border border-white/15 rounded-xl px-3 py-2 text-[13px] text-white"
+                >
+                  <option value="all">All PDM posts ({pdmItems.length})</option>
+                  {pdmMonths.map((m) => (
+                    <option key={m} value={m}>
+                      {new Date(`${m}-01T12:00:00`).toLocaleDateString(undefined, { month: 'long', year: 'numeric' })}
+                      {' '}({pdmItems.filter((i) => (i.post_date || '').startsWith(m)).length})
+                    </option>
+                  ))}
+                </select>
+              </div>
+            )}
+
+            <div className="text-white/60 text-[12px]">
+              Sending <span className="font-bold text-white/80">{pdmPushItems.length}</span> PDM post{pdmPushItems.length === 1 ? '' : 's'} from <span className="font-bold text-white/80">{activeClient?.shortName || activeClient?.name}</span> to:
+            </div>
+            <div className="flex flex-col gap-2">
+              {primeIvClients.filter((c) => c.id !== activeClient?.id).map((c) => {
+                const sel = pdmPushTargets.includes(c.id);
+                return (
+                  <button
+                    key={c.id}
+                    type="button"
+                    disabled={!!pdmPushing}
+                    onClick={() => setPdmPushTargets((prev) => sel ? prev.filter((x) => x !== c.id) : [...prev, c.id])}
+                    className={`text-left text-[13px] font-semibold px-4 py-2.5 rounded-xl border transition-colors flex items-center gap-2 ${
+                      sel ? 'bg-white/15 text-white border-white/30' : 'bg-white/5 text-white/50 border-white/10 hover:border-white/20'
+                    }`}
+                  >
+                    <span className="material-symbols-outlined" style={{ fontSize: 18 }}>{sel ? 'check_box' : 'check_box_outline_blank'}</span>
+                    {c.shortName || c.name}
+                  </button>
+                );
+              })}
+              {primeIvClients.filter((c) => c.id !== activeClient?.id).length > 1 && !pdmPushing && (
+                <button
+                  type="button"
+                  onClick={() => setPdmPushTargets(primeIvClients.filter((c) => c.id !== activeClient?.id).map((c) => c.id))}
+                  className="self-start text-[11px] font-semibold text-white/50 hover:text-white underline"
+                >
+                  Select every location
+                </button>
+              )}
+            </div>
+
+            {pdmMissingPhotos > 0 && (
+              <div className="text-[11px] rounded-xl px-3 py-2 bg-amber-500/10 border border-amber-500/25 text-amber-200/90">
+                <span className="font-bold">{pdmMissingPhotos}</span> of these {pdmMissingPhotos === 1 ? 'has' : 'have'} no photo yet — {pdmMissingPhotos === 1 ? 'it' : 'they'}&apos;ll go over without a preview. Attach the artwork here first, then push again to fill the copies in.
+              </div>
+            )}
+
+            {pdmPushing ? (
+              <div className="space-y-2">
+                <div className="text-white/70 text-[12px]">Pushing PDM posts… {pdmPushing.done} / {pdmPushing.total}</div>
+                <div className="h-1.5 rounded-full bg-white/10 overflow-hidden">
+                  <div
+                    className="h-full rounded-full transition-all"
+                    style={{ width: `${(pdmPushing.done / Math.max(1, pdmPushing.total)) * 100}%`, background: `linear-gradient(90deg,${PDM_STYLE.chipBorder},${PDM_STYLE.accent})` }}
+                  />
+                </div>
+              </div>
+            ) : (
+              <div className="flex gap-2">
+                <button
+                  onClick={runPdmPush}
+                  disabled={pdmPushTargets.length === 0 || pdmPushItems.length === 0}
+                  className="flex-1 font-bold text-[13px] px-4 py-2.5 rounded-xl disabled:opacity-40 text-white"
+                  style={{ background: PDM_STYLE.chipBg, border: `1px solid ${PDM_STYLE.chipBorder}` }}
+                >
+                  Push {pdmPushItems.length} post{pdmPushItems.length === 1 ? '' : 's'} to {pdmPushTargets.length || ''} location{pdmPushTargets.length === 1 ? '' : 's'}
+                </button>
+                <button
+                  onClick={() => setShowPdmPush(false)}
+                  className="text-[12px] font-semibold px-4 py-2.5 rounded-xl bg-white/5 text-white/60 border border-white/10"
+                >
+                  Cancel
+                </button>
+              </div>
+            )}
+          </div>
+        </div>
+      )}
+
+      {/* Multi-select action bar — floats above the calendar/cards while ticking */}
+      {isStaff && selectMode && (
+        <div className="fixed bottom-4 left-1/2 -translate-x-1/2 z-40 w-[min(680px,calc(100vw-2rem))]">
+          <div
+            className="rounded-2xl px-4 py-3 flex items-center gap-3 flex-wrap shadow-2xl"
+            style={{ background: 'rgba(15,31,46,0.97)', border: '1px solid rgba(34,211,238,0.35)', backdropFilter: 'blur(24px)' }}
+          >
+            <span className="text-white font-bold text-[13px] inline-flex items-center gap-1.5">
+              <span className="material-symbols-outlined" style={{ fontSize: 18, color: '#22d3ee' }}>checklist</span>
+              {selectedIds.size} selected
+            </span>
+            <button
+              onClick={() => setSelectedIds(new Set(shown.map((i) => i.id)))}
+              className="text-[11px] font-semibold text-white/60 hover:text-white underline"
+            >
+              Select all {shown.length} shown
+            </button>
+            {selectedIds.size > 0 && (
+              <button
+                onClick={() => setSelectedIds(new Set())}
+                className="text-[11px] font-semibold text-white/60 hover:text-white underline"
+              >
+                Clear
+              </button>
+            )}
+            <div className="ml-auto flex items-center gap-2">
+              <button
+                onClick={() => { setShowSelectionPush(true); setSelectionTargets([]); }}
+                disabled={selectedIds.size === 0}
+                className="rounded-xl px-4 py-2 text-[13px] font-bold disabled:opacity-40 inline-flex items-center gap-1.5"
+                style={{ background: 'linear-gradient(135deg,#0891b2,#22d3ee)', color: '#062a35' }}
+              >
+                <span className="material-symbols-outlined" style={{ fontSize: 16 }}>send</span>
+                Push to locations…
+              </button>
+              <button
+                onClick={exitSelectMode}
+                className="text-[12px] font-semibold px-3 py-2 rounded-xl bg-white/5 text-white/60 border border-white/10"
+              >
+                Done
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Push-the-selection modal */}
+      {isStaff && showSelectionPush && (
+        <div className="fixed inset-0 bg-black/60 flex items-center justify-center p-4 z-50" onClick={() => !selectionPushing && setShowSelectionPush(false)}>
+          <div
+            className="max-w-md w-full rounded-2xl p-6 space-y-4"
+            style={{ background: 'rgba(15,31,46,0.97)', border: '1px solid rgba(34,211,238,0.35)', backdropFilter: 'blur(24px)' }}
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="flex items-center justify-between">
+              <div className="text-white font-bold text-base flex items-center gap-2">
+                <span className="material-symbols-outlined" style={{ fontSize: 20, color: '#22d3ee' }}>send</span>
+                Push {selectedItems.length} selected post{selectedItems.length === 1 ? '' : 's'}
+              </div>
+              {!selectionPushing && (
+                <button onClick={() => setShowSelectionPush(false)} className="text-white/40 hover:text-white">
+                  <span className="material-symbols-outlined">close</span>
+                </button>
+              )}
+            </div>
+
+            <div className="text-white/60 text-[12px]">
+              From <span className="font-bold text-white/80">{activeClient?.shortName || activeClient?.name}</span> to:
+            </div>
+            <div className="flex flex-col gap-2">
+              {primeIvClients.filter((c) => c.id !== activeClient?.id).map((c) => {
+                const sel = selectionTargets.includes(c.id);
+                return (
+                  <button
+                    key={c.id}
+                    type="button"
+                    disabled={!!selectionPushing}
+                    onClick={() => setSelectionTargets((prev) => sel ? prev.filter((x) => x !== c.id) : [...prev, c.id])}
+                    className={`text-left text-[13px] font-semibold px-4 py-2.5 rounded-xl border transition-colors flex items-center gap-2 ${
+                      sel ? 'bg-white/15 text-white border-white/30' : 'bg-white/5 text-white/50 border-white/10 hover:border-white/20'
+                    }`}
+                  >
+                    <span className="material-symbols-outlined" style={{ fontSize: 18 }}>{sel ? 'check_box' : 'check_box_outline_blank'}</span>
+                    {c.shortName || c.name}
+                  </button>
+                );
+              })}
+              {primeIvClients.filter((c) => c.id !== activeClient?.id).length > 1 && !selectionPushing && (
+                <button
+                  type="button"
+                  onClick={() => setSelectionTargets(primeIvClients.filter((c) => c.id !== activeClient?.id).map((c) => c.id))}
+                  className="self-start text-[11px] font-semibold text-white/50 hover:text-white underline"
+                >
+                  Select every location
+                </button>
+              )}
+            </div>
+
+            <div className="text-[11px] text-white/50 leading-relaxed">
+              {selectedItems.filter(isPdmItem).length > 0 && (
+                <><span className="font-bold text-blue-300">{selectedItems.filter(isPdmItem).length} PDM</span> arrive as brand reference (scheduled, visible to the client). </>
+              )}
+              {selectedItems.filter((i) => !isPdmItem(i)).length > 0 && (
+                <><span className="font-bold text-white/70">{selectedItems.filter((i) => !isPdmItem(i)).length}</span> land as drafts for the target team. </>
+              )}
+              Photos travel with every post, and copies already there get refreshed.
+            </div>
+
+            {selectedItems.filter((i) => photosOf(i).length === 0).length > 0 && (
+              <div className="text-[11px] rounded-xl px-3 py-2 bg-amber-500/10 border border-amber-500/25 text-amber-200/90">
+                <span className="font-bold">{selectedItems.filter((i) => photosOf(i).length === 0).length}</span> of these have no photo yet — they&apos;ll go over without a preview. Attach the artwork here, then push again to fill the copies in.
+              </div>
+            )}
+
+            {selectionPushing ? (
+              <div className="space-y-2">
+                <div className="text-white/70 text-[12px]">Pushing… {selectionPushing.done} / {selectionPushing.total}</div>
+                <div className="h-1.5 rounded-full bg-white/10 overflow-hidden">
+                  <div
+                    className="h-full rounded-full transition-all"
+                    style={{ width: `${(selectionPushing.done / Math.max(1, selectionPushing.total)) * 100}%`, background: 'linear-gradient(90deg,#0891b2,#22d3ee)' }}
+                  />
+                </div>
+              </div>
+            ) : (
+              <div className="flex gap-2">
+                <button
+                  onClick={runSelectionPush}
+                  disabled={selectionTargets.length === 0 || selectedItems.length === 0}
+                  className="flex-1 font-bold text-[13px] px-4 py-2.5 rounded-xl disabled:opacity-40"
+                  style={{ background: 'linear-gradient(135deg,#0891b2,#22d3ee)', color: '#062a35' }}
+                >
+                  Push to {selectionTargets.length || ''} location{selectionTargets.length === 1 ? '' : 's'}
+                </button>
+                <button
+                  onClick={() => setShowSelectionPush(false)}
+                  className="text-[12px] font-semibold px-4 py-2.5 rounded-xl bg-white/5 text-white/60 border border-white/10"
+                >
+                  Cancel
+                </button>
+              </div>
+            )}
+          </div>
+        </div>
+      )}
+
       {isStaff && items.length > 0 && primeIvClients.some((c) => c.id !== activeClient?.id) && (
         <div className="glass-card p-4 flex items-center justify-between gap-4 flex-wrap" style={{ borderLeft: '3px solid #c8a96e' }}>
           <div>
@@ -1946,7 +2328,21 @@ export default function ContentPage() {
             {p} ({items.filter((i) => i.platform === p).length})
           </button>
         ))}
-        <div className="ml-auto">
+        <div className="ml-auto flex items-center gap-2">
+          {isStaff && primeIvClients.some((c) => c.id !== activeClient?.id) && (
+            <button
+              onClick={() => (selectMode ? exitSelectMode() : setSelectMode(true))}
+              className={`flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs font-semibold border transition ${
+                selectMode ? 'bg-white/15 text-white border-white/30' : 'bg-white/5 text-white/60 border-white/10 hover:bg-white/10'
+              }`}
+              title="Tick posts on the calendar or cards, then push them to other locations"
+            >
+              <span className="material-symbols-outlined" style={{ fontSize: 16 }}>
+                {selectMode ? 'check_box' : 'checklist'}
+              </span>
+              {selectMode ? 'Done selecting' : 'Select posts'}
+            </button>
+          )}
           <button
             onClick={() => setSortAsc((v) => !v)}
             className="flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs font-semibold border bg-white/5 text-white/60 border-white/10 hover:bg-white/10 transition"
@@ -2071,19 +2467,31 @@ export default function ContentPage() {
                       return (
                         <button
                           key={p.id}
-                          draggable={isStaff}
-                          onDragStart={isStaff ? (e) => { setDraggingId(p.id); e.dataTransfer.effectAllowed = 'move'; } : undefined}
-                          onDragEnd={isStaff ? () => { setDraggingId(null); setDragOverIso(null); } : undefined}
-                          onClick={(e) => { e.stopPropagation(); setActiveId(p.id); }}
-                          className={`group relative text-left rounded-lg overflow-hidden hover:ring-2 hover:ring-white/20 transition ${pdm ? '' : 'border border-white/10'} ${isStaff ? 'cursor-grab active:cursor-grabbing' : ''}`}
+                          draggable={isStaff && !selectMode}
+                          onDragStart={isStaff && !selectMode ? (e) => { setDraggingId(p.id); e.dataTransfer.effectAllowed = 'move'; } : undefined}
+                          onDragEnd={isStaff && !selectMode ? () => { setDraggingId(null); setDragOverIso(null); } : undefined}
+                          onClick={(e) => { e.stopPropagation(); if (selectMode) toggleSelected(p.id); else setActiveId(p.id); }}
+                          className={`group relative text-left rounded-lg overflow-hidden hover:ring-2 hover:ring-white/20 transition ${pdm ? '' : 'border border-white/10'} ${isStaff && !selectMode ? 'cursor-grab active:cursor-grabbing' : ''} ${selectMode && selectedIds.has(p.id) ? 'ring-2 ring-cyan-400' : ''}`}
                           style={{
                             ...(pdm
                               ? { background: PDM_STYLE.chipBg, border: `1px solid ${PDM_STYLE.chipBorder}` }
                               : { background: 'rgba(255,255,255,0.06)' }),
                             opacity: draggingId === p.id ? 0.4 : 1,
                           }}
-                          title={pdm ? 'PDM · Brand Cascade (reference only, no approval)' : isStaff ? 'Click to open, drag to reschedule' : undefined}
+                          title={selectMode ? 'Click to tick this post' : pdm ? 'PDM · Brand Cascade (reference only, no approval)' : isStaff ? 'Click to open, drag to reschedule' : undefined}
                         >
+                          {selectMode && (
+                            <span
+                              className="material-symbols-outlined absolute top-0.5 left-0.5 z-20 rounded"
+                              style={{
+                                fontSize: 14,
+                                color: selectedIds.has(p.id) ? '#22d3ee' : 'rgba(255,255,255,0.55)',
+                                background: 'rgba(0,0,0,0.55)',
+                              }}
+                            >
+                              {selectedIds.has(p.id) ? 'check_box' : 'check_box_outline_blank'}
+                            </span>
+                          )}
                           <DriveThumb url={photosOf(p)[0]} className="w-full h-[48px] object-cover opacity-70 group-hover:opacity-90 transition-opacity" />
                           {photosOf(p).length > 1 && (
                             <span className="absolute top-0.5 right-0.5 z-10 text-[8px] font-bold px-1 py-0.5 rounded bg-black/60 text-white/90 inline-flex items-center gap-0.5">
@@ -2762,9 +3170,23 @@ export default function ContentPage() {
               <div
                 key={it.id}
                 id={`card-${it.id}`}
-                className="glass-card p-5 flex flex-col gap-3 group scroll-mt-24"
+                className={`glass-card p-5 flex flex-col gap-3 group scroll-mt-24 ${selectMode && selectedIds.has(it.id) ? 'ring-2 ring-cyan-400' : ''}`}
                 style={pdm ? { borderLeft: `3px solid ${PDM_STYLE.chipBorder}` } : undefined}
               >
+                {selectMode && (
+                  <button
+                    type="button"
+                    onClick={() => toggleSelected(it.id)}
+                    className={`-mt-1 -mx-1 flex items-center gap-2 px-2 py-1.5 rounded-lg text-[11px] font-semibold transition-colors ${
+                      selectedIds.has(it.id) ? 'bg-cyan-400/15 text-cyan-200' : 'bg-white/5 text-white/50 hover:bg-white/10'
+                    }`}
+                  >
+                    <span className="material-symbols-outlined" style={{ fontSize: 16 }}>
+                      {selectedIds.has(it.id) ? 'check_box' : 'check_box_outline_blank'}
+                    </span>
+                    {selectedIds.has(it.id) ? 'Selected' : 'Select'}
+                  </button>
+                )}
                 {/* Edit mode (staff only) */}
                 {isStaff && isEditing ? (
                   <div className="flex flex-col gap-2">

@@ -26,7 +26,7 @@ import {
   type LeadSourceRow,
   type TopPostRow,
 } from '@/lib/portal-layout';
-import { driveThumbnailUrl, driveViewUrl } from '@/lib/drive';
+import { previewSrc, photoOpenUrl, photosOf, isVideoUrl } from '@/lib/drive';
 
 type MonthData = {
   month: string; // 'Jan', 'Feb', etc.
@@ -121,15 +121,23 @@ type CalendarItem = {
   title: string | null;
   client_approval_status: CalendarApprovalStatus | null;
   photo_drive_url: string | null;
+  photo_urls?: string[] | null;
   caption: string | null;
 };
 
-/** Image with graceful fallback — hides itself if Drive thumbnail fails to load */
+/**
+ * Post media with graceful fallback — hides itself if the source fails.
+ * Covers Drive links and files uploaded straight to storage alike.
+ */
 function DriveThumb({ url, className }: { url: string | null | undefined; className?: string }) {
-  const thumb = driveThumbnailUrl(url, 400);
+  const src = previewSrc(url, 400);
   const [failed, setFailed] = useState(false);
-  if (!thumb || failed) return null;
-  return <img src={thumb} alt="" className={className} onError={() => setFailed(true)} />;
+  if (!src || failed) return null;
+  if (isVideoUrl(src)) {
+    // eslint-disable-next-line jsx-a11y/media-has-caption
+    return <video src={src} className={className} controls playsInline muted preload="metadata" onError={() => setFailed(true)} />;
+  }
+  return <img src={src} alt="" className={className} onError={() => setFailed(true)} />;
 }
 
 const STATUS_DOT: Record<CalendarApprovalStatus, string> = {
@@ -486,8 +494,8 @@ export default function ClientOverviewPage() {
                         onClick={() => setActiveCalId(it.id)}
                         className="w-full text-left rounded overflow-hidden border border-white/10 bg-white/[0.04] hover:ring-2 hover:ring-white/20 hover:bg-white/10 transition-all cursor-pointer"
                       >
-                        {it.photo_drive_url && (
-                          <DriveThumb url={it.photo_drive_url} className="w-full h-[42px] object-cover opacity-80 group-hover:opacity-100 transition-opacity" />
+                        {photosOf(it)[0] && (
+                          <DriveThumb url={photosOf(it)[0]} className="w-full h-[42px] object-cover opacity-80 group-hover:opacity-100 transition-opacity" />
                         )}
                         <div className="px-1 py-0.5 flex items-center gap-1">
                           <span className="w-1.5 h-1.5 rounded-full shrink-0" style={{ background: STATUS_DOT[status] || '#9ca3af' }} />
@@ -518,9 +526,9 @@ export default function ClientOverviewPage() {
                 onClick={() => setActiveCalId(it.id)}
                 className="w-full text-left flex items-center gap-3 rounded-xl border border-white/10 bg-white/5 p-3 hover:bg-white/10 hover:ring-2 hover:ring-white/20 transition-all"
               >
-                {it.photo_drive_url && (
+                {photosOf(it)[0] && (
                   <div className="shrink-0 rounded-lg overflow-hidden w-14 h-14">
-                    <DriveThumb url={it.photo_drive_url} className="w-14 h-14 object-cover" />
+                    <DriveThumb url={photosOf(it)[0]} className="w-14 h-14 object-cover" />
                   </div>
                 )}
                 <div className="flex-1 min-w-0">
@@ -603,7 +611,8 @@ export default function ClientOverviewPage() {
         if (!item) return null;
         const status = (item.client_approval_status || 'pending_review') as CalendarApprovalStatus;
         const statusLabel = status === 'pending_review' ? 'Ready for review' : status === 'changes_requested' ? 'Changes requested' : status.charAt(0).toUpperCase() + status.slice(1);
-        const driveLink = driveViewUrl(item.photo_drive_url);
+        const photos = photosOf(item);
+        const driveLink = photoOpenUrl(photos[0]);
         return (
           <div className="fixed inset-0 bg-black/60 flex items-center justify-center p-4 z-50" onClick={() => setActiveCalId(null)}>
             <div
@@ -615,10 +624,19 @@ export default function ClientOverviewPage() {
               }}
               onClick={(e) => e.stopPropagation()}
             >
-              {item.photo_drive_url && (
-                <a href={driveLink!} target="_blank" rel="noreferrer" className="block bg-black rounded-t-2xl overflow-hidden">
-                  <DriveThumb url={item.photo_drive_url} className="w-full max-h-72 object-contain" />
+              {photos[0] && (
+                <a href={driveLink || undefined} target="_blank" rel="noreferrer" className="block bg-black rounded-t-2xl overflow-hidden">
+                  <DriveThumb url={photos[0]} className="w-full max-h-72 object-contain" />
                 </a>
+              )}
+              {photos.length > 1 && (
+                <div className="flex gap-2 overflow-x-auto px-5 pt-4">
+                  {photos.map((u, idx) => (
+                    <a key={`${u}-${idx}`} href={photoOpenUrl(u) || undefined} target="_blank" rel="noreferrer" className="shrink-0">
+                      <DriveThumb url={u} className="h-14 w-14 object-cover rounded-md border border-white/15" />
+                    </a>
+                  ))}
+                </div>
               )}
               <div className="p-5 space-y-3">
                 <div className="flex items-center justify-between">

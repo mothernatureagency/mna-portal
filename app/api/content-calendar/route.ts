@@ -189,8 +189,13 @@ export async function GET(req: NextRequest) {
 }
 
 // POST — bulk insert content items
-// body: { clientName, items: [{ post_date, platform, content_type, title, status?, assigned_role? }] }
+// body: { clientName, items: [{ post_date, platform, content_type, title, status?,
+//         assigned_role?, caption?, photo_drive_url?, photo_urls?, client_visible?,
+//         client_approval_status? }], syncExisting? }
 //   OR: { clientName, playbookId, startDate }  ← applies a playbook
+// Items that already exist (same date + platform + title) are skipped, or —
+// with syncExisting — refreshed with this push's media/caption. That's what
+// lets a PDM cascade be pushed again once the artwork is attached.
 export async function POST(req: NextRequest) {
   await ensureSchema();
   let body: any;
@@ -207,8 +212,22 @@ export async function POST(req: NextRequest) {
     status?: string;
     assigned_role?: string;
     caption?: string;
+    // Media travels with the post so a cross-posted copy previews the same
+    // photos in the target location's calendar (staff and client views).
+    photo_drive_url?: string | null;
+    photo_urls?: string[] | null;
+    // Explicit overrides — a PDM brand post pushed to another location has to
+    // land as PDM reference (scheduled + client-visible), not as a fresh draft.
+    client_visible?: boolean;
+    client_approval_status?: string;
   };
   let items: SeedItem[] = [];
+
+  // When true, an item that already exists at the target (same date+platform+
+  // title) is refreshed with this push's media/caption instead of just being
+  // skipped. That's what makes "push PDM again once the photos are attached"
+  // work — the second push fills in the artwork rather than doing nothing.
+  const syncExisting: boolean = body?.syncExisting === true;
 
   if (body?.playbookId) {
     const pb = getPlaybook(body.playbookId);
@@ -239,6 +258,7 @@ export async function POST(req: NextRequest) {
   const projectId = await getOrCreateProject(clientName);
   const inserted: any[] = [];
   let skipped = 0;
+  let updated = 0;
   for (const it of items) {
     if (!it.post_date || !it.platform) continue;
     const isPDM = it.assigned_role === 'PDM (Brand)';
@@ -254,11 +274,63 @@ export async function POST(req: NextRequest) {
         limit 1`,
       [projectId, it.post_date, it.platform, it.title || null],
     );
-    if (dupe.rows[0]) { skipped++; continue; }
+    if (dupe.rows[0]) {
+      const photos = Array.isArray(it.photo_urls) ? it.photo_urls.filter(Boolean) : [];
+      const cover = it.photo_drive_url || photos[0] || null;
+      // A PDM brand post pushed here before this route carried PDM identity
+      // landed as a plain draft. Re-align it (unless it already went out) so it
+      // reads as reference content in every location's calendar.
+      let touched = false;
+      if (syncExisting && it.assigned_role === 'PDM (Brand)') {
+        const realigned = await query(
+          `update content_calendar
+              set assigned_role = 'PDM (Brand)',
+                  status = 'Reference',
+                  client_approval_status = 'scheduled',
+                  client_visible = true
+            where id = $1
+              and coalesce(publish_status, '') <> 'posted'
+              and (coalesce(assigned_role, '') <> 'PDM (Brand)'
+                   or coalesce(client_approval_status, '') <> 'scheduled'
+                   or client_visible is distinct from true)
+            returning id`,
+          [dupe.rows[0].id],
+        );
+        touched = realigned.rows.length > 0;
+      }
+      if (syncExisting && (cover || it.caption)) {
+        // Only ever fills gaps or refreshes media — never blanks out artwork or
+        // a caption the target location wrote for itself.
+        const { rows } = await query(
+          `update content_calendar
+              set photo_urls = case when $2::jsonb is null then photo_urls else $2::jsonb end,
+                  photo_drive_url = coalesce($3, photo_drive_url),
+                  caption = case when coalesce(caption, '') = '' then coalesce($4, caption) else caption end
+            where id = $1
+              and (($2::jsonb is not null and coalesce(photo_urls, '[]'::jsonb) is distinct from $2::jsonb)
+                   or ($3::text is not null and photo_drive_url is distinct from $3)
+                   or (coalesce(caption, '') = '' and coalesce($4, '') <> ''))
+            returning id`,
+          [
+            dupe.rows[0].id,
+            photos.length > 0 ? JSON.stringify(photos) : cover ? JSON.stringify([cover]) : null,
+            cover,
+            it.caption || null,
+          ],
+        );
+        if (rows[0]) touched = true;
+      }
+      if (touched) { updated++; continue; }
+      skipped++;
+      continue;
+    }
 
+    const photos = Array.isArray(it.photo_urls) ? it.photo_urls.filter(Boolean) : [];
+    const cover = it.photo_drive_url || photos[0] || null;
+    const photoList = photos.length > 0 ? photos : cover ? [cover] : [];
     const { rows } = await query(
-      `insert into content_calendar (project_id, post_date, platform, content_type, title, status, assigned_role, caption, client_approval_status, client_visible)
-       values ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10) returning *`,
+      `insert into content_calendar (project_id, post_date, platform, content_type, title, status, assigned_role, caption, client_approval_status, client_visible, photo_drive_url, photo_urls)
+       values ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12::jsonb) returning *`,
       [
         projectId,
         it.post_date,
@@ -272,17 +344,20 @@ export async function POST(req: NextRequest) {
         // so the client sees them as already-locked scheduled content (no
         // approval actions, no special color) rather than something to review.
         // Otherwise: pre-written caption → pending_review; else drafting.
-        isPDM
-          ? 'scheduled'
-          : it.caption ? 'pending_review' : 'drafting',
+        it.client_approval_status
+          || (isPDM
+            ? 'scheduled'
+            : it.caption ? 'pending_review' : 'drafting'),
         // PDM posts are visible to the client too — they fill the client's
         // calendar so it doesn't look empty, even though MNA didn't write them.
-        isPDM,
+        it.client_visible !== undefined ? it.client_visible : isPDM,
+        cover,
+        JSON.stringify(photoList),
       ]
     );
     inserted.push(rows[0]);
   }
-  return NextResponse.json({ inserted, count: inserted.length, skipped });
+  return NextResponse.json({ inserted, count: inserted.length, skipped, updated });
 }
 
 // DELETE — remove a content item (staff only)

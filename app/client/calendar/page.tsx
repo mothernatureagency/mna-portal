@@ -1,14 +1,22 @@
 'use client';
 
 import { useEffect, useMemo, useState } from 'react';
-import { driveThumbnailUrl, driveViewUrl } from '@/lib/drive';
+import { previewSrc, photoOpenUrl, photosOf, isVideoUrl } from '@/lib/drive';
 
-/** Image with graceful fallback — hides itself if Drive thumbnail fails */
+/**
+ * Post media with graceful fallback — hides itself if the source fails.
+ * Handles both Google Drive links and files uploaded straight to storage,
+ * so the client sees the same preview staff attached.
+ */
 function DriveThumb({ url, className }: { url: string | null | undefined; className?: string }) {
-  const thumb = driveThumbnailUrl(url, 600);
+  const src = previewSrc(url, 600);
   const [failed, setFailed] = useState(false);
-  if (!thumb || failed) return null;
-  return <img src={thumb} alt="" className={className} onError={() => setFailed(true)} />;
+  if (!src || failed) return null;
+  if (isVideoUrl(src)) {
+    // eslint-disable-next-line jsx-a11y/media-has-caption
+    return <video src={src} className={className} controls playsInline muted preload="metadata" onError={() => setFailed(true)} />;
+  }
+  return <img src={src} alt="" className={className} onError={() => setFailed(true)} />;
 }
 import { useClientPortal } from '@/components/client-portal/ClientPortalContext';
 
@@ -39,6 +47,7 @@ type ContentItem = {
   client_comments: string | null;
   mna_comments: string | null;
   photo_drive_url: string | null;
+  photo_urls?: string[] | null;
 };
 
 const APPROVAL_STYLES: Record<ApprovalStatus, { label: string; bg: string; text: string }> = {
@@ -240,7 +249,7 @@ export default function ClientCalendarPage() {
                           className="group relative text-left rounded-lg overflow-hidden border border-white/10 hover:ring-2 hover:ring-white/20 transition"
                           style={{ background: 'rgba(255,255,255,0.06)' }}
                         >
-                          <DriveThumb url={p.photo_drive_url} className="w-full h-[54px] object-cover opacity-70 group-hover:opacity-90 transition-opacity" />
+                          <DriveThumb url={photosOf(p)[0]} className="w-full h-[54px] object-cover opacity-70 group-hover:opacity-90 transition-opacity" />
                           <div className="px-1.5 py-1">
                             <div className="text-[9px] font-bold text-white/80 truncate">{parsed.title}</div>
                             <div
@@ -268,12 +277,19 @@ export default function ClientCalendarPage() {
             const parsed = parseTitle(it.title);
             const status = (it.client_approval_status || 'pending_review') as ApprovalStatus;
             const style = APPROVAL_STYLES[status];
-            const driveLink = driveViewUrl(it.photo_drive_url);
+            const photos = photosOf(it);
+            const driveLink = photoOpenUrl(photos[0]);
             return (
               <div key={it.id} className="glass-card overflow-hidden flex flex-col">
-                {it.photo_drive_url && (
-                  <a href={driveViewUrl(it.photo_drive_url)!} target="_blank" rel="noreferrer" className="block bg-black/30">
-                    <DriveThumb url={it.photo_drive_url} className="w-full h-48 object-cover opacity-80 hover:opacity-100 transition-opacity" />
+                {photos[0] && (
+                  <a href={driveLink || undefined} target="_blank" rel="noreferrer" className="block bg-black/30 relative">
+                    <DriveThumb url={photos[0]} className="w-full h-48 object-cover opacity-80 hover:opacity-100 transition-opacity" />
+                    {photos.length > 1 && (
+                      <span className="absolute top-2 right-2 text-[10px] font-bold px-2 py-0.5 rounded-full bg-black/60 text-white/90 inline-flex items-center gap-1">
+                        <span className="material-symbols-outlined" style={{ fontSize: 12 }}>photo_library</span>
+                        {photos.length}
+                      </span>
+                    )}
                   </a>
                 )}
                 <div className="p-5 flex flex-col gap-3 flex-1">
@@ -355,13 +371,23 @@ export default function ClientCalendarPage() {
               const parsed = parseTitle(activeItem.title);
               const status = (activeItem.client_approval_status || 'pending_review') as ApprovalStatus;
               const style = APPROVAL_STYLES[status];
-              const driveLink = driveViewUrl(activeItem.photo_drive_url);
+              const photos = photosOf(activeItem);
+              const driveLink = photoOpenUrl(photos[0]);
               return (
                 <>
-                  {activeItem.photo_drive_url && (
-                    <a href={driveLink!} target="_blank" rel="noreferrer" className="block bg-black rounded-t-2xl overflow-hidden">
-                      <DriveThumb url={activeItem.photo_drive_url} className="w-full max-h-80 object-contain" />
+                  {photos[0] && (
+                    <a href={driveLink || undefined} target="_blank" rel="noreferrer" className="block bg-black rounded-t-2xl overflow-hidden">
+                      <DriveThumb url={photos[0]} className="w-full max-h-80 object-contain" />
                     </a>
+                  )}
+                  {photos.length > 1 && (
+                    <div className="flex gap-2 overflow-x-auto px-6 pt-4">
+                      {photos.map((u, idx) => (
+                        <a key={`${u}-${idx}`} href={photoOpenUrl(u) || undefined} target="_blank" rel="noreferrer" className="shrink-0">
+                          <DriveThumb url={u} className="h-16 w-16 object-cover rounded-md border border-white/15" />
+                        </a>
+                      ))}
+                    </div>
                   )}
                   <div className="p-6 space-y-4">
                     <div className="flex items-center justify-between">

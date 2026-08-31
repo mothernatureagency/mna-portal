@@ -9,7 +9,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import Link from 'next/link';
 import React from 'react';
-import { driveThumbnailUrl, driveViewUrl } from '@/lib/drive';
+import { previewSrc, photoOpenUrl, photosOf } from '@/lib/drive';
 
 type ApprovalStatus =
   | 'drafting'
@@ -28,6 +28,7 @@ type ContentItem = {
   assigned_role: string | null;
   client_approval_status: ApprovalStatus | null;
   photo_drive_url?: string | null;
+  photo_urls?: string[] | null;
   client_comments?: string | null;
   mna_comments?: string | null;
   client_visible?: boolean | null;
@@ -663,8 +664,11 @@ export default function MonthlyContentCalendar({
       {interactive && activePost && (() => {
         const p = activePost;
         const status = (p.client_approval_status || 'pending_review') as ApprovalStatus;
-        const thumb = driveThumbnailUrl(p.photo_drive_url);
-        const view = driveViewUrl(p.photo_drive_url);
+        // Drive links and uploaded files both preview here — an uploaded photo
+        // used to render nothing because only the Drive thumbnail was tried.
+        const photos = photosOf(p);
+        const thumb = previewSrc(photos[0], 800);
+        const view = photoOpenUrl(photos[0]);
         return (
           <div className="fixed inset-0 bg-black/60 flex items-center justify-center p-4 z-50" onClick={() => setActivePost(null)}>
             <div
@@ -688,9 +692,22 @@ export default function MonthlyContentCalendar({
               {/* Photo */}
               <div className="mb-3">
                 {thumb && !photoEditing && (
-                  <a href={view!} target="_blank" rel="noreferrer" className="block rounded-lg overflow-hidden border border-white/10 mb-2">
+                  <a href={view || undefined} target="_blank" rel="noreferrer" className="block rounded-lg overflow-hidden border border-white/10 mb-2">
                     <img src={thumb} alt="" className="w-full h-40 object-cover opacity-90 hover:opacity-100 transition-opacity" />
                   </a>
+                )}
+                {photos.length > 1 && !photoEditing && (
+                  <div className="flex gap-2 overflow-x-auto mb-2">
+                    {photos.slice(1).map((u, idx) => {
+                      const src = previewSrc(u, 300);
+                      if (!src) return null;
+                      return (
+                        <a key={`${u}-${idx}`} href={photoOpenUrl(u) || undefined} target="_blank" rel="noreferrer" className="shrink-0">
+                          <img src={src} alt="" className="h-12 w-12 object-cover rounded-md border border-white/10" />
+                        </a>
+                      );
+                    })}
+                  </div>
                 )}
                 {photoEditing ? (
                   <div className="flex gap-2">

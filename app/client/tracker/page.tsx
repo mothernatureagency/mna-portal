@@ -3,7 +3,23 @@
 import { useEffect, useState } from 'react';
 import { clients, Client } from '@/lib/clients';
 import { createClient } from '@/lib/supabase/client';
-import { driveViewUrl } from '@/lib/drive';
+import { previewSrc, photoOpenUrl, photosOf, isVideoUrl } from '@/lib/drive';
+
+/**
+ * Post media with graceful fallback — hides itself if the source fails.
+ * Drive links and uploaded files both preview here, so the client sees the
+ * artwork on the post they're approving instead of just a link to it.
+ */
+function PostThumb({ url, className }: { url: string | null | undefined; className?: string }) {
+  const src = previewSrc(url, 600);
+  const [failed, setFailed] = useState(false);
+  if (!src || failed) return null;
+  if (isVideoUrl(src)) {
+    // eslint-disable-next-line jsx-a11y/media-has-caption
+    return <video src={src} className={className} controls playsInline muted preload="metadata" onError={() => setFailed(true)} />;
+  }
+  return <img src={src} alt="" className={className} onError={() => setFailed(true)} />;
+}
 
 type ApprovalStatus = 'drafting' | 'pending_review' | 'approved' | 'changes_requested' | 'scheduled';
 
@@ -21,6 +37,7 @@ type ContentItem = {
   mna_comments: string | null;
   approved_at: string | null;
   photo_drive_url: string | null;
+  photo_urls?: string[] | null;
 };
 
 const APPROVAL_STYLES: Record<ApprovalStatus, { label: string; bg: string; text: string }> = {
@@ -177,9 +194,21 @@ export default function ClientTrackerPage() {
             const parsed = parseTitle(it.title);
             const status = (it.client_approval_status || 'pending_review') as ApprovalStatus;
             const style = APPROVAL_STYLES[status];
-            const driveLink = driveViewUrl(it.photo_drive_url);
+            const photos = photosOf(it);
+            const driveLink = photoOpenUrl(photos[0]);
             return (
               <div key={it.id} className="bg-white rounded-2xl overflow-hidden shadow-sm border border-black/5 flex flex-col">
+                {photos[0] && (
+                  <a href={driveLink || undefined} target="_blank" rel="noreferrer" className="block bg-neutral-100 relative">
+                    <PostThumb url={photos[0]} className="w-full h-48 object-cover" />
+                    {photos.length > 1 && (
+                      <span className="absolute top-2 right-2 text-[10px] font-bold px-2 py-0.5 rounded-full bg-black/60 text-white inline-flex items-center gap-1">
+                        <span className="material-symbols-outlined" style={{ fontSize: 12 }}>photo_library</span>
+                        {photos.length}
+                      </span>
+                    )}
+                  </a>
+                )}
                 <div className="p-5 flex flex-col gap-3 flex-1">
                   <div className="flex items-center justify-between text-[10px] font-bold uppercase tracking-wider text-neutral-500">
                     <span>{fmtDate(it.post_date)}</span>
@@ -213,7 +242,7 @@ export default function ClientTrackerPage() {
                     </div>
                   )}
 
-                  {/* Drive link */}
+                  {/* Full-size photo link */}
                   {driveLink && (
                     <a
                       href={driveLink}
@@ -223,7 +252,7 @@ export default function ClientTrackerPage() {
                       style={{ color: gradientFrom }}
                     >
                       <span className="material-symbols-outlined" style={{ fontSize: 14 }}>open_in_new</span>
-                      Open in Google Drive
+                      {photos.length > 1 ? `Open all ${photos.length} photos` : 'Open full photo'}
                     </a>
                   )}
 
