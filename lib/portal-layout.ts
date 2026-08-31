@@ -80,6 +80,7 @@ export const PORTAL_PAGES: PortalPageDef[] = [
     ],
   },
   { href: '/client/agenda', label: 'Agenda', icon: 'event_note', sections: [] },
+  { href: '/client/specials', label: 'Monthly Specials', icon: 'local_offer', sections: [] },
   { href: '/client/calendar', label: 'Content Calendar', icon: 'calendar_month', sections: [] },
   { href: '/client/campaigns', label: 'Email & SMS', icon: 'forward_to_inbox', sections: [] },
   { href: '/client/notes', label: 'Meeting Notes', icon: 'description', sections: [] },

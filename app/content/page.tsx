@@ -1080,6 +1080,55 @@ export default function ContentPage() {
     alert(`Done. Created ${totalSent} post${totalSent === 1 ? '' : 's'} across ${targets.length} location${targets.length === 1 ? '' : 's'}.${totalSynced ? ` ${totalSynced} existing cop${totalSynced === 1 ? 'y was' : 'ies were'} refreshed with the current photos.` : ''}${totalSkipped ? ` ${totalSkipped} duplicates were skipped.` : ''}`);
   }
 
+  // Pull whatever the client approved in the Specials section for this month.
+  // That's the whole point of the specials stage — the plan gets built off
+  // offers the client already signed off on, not off a guess.
+  async function pullApprovedSpecials(forMonth: string, quiet = false) {
+    if (!activeClient?.id) return;
+    setReadingSpecials(true);
+    setSpecialsError(null);
+    try {
+      const res = await fetch(`/api/specials?clientId=${encodeURIComponent(activeClient.id)}&month=${forMonth}`);
+      const data = await res.json();
+      const approved = (Array.isArray(data.items) ? data.items : []).filter((s: any) => s.status === 'approved');
+      if (approved.length === 0) {
+        if (!quiet) setSpecialsError(`Nothing approved for ${forMonth} yet. Check the Monthly Specials page.`);
+        return;
+      }
+      const text = approved.map((s: any) => {
+        const head = [s.name, s.offer].filter(Boolean).join(' — ');
+        const range = s.starts_on && s.ends_on ? ` (${s.starts_on} to ${s.ends_on})`
+          : s.starts_on ? ` (from ${s.starts_on})`
+          : s.ends_on ? ` (until ${s.ends_on})` : '';
+        return `${head}${range}${s.terms ? ` · ${s.terms}` : ''}${s.description ? ` · ${s.description}` : ''}`;
+      }).join('\n');
+      setPlanSpecials((prev) => (prev.trim() ? `${prev.trim()}\n\n${text}` : text));
+      setSpecialsSource(`${approved.length} approved special${approved.length === 1 ? '' : 's'}`);
+    } catch {
+      if (!quiet) setSpecialsError('Could not load the approved specials.');
+    } finally {
+      setReadingSpecials(false);
+    }
+  }
+
+  // Arriving from the Specials page's "Plan content from approved" button.
+  useEffect(() => {
+    let raw: string | null = null;
+    try { raw = sessionStorage.getItem('mna:plan-specials'); } catch { return; }
+    if (!raw) return;
+    try { sessionStorage.removeItem('mna:plan-specials'); } catch {}
+    try {
+      const handoff = JSON.parse(raw) as { month?: string; specials?: string; clientId?: string };
+      if (!handoff?.specials) return;
+      if (handoff.clientId && activeClient?.id && handoff.clientId !== activeClient.id) return;
+      if (handoff.month) setPlanMonth(handoff.month);
+      setPlanSpecials(handoff.specials);
+      setSpecialsSource('the approved specials');
+      setShowPlanner(true);
+    } catch {}
+    /* eslint-disable-next-line react-hooks/exhaustive-deps */
+  }, [activeClient?.id]);
+
   // Read the month's specials off an uploaded file or a Drive link and drop
   // the text into the planner box. Always lands in the textarea rather than
   // planning straight off it — staff read and fix it first.
@@ -1519,6 +1568,18 @@ export default function ContentPage() {
 
                 {/* Read them off the owner's flyer/sheet instead of retyping */}
                 <div className="flex items-center gap-2 flex-wrap mb-1.5">
+                  <button
+                    type="button"
+                    onClick={() => pullApprovedSpecials(planMonth)}
+                    disabled={readingSpecials}
+                    className="text-[11px] font-semibold px-3 py-1.5 rounded-lg border text-white inline-flex items-center gap-1.5 disabled:opacity-40"
+                    style={{ background: 'rgba(16,185,129,0.15)', borderColor: 'rgba(16,185,129,0.35)' }}
+                    title="Pull in the specials this client already approved for the month"
+                  >
+                    <span className="material-symbols-outlined" style={{ fontSize: 15 }}>local_offer</span>
+                    Use approved specials
+                  </button>
+                  <span className="text-white/25 text-[11px]">or</span>
                   <input
                     ref={specialsFileRef}
                     type="file"

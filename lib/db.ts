@@ -337,6 +337,31 @@ async function initSchema() {
                         synced_at timestamptz not null default now(),
                         primary key (campaign_id)
                   )`,
+                  // Monthly specials — the promos a client runs in a given month.
+                  // This is the stage BEFORE the content calendar: MNA plans the
+                  // month's offers, the client approves/denies/comments on them,
+                  // and only then does content get planned around what survived.
+                  // client_id is the lib/clients.ts id (text), matching client_requests.
+                  `create table if not exists monthly_specials (
+                        id uuid primary key default uuid_generate_v4(),
+                        client_id text not null,
+                        month text not null,
+                        name text not null,
+                        offer text,
+                        description text,
+                        starts_on date,
+                        ends_on date,
+                        terms text,
+                        sort_order integer not null default 0,
+                        status text not null default 'drafting',
+                        client_visible boolean not null default false,
+                        client_comments text,
+                        mna_comments text,
+                        approved_at timestamptz,
+                        created_at timestamptz not null default now()
+                  )`,
+                  `create index if not exists monthly_specials_client_month_idx
+                     on monthly_specials (client_id, month)`,
                   // Meeting notes — per-client, per-meeting, with optional client visibility
                   `create table if not exists meeting_notes (
                         id uuid primary key default uuid_generate_v4(),

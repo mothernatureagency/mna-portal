@@ -18,6 +18,7 @@ const NAV = [
     { label: 'Task Manager', href: '/client-tasks', e: 'checklist' },
   ]},
   { sec: 'CONTENT', items: [
+    { label: 'Monthly Specials', href: '/specials', e: 'local_offer' },
     { label: 'Content Tracker', href: '/content', e: 'grid_view' },
     { label: 'LinkedIn', href: '/linkedin', e: 'business_center' },
     { label: 'Content Planner', href: '/planner', e: 'edit_calendar' },
