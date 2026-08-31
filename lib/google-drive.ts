@@ -45,3 +45,68 @@ export async function listFolderFiles(userEmail: string, folderId: string): Prom
   const data = await res.json();
   return (data.files || []) as DriveFile[];
 }
+
+/**
+ * Download a single Drive file's bytes so it can be handed to Claude.
+ *
+ * Google-native files (Docs/Sheets/Slides) have no binary to download, so they
+ * are exported to text/CSV instead. Everything else comes back as-is.
+ *
+ * Falls back to Drive's public download endpoint when the user hasn't
+ * connected Google — enough for a flyer that's already shared by link.
+ */
+export async function fetchDriveFileBytes(
+  userEmail: string | null | undefined,
+  fileId: string,
+): Promise<{ name: string; mimeType: string; bytes: Buffer }> {
+  const token = userEmail ? await getAccessToken(userEmail).catch(() => null) : null;
+
+  if (!token) {
+    // No Google connection — try the public link. Drive serves an HTML consent
+    // page instead of the file when it isn't shared, so reject that explicitly
+    // rather than handing Claude a login page to read.
+    const res = await fetch(`https://drive.google.com/uc?export=download&id=${fileId}`, {
+      headers: { 'User-Agent': 'Mozilla/5.0 (compatible; MNA-Portal)' },
+      redirect: 'follow',
+    });
+    if (!res.ok) throw new Error(`Could not download that Drive file (${res.status}). Connect Google in /schedule, or share the file with "anyone with the link".`);
+    const mimeType = res.headers.get('content-type') || 'application/octet-stream';
+    const bytes = Buffer.from(await res.arrayBuffer());
+    if (/text\/html/i.test(mimeType)) {
+      throw new Error('That Drive file is not shared publicly. Connect Google in /schedule, or set the file to "anyone with the link".');
+    }
+    return { name: fileId, mimeType, bytes };
+  }
+
+  const metaRes = await fetch(
+    `https://www.googleapis.com/drive/v3/files/${fileId}?fields=id,name,mimeType&supportsAllDrives=true`,
+    { headers: { Authorization: `Bearer ${token}` } },
+  );
+  if (!metaRes.ok) {
+    const txt = await metaRes.text().catch(() => '');
+    throw new Error(`Drive file lookup failed (${metaRes.status}): ${txt.slice(0, 200)}`);
+  }
+  const meta = await metaRes.json() as { name: string; mimeType: string };
+
+  // Docs/Sheets/Slides can't be downloaded raw — export them to text.
+  const EXPORT_AS: Record<string, string> = {
+    'application/vnd.google-apps.document': 'text/plain',
+    'application/vnd.google-apps.spreadsheet': 'text/csv',
+    'application/vnd.google-apps.presentation': 'text/plain',
+  };
+  const exportMime = EXPORT_AS[meta.mimeType];
+  const url = exportMime
+    ? `https://www.googleapis.com/drive/v3/files/${fileId}/export?mimeType=${encodeURIComponent(exportMime)}`
+    : `https://www.googleapis.com/drive/v3/files/${fileId}?alt=media&supportsAllDrives=true`;
+
+  const fileRes = await fetch(url, { headers: { Authorization: `Bearer ${token}` } });
+  if (!fileRes.ok) {
+    const txt = await fileRes.text().catch(() => '');
+    throw new Error(`Drive download failed (${fileRes.status}): ${txt.slice(0, 200)}`);
+  }
+  return {
+    name: meta.name,
+    mimeType: exportMime || meta.mimeType,
+    bytes: Buffer.from(await fileRes.arrayBuffer()),
+  };
+}

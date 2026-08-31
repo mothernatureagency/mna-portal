@@ -318,6 +318,12 @@ export default function ContentPage() {
     return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
   });
   const [planSpecials, setPlanSpecials] = useState('');
+  // Reading the specials off a flyer / sheet instead of typing them in.
+  const [specialsDriveUrl, setSpecialsDriveUrl] = useState('');
+  const [readingSpecials, setReadingSpecials] = useState(false);
+  const [specialsSource, setSpecialsSource] = useState<string | null>(null);
+  const [specialsError, setSpecialsError] = useState<string | null>(null);
+  const specialsFileRef = useRef<HTMLInputElement | null>(null);
   const [planPerWeek, setPlanPerWeek] = useState(3);
   const [planDays, setPlanDays] = useState<Set<string>>(new Set());
   const [planResearch, setPlanResearch] = useState(false);
@@ -1073,6 +1079,40 @@ export default function ContentPage() {
     alert(`Done. Created ${totalSent} post${totalSent === 1 ? '' : 's'} across ${targets.length} location${targets.length === 1 ? '' : 's'}.${totalSynced ? ` ${totalSynced} existing cop${totalSynced === 1 ? 'y was' : 'ies were'} refreshed with the current photos.` : ''}${totalSkipped ? ` ${totalSkipped} duplicates were skipped.` : ''}`);
   }
 
+  // Read the month's specials off an uploaded file or a Drive link and drop
+  // the text into the planner box. Always lands in the textarea rather than
+  // planning straight off it — staff read and fix it first.
+  async function readSpecials(input: { file?: File; driveUrl?: string }) {
+    setReadingSpecials(true);
+    setSpecialsError(null);
+    try {
+      let res: Response;
+      if (input.file) {
+        const fd = new FormData();
+        fd.append('file', input.file);
+        res = await fetch('/api/content-calendar/read-specials', { method: 'POST', body: fd });
+      } else {
+        res = await fetch('/api/content-calendar/read-specials', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ driveUrl: input.driveUrl }),
+        });
+      }
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || 'Could not read that file');
+      // Append rather than clobber — a second flyer adds to the first, and
+      // anything already typed survives.
+      setPlanSpecials((prev) => (prev.trim() ? `${prev.trim()}\n\n${data.specials}` : data.specials));
+      setSpecialsSource(data.source || 'file');
+      setSpecialsDriveUrl('');
+    } catch (e: any) {
+      setSpecialsError(e.message || 'Could not read that file');
+    } finally {
+      setReadingSpecials(false);
+      if (specialsFileRef.current) specialsFileRef.current.value = '';
+    }
+  }
+
   // ── Selection ─────────────────────────────────────────────────────
   function toggleSelected(id: string) {
     setSelectedIds((prev) => {
@@ -1476,10 +1516,64 @@ export default function ContentPage() {
               </div>
               <label className="flex flex-col gap-1">
                 <span className="text-[10px] font-bold uppercase tracking-wider text-white/50">Specials &amp; promos this month</span>
+
+                {/* Read them off the owner's flyer/sheet instead of retyping */}
+                <div className="flex items-center gap-2 flex-wrap mb-1.5">
+                  <input
+                    ref={specialsFileRef}
+                    type="file"
+                    accept="image/*,application/pdf,.csv,.txt"
+                    className="hidden"
+                    onChange={(e) => { const f = e.target.files?.[0]; if (f) readSpecials({ file: f }); }}
+                  />
+                  <button
+                    type="button"
+                    onClick={() => specialsFileRef.current?.click()}
+                    disabled={readingSpecials}
+                    className="text-[11px] font-semibold px-3 py-1.5 rounded-lg bg-white/5 border border-white/15 text-white/70 hover:bg-white/10 disabled:opacity-40 inline-flex items-center gap-1.5"
+                  >
+                    <span className="material-symbols-outlined" style={{ fontSize: 15 }}>upload_file</span>
+                    Upload flyer or sheet
+                  </button>
+                  <span className="text-white/25 text-[11px]">or</span>
+                  <input
+                    value={specialsDriveUrl}
+                    onChange={(e) => setSpecialsDriveUrl(e.target.value)}
+                    onKeyDown={(e) => { if (e.key === 'Enter' && specialsDriveUrl.trim() && !readingSpecials) { e.preventDefault(); readSpecials({ driveUrl: specialsDriveUrl.trim() }); } }}
+                    disabled={readingSpecials}
+                    placeholder="paste a Google Drive link…"
+                    className="flex-1 min-w-[200px] text-[11px] px-3 py-1.5 rounded-lg bg-white/5 border border-white/15 text-white outline-none placeholder:text-white/25 disabled:opacity-40"
+                  />
+                  <button
+                    type="button"
+                    onClick={() => readSpecials({ driveUrl: specialsDriveUrl.trim() })}
+                    disabled={readingSpecials || !specialsDriveUrl.trim()}
+                    className="text-[11px] font-semibold px-3 py-1.5 rounded-lg bg-white/10 border border-white/20 text-white hover:bg-white/15 disabled:opacity-40"
+                  >
+                    Read
+                  </button>
+                  {readingSpecials && (
+                    <span className="text-[11px] text-cyan-300 inline-flex items-center gap-1.5">
+                      <span className="material-symbols-outlined animate-spin" style={{ fontSize: 14 }}>progress_activity</span>
+                      Reading…
+                    </span>
+                  )}
+                </div>
+                {specialsError && (
+                  <div className="text-[11px] text-rose-300 bg-rose-500/10 border border-rose-500/25 rounded-lg px-3 py-1.5 mb-1.5">
+                    {specialsError}
+                  </div>
+                )}
+                {specialsSource && !specialsError && (
+                  <div className="text-[11px] text-emerald-300/90 bg-emerald-500/10 border border-emerald-500/25 rounded-lg px-3 py-1.5 mb-1.5">
+                    Read from <span className="font-semibold">{specialsSource}</span> — check it below before planning.
+                  </div>
+                )}
+
                 <textarea
                   value={planSpecials}
                   onChange={(e) => setPlanSpecials(e.target.value)}
-                  rows={3}
+                  rows={planSpecials ? 8 : 3}
                   placeholder={'e.g. 20% off NAD+ drips all month · Buy 2 get 1 free memberships week of the 15th · Mother’s Day gift cards'}
                   className="w-full text-[12px] px-3 py-2 rounded-xl bg-white/5 border border-white/15 text-white outline-none placeholder:text-white/25 leading-relaxed"
                 />
