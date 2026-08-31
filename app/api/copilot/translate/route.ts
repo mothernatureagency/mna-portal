@@ -61,7 +61,7 @@ export async function POST(req: NextRequest) {
   const client = new Anthropic({ apiKey });
   try {
     const res = await client.messages.create({
-      model: 'claude-haiku-4-5-20251001',
+      model: 'claude-haiku-4-5',
       max_tokens: 500,
       system: systemWithContext,
       messages: [{ role: 'user', content: `Live snippet:\n"""\n${recent}\n"""` }],

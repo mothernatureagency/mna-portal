@@ -89,7 +89,7 @@ export async function POST(req: NextRequest) {
 
   try {
     const res = await client.messages.create({
-      model: 'claude-haiku-4-5-20251001',
+      model: 'claude-haiku-4-5',
       max_tokens: 400,
       // Cache control on the system block would help latency, but the
       // pinned @anthropic-ai/sdk version doesn't surface cache_control in

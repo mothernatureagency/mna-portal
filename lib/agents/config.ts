@@ -22,7 +22,11 @@ export type AgentConfig = {
   model: string;
 };
 
-const SONNET = 'claude-sonnet-4-5';
+// Model tiers. OPUS for work whose output goes out under a client's name or
+// needs real judgment; SONNET for everyday generation; HAIKU for cheap,
+// mechanical summarising where quality barely moves the result.
+const OPUS = 'claude-opus-5';
+const SONNET = 'claude-sonnet-5';
 const HAIKU = 'claude-haiku-4-5';
 
 export const AGENTS: AgentConfig[] = [
@@ -92,7 +96,7 @@ export const AGENTS: AgentConfig[] = [
       'Plan 4 weeks of content around a summer hydration promo',
       'What content should I post the week of a grand opening?',
     ],
-    model: HAIKU,
+    model: SONNET,
   },
   {
     id: 'social-media',
@@ -109,7 +113,7 @@ export const AGENTS: AgentConfig[] = [
       'Draft a DM response to "how much does this cost?"',
       'How should I reply to a negative comment on Instagram?',
     ],
-    model: HAIKU,
+    model: OPUS,
   },
   {
     id: 'email-sms',
@@ -126,7 +130,7 @@ export const AGENTS: AgentConfig[] = [
       'Draft 2 SMS options for a flash sale on Myers Cocktail IVs',
       'Write a re-engagement email for leads who haven\'t booked in 60 days',
     ],
-    model: HAIKU,
+    model: SONNET,
   },
   {
     id: 'video-editor',
@@ -177,7 +181,7 @@ export const AGENTS: AgentConfig[] = [
       'Build me a 2-week sprint plan for launching a TikTok account',
       'What should my daily standup agenda look like?',
     ],
-    model: SONNET,
+    model: OPUS,
   },
   {
     id: 'ceo',
@@ -194,7 +198,7 @@ export const AGENTS: AgentConfig[] = [
       'A client wants more leads but budget is flat - what do I do?',
       'Route this: "we need 20 new TikTok hooks for Prime IV"',
     ],
-    model: SONNET,
+    model: OPUS,
   },
 ];
 

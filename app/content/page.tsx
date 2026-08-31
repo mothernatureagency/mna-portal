@@ -2813,8 +2813,22 @@ export default function ContentPage() {
                       <div className="rounded-t-2xl overflow-hidden">{gallery}</div>
                     )
                   )}
+                  {isStaff && editingPhoto[activeItem.id] && (
+                    <div className="px-6 pt-4 -mb-1 flex gap-2">
+                      <input
+                        value={photoDraft[activeItem.id] ?? ''}
+                        onChange={(e) => setPhotoDraft((d) => ({ ...d, [activeItem.id]: e.target.value }))}
+                        onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); savePhoto(activeItem.id); } }}
+                        autoFocus
+                        placeholder="Paste an image URL or Google Drive share link"
+                        className="flex-1 text-[11px] rounded-lg bg-white/5 border border-white/10 p-2 text-white placeholder:text-white/30"
+                      />
+                      <button onClick={() => savePhoto(activeItem.id)} className="rounded-lg px-3 py-1 text-[11px] font-semibold bg-emerald-500/80 text-white">Add</button>
+                      <button onClick={() => setEditingPhoto((e) => ({ ...e, [activeItem.id]: false }))} className="rounded-lg px-3 py-1 text-[11px] font-semibold bg-white/10 text-white/80">Cancel</button>
+                    </div>
+                  )}
                   {isStaff && (
-                    <div className="px-6 pt-4 -mb-1 flex items-center gap-3">
+                    <div className="px-6 pt-4 -mb-1 flex items-center gap-3 flex-wrap">
                       <button
                         onClick={() => openDrivePicker(activeItem.id)}
                         className="text-[11px] font-semibold text-white/70 hover:text-white inline-flex items-center gap-1 px-2.5 py-1.5 rounded-lg bg-white/5 border border-white/10 hover:bg-white/10"
@@ -2823,6 +2837,22 @@ export default function ContentPage() {
                         <span className="material-symbols-outlined" style={{ fontSize: 14 }}>folder_open</span>
                         Pick from Drive
                       </button>
+                      <button
+                        onClick={() => {
+                          setPhotoDraft((d) => ({ ...d, [activeItem.id]: '' }));
+                          setEditingPhoto((e) => ({ ...e, [activeItem.id]: true }));
+                        }}
+                        className="text-[11px] font-semibold text-white/70 hover:text-white inline-flex items-center gap-1 px-2.5 py-1.5 rounded-lg bg-white/5 border border-white/10 hover:bg-white/10"
+                      >
+                        <span className="material-symbols-outlined" style={{ fontSize: 14 }}>link</span>
+                        {photos.length > 0 ? 'Add link' : 'Paste link'}
+                      </button>
+                      {mirroring[activeItem.id] && (
+                        <span className="text-[10px] text-cyan-300 inline-flex items-center gap-1">
+                          <span className="material-symbols-outlined animate-spin" style={{ fontSize: 12 }}>progress_activity</span>
+                          Copying from Drive so it will post…
+                        </span>
+                      )}
                       {photos.length > 1 && (
                         <span className="text-[10px] text-white/35 inline-flex items-center gap-1">
                           <span className="material-symbols-outlined" style={{ fontSize: 12 }}>photo_library</span>

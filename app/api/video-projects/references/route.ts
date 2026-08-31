@@ -41,7 +41,7 @@ If you don't recognize the URL, INFER from the domain (e.g. viralvacations.com =
 No markdown, no extra text outside the JSON.`;
   try {
     const res = await client.messages.create({
-      model: 'claude-sonnet-4-5',
+      model: 'claude-sonnet-5',
       max_tokens: 900,
       messages: [{ role: 'user', content: prompt }],
     });

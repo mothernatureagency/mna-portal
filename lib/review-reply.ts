@@ -34,7 +34,7 @@ export async function draftReplies(businessName: string, reviews: ReviewForDraft
 
   const client = new Anthropic({ apiKey });
   const res = await client.messages.create({
-    model: 'claude-haiku-4-5-20251001',
+    model: 'claude-haiku-4-5',
     max_tokens: 1600,
     system: REVIEW_REPLY_SYSTEM,
     messages: [{ role: 'user', content: `Business: ${businessName || 'our business'}\n\nReviews:\n${list}` }],

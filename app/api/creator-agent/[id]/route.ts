@@ -19,7 +19,7 @@ export async function POST(req: NextRequest, { params }: { params: { id: string 
   const client = new Anthropic({ apiKey });
   try {
     const res = await client.messages.create({
-      model: 'claude-sonnet-4-5',
+      model: 'claude-sonnet-5',
       max_tokens: 1024,
       system: agent.systemPrompt,
       messages: messages.map((m: any) => ({

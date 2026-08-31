@@ -110,7 +110,7 @@ Rules:
   let parsed: any[] = [];
   try {
     const res = await client.messages.create({
-      model: 'claude-sonnet-4-5',
+      model: 'claude-sonnet-5',
       max_tokens: 2400,
       messages: [{ role: 'user', content: prompt }],
     });

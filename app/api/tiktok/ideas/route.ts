@@ -56,7 +56,7 @@ Return 5-7 contentIdeas. No commentary outside the JSON. No markdown inside stri
 
   try {
     const res = await client.messages.create({
-      model: 'claude-sonnet-4-5',
+      model: 'claude-sonnet-5',
       max_tokens: 1800,
       messages: [{ role: 'user', content: prompt }],
     });

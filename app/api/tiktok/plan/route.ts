@@ -99,7 +99,7 @@ Rules:
 
   try {
     const res = await client.messages.create({
-      model: 'claude-sonnet-4-5',
+      model: 'claude-sonnet-5',
       max_tokens: 8000,
       messages: [{ role: 'user', content: prompt }],
     });
