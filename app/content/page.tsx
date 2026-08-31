@@ -2,7 +2,7 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { useClient } from '@/context/ClientContext';
 import { createClient } from '@/lib/supabase/client';
-import { driveThumbnailUrl, previewSrc, photoOpenUrl, photosOf, isVideoUrl } from '@/lib/drive';
+import { driveThumbnailUrl, previewSrc, photoOpenUrl, photosOf, isVideoUrl, isDriveUrl } from '@/lib/drive';
 import { extractFolderId, type DriveFile } from '@/lib/google-drive-shared';
 import { KNOWN_MERGE_FIELDS, tokenizeWithVars } from '@/lib/merge-vars';
 
@@ -251,6 +251,9 @@ export default function ContentPage() {
   const [commentDraft, setCommentDraft] = useState<Record<string, string>>({});
   const [approvalFilter, setApprovalFilter] = useState<'all' | ApprovalStatus>('all');
   const [photoDraft, setPhotoDraft] = useState<Record<string, string>>({});
+  // Mirroring Drive files into storage so they'll actually publish.
+  const [mirroring, setMirroring] = useState<Record<string, boolean>>({});
+  const [mirrorError, setMirrorError] = useState<Record<string, string>>({});
   const [editingPhoto, setEditingPhoto] = useState<Record<string, boolean>>({});
   const [uploadingId, setUploadingId] = useState<string | null>(null);
   const [publishing, setPublishing] = useState<string | null>(null);
@@ -371,14 +374,65 @@ export default function ContentPage() {
     await patchItem(id, { photo_urls: urls, photo_drive_url: urls[0] || null });
   }
 
+  // Copy a Drive file into public storage so the post can actually publish
+  // with it. Drive links preview but publishers can't fetch them, so every
+  // Drive link gets mirrored the moment it's attached rather than failing
+  // silently weeks later at post time.
+  async function mirrorDriveUrl(postId: string, driveUrl: string): Promise<string | null> {
+    try {
+      const res = await fetch('/api/content-calendar/mirror-drive', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ driveUrl, postId }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || 'Could not copy that file from Drive');
+      return data.url as string;
+    } catch (e: any) {
+      setMirrorError((m) => ({ ...m, [postId]: e.message || 'Could not copy that file from Drive' }));
+      return null;
+    }
+  }
+
+  // Attach a URL, mirroring it first when it's a Drive link. Falls back to
+  // storing the Drive link if the copy fails, so the preview still works and
+  // the post carries a visible "won't publish" warning.
+  async function attachPhotoUrl(postId: string, url: string) {
+    const item = items.find((i) => i.id === postId);
+    const existing = item ? photosOf(item) : [];
+    if (!isDriveUrl(url)) {
+      await savePhotos(postId, [...existing, url]);
+      return;
+    }
+    setMirroring((m) => ({ ...m, [postId]: true }));
+    setMirrorError((m) => ({ ...m, [postId]: '' }));
+    try {
+      await savePhotos(postId, [...existing, url]);
+      const mirrored = await mirrorDriveUrl(postId, url);
+      // mirror-drive rewrites the row itself, so pull the truth back.
+      if (mirrored) await reloadItems();
+    } finally {
+      setMirroring((m) => ({ ...m, [postId]: false }));
+    }
+  }
+
+  // Repair a post already carrying a Drive link.
+  async function makePostable(postId: string, driveUrl: string) {
+    setMirroring((m) => ({ ...m, [postId]: true }));
+    setMirrorError((m) => ({ ...m, [postId]: '' }));
+    try {
+      const url = await mirrorDriveUrl(postId, driveUrl);
+      if (url) await reloadItems();
+    } finally {
+      setMirroring((m) => ({ ...m, [postId]: false }));
+    }
+  }
+
   // "Paste link" — appends the pasted URL to the post's photo list.
   async function savePhoto(id: string) {
     const url = photoDraft[id]?.trim() || '';
     try {
-      if (url) {
-        const item = items.find((i) => i.id === id);
-        await savePhotos(id, [...(item ? photosOf(item) : []), url]);
-      }
+      if (url) await attachPhotoUrl(id, url);
       setPhotoDraft((d) => ({ ...d, [id]: '' }));
       setEditingPhoto((e) => ({ ...e, [id]: false }));
     } catch (e: any) { alert(e.message); }
@@ -790,9 +844,8 @@ export default function ContentPage() {
     if (file.mimeType === 'application/vnd.google-apps.folder') { enterPickerFolder(file); return; }
     const url = file.webViewLink || `https://drive.google.com/file/d/${file.id}/view`;
     try {
-      const item = items.find((i) => i.id === postId);
-      await savePhotos(postId, [...(item ? photosOf(item) : []), url]);
       setPickerForId(null);
+      await attachPhotoUrl(postId, url);
     } catch (e: any) { alert(e.message); }
   }
 
@@ -2690,11 +2743,36 @@ export default function ContentPage() {
               const astyle = APPROVAL_STYLES[status];
               const photos = photosOf(activeItem);
               const driveLink = photoOpenUrl(photos[0]);
+              // Drive links preview but won't publish — surface that here,
+              // where the photo is, rather than letting the post fail later.
+              const stuckPhotos = photos.filter(isDriveUrl);
               const gallery = photos.length > 0 && (
                 <>
                   <a href={driveLink || undefined} target="_blank" rel="noreferrer" className="block bg-black">
                     <DriveThumb url={photos[0]} className="w-full max-h-80 object-contain" />
                   </a>
+                  {isStaff && stuckPhotos.length > 0 && (
+                    <div className="px-3 py-2.5 text-[11px] flex items-center gap-2 flex-wrap"
+                         style={{ background: 'rgba(245,158,11,0.12)', borderTop: '1px solid rgba(245,158,11,0.3)' }}>
+                      <span className="material-symbols-outlined" style={{ fontSize: 15, color: '#fbbf24' }}>warning</span>
+                      <span className="text-amber-100/90 flex-1 min-w-[200px]">
+                        {stuckPhotos.length === photos.length ? 'This photo is' : `${stuckPhotos.length} of these are`} a Google Drive link
+                        — it previews here, but the post would go out with no image.
+                      </span>
+                      <button
+                        type="button"
+                        onClick={() => makePostable(activeItem.id, stuckPhotos[0])}
+                        disabled={!!mirroring[activeItem.id]}
+                        className="text-[11px] font-bold px-3 py-1.5 rounded-lg text-amber-950 disabled:opacity-50"
+                        style={{ background: 'linear-gradient(135deg,#fbbf24,#fcd34d)' }}
+                      >
+                        {mirroring[activeItem.id] ? 'Copying…' : 'Make postable'}
+                      </button>
+                      {mirrorError[activeItem.id] && (
+                        <div className="w-full text-rose-300">{mirrorError[activeItem.id]}</div>
+                      )}
+                    </div>
+                  )}
                   {photos.length > 1 && (
                     <div className="flex gap-1.5 p-2 bg-black/60 overflow-x-auto">
                       {photos.map((u, idx) => (

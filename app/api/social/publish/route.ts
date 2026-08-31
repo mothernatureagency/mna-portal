@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { ensureSchema, query } from '@/lib/db';
 import { createClient } from '@/lib/supabase/server';
 import { clients as staticClients } from '@/lib/clients';
-import { postformePublish, platformsFor, platformBase, mediaForPost, isVideoUrl, isVideoOnlyPlatform } from '@/lib/postforme';
+import { postformePublish, platformsFor, platformBase, mediaForPost, unpublishableMediaOn, isVideoUrl, isVideoOnlyPlatform } from '@/lib/postforme';
 import { applyMergeVars, effectiveVars, deriveLocation } from '@/lib/merge-vars';
 
 export const runtime = 'nodejs';
@@ -54,6 +54,16 @@ export async function POST(req: NextRequest) {
   if (platforms.length === 0) return NextResponse.json({ error: `No connected platform for "${post.platform}".` }, { status: 400 });
 
   const media = mediaForPost(post);
+
+  // A photo is attached but it's a Drive link, which the publisher can't
+  // fetch. Publishing now would silently send the caption on its own, so stop
+  // and point at the one-click fix instead.
+  const stuck = unpublishableMediaOn(post);
+  if (media.length === 0 && stuck.length > 0) {
+    return NextResponse.json({
+      error: `This post's photo is a Google Drive link, which can't be published — the post would go out with no image. Open the post and hit "Make postable" to copy it across, then publish.`,
+    }, { status: 400 });
+  }
   if (platforms.includes('instagram') && media.length === 0) {
     return NextResponse.json({ error: 'Instagram needs an image/video. Upload one to this post (a Drive link won\'t work), then publish.' }, { status: 400 });
   }

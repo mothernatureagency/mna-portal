@@ -81,3 +81,14 @@ export function isVideoUrl(src: string | null | undefined): boolean {
   if (!t) return false;
   return /\.(mp4|mov|m4v|webm|avi|mkv)(\?|$)/i.test(t) || /-video\./i.test(t);
 }
+
+/**
+ * True for Google Drive / Docs share links.
+ *
+ * These preview through Drive's thumbnail endpoint but social publishers
+ * can't fetch media from them, so a post carrying one has to have it mirrored
+ * into public storage before it can go out with its photo.
+ */
+export function isDriveUrl(url: string | null | undefined): boolean {
+  return /drive\.google\.com|docs\.google\.com/i.test((url || '').trim());
+}

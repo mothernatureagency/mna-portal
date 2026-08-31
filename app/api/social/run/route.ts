@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { ensureSchema, query } from '@/lib/db';
 import { clients as staticClients } from '@/lib/clients';
-import { postformePublish, postformeRawAccounts, platformsFor, platformBase, mediaForPost, isVideoUrl, isVideoOnlyPlatform } from '@/lib/postforme';
+import { postformePublish, postformeRawAccounts, platformsFor, platformBase, mediaForPost, isVideoUrl, isVideoOnlyPlatform, unpublishableMediaOn } from '@/lib/postforme';
 import { clientTimezone, slotTimeUtc } from '@/lib/social-schedule';
 import { applyMergeVars, effectiveVars, deriveLocation, type MergeVars } from '@/lib/merge-vars';
 
@@ -119,6 +119,19 @@ export async function GET(req: NextRequest) {
   for (const post of due) {
     const platforms = platformsFor(post.platform);
     const media = mediaForPost(post);
+
+    // Never auto-post a caption whose photo got dropped. A Drive link looks
+    // fine in the calendar and publishes as nothing, so hold the post and
+    // leave the reason where staff will see it.
+    const stuck = unpublishableMediaOn(post);
+    if (media.length === 0 && stuck.length > 0) {
+      await query(
+        `update content_calendar set publish_status = 'failed', publish_error = $1 where id = $2`,
+        ['Photo is a Google Drive link — publishers can\'t fetch it. Open the post and hit "Make postable", then it will go out.', post.id],
+      );
+      failed++;
+      continue;
+    }
     if (platforms.length === 0 || (platforms.includes('instagram') && media.length === 0)) { skipped++; continue; }
     // TikTok / YouTube need a video — skip if there isn't one.
     if (platforms.some(isVideoOnlyPlatform) && !media.some(isVideoUrl)) { skipped++; continue; }

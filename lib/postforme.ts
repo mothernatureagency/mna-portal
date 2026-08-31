@@ -61,14 +61,31 @@ export function mediaFor(url: string | null): string[] {
   return [u];
 }
 
+// Everything attached to a post, publishable or not.
+export function allMediaOn(post: { photo_urls?: unknown; photo_drive_url?: string | null }): string[] {
+  const list = Array.isArray(post.photo_urls) && post.photo_urls.length > 0
+    ? post.photo_urls.filter((u): u is string => typeof u === 'string')
+    : [post.photo_drive_url || null];
+  return list.filter((u): u is string => !!u && u.trim().length > 0);
+}
+
 // Every publishable media URL on a post — the multi-photo list when present
 // (posted as a carousel where the platform supports it), else the legacy
 // single-photo column. Unusable URLs (Drive share links) are filtered out.
 export function mediaForPost(post: { photo_urls?: unknown; photo_drive_url?: string | null }): string[] {
-  const list = Array.isArray(post.photo_urls) && post.photo_urls.length > 0
-    ? post.photo_urls.filter((u): u is string => typeof u === 'string')
-    : [post.photo_drive_url || null];
-  return list.flatMap((u) => mediaFor(u));
+  return allMediaOn(post).flatMap((u) => mediaFor(u));
+}
+
+/**
+ * Media that's on the post but can't be published — in practice, Drive share
+ * links, which preview happily and then publish as nothing.
+ *
+ * Callers must treat a non-empty result as a hard stop. Posting the caption
+ * without the photo the staff member attached is worse than not posting: it
+ * looks like it worked, and the post is already out.
+ */
+export function unpublishableMediaOn(post: { photo_urls?: unknown; photo_drive_url?: string | null }): string[] {
+  return allMediaOn(post).filter((u) => mediaFor(u).length === 0);
 }
 
 // Is this media URL a video? (uploaded videos are named "…-video.<ext>")
