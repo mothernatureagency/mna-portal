@@ -97,6 +97,11 @@ async function initSchema() {
                         completed_at timestamptz
                   )`,
                   `alter table client_requests add column if not exists assigned_to text`,
+                  // Set when a task was raised from a content post ("this one
+                  // needs a graphic"). Lets the tracker show which posts are
+                  // waiting on art, and close the task once one is attached.
+                  `alter table client_requests add column if not exists content_item_id uuid`,
+                  `create index if not exists client_requests_content_item_idx on client_requests (content_item_id) where content_item_id is not null`,
                   // Per-client key/value blobs for things that don't justify their own
                   // schema: manual lead source splits, QA notes, override targets, etc.
                   // client_id = lib/clients.ts id, key = semantic name, value = jsonb.

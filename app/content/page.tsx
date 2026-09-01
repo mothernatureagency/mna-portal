@@ -120,7 +120,21 @@ type ContentItem = {
   published_at?: string | null;
   publish_error?: string | null;
   scheduled_for?: string | null;
+  // Newest open "needs a graphic" task raised against this post, joined in by
+  // the content-calendar GET. Null once art is attached (the task auto-closes).
+  graphic_request_id?: string | null;
+  graphic_request_note?: string | null;
+  graphic_requested_at?: string | null;
 };
+
+// A post is waiting on art when someone asked for a graphic and none has landed.
+function needsGraphic(i: ContentItem): boolean {
+  return !!i.graphic_request_id;
+}
+
+function hasArt(i: ContentItem): boolean {
+  return !!i.photo_drive_url || !!(i.photo_urls && i.photo_urls.length > 0);
+}
 
 // Portal roles that get the read-only Content Tracker (approve / request
 // changes, but no editing). Everyone else on the team can edit.
@@ -291,6 +305,11 @@ export default function ContentPage() {
   // can't silently retarget a client's auto-posting. Opens itself when nothing
   // is ticked yet (i.e. this location still needs setting up).
   const [showAccounts, setShowAccounts] = useState(false);
+  // Graphic requests: which post's composer is open, and what's typed in it.
+  const [graphicFor, setGraphicFor] = useState<string | null>(null);
+  const [graphicNote, setGraphicNote] = useState('');
+  const [graphicBusy, setGraphicBusy] = useState(false);
+  const [briefBusy, setBriefBusy] = useState(false);
   const [viewMode, setViewMode] = useState<'cards' | 'calendar'>('calendar');
   const [activeId, setActiveId] = useState<string | null>(null);
   // When crossing over from the calendar to cards view, scroll to this card
@@ -629,6 +648,59 @@ export default function ContentPage() {
   // so it stays the primary row.
   function platformsForPost(item: ContentItem): string[] {
     return Array.from(new Set([item.platform, ...siblingsOf(item).map((it) => it.platform)]));
+  }
+
+  // ── Graphic requests ─────────────────────────────────────────────
+  function openGraphicComposer(item: ContentItem) {
+    setGraphicFor(item.id);
+    // Re-opening an existing request shows what was asked for, so a follow-up
+    // edits the note instead of silently starting from blank.
+    setGraphicNote(item.graphic_request_note?.split('\nNotes:\n')[1] || '');
+  }
+
+  async function sendGraphicRequest(id: string) {
+    setGraphicBusy(true);
+    try {
+      const res = await fetch(`/api/content-calendar/${id}/request-graphic`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ note: graphicNote }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || 'Could not raise the request');
+      setGraphicFor(null);
+      setGraphicNote('');
+      await reloadItems();
+    } catch (e: any) { alert(e.message); }
+    finally { setGraphicBusy(false); }
+  }
+
+  async function cancelGraphicRequest(id: string) {
+    if (!confirm('Cancel the graphic request for this post?')) return;
+    setGraphicBusy(true);
+    try {
+      const res = await fetch(`/api/content-calendar/${id}/request-graphic`, { method: 'DELETE' });
+      if (!res.ok) throw new Error('Could not cancel the request');
+      await reloadItems();
+    } catch (e: any) { alert(e.message); }
+    finally { setGraphicBusy(false); }
+  }
+
+  // Optional: let the Graphic Designer agent draft the spec into the note box.
+  // It writes the brief, not the artwork — the note stays editable before send.
+  async function draftGraphicBrief(id: string) {
+    setBriefBusy(true);
+    try {
+      const res = await fetch(`/api/content-calendar/${id}/graphic-brief`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ note: graphicNote }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || 'Could not draft the brief');
+      setGraphicNote(data.brief || '');
+    } catch (e: any) { alert(e.message); }
+    finally { setBriefBusy(false); }
   }
 
   async function reloadItems() {
@@ -1345,7 +1417,11 @@ export default function ContentPage() {
     const s = (i.client_approval_status || 'pending_review') as ApprovalStatus;
     if (byApproval[s] !== undefined) byApproval[s]++;
   });
-  const platformFiltered = filter === 'all' ? items : items.filter((i) => i.platform === filter);
+  const awaitingArt = items.filter(needsGraphic);
+  const platformFiltered =
+    filter === 'all' ? items
+    : filter === '__needs_graphic__' ? awaitingArt
+    : items.filter((i) => i.platform === filter);
   const filtered = approvalFilter === 'all'
     ? platformFiltered
     : platformFiltered.filter((i) => !isPdmItem(i) && (i.client_approval_status || 'pending_review') === approvalFilter);
@@ -2527,6 +2603,15 @@ export default function ContentPage() {
             {p} ({items.filter((i) => i.platform === p).length})
           </button>
         ))}
+        {awaitingArt.length > 0 && (
+          <button
+            onClick={() => setFilter(filter === '__needs_graphic__' ? 'all' : '__needs_graphic__')}
+            title="Posts with an open graphic request"
+            className={`px-4 py-2 rounded-xl text-sm font-semibold border ${filter === '__needs_graphic__' ? 'bg-amber-500/25 text-amber-100 border-amber-400/50' : 'bg-amber-500/10 text-amber-300/80 border-amber-400/20'}`}
+          >
+            🎨 Needs graphic ({awaitingArt.length})
+          </button>
+        )}
         <div className="ml-auto flex items-center gap-2">
           <button
             onClick={() => setSortAsc((v) => !v)}
@@ -3052,6 +3137,81 @@ export default function ContentPage() {
                         )}
                       </div>
                     )}
+                    {isStaff && (
+                      <div className="rounded-lg p-3" style={{ background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.08)' }}>
+                        <div className="flex items-center justify-between gap-2 mb-1.5">
+                          <span className="text-[10px] font-bold uppercase tracking-wider text-white/40">Artwork</span>
+                          {needsGraphic(activeItem) ? (
+                            <span className="text-[9px] font-bold px-2 py-0.5 rounded-full bg-amber-500/20 text-amber-300">🎨 Graphic requested</span>
+                          ) : hasArt(activeItem) ? (
+                            <span className="text-[9px] font-bold px-2 py-0.5 rounded-full bg-emerald-500/20 text-emerald-300">✓ Has art</span>
+                          ) : (
+                            <span className="text-[9px] font-bold px-2 py-0.5 rounded-full bg-white/10 text-white/50">No art yet</span>
+                          )}
+                        </div>
+                        {graphicFor === activeItem.id ? (
+                          <div className="flex flex-col gap-2">
+                            <textarea
+                              value={graphicNote}
+                              onChange={(e) => setGraphicNote(e.target.value)}
+                              rows={briefBusy || graphicNote.length > 200 ? 8 : 3}
+                              placeholder="What do you need? e.g. before/after split, hero shot of the drip bar, use the autumn palette…"
+                              className="w-full text-[12px] px-3 py-2 rounded-lg bg-white/5 border border-white/15 text-white outline-none placeholder:text-white/30"
+                            />
+                            <div className="flex items-center gap-2 flex-wrap">
+                              <button
+                                onClick={() => sendGraphicRequest(activeItem.id)}
+                                disabled={graphicBusy || briefBusy}
+                                className="text-[11px] font-bold px-3 py-1.5 rounded-lg text-white disabled:opacity-50"
+                                style={{ background: 'linear-gradient(135deg,#0c6da4,#4ab8ce)' }}
+                              >
+                                {graphicBusy ? 'Sending…' : needsGraphic(activeItem) ? 'Update request' : 'Send request'}
+                              </button>
+                              <button
+                                onClick={() => draftGraphicBrief(activeItem.id)}
+                                disabled={briefBusy || graphicBusy}
+                                title="Let the Graphic Designer agent draft the spec — it writes the brief, not the artwork"
+                                className="text-[11px] font-semibold px-3 py-1.5 rounded-lg bg-white/10 text-white/80 hover:text-white disabled:opacity-50 inline-flex items-center gap-1"
+                              >
+                                <span className="material-symbols-outlined" style={{ fontSize: 14 }}>auto_awesome</span>
+                                {briefBusy ? 'Drafting…' : 'Draft brief with AI'}
+                              </button>
+                              <button
+                                onClick={() => { setGraphicFor(null); setGraphicNote(''); }}
+                                className="text-[11px] text-white/50 hover:text-white/80 px-2"
+                              >
+                                Cancel
+                              </button>
+                            </div>
+                          </div>
+                        ) : (
+                          <div className="flex items-center gap-2 flex-wrap">
+                            <button
+                              onClick={() => openGraphicComposer(activeItem)}
+                              className="text-[11px] font-bold px-3 py-1.5 rounded-lg text-white inline-flex items-center gap-1"
+                              style={{ background: needsGraphic(activeItem) ? 'rgba(255,255,255,0.12)' : 'linear-gradient(135deg,#0c6da4,#4ab8ce)' }}
+                            >
+                              <span className="material-symbols-outlined" style={{ fontSize: 14 }}>palette</span>
+                              {needsGraphic(activeItem) ? 'Edit request' : 'Request graphic'}
+                            </button>
+                            {needsGraphic(activeItem) && (
+                              <button
+                                onClick={() => cancelGraphicRequest(activeItem.id)}
+                                disabled={graphicBusy}
+                                className="text-[11px] text-white/50 hover:text-rose-300 px-2 disabled:opacity-50"
+                              >
+                                Cancel request
+                              </button>
+                            )}
+                          </div>
+                        )}
+                        {needsGraphic(activeItem) && graphicFor !== activeItem.id && (
+                          <div className="text-[10px] text-white/40 mt-1.5">
+                            In the agenda as a task{activeItem.graphic_requested_at ? ` since ${fmtDate(activeItem.graphic_requested_at.slice(0, 10))}` : ''}. Closes itself when a photo is attached.
+                          </div>
+                        )}
+                      </div>
+                    )}
                     {isStaff && (!pdm || pdmAutopost) && (
                       <div className="rounded-lg p-3" style={{ background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.08)' }}>
                         <div className="flex items-center justify-between gap-2 mb-1.5">
@@ -3535,6 +3695,14 @@ export default function ContentPage() {
                     </div>
                     <div className="flex items-center gap-2 flex-wrap">
                       <span className="text-xs px-2 py-0.5 rounded-md bg-white/10 text-white/80">{it.platform}</span>
+                      {needsGraphic(it) && (
+                        <span
+                          className="text-xs px-2 py-0.5 rounded-md bg-amber-500/20 text-amber-300"
+                          title="Graphic requested — open in the agenda"
+                        >
+                          🎨 Needs graphic
+                        </span>
+                      )}
                       {it.content_type && <span className="text-xs px-2 py-0.5 rounded-md bg-white/10 text-white/80">{it.content_type}</span>}
                       {pdm ? (
                         <span

@@ -98,6 +98,21 @@ export async function PATCH(req: NextRequest) {
   );
   const updated = rows[0];
 
+  // Art landed on the post → the "needs a graphic" task is done. Closing it
+  // here means the tracker and the agenda can't drift apart, whichever way the
+  // photo got attached (upload, Drive link, cross-post copy).
+  try {
+    const hasArt = !!updated?.photo_drive_url
+      || (Array.isArray(updated?.photo_urls) && updated.photo_urls.length > 0);
+    if (hasArt && (photo_drive_url !== undefined || photo_urls !== undefined)) {
+      await query(
+        `update client_requests set status = 'done', completed_at = now()
+          where content_item_id = $1 and status = 'open'`,
+        [id],
+      );
+    }
+  } catch { /* a stale task must never break the edit that attached the photo */ }
+
   // Fire email notifications for key approval transitions.
   // Wrapped so a notification failure never breaks the PATCH.
   try {
@@ -178,9 +193,23 @@ export async function GET(req: NextRequest) {
   if (!clientName) return NextResponse.json({ items: [] });
   const onlyVisible = req.nextUrl.searchParams.get('visible') === '1';
   const visibleClause = onlyVisible ? ' and cc.client_visible = true' : '';
+  // graphic_request_* comes from the newest open graphic task raised against
+  // each post, so the tracker can flag what's still waiting on art without a
+  // second round trip.
   const { rows } = await query(
-    `select cc.* from content_calendar cc
+    `select cc.*,
+            gr.id   as graphic_request_id,
+            gr.description as graphic_request_note,
+            gr.created_at  as graphic_requested_at
+       from content_calendar cc
        join projects p on p.id = cc.project_id
+       left join lateral (
+            select r.id, r.description, r.created_at
+              from client_requests r
+             where r.content_item_id = cc.id and r.status = 'open'
+             order by r.created_at desc
+             limit 1
+       ) gr on true
       where p.client_name = $1${visibleClause}
       order by cc.post_date asc, cc.created_at asc`,
     [clientName]
