@@ -3273,7 +3273,12 @@ export default function ContentPage() {
                             ↩ Reset to pending
                           </button>
                         )}
-                        {status === 'pending_review' && (
+                        {/* Approve from any state that isn't already approved.
+                            This used to require pending_review, which meant a
+                            post still in 'drafting' had no Approve button at
+                            all — staff couldn't sign off their own work
+                            without first pushing it to the client for review. */}
+                        {status !== 'approved' && (
                           <button
                             onClick={async () => { await patchItem(activeItem.id, { client_approval_status: 'approved' }); }}
                             className="text-[11px] font-bold px-4 py-2 rounded-lg bg-emerald-500/20 text-emerald-200 hover:bg-emerald-500/30"
@@ -3910,8 +3915,11 @@ export default function ContentPage() {
                   </div>
                 )}
 
-                {/* Approval controls — always visible for both staff and client */}
-                {approval !== 'scheduled' && it.caption && (
+                {/* Approval controls — always visible for both staff and client.
+                    The caption gate stays for clients: never ask someone to
+                    approve an empty post. Staff see it regardless, so a post
+                    still being drafted can be signed off internally. */}
+                {approval !== 'scheduled' && (it.caption || isStaff) && (
                   <div className="pt-2 border-t border-white/10 flex flex-col gap-2">
                     <div className="text-[10px] uppercase tracking-wider text-white/50 font-semibold">
                       {isStaff ? 'Client approval' : 'Your approval'}
