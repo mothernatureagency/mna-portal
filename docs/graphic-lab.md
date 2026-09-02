@@ -66,3 +66,40 @@ get normalised to their preview endpoint on the way through.
 - `OPENAI_API_KEY` — **optional**, only for generating photo backgrounds. Without
   it that one button returns a 503 explaining as much and everything else works,
   the same way the Video Lab degrades without HeyGen.
+
+## Brand kits
+
+`/brand-kits` holds the type, colour and rules the lab designs to. Without one
+the designer picks a Google Font fresh each time, so two graphics for the same
+client can come out in different typefaces — the kit turns typography from the
+model's choice into a constraint.
+
+A kit carries: headline and body font (a Google family by name, or an uploaded
+`.woff2`/`.ttf`/`.otf`), a named palette, logo files labelled by when to use
+them, plus free-text brand rules, voice and imagery direction. The rules are the
+part that separates on-brand from merely on-palette — "never put type over the
+logo", "prices always in gold" — and they go into the prompt as hard
+constraints rather than suggestions.
+
+### Groups
+
+The shape of the problem is franchise-shaped. Every Prime IV location shares the
+same wordmark, navy and gold, and headline face; what differs is a phone number
+or a photo of that clinic. So a kit belongs either to one client or to a
+**group** of them, and a client's own kit stores only the fields it actually
+overrides. Resolving a client walks group → client field by field, so a location
+inherits the franchise and departs from it only where it means to. In the
+editor, an inherited value shows as placeholder text until you type over it.
+
+Group membership is explicit where it's set (the picker at the top of a client
+kit) and otherwise derived from the client id — `prime-iv-pinecrest` resolves to
+the `prime-iv` group, since that's already how the codebase encodes the
+relationship. New groups are created by typing a name under the group list.
+
+### Fonts and licensing
+
+Uploaded fonts go in the public media bucket, which serves them with the CORS
+headers `@font-face` and the rasteriser both need. Note that a public bucket
+serving a font file is redistribution: plenty of commercial licences, desktop
+ones especially, don't permit webfont use. Google Fonts and openly-licensed
+faces are safe; check the licence on anything else before uploading it.

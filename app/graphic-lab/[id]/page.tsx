@@ -56,6 +56,9 @@ function sameOriginAssets(html: string): string {
     return `${attr}=${q}${origin}/api/graphic-projects/proxy-image?url=${encodeURIComponent(url)}${q}`;
   }).replace(/url\(\s*(["']?)(https?:\/\/[^)"']+)\1\s*\)/gi, (full, q, url) => {
     if (url.startsWith(origin) || /fonts\.(googleapis|gstatic)\.com/.test(url)) return full;
+    // Font files go direct: our bucket already serves them CORS-open, and the
+    // proxy only passes images.
+    if (/\.(woff2?|ttf|otf|eot)(\?|$)/i.test(url)) return full;
     return `url(${q}${origin}/api/graphic-projects/proxy-image?url=${encodeURIComponent(url)}${q})`;
   });
 }

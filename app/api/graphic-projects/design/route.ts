@@ -4,6 +4,8 @@ import { ensureSchema, query } from '@/lib/db';
 import { getAgent } from '@/lib/agents/config';
 import { getBrand } from '@/lib/client-brand';
 import { getFormat } from '@/lib/graphic-formats';
+import { resolveBrandKit } from '@/lib/brand-kit-server';
+import { fontFamilyCss, fontLoaderCss, type BrandKitFields } from '@/lib/brand-kit';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -31,7 +33,7 @@ export const maxDuration = 300;
 const DESIGN_MODEL = 'claude-opus-5';
 const MAX_VERSIONS = 8;
 
-function artboardContract(width: number, height: number) {
+function artboardContract(width: number, height: number, fontRule: string) {
   return `
 OUTPUT CONTRACT — follow exactly, this is rendered by a machine:
 
@@ -45,16 +47,12 @@ OUTPUT CONTRACT — follow exactly, this is rendered by a machine:
    transform on it. Set body margin:0 and give body the same dimensions.
 3. All styling goes in a single <style> block in <head>. No JavaScript at all
    — a <script> tag will be stripped.
-4. Fonts: you may load ONE Google Fonts stylesheet with a <link rel="stylesheet"
-   href="https://fonts.googleapis.com/css2?...&display=swap"> in <head>. Always
-   write font-family with a real fallback stack after it
-   (e.g. font-family:'Bebas Neue', Impact, system-ui, sans-serif) so the piece
-   still holds up if the webfont is slow.
-5. Imagery: you may only reference image URLs from the ASSETS list below, and
-   you must use the URL verbatim. If there are no assets, build the whole piece
-   out of CSS — gradients, blurred colour blobs, geometric shapes, inline SVG.
-   Never invent an image URL, never link a stock photo, never use an <img> src
-   that is not in ASSETS.
+4. ${fontRule}
+5. Imagery: the only image URLs you may reference are the ones in the ASSETS
+   list and the logo URLs in the BRAND block, and you must use them verbatim.
+   With no assets, build the whole piece out of CSS — gradients, blurred colour
+   blobs, geometric shapes, inline SVG. Never invent an image URL, never link a
+   stock photo, never use an <img> src that appears nowhere in this message.
 6. Do NOT use backdrop-filter, external @import, CSS variables in url(), or
    position:fixed — they do not survive rasterisation. Plain filter, blend
    modes, gradients, box-shadow, transform and inline SVG all rasterise fine.
@@ -68,9 +66,74 @@ DESIGN STANDARD — this goes out under a client's name:
 - Real contrast. Text over imagery needs a scrim, gradient or solid panel
   behind it — never rely on the photo being dark enough.
 - Generous negative space. Crowding is the most common way this looks amateur.
-- Use the brand palette below, not generic blues. Two colours carry the piece;
+- Use the brand palette above, not generic blues. Two colours carry the piece;
   a third is an accent used once.
 - The 3-second test: at thumbnail size, the headline and the offer must survive.`;
+}
+
+/**
+ * The font rule handed to the designer. With a brand kit the typeface stops
+ * being the model's choice and becomes a constraint — which is the whole point
+ * of a kit. Without one it picks a Google Font, as it did before.
+ */
+function fontRuleFor(kit: BrandKitFields): string {
+  const head = kit.headlineFont;
+  const body = kit.bodyFont;
+  if (!head && !body) {
+    return `Fonts: you may load ONE Google Fonts stylesheet with a <link rel="stylesheet"
+   href="https://fonts.googleapis.com/css2?...&display=swap"> in <head>. Always
+   write font-family with a real fallback stack after it
+   (e.g. font-family:'Bebas Neue', Impact, system-ui, sans-serif) so the piece
+   still holds up if the webfont is slow.`;
+  }
+
+  const lines: string[] = [
+    'Fonts are FIXED by the brand kit. Use these and no others — not for accents,',
+    '   not for a pull quote, not "for contrast":',
+  ];
+  const loaders: string[] = [];
+  for (const [role, f] of [['Headings', head], ['Body and small copy', body]] as const) {
+    if (!f) continue;
+    lines.push(`     ${role}: font-family: ${fontFamilyCss(f)}`);
+    const loader = fontLoaderCss(f);
+    if (loader) loaders.push(loader);
+  }
+  if (!head && body) lines.push('     Headings: use the body face at a heavy weight.');
+  if (head && !body) lines.push('     Body: use the heading face at a lighter weight.');
+
+  const links = loaders.filter((l) => l.startsWith('<link'));
+  const faces = loaders.filter((l) => !l.startsWith('<link'));
+  if (links.length) {
+    lines.push('   Load them by putting exactly these in <head>:');
+    links.forEach((l) => lines.push(`     ${l}`));
+  }
+  if (faces.length) {
+    lines.push('   And put exactly these @font-face rules at the top of your <style> block:');
+    faces.forEach((l) => lines.push(`     ${l}`));
+  }
+  return lines.join('\n');
+}
+
+/** The brand kit as prompt text. Empty string when there is no kit at all. */
+function kitBlock(kit: BrandKitFields): string {
+  const out: string[] = [];
+  if (kit.palette?.length) {
+    out.push('  Palette (use these, not approximations):');
+    kit.palette.forEach((c) => out.push(`    ${c.hex} — ${c.label}`));
+  }
+  if (kit.logos?.length) {
+    out.push('  Logo files — pick the one that suits the background, use the URL verbatim:');
+    kit.logos.forEach((l) => out.push(`    ${l.label}: ${l.url}`));
+  }
+  if (kit.imagery?.trim()) out.push(`  Imagery direction: ${kit.imagery.trim()}`);
+  if (kit.voice?.trim()) out.push(`  Voice for any copy you write: ${kit.voice.trim()}`);
+  if (kit.rules?.trim()) {
+    out.push('');
+    out.push('BRAND RULES — these are not suggestions. A piece that breaks one is wrong');
+    out.push('even if it looks good:');
+    kit.rules.trim().split('\n').forEach((r) => { if (r.trim()) out.push(`  - ${r.trim()}`); });
+  }
+  return out.length ? out.join('\n') : '';
 }
 
 export async function POST(req: NextRequest) {
@@ -90,6 +153,8 @@ export async function POST(req: NextRequest) {
   if (!agent) return NextResponse.json({ error: 'Graphic Designer agent missing' }, { status: 500 });
 
   const brand = await getBrand(project.client_id);
+  const kitResolved = await resolveBrandKit(project.client_id);
+  const kit = kitResolved.fields;
   const fmt = getFormat(project.format);
   const assets: Array<{ url: string; label?: string }> = Array.isArray(project.assets) ? project.assets : [];
 
@@ -108,12 +173,18 @@ export async function POST(req: NextRequest) {
     ``,
     `BRAND`,
     `  Business: ${brand.name} · ${brand.industry}`,
-    `  Primary: ${brand.primary}`,
-    `  Secondary: ${brand.secondary}`,
-    `  Accent: ${brand.accent}`,
-    `  Gradient: ${brand.gradientFrom} → ${brand.gradientTo}`,
-    brand.logoUrl ? `  Logo (use it, small, one corner): ${brand.logoUrl}` : `  No logo file — set the name "${brand.logoText}" as a small wordmark instead`,
+    kitResolved.groupKey ? `  Part of the ${kitResolved.groupKey} group — hold to the group's kit below.` : '',
+    // A kit's palette and logos supersede the two hexes on the client record;
+    // fall back to those only where the kit is silent.
+    kit.palette?.length ? '' : `  Primary: ${brand.primary}`,
+    kit.palette?.length ? '' : `  Secondary: ${brand.secondary}`,
+    kit.palette?.length ? '' : `  Accent: ${brand.accent}`,
+    kit.palette?.length ? '' : `  Gradient: ${brand.gradientFrom} → ${brand.gradientTo}`,
+    kit.logos?.length
+      ? ''
+      : brand.logoUrl ? `  Logo (use it, small, one corner): ${brand.logoUrl}` : `  No logo file — set the name "${brand.logoText}" as a small wordmark instead`,
     brand.website ? `  Website to lock up with the CTA: ${brand.website}` : '',
+    kitBlock(kit),
     ``,
     `THE PIECE`,
     `  Working title: ${project.title}`,
@@ -138,7 +209,7 @@ export async function POST(req: NextRequest) {
       ? `\nExtra direction from the team:\n"${instruction}"\n`
       : '';
 
-  const userPrompt = `${parts}${revisionBlock}\n${artboardContract(fmt.width, fmt.height)}`;
+  const userPrompt = `${parts}${revisionBlock}\n${artboardContract(fmt.width, fmt.height, fontRuleFor(kit))}`;
 
   const client = new Anthropic({ apiKey });
   let raw = '';
