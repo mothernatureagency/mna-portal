@@ -224,6 +224,33 @@ async function initSchema() {
                         created_at timestamptz not null default now(),
                         updated_at timestamptz not null default now()
                   )`,
+                  // Graphic Lab projects — static creative MNA is producing
+                  // (IG posts, stories, ad creative, thumbnails). Unlike the
+                  // video lab, the artwork itself is made here: `html` holds
+                  // the generated artboard (a self-contained document rendered
+                  // at exact pixel dimensions), `image_url` the rasterised PNG
+                  // once it's exported to storage. `versions` keeps the earlier
+                  // artboards so a revision that goes the wrong way is undoable.
+                  `create table if not exists graphic_projects (
+                        id uuid primary key default uuid_generate_v4(),
+                        client_id text not null,
+                        title text not null,
+                        format text not null default 'ig-square',
+                        topic text,
+                        brief text,
+                        headline text,
+                        subhead text,
+                        cta text,
+                        assets jsonb default '[]',
+                        html text,
+                        versions jsonb default '[]',
+                        image_url text,
+                        content_item_id uuid,
+                        status text not null default 'drafting',
+                        created_at timestamptz not null default now(),
+                        updated_at timestamptz not null default now()
+                  )`,
+                  `create index if not exists graphic_projects_client_idx on graphic_projects (client_id)`,
                   // Kids' journal entries. owner_email = the kid's email
                   // (marissa@... / kyle@...). author = 'kid' or 'mom'.
                   // shared = none | mom | ai | both — what's allowed to read it.

@@ -132,6 +132,32 @@ function needsGraphic(i: ContentItem): boolean {
   return !!i.graphic_request_id;
 }
 
+// Best-guess canvas for a post, so the Graphic Lab opens on the right size
+// instead of making someone pick it twice.
+function graphicFormatFor(i: ContentItem): string {
+  const t = `${i.content_type || ''} ${i.platform || ''}`.toLowerCase();
+  if (t.includes('story')) return 'story';
+  if (t.includes('reel') || t.includes('tiktok')) return 'story';
+  if (t.includes('carousel')) return 'carousel';
+  if (t.includes('ad')) return 'fb-ad';
+  if (t.includes('youtube')) return 'yt-thumb';
+  return 'ig-portrait';
+}
+
+// Hand the post's details to the Graphic Lab, which makes the artwork and
+// attaches the finished PNG back onto this post.
+function graphicLabHref(i: ContentItem, note?: string): string {
+  const topic = [i.caption || '', note ? `What the team asked for: ${note}` : '']
+    .filter(Boolean).join('\n\n');
+  const q = new URLSearchParams({
+    postId: i.id,
+    title: i.title || `${i.platform} post ${i.post_date}`,
+    format: graphicFormatFor(i),
+  });
+  if (topic) q.set('topic', topic);
+  return `/graphic-lab?${q.toString()}`;
+}
+
 function hasArt(i: ContentItem): boolean {
   return !!i.photo_drive_url || !!(i.photo_urls && i.photo_urls.length > 0);
 }
@@ -3176,6 +3202,15 @@ export default function ContentPage() {
                                 <span className="material-symbols-outlined" style={{ fontSize: 14 }}>auto_awesome</span>
                                 {briefBusy ? 'Drafting…' : 'Draft brief with AI'}
                               </button>
+                              <a
+                                href={graphicLabHref(activeItem, graphicNote)}
+                                title="Take this straight into the Graphic Lab and build the artwork"
+                                className="text-[11px] font-semibold px-3 py-1.5 rounded-lg text-white inline-flex items-center gap-1"
+                                style={{ background: 'linear-gradient(135deg,#7c3aed,#c026d3)' }}
+                              >
+                                <span className="material-symbols-outlined" style={{ fontSize: 14 }}>brush</span>
+                                Make it in Graphic Lab
+                              </a>
                               <button
                                 onClick={() => { setGraphicFor(null); setGraphicNote(''); }}
                                 className="text-[11px] text-white/50 hover:text-white/80 px-2"
@@ -3194,6 +3229,15 @@ export default function ContentPage() {
                               <span className="material-symbols-outlined" style={{ fontSize: 14 }}>palette</span>
                               {needsGraphic(activeItem) ? 'Edit request' : 'Request graphic'}
                             </button>
+                            <a
+                              href={graphicLabHref(activeItem, activeItem.graphic_request_note?.split('\nNotes:\n')[1])}
+                              title="Open the Graphic Lab — the AI builds the artwork and attaches the PNG back to this post"
+                              className="text-[11px] font-bold px-3 py-1.5 rounded-lg text-white inline-flex items-center gap-1"
+                              style={{ background: 'linear-gradient(135deg,#7c3aed,#c026d3)' }}
+                            >
+                              <span className="material-symbols-outlined" style={{ fontSize: 14 }}>brush</span>
+                              Make it
+                            </a>
                             {needsGraphic(activeItem) && (
                               <button
                                 onClick={() => cancelGraphicRequest(activeItem.id)}

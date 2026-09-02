@@ -23,6 +23,7 @@ const NAV = [
     { label: 'LinkedIn', href: '/linkedin', e: 'business_center' },
     { label: 'Content Planner', href: '/planner', e: 'edit_calendar' },
     { label: 'Video Lab', href: '/video-lab', e: 'movie' },
+    { label: 'Graphic Lab', href: '/graphic-lab', e: 'palette' },
   ]},
   { sec: 'EMAIL & SMS', items: [
     { label: 'Campaigns', href: '/campaigns', e: 'forward_to_inbox' },
