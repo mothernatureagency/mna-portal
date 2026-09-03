@@ -63,9 +63,9 @@ get normalised to their preview endpoint on the way through.
 - `ANTHROPIC_API_KEY` — required, same key the rest of the agents use.
 - `SUPABASE_SERVICE_ROLE_KEY` + `SUPABASE_URL` — required to save renders
   (same `content-images` bucket the content tracker uploads to).
-- `OPENAI_API_KEY` — **optional**, only for generating photo backgrounds. Without
-  it that one button returns a 503 explaining as much and everything else works,
-  the same way the Video Lab degrades without HeyGen.
+- `OPENAI_API_KEY` — needed for generated photography. Without it the lab still
+  works from uploaded photos and type-led design, but a brand whose creative
+  depends on faces will feel the gap; see **Photography** below.
 
 ## Brand kits
 
@@ -103,3 +103,56 @@ headers `@font-face` and the rasteriser both need. Note that a public bucket
 serving a font file is redistribution: plenty of commercial licences, desktop
 ones especially, don't permit webfont use. Google Fonts and openly-licensed
 faces are safe; check the licence on anything else before uploading it.
+
+
+## Photography
+
+A wellness brand sells a feeling, and the feeling lives in a face and the light
+on it. Type and gradients make a clean offer graphic; they do not make a spa
+look like a spa. So generated photography is a first-class part of the lab, not
+a nice-to-have.
+
+The generator (`lib/graphic-imagery.ts`) fights the two failure modes that make
+AI imagery read as fake at a glance. Every prompt carries craft notes that ask
+for real skin texture, real catchlights and real depth of field, and explicitly
+rule out the smoothed, waxy, over-retouched look models drift toward. And every
+prompt bans text, logos and signage outright, because all the words on a piece
+are live DOM text on the artboard — nothing on the finished graphic comes back
+misspelled.
+
+Five styles, chosen for this kind of client:
+
+| Style | For |
+| --- | --- |
+| Real face, close | A person, warm and present. Carries a wellness brand. |
+| Surreal + photoreal | Dreamlike setting, entirely photoreal person. |
+| Candid lifestyle | Unposed, documentary rather than advertising. |
+| The space itself | The drip bar, the treatment room, the light. |
+| Texture, no people | Water, silk, botanicals, when type has to carry it. |
+
+Two frames come back per generation and you pick one. Frames of the same brief
+differ mostly in the expression, and the expression is the whole job — choosing
+beats re-rolling until one lands. "Leave room for type" tells the model which
+part of the frame to keep quiet, which is the difference between a photo you
+can design on and one you can only look at.
+
+The brand kit's imagery direction is folded into every generation, so a house
+look set once carries across every graphic for that client or group.
+
+### The artboard leads with the photo
+
+The design contract is explicit that a piece with a photograph in ASSETS is a
+photo with type on it, not a coloured panel with a photo tucked into a corner:
+bleed to at least one edge, never cover a face, earn contrast with a gradient
+scrim rather than a flat box, and keep the photo big enough to read as a
+photograph. A face used too small to tell whether the person is real is a face
+that may as well not be there.
+
+### A note on faces
+
+Generated people are fine as mood and lifestyle imagery. They are not fine
+standing in for a real client, a testimonial, or a before/after result — that
+crosses from styling into a claim about outcomes, which is both a legal problem
+in health-adjacent advertising and the kind of thing that erodes trust when
+noticed. For anything that implies a real person's experience, use a real photo
+with permission.

@@ -68,7 +68,23 @@ DESIGN STANDARD — this goes out under a client's name:
 - Generous negative space. Crowding is the most common way this looks amateur.
 - Use the brand palette above, not generic blues. Two colours carry the piece;
   a third is an accent used once.
-- The 3-second test: at thumbnail size, the headline and the offer must survive.`;
+- The 3-second test: at thumbnail size, the headline and the offer must survive.
+
+WHEN THERE IS A PHOTOGRAPH IN ASSETS, IT LEADS.
+A wellness brand sells a feeling, and the feeling is in the face and the light.
+So a piece with a photo is a photo with type on it, not a coloured panel with a
+photo tucked in a corner:
+- Bleed the photo to at least one full edge. Full-bleed is usually right; a
+  hard-cropped half is the other good answer. A small rounded thumbnail floating
+  in a coloured field is the look of a graphic made by someone who did not
+  trust the photo.
+- Never cover a face. Find the quiet part of the frame and set the type there.
+- Earn the contrast with a gradient scrim over the photo — a soft dark ramp up
+  from the bottom, or a side ramp — rather than a flat box dropped on top.
+- Colour touches the photo through the palette: a subtle duotone, a tinted
+  overlay at low opacity, the accent on one word. Not a border around it.
+- Let the photograph be big enough to read as a photograph. If a viewer cannot
+  tell whether the person is real, it has been used too small.`;
 }
 
 /**

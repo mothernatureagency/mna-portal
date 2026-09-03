@@ -14,6 +14,7 @@ import Link from 'next/link';
 import { useParams } from 'next/navigation';
 import { toPng } from 'html-to-image';
 import { GRAPHIC_FORMATS, getFormat } from '@/lib/graphic-formats';
+import { IMAGERY_STYLES } from '@/lib/graphic-imagery';
 
 type Asset = { url: string; label?: string };
 type Version = { html: string; at: string; note?: string };
@@ -83,6 +84,13 @@ export default function GraphicLabCanvas() {
   const [newAsset, setNewAsset] = useState('');
   const [assetBusy, setAssetBusy] = useState(false);
   const [aiPrompt, setAiPrompt] = useState('');
+  const [aiStyle, setAiStyle] = useState('portrait');
+  const [aiCopySpace, setAiCopySpace] = useState<'top' | 'bottom' | 'left' | 'right' | 'none'>('bottom');
+  // Generated options waiting to be picked. Choosing an expression beats
+  // re-rolling until one happens to land.
+  const [candidates, setCandidates] = useState<{ url: string }[]>([]);
+  // The brand kit's imagery direction, so generated photos match the house look.
+  const [kitImagery, setKitImagery] = useState('');
 
   const frameRef = useRef<HTMLIFrameElement | null>(null);
   const stageRef = useRef<HTMLDivElement | null>(null);
@@ -94,7 +102,16 @@ export default function GraphicLabCanvas() {
   useEffect(() => {
     fetch(`/api/graphic-projects?id=${encodeURIComponent(params.id)}`)
       .then((r) => r.json())
-      .then((d) => { setProject(d.project); setCodeDraft(d.project?.html || ''); })
+      .then((d) => {
+        setProject(d.project);
+        setCodeDraft(d.project?.html || '');
+        if (d.project?.client_id) {
+          fetch(`/api/brand-kits?clientId=${encodeURIComponent(d.project.client_id)}`)
+            .then((r) => r.json())
+            .then((k) => setKitImagery(k?.resolved?.fields?.imagery || ''))
+            .catch(() => { /* a kit is optional */ });
+        }
+      })
       .finally(() => setLoading(false));
   }, [params.id]);
 
@@ -213,25 +230,36 @@ export default function GraphicLabCanvas() {
     } finally { setAssetBusy(false); }
   }
 
-  async function generateAsset() {
+  async function generateImages() {
     if (!project || !aiPrompt.trim()) return;
     setAssetBusy(true);
     setError('');
+    setCandidates([]);
     try {
       const r = await fetch('/api/graphic-projects/image', {
         method: 'POST', headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          prompt: aiPrompt.trim(),
-          size: fmt.height > fmt.width ? '1024x1536' : fmt.width > fmt.height ? '1536x1024' : '1024x1024',
+          subject: aiPrompt.trim(),
+          styleId: aiStyle,
+          copySpace: aiCopySpace,
+          brandNote: [project.title, project.topic, kitImagery].filter(Boolean).join(' — '),
+          aspect: fmt.height > fmt.width ? 'portrait' : fmt.width > fmt.height ? 'landscape' : 'square',
+          count: 2,
         }),
       });
       const d = await r.json();
-      if (!r.ok || !d.url) { setError(d.error || 'Could not generate that image'); return; }
-      setAssets([...(project.assets || []), { url: d.url, label: aiPrompt.trim().slice(0, 40) }]);
-      setAiPrompt('');
+      if (!r.ok || !d.images?.length) { setError(d.error || 'Could not generate that image'); return; }
+      setCandidates(d.images);
+      if (d.warning) setError(d.warning);
     } catch (e: any) {
       setError(e?.message || 'Could not generate that image');
     } finally { setAssetBusy(false); }
+  }
+
+  function keepCandidate(url: string) {
+    if (!project) return;
+    setAssets([...(project.assets || []), { url, label: aiPrompt.trim().slice(0, 40) || 'generated photo' }]);
+    setCandidates([]);
   }
 
   // ── Export ────────────────────────────────────────────────────────────
@@ -594,8 +622,9 @@ export default function GraphicLabCanvas() {
           {tab === 'assets' && (
             <div className="space-y-3">
               <p className="text-[11px] text-white/50 leading-relaxed">
-                Photos the designer is allowed to place. With none, the piece gets built entirely
-                from typography, gradients and shapes — which is often the stronger option for an offer.
+                Photos the designer is allowed to place. Give it one and the piece is built around
+                it — bled to the edge, type set in the quiet part of the frame. With none, it falls
+                back to typography and shapes, which suits a pure offer but won&apos;t carry a spa.
               </p>
 
               <div className="flex gap-2">
@@ -630,26 +659,91 @@ export default function GraphicLabCanvas() {
                 {assetBusy ? 'Working…' : 'Upload a photo'}
               </button>
 
-              <div className="pt-2 border-t border-white/10">
-                <div className="text-[10px] uppercase tracking-wider font-bold text-white/45 mb-1.5">Generate a background</div>
+              <div className="pt-2 border-t border-white/10 space-y-2">
+                <div className="text-[10px] uppercase tracking-wider font-bold text-white/45">Generate a photograph</div>
+
+                <div className="grid grid-cols-2 gap-1.5">
+                  {IMAGERY_STYLES.map((st) => (
+                    <button
+                      key={st.id}
+                      onClick={() => setAiStyle(st.id)}
+                      title={st.hint}
+                      className={`text-left px-2.5 py-1.5 rounded-lg text-[11px] leading-tight transition ${
+                        aiStyle === st.id
+                          ? 'bg-white/20 text-white font-bold'
+                          : 'bg-white/5 text-white/60 hover:bg-white/10 hover:text-white/85'
+                      }`}
+                    >
+                      {st.label}
+                    </button>
+                  ))}
+                </div>
+                <p className="text-[10px] text-white/40 leading-relaxed">
+                  {IMAGERY_STYLES.find((st) => st.id === aiStyle)?.hint}
+                </p>
+
                 <textarea
                   rows={2}
                   value={aiPrompt}
                   onChange={(e) => setAiPrompt(e.target.value)}
-                  placeholder="e.g. soft-focus IV drip bar, morning light, muted teal, shot on 35mm"
+                  placeholder="Who or what is in the photo? e.g. a woman in her thirties resting after a drip, eyes closed"
                   className="w-full px-3 py-2 rounded-lg border text-white text-[12px] placeholder:text-white/35 focus:outline-none"
                   style={inputStyle}
                 />
+
+                <div className="flex items-center gap-2">
+                  <span className="text-[10px] text-white/45 whitespace-nowrap">Leave room for type</span>
+                  <select
+                    value={aiCopySpace}
+                    onChange={(e) => setAiCopySpace(e.target.value as typeof aiCopySpace)}
+                    className="flex-1 px-2 py-1.5 rounded-lg border text-white text-[11px] focus:outline-none"
+                    style={inputStyle}
+                  >
+                    <option value="bottom" className="bg-slate-900">at the bottom</option>
+                    <option value="top" className="bg-slate-900">at the top</option>
+                    <option value="left" className="bg-slate-900">on the left</option>
+                    <option value="right" className="bg-slate-900">on the right</option>
+                    <option value="none" className="bg-slate-900">anywhere — fill the frame</option>
+                  </select>
+                </div>
+
                 <button
-                  onClick={generateAsset}
+                  onClick={generateImages}
                   disabled={assetBusy || !aiPrompt.trim()}
-                  className="mt-2 w-full text-[11px] font-semibold px-3 py-2 rounded-lg bg-white/10 text-white/80 hover:text-white disabled:opacity-40 inline-flex items-center justify-center gap-1"
+                  className="w-full text-[11px] font-bold px-3 py-2 rounded-lg text-white disabled:opacity-40 inline-flex items-center justify-center gap-1"
+                  style={{ background: 'linear-gradient(135deg,#7c3aed,#c026d3)' }}
                 >
-                  <span className="material-symbols-outlined" style={{ fontSize: 14 }}>auto_awesome_motion</span>
-                  {assetBusy ? 'Generating…' : 'Generate photo layer'}
+                  <span className="material-symbols-outlined" style={{ fontSize: 14 }}>photo_camera</span>
+                  {assetBusy ? 'Shooting…' : 'Generate 2 options'}
                 </button>
-                <p className="text-[10px] text-white/35 mt-1">
-                  Imagery only — every word on the piece stays live text on the artboard.
+
+                {candidates.length > 0 && (
+                  <div className="space-y-1.5">
+                    <div className="text-[10px] text-white/50">Pick one — the expression is the whole job.</div>
+                    <div className="grid grid-cols-2 gap-2">
+                      {candidates.map((c) => (
+                        <button
+                          key={c.url}
+                          onClick={() => keepCandidate(c.url)}
+                          className="relative rounded-lg overflow-hidden border border-white/15 hover:border-white/60 transition group"
+                        >
+                          {/* eslint-disable-next-line @next/next/no-img-element */}
+                          <img src={c.url} alt="Option" className="w-full h-32 object-cover" />
+                          <span className="absolute inset-0 bg-black/50 opacity-0 group-hover:opacity-100 transition flex items-center justify-center text-[11px] font-bold text-white">
+                            Use this
+                          </span>
+                        </button>
+                      ))}
+                    </div>
+                    <button onClick={() => setCandidates([])} className="text-[10px] text-white/40 hover:text-white/70">
+                      Discard both
+                    </button>
+                  </div>
+                )}
+
+                <p className="text-[10px] text-white/35 leading-relaxed">
+                  Imagery only — every word on the piece stays live text on the artboard, so nothing
+                  comes back misspelled.
                 </p>
               </div>
 
