@@ -4,6 +4,7 @@ import { ensureSchema, query } from '@/lib/db';
 import { getAgent } from '@/lib/agents/config';
 import { createClient } from '@/lib/supabase/server';
 import { clients as staticClients } from '@/lib/clients';
+import { autoPickDates } from '@/lib/plan-month-shared';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -34,37 +35,8 @@ async function role(): Promise<string> {
   } catch { return ''; }
 }
 
-// Spread N posts/week across the month, skipping past days and days that
-// already have posts. Weekday preference keeps a natural cadence.
-function autoPickDates(month: string, postsPerWeek: number, takenDates: Set<string>): string[] {
-  const [y, m] = month.split('-').map(Number);
-  const daysInMonth = new Date(y, m, 0).getDate();
-  const todayIso = new Date().toISOString().slice(0, 10);
-  const preference = [2, 4, 6, 1, 3, 5, 0]; // Tue, Thu, Sat, Mon, Wed, Fri, Sun
-
-  // Group the month's days by calendar week (Sun-start).
-  const weeks: { iso: string; weekday: number }[][] = [];
-  let week: { iso: string; weekday: number }[] = [];
-  for (let d = 1; d <= daysInMonth; d++) {
-    const date = new Date(y, m - 1, d);
-    const iso = `${month}-${String(d).padStart(2, '0')}`;
-    week.push({ iso, weekday: date.getDay() });
-    if (date.getDay() === 6 || d === daysInMonth) { weeks.push(week); week = []; }
-  }
-
-  const picked: string[] = [];
-  for (const w of weeks) {
-    const usable = w.filter((d) => d.iso >= todayIso && !takenDates.has(d.iso));
-    const chosen = preference
-      .map((wd) => usable.find((d) => d.weekday === wd))
-      .filter((d): d is { iso: string; weekday: number } => !!d)
-      .slice(0, postsPerWeek)
-      .map((d) => d.iso)
-      .sort();
-    picked.push(...chosen);
-  }
-  return picked;
-}
+// autoPickDates now lives in lib/plan-month-shared.ts so plan-month-photos
+// (the photo-based planner) schedules identically without duplicating it.
 
 // Fetch a web page and reduce it to plain text for prompt context.
 async function fetchSiteText(url: string): Promise<string> {

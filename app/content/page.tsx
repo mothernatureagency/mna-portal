@@ -359,7 +359,7 @@ export default function ContentPage() {
   // Subfolder navigation inside the picker — breadcrumb trail from the root.
   const [pickerPath, setPickerPath] = useState<{ id: string; name: string }[]>([]);
   const [newPost, setNewPost] = useState({ post_date: '', platform: 'Instagram', content_type: 'Post', title: '', caption: '' });
-  // Monthly Specials Planner — enter the month's specials, AI drafts the plan
+  // Monthly Planner — enter the month's specials (or pick Drive photos), AI drafts the plan
   const [showPlanner, setShowPlanner] = useState(false);
   const [planMonth, setPlanMonth] = useState(() => {
     const d = new Date();
@@ -380,6 +380,16 @@ export default function ContentPage() {
   const [planPreview, setPlanPreview] = useState<any[] | null>(null);
   const [planChecked, setPlanChecked] = useState<Set<number>>(new Set());
   const [planAdding, setPlanAdding] = useState(false);
+  // Plan from a folder of photos instead of typed specials — reuses the same
+  // per-client Drive folder as the per-post picker below, but lets multiple
+  // photos be selected at once (one photo → one post).
+  const [planUsePhotos, setPlanUsePhotos] = useState(false);
+  const [planPickerFiles, setPlanPickerFiles] = useState<DriveFile[]>([]);
+  const [planPickerLoading, setPlanPickerLoading] = useState(false);
+  const [planPickerError, setPlanPickerError] = useState<string | null>(null);
+  const [planPickerPath, setPlanPickerPath] = useState<{ id: string; name: string }[]>([]);
+  const [planSelectedPhotos, setPlanSelectedPhotos] = useState<DriveFile[]>([]);
+  const [planPhotoWarning, setPlanPhotoWarning] = useState<string | null>(null);
   // Cross-post: push one post (or a whole filtered batch) to other Prime IV locations
   const [crossPostId, setCrossPostId] = useState<string | null>(null);
   const [crossPostTargets, setCrossPostTargets] = useState<string[]>([]);
@@ -947,6 +957,52 @@ export default function ContentPage() {
     } catch (e: any) { alert(e.message); }
   }
 
+  // ── Monthly Planner's photo-folder picker ──────────────────────────
+  // A lighter, multi-select sibling of the picker above — reuses the same
+  // client Drive folder, but toggles photos in/out of a selection instead of
+  // attaching one immediately.
+  async function loadPlanPickerFiles(folderId: string) {
+    setPlanPickerError(null);
+    setPlanPickerLoading(true);
+    try {
+      const res = await fetch(`/api/drive/list?folderId=${encodeURIComponent(folderId)}`);
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || 'Drive list failed');
+      setPlanPickerFiles(data.files || []);
+    } catch (e: any) {
+      setPlanPickerError(e.message);
+    } finally {
+      setPlanPickerLoading(false);
+    }
+  }
+
+  function openPlanPicker() {
+    setPlanPickerPath([]);
+    setPlanPickerError(null);
+    const folderId = extractFolderId(driveFolderUrl);
+    if (folderId) loadPlanPickerFiles(folderId);
+  }
+
+  function enterPlanPickerFolder(f: DriveFile) {
+    setPlanPickerPath((p) => [...p, { id: f.id, name: f.name }]);
+    loadPlanPickerFiles(f.id);
+  }
+  function gotoPlanPickerCrumb(idx: number) {
+    const next = idx < 0 ? [] : planPickerPath.slice(0, idx + 1);
+    setPlanPickerPath(next);
+    const fid = next.length > 0 ? next[next.length - 1].id : extractFolderId(driveFolderUrl);
+    if (fid) loadPlanPickerFiles(fid);
+  }
+
+  function togglePlanPhoto(f: DriveFile) {
+    if (f.mimeType === 'application/vnd.google-apps.folder') { enterPlanPickerFolder(f); return; }
+    setPlanSelectedPhotos((prev) => {
+      const exists = prev.some((p) => p.id === f.id);
+      if (exists) return prev.filter((p) => p.id !== f.id);
+      return [...prev, f];
+    });
+  }
+
   async function approve(id: string) {
     try { await patchItem(id, { client_approval_status: 'approved' }); }
     catch (e: any) { alert(e.message); }
@@ -1048,7 +1104,7 @@ export default function ContentPage() {
     } catch (e: any) { alert(e.message); }
   }
 
-  // ── Monthly Specials Planner ─────────────────────────────────────
+  // ── Monthly Planner ───────────────────────────────────────────────
   async function generatePlan() {
     if (!activeClient?.name) return;
     setPlanning(true);
@@ -1078,6 +1134,39 @@ export default function ContentPage() {
     }
   }
 
+  async function generatePlanFromPhotos() {
+    if (!activeClient?.name || planSelectedPhotos.length === 0) return;
+    setPlanning(true);
+    setPlanError(null);
+    setPlanPhotoWarning(null);
+    try {
+      const res = await fetch('/api/content-calendar/plan-month-photos', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          clientName: activeClient.name,
+          clientId: activeClient.id,
+          month: planMonth,
+          specials: planSpecials,
+          postsPerWeek: planPerWeek,
+          selectedDays: Array.from(planDays),
+          files: planSelectedPhotos.map((f) => ({ id: f.id, name: f.name, mimeType: f.mimeType })),
+        }),
+      });
+      const d = await res.json();
+      if (!res.ok) throw new Error(d.error || 'Planning failed');
+      setPlanPreview(d.items || []);
+      setPlanChecked(new Set((d.items || []).map((_: unknown, i: number) => i)));
+      if (Array.isArray(d.skipped) && d.skipped.length > 0) {
+        setPlanPhotoWarning(`Skipped ${d.skipped.length} photo${d.skipped.length === 1 ? '' : 's'}: ${d.skipped.join('; ')}`);
+      }
+    } catch (e: any) {
+      setPlanError(e.message);
+    } finally {
+      setPlanning(false);
+    }
+  }
+
   async function addPlannedPosts() {
     if (!activeClient?.name || !planPreview) return;
     const chosen = planPreview.filter((_, i) => planChecked.has(i));
@@ -1094,6 +1183,9 @@ export default function ContentPage() {
       setPlanPreview(null);
       setPlanDays(new Set());
       setPlanSpecials('');
+      setPlanUsePhotos(false);
+      setPlanSelectedPhotos([]);
+      setPlanPhotoWarning(null);
       setShowPlanner(false);
       const listRes = await fetch(`/api/content-calendar?client=${encodeURIComponent(activeClient.name)}`);
       const listData = await listRes.json();
@@ -1681,13 +1773,13 @@ export default function ContentPage() {
         </div>
       )}
 
-      {/* Monthly Specials Planner — specials in, AI month plan out (staff) */}
+      {/* Monthly Planner — specials or a folder of photos in, AI month plan out (staff) */}
       {isStaff && (
         <div className="glass-card p-3" style={{ borderLeft: '3px solid #4ab8ce' }}>
           <button onClick={() => setShowPlanner((s) => !s)} className="w-full flex items-center gap-2 text-left">
             <span className="material-symbols-outlined text-cyan-300 shrink-0" style={{ fontSize: 18 }}>auto_awesome</span>
-            <span className="text-[12px] font-semibold text-white/80">Monthly Specials Planner</span>
-            <span className="text-[11px] text-white/45">— enter the month&apos;s specials and AI drafts the whole calendar around them</span>
+            <span className="text-[12px] font-semibold text-white/80">Monthly Planner</span>
+            <span className="text-[11px] text-white/45">— enter the month&apos;s specials, or pick photos from a Drive folder, and AI drafts the whole calendar around them</span>
             <span className="ml-auto text-white/40 text-[11px]">{showPlanner ? '▲' : '▼'}</span>
           </button>
           {showPlanner && (
@@ -1794,6 +1886,123 @@ export default function ContentPage() {
                   className="w-full text-[12px] px-3 py-2 rounded-xl bg-white/5 border border-white/15 text-white outline-none placeholder:text-white/25 leading-relaxed"
                 />
               </label>
+
+              {/* Plan from a folder of photos instead — one photo becomes one post,
+                  captioned from what's actually in the picture. */}
+              <div>
+                <div className="flex items-center gap-2 flex-wrap mb-1.5">
+                  <span className="text-[10px] font-bold uppercase tracking-wider text-white/50">or plan from photos</span>
+                  <button
+                    type="button"
+                    onClick={() => setPlanUsePhotos((v) => { const next = !v; if (next) openPlanPicker(); return next; })}
+                    className="text-[11px] font-semibold px-3 py-1.5 rounded-lg border text-white inline-flex items-center gap-1.5"
+                    style={{
+                      background: planUsePhotos ? 'rgba(74,184,206,0.2)' : 'rgba(255,255,255,0.05)',
+                      borderColor: planUsePhotos ? 'rgba(74,184,206,0.5)' : 'rgba(255,255,255,0.15)',
+                    }}
+                  >
+                    <span className="material-symbols-outlined" style={{ fontSize: 15 }}>photo_library</span>
+                    {planUsePhotos ? 'Planning from Drive photos' : 'Plan from a Drive folder of photos'}
+                  </button>
+                  {planUsePhotos && planSelectedPhotos.length > 0 && (
+                    <span className="text-[11px] text-cyan-300 font-semibold">{planSelectedPhotos.length} photo{planSelectedPhotos.length === 1 ? '' : 's'} selected</span>
+                  )}
+                </div>
+
+                {planUsePhotos && (
+                  <div className="rounded-xl border border-white/15 bg-white/5 p-3 mb-3">
+                    {editingFolder || !extractFolderId(driveFolderUrl) ? (
+                      <div className="flex flex-col gap-2">
+                        <div className="text-[11px] text-white/50">Paste the client&apos;s Google Drive folder link once — it&apos;s remembered for this client.</div>
+                        <div className="flex gap-2">
+                          <input
+                            value={driveFolderUrl}
+                            onChange={(e) => setDriveFolderUrl(e.target.value)}
+                            placeholder="paste the client's Google Drive folder link…"
+                            className="flex-1 text-[11px] px-3 py-1.5 rounded-lg bg-white/5 border border-white/15 text-white outline-none placeholder:text-white/25"
+                          />
+                          <button
+                            type="button"
+                            onClick={() => { const fid = extractFolderId(driveFolderUrl); if (fid) { saveDriveFolderUrl(driveFolderUrl); setEditingFolder(false); setPlanPickerPath([]); loadPlanPickerFiles(fid); } }}
+                            className="text-[11px] font-semibold px-3 py-1.5 rounded-lg bg-white/10 border border-white/20 text-white hover:bg-white/15"
+                          >
+                            Use folder
+                          </button>
+                        </div>
+                      </div>
+                    ) : (
+                      <>
+                        <div className="flex items-center gap-1 text-[11px] mb-2 flex-wrap">
+                          <button type="button" onClick={() => gotoPlanPickerCrumb(-1)} className={`font-semibold inline-flex items-center gap-1 ${planPickerPath.length === 0 ? 'text-white' : 'text-cyan-300 hover:text-cyan-200'}`}>
+                            <span className="material-symbols-outlined" style={{ fontSize: 14 }}>folder</span>
+                            Folder
+                          </button>
+                          {planPickerPath.map((p, i) => (
+                            <span key={p.id} className="flex items-center gap-1">
+                              <span className="text-white/30">/</span>
+                              <button
+                                type="button"
+                                onClick={() => gotoPlanPickerCrumb(i)}
+                                className={`font-semibold max-w-[140px] truncate ${i === planPickerPath.length - 1 ? 'text-white' : 'text-cyan-300 hover:text-cyan-200'}`}
+                              >
+                                {p.name}
+                              </button>
+                            </span>
+                          ))}
+                          <span className="ml-auto text-white/40">
+                            {planPickerLoading ? 'Loading…' : `${planPickerFiles.length} item${planPickerFiles.length === 1 ? '' : 's'}`}
+                          </span>
+                          <button type="button" onClick={() => setEditingFolder(true)} className="text-white/35 hover:text-white/60 text-[10px] underline">change folder</button>
+                        </div>
+
+                        {planPickerError && (
+                          <div className="text-[11px] text-rose-300 bg-rose-500/10 border border-rose-500/25 rounded-lg px-3 py-1.5 mb-2">{planPickerError}</div>
+                        )}
+                        {planPickerLoading && <div className="text-[11px] text-white/40 py-4 text-center">Loading…</div>}
+
+                        {!planPickerLoading && !planPickerError && planPickerFiles.length === 0 && (
+                          <div className="text-[11px] text-white/40 py-4 text-center">No files in this folder.</div>
+                        )}
+
+                        {!planPickerLoading && !planPickerError && planPickerFiles.length > 0 && (
+                          <div className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-6 gap-2 max-h-64 overflow-y-auto">
+                            {[...planPickerFiles]
+                              .sort((a, b) => (a.mimeType === 'application/vnd.google-apps.folder' ? 0 : 1) - (b.mimeType === 'application/vnd.google-apps.folder' ? 0 : 1))
+                              .map((f) => {
+                                const isFolder = f.mimeType === 'application/vnd.google-apps.folder';
+                                const selected = planSelectedPhotos.some((p) => p.id === f.id);
+                                const thumb = !isFolder ? driveThumbnailUrl(`https://drive.google.com/file/d/${f.id}/view`, 200) : null;
+                                return (
+                                  <button
+                                    key={f.id}
+                                    type="button"
+                                    onClick={() => togglePlanPhoto(f)}
+                                    title={f.name}
+                                    className={`relative rounded-lg overflow-hidden border aspect-square flex items-center justify-center bg-black/30 ${
+                                      selected ? 'border-cyan-300 ring-2 ring-cyan-300/50' : 'border-white/10 hover:border-white/30'
+                                    }`}
+                                  >
+                                    {isFolder ? (
+                                      <span className="material-symbols-outlined text-white/50" style={{ fontSize: 28 }}>folder</span>
+                                    ) : thumb ? (
+                                      <img src={thumb} alt="" className="w-full h-full object-cover" onError={(e) => { (e.target as HTMLImageElement).style.display = 'none'; }} />
+                                    ) : (
+                                      <span className="material-symbols-outlined text-white/30" style={{ fontSize: 28 }}>image</span>
+                                    )}
+                                    {selected && (
+                                      <span className="absolute top-1 right-1 bg-cyan-400 text-slate-900 rounded-full w-4 h-4 flex items-center justify-center text-[10px] font-bold">✓</span>
+                                    )}
+                                  </button>
+                                );
+                              })}
+                          </div>
+                        )}
+                      </>
+                    )}
+                  </div>
+                )}
+              </div>
+
               <div>
                 <div className="text-[10px] font-bold uppercase tracking-wider text-white/50 mb-1.5">
                   Post days <span className="text-white/35 normal-case font-semibold">(optional — click days to hand-pick; leave blank and it spreads {planPerWeek}/week around existing posts)</span>
@@ -1834,14 +2043,19 @@ export default function ContentPage() {
                 )}
               </div>
               {planError && <div className="text-[12px] text-rose-300 bg-rose-500/10 border border-rose-500/30 rounded-lg p-2.5">{planError}</div>}
+              {planPhotoWarning && <div className="text-[12px] text-amber-200 bg-amber-500/10 border border-amber-500/30 rounded-lg p-2.5">{planPhotoWarning}</div>}
               <button
-                onClick={generatePlan}
-                disabled={planning || (!planSpecials.trim() && !planResearch)}
+                onClick={planUsePhotos ? generatePlanFromPhotos : generatePlan}
+                disabled={planning || (planUsePhotos ? planSelectedPhotos.length === 0 : (!planSpecials.trim() && !planResearch))}
                 className="text-[12px] font-bold px-5 py-2 rounded-xl text-white disabled:opacity-40 inline-flex items-center gap-1.5"
                 style={{ background: 'linear-gradient(135deg, #0c6da4, #4ab8ce)' }}
               >
                 <span className="material-symbols-outlined" style={{ fontSize: 15 }}>auto_awesome</span>
-                {planning ? 'Planning the month…' : 'Generate plan'}
+                {planning
+                  ? 'Planning the month…'
+                  : planUsePhotos
+                    ? `Generate plan from ${planSelectedPhotos.length} photo${planSelectedPhotos.length === 1 ? '' : 's'}`
+                    : 'Generate plan'}
               </button>
             </div>
           )}
@@ -1883,6 +2097,13 @@ export default function ContentPage() {
                       onChange={() => setPlanChecked((prev) => { const n = new Set(prev); if (n.has(i)) n.delete(i); else n.add(i); return n; })}
                       className="mt-1 accent-cyan-400"
                     />
+                    {(p.photo_urls?.[0] || p.photo_drive_url) && (
+                      <img
+                        src={p.photo_urls?.[0] || p.photo_drive_url}
+                        alt=""
+                        className="w-14 h-14 rounded-lg object-cover shrink-0 border border-white/10"
+                      />
+                    )}
                     <div className="min-w-0 flex-1">
                       <div className="flex items-center gap-2 flex-wrap">
                         <span className="text-[11px] font-bold uppercase tracking-wider text-white/50">{fmtDate(p.post_date)}</span>
@@ -1908,7 +2129,7 @@ export default function ContentPage() {
                 {planAdding ? 'Adding…' : `Add ${planChecked.size} post${planChecked.size === 1 ? '' : 's'} to calendar`}
               </button>
               <button
-                onClick={generatePlan}
+                onClick={planUsePhotos ? generatePlanFromPhotos : generatePlan}
                 disabled={planning || planAdding}
                 className="text-[12px] font-semibold px-4 py-2.5 rounded-xl bg-white/5 text-white/70 border border-white/10 hover:bg-white/10 disabled:opacity-40"
               >
