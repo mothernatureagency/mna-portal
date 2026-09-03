@@ -42,8 +42,14 @@ export async function GET(req: NextRequest) {
     if (!r.ok) return NextResponse.json({ error: `Source returned ${r.status}` }, { status: 502 });
 
     const type = r.headers.get('content-type') || 'application/octet-stream';
-    if (!type.startsWith('image/')) {
-      return NextResponse.json({ error: `That link is ${type.split(';')[0]}, not an image` }, { status: 415 });
+    // Images are what this is for; fonts ride along because a brand kit's
+    // uploaded face is referenced from the artboard the same way.
+    const ok = type.startsWith('image/')
+      || type.startsWith('font/')
+      || /^application\/(x-)?font/.test(type)
+      || /\.(woff2?|ttf|otf)(\?|$)/i.test(target.pathname);
+    if (!ok) {
+      return NextResponse.json({ error: `That link is ${type.split(';')[0]}, not an image or font` }, { status: 415 });
     }
     const buf = await r.arrayBuffer();
     if (buf.byteLength > MAX_BYTES) {

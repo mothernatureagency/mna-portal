@@ -31,6 +31,7 @@ const NAV = [
   ]},
   { sec: 'CLIENT MGMT', items: [
     { label: 'Clients', href: '/clients', e: 'add_business' },
+    { label: 'Brand Kits', href: '/brand-kits', e: 'style' },
     { label: 'Accounts', href: '/accounts', e: 'manage_accounts' },
     { label: 'Onboarding', href: '/onboarding', e: 'rocket_launch' },
     { label: 'Pricing & Info', href: '/knowledge', e: 'menu_book' },
