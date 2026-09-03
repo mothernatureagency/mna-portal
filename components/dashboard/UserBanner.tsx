@@ -1,6 +1,5 @@
 'use client';
 import { useEffect, useState } from 'react';
-import { useRouter } from 'next/navigation';
 import { createClient } from '@/lib/supabase/client';
 import { LogOut, ShieldCheck, Users, User } from 'lucide-react';
 import React from 'react';
@@ -20,7 +19,6 @@ const ROLE_CONFIG = {
 export default function UserBanner() {
   const [profile, setProfile] = useState(null as Profile | null);
   const [email, setEmail] = useState(null as string | null);
-  const router = useRouter();
   const supabase = createClient();
 
   useEffect(() => {
@@ -43,7 +41,11 @@ export default function UserBanner() {
 
   async function handleLogout() {
     await supabase.auth.signOut();
-    router.push('/login');
+    // Hard reload, not router.push: this throws away every in-memory
+    // context/cache so the next login in this browser — staff or client,
+    // same account or a different one — never renders with a stale layout
+    // left over from this session.
+    window.location.href = '/login';
   }
 
   const role = profile?.role ?? 'team';

@@ -1,7 +1,7 @@
 'use client';
 import React, { useState } from 'react';
 import Link from 'next/link';
-import { usePathname, useRouter } from 'next/navigation';
+import { usePathname } from 'next/navigation';
 import { useClient } from '@/context/ClientContext';
 import { createClient } from '@/lib/supabase/client';
 
@@ -73,14 +73,17 @@ export function MobileMenuButton() {
 
 export default function Sidebar({ mobileOpen, onClose }: { mobileOpen?: boolean; onClose?: () => void }) {
   const path = usePathname();
-  const router = useRouter();
   const ctx = useClient();
   const client = (ctx as any)?.activeClient;
 
   async function signOut() {
     const supabase = createClient();
     await supabase.auth.signOut();
-    router.push('/login');
+    // Hard reload, not router.push: this throws away every in-memory
+    // context/cache (ClientContext, the Router Cache) so the next login in
+    // this browser — staff or client, same account or a different one —
+    // never renders with a stale layout left over from this session.
+    window.location.href = '/login';
   }
   const active = (href: string) => href === '/' ? path === href : (path || '').startsWith(href);
 

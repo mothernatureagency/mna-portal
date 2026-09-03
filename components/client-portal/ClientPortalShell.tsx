@@ -123,7 +123,12 @@ function ShellBody({
   async function signOut() {
     const supabase = createClient();
     await supabase.auth.signOut();
-    router.push('/login');
+    // Hard reload, not router.push: this throws away every in-memory
+    // context/cache (ClientPortalContext, PortalEditContext, the Router
+    // Cache) so the next login in this browser — staff or client, same
+    // account or a different one — never renders with a stale layout left
+    // over from this session.
+    window.location.href = '/login';
   }
 
   const sidebarContent = (
