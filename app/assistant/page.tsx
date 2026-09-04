@@ -37,6 +37,7 @@ export default function AssistantPage() {
   const chatEndRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLTextAreaElement>(null);
   const recognitionRef = useRef<any>(null);
+  const audioRef = useRef<HTMLAudioElement | null>(null);
   const voiceOnRef = useRef(false);
   const speakingRef = useRef(false);
   const listeningRef = useRef(false);
@@ -61,6 +62,7 @@ export default function AssistantPage() {
     return () => {
       try { recognitionRef.current?.stop(); } catch { /* already stopped */ }
       try { window.speechSynthesis?.cancel(); } catch { /* unavailable */ }
+      try { audioRef.current?.pause(); } catch { /* unavailable */ }
     };
   }, []);
 
@@ -86,28 +88,59 @@ export default function AssistantPage() {
       || null;
   }
 
-  function speak(text: string) {
-    if (!voiceOnRef.current || typeof window === 'undefined' || !window.speechSynthesis) return;
-    // Strip characters that read badly aloud (markdown, merge tags, emoji-ish).
-    const clean = text.replace(/[*_#`>|]/g, ' ').replace(/\{\{[^}]+\}\}/g, 'the link').replace(/\s+/g, ' ').trim().slice(0, 1400);
-    if (!clean) return;
+  function onSpeechStart() { speakingRef.current = true; setSpeaking(true); }
+  function onSpeechEnd() {
+    speakingRef.current = false;
+    setSpeaking(false);
+    // Hands-free loop: after answering, listen for the next request.
+    if (voiceOnRef.current) setTimeout(() => startListening(), 300);
+  }
+
+  /** Browser-built-in voice — the fallback when premium TTS isn't set up. */
+  function browserSpeak(clean: string) {
+    if (!window.speechSynthesis) return;
     window.speechSynthesis.cancel();
     const u = new SpeechSynthesisUtterance(clean);
     const v = pickVoice();
     if (v) u.voice = v;
     u.rate = 1.05;
-    u.onstart = () => { speakingRef.current = true; setSpeaking(true); };
-    u.onend = () => {
-      speakingRef.current = false;
-      setSpeaking(false);
-      // Hands-free loop: after answering, listen for the next request.
-      if (voiceOnRef.current) setTimeout(() => startListening(), 300);
-    };
+    u.onstart = onSpeechStart;
+    u.onend = onSpeechEnd;
     u.onerror = () => { speakingRef.current = false; setSpeaking(false); };
     window.speechSynthesis.speak(u);
   }
 
+  async function speak(text: string) {
+    if (!voiceOnRef.current || typeof window === 'undefined') return;
+    // Strip characters that read badly aloud (markdown, merge tags, emoji-ish).
+    const clean = text.replace(/[*_#`>|]/g, ' ').replace(/\{\{[^}]+\}\}/g, 'the link').replace(/\s+/g, ' ').trim().slice(0, 1400);
+    if (!clean) return;
+    stopSpeaking();
+    // Premium voice first (ElevenLabs "Lily" via /api/voice/tts) —
+    // falls back to the browser voice when the key isn't configured.
+    try {
+      const res = await fetch('/api/voice/tts', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ text: clean }),
+      });
+      if (res.ok) {
+        const url = URL.createObjectURL(await res.blob());
+        const audio = new Audio(url);
+        audioRef.current = audio;
+        audio.onplay = onSpeechStart;
+        audio.onended = () => { URL.revokeObjectURL(url); onSpeechEnd(); };
+        audio.onerror = () => { URL.revokeObjectURL(url); browserSpeak(clean); };
+        await audio.play();
+        return;
+      }
+    } catch { /* fall through to the browser voice */ }
+    browserSpeak(clean);
+  }
+
   function stopSpeaking() {
+    try { audioRef.current?.pause(); } catch { /* unavailable */ }
+    audioRef.current = null;
     try { window.speechSynthesis?.cancel(); } catch { /* unavailable */ }
     speakingRef.current = false;
     setSpeaking(false);
