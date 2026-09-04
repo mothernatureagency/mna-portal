@@ -51,18 +51,35 @@ export async function GET(req: NextRequest) {
   );
   const pdmOptIn = new Set(optRows.map((r) => r.client_id));
 
+  // Clients auto-posting ALL of their own approved posts — either always
+  // (value true) or scoped to the current month (value 'YYYY-MM'). A month
+  // scope expires on its own when the calendar rolls over.
+  const curMonth = new Date().toISOString().slice(0, 7);
+  const { rows: allOursRows } = await query<{ client_id: string }>(
+    `select client_id from client_kv where key = 'autopost_all_ours' and (value = 'true'::jsonb or value = $1::jsonb)`,
+    [JSON.stringify(curMonth)],
+  );
+  const allOursNames: string[] = [];
+  for (const r of allOursRows) {
+    const s = staticClients.find((c) => c.id === r.client_id);
+    if (s) { allOursNames.push(s.name); continue; }
+    const { rows } = await query<{ name: string }>(`select name from custom_clients where id = $1 limit 1`, [r.client_id]);
+    if (rows[0]?.name) allOursNames.push(rows[0].name);
+  }
+
   const { rows: normal } = await query<any>(
     `select cc.id, cc.platform, cc.caption, cc.photo_drive_url, cc.photo_urls,
             to_char(cc.post_date, 'YYYY-MM-DD') as post_date, p.client_name, false as is_pdm
        from content_calendar cc
        join projects p on p.id = cc.project_id
-      where cc.auto_post = true
+      where (cc.auto_post = true or p.client_name = any($1::text[]))
         and coalesce(cc.publish_status, '') not in ('posted', 'scheduled')
         and cc.client_approval_status in ('approved', 'scheduled')
         and cc.assigned_role is distinct from 'PDM (Brand)'
         and cc.post_date <= current_date
       order by cc.post_date asc, cc.id asc
       limit 50`,
+    [allOursNames],
   );
 
   // PDM brand posts (only processed for opted-in clients, checked in the loop).

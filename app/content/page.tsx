@@ -306,6 +306,9 @@ export default function ContentPage() {
   const [showMerge, setShowMerge] = useState(false);
   const [mergeSaved, setMergeSaved] = useState(false);
   const [pdmAutopost, setPdmAutopost] = useState(false);
+  // Auto-post ALL of our own posts for this client: false = off,
+  // true = every month until turned off, 'YYYY-MM' = just that month.
+  const [autopostOurs, setAutopostOurs] = useState<boolean | string>(false);
   const [isStaff, setIsStaff] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editDraft, setEditDraft] = useState<{ post_date: string; platform: string; content_type: string; title: string }>({ post_date: '', platform: '', content_type: '', title: '' });
@@ -796,6 +799,27 @@ export default function ContentPage() {
     setPdmAutopost(v);
     fetch('/api/client-kv', { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ clientId: activeClient.id, key: 'pdm_autopost', value: v }) }).catch(() => {});
   }
+  // Opt this client in/out of auto-posting ALL of our own posts. Scope is
+  // "always" (true) or one month ('YYYY-MM') — month scopes expire on their
+  // own when the month rolls over, so "just do September" needs no cleanup.
+  useEffect(() => {
+    if (!activeClient?.id) return;
+    fetch(`/api/client-kv?clientId=${encodeURIComponent(activeClient.id)}&key=autopost_all_ours`)
+      .then((r) => r.json())
+      .then((d) => setAutopostOurs(d.value === true ? true : (typeof d.value === 'string' && /^\d{4}-\d{2}$/.test(d.value) ? d.value : false)))
+      .catch(() => setAutopostOurs(false));
+  }, [activeClient?.id]);
+  function saveAutopostOurs(v: boolean | string) {
+    if (!activeClient?.id) return;
+    setAutopostOurs(v);
+    fetch('/api/client-kv', { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ clientId: activeClient.id, key: 'autopost_all_ours', value: v }) }).catch(() => {});
+  }
+  const _apNow = new Date();
+  const apCurMonth = `${_apNow.getFullYear()}-${String(_apNow.getMonth() + 1).padStart(2, '0')}`;
+  const _apNext = new Date(_apNow.getFullYear(), _apNow.getMonth() + 1, 1);
+  const apNextMonth = `${_apNext.getFullYear()}-${String(_apNext.getMonth() + 1).padStart(2, '0')}`;
+  const apCurLabel = _apNow.toLocaleDateString(undefined, { month: 'long' });
+  const apNextLabel = _apNext.toLocaleDateString(undefined, { month: 'long' });
   // Re-check the pool when the user returns from the Post for Me connect tab.
   useEffect(() => {
     const onFocus = () => loadSocialAccounts();
@@ -1725,6 +1749,29 @@ export default function ContentPage() {
               Also auto-post <span className="text-blue-300 font-semibold">PDM brand posts</span> for this location
               <span className="text-white/35">(for locations corporate isn&apos;t covering)</span>
             </label>
+          )}
+          {socialConfigured && (
+            <div className="flex items-center gap-2 pl-7 text-[11px] text-white/60 flex-wrap">
+              <label className="flex items-center gap-2 cursor-pointer">
+                <input type="checkbox" checked={!!autopostOurs} onChange={(e) => saveAutopostOurs(e.target.checked)} className="accent-emerald-400" />
+                Auto-post <span className="text-emerald-300 font-semibold">ALL of our posts</span> for this client
+              </label>
+              {!!autopostOurs && (
+                <select
+                  value={autopostOurs === true ? 'always' : autopostOurs}
+                  onChange={(e) => saveAutopostOurs(e.target.value === 'always' ? true : e.target.value)}
+                  className="text-[10px] px-2 py-1 rounded-lg bg-white/10 border border-white/15 text-white/85 outline-none"
+                >
+                  <option value="always">every month, until I turn it off</option>
+                  <option value={apCurMonth}>{apCurLabel} only</option>
+                  <option value={apNextMonth}>{apNextLabel} only</option>
+                  {typeof autopostOurs === 'string' && ![apCurMonth, apNextMonth].includes(autopostOurs) && (
+                    <option value={autopostOurs}>{autopostOurs} (past)</option>
+                  )}
+                </select>
+              )}
+              <span className="text-white/35">(only Approved posts go out — untick anytime to stop)</span>
+            </div>
           )}
         </div>
       )}
