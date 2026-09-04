@@ -19,9 +19,12 @@
  */
 
 import React, { useEffect, useRef, useState } from 'react';
+import { useRouter } from 'next/navigation';
 import { createClient } from '@/lib/supabase/client';
 import { getDisplayName } from '@/lib/display-names';
 import { STAFF } from '@/lib/staff';
+import { useClient } from '@/context/ClientContext';
+import WelcomeHero from '@/components/dashboard/WelcomeHero';
 
 type Feed = {
   generatedAt: string;
@@ -71,6 +74,9 @@ function untilLabel(dateIso: string, startTime: string | null, todayIso: string)
 }
 
 export default function CommandCenterPage() {
+  const router = useRouter();
+  const clientCtx = useClient() as any;
+  const allClients: Array<{ id: string; name: string; shortName?: string; branding?: { gradientFrom?: string; gradientTo?: string; logoUrl?: string } }> = clientCtx?.allClients || [];
   const [feed, setFeed] = useState<Feed | null>(null);
   const [staffRows, setStaffRows] = useState<Array<{ email: string; name: string; color: string | null }>>([]);
   const [clock, setClock] = useState('');
@@ -404,6 +410,34 @@ export default function CommandCenterPage() {
         .jv-eq span { display: inline-block; width: 3px; border-radius: 2px; margin-right: 2px; transform-origin: bottom; }
       `}</style>
 
+      {/* ═══ WELCOME HERO — same greeting strip as the home page ═══ */}
+      <div className="mb-3"><WelcomeHero /></div>
+
+      {/* ═══ CLIENT DECK — "click a client below to drop in" ═══════ */}
+      <div className="jv-panel px-3 py-2.5 mb-3 flex items-center gap-2 flex-wrap">
+        <span className="jv-title mr-1">Clients</span>
+        {allClients.map((c) => (
+          <button
+            key={c.id}
+            onClick={() => { try { clientCtx?.setActiveClientId?.(c.id); } catch { /* fine */ } router.push('/'); }}
+            className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg transition-colors hover:bg-cyan-400/10"
+            style={{ background: 'rgba(255,255,255,.03)', border: `1px solid ${(c.branding?.gradientFrom || '#4ab8ce')}44` }}
+            title={`Open ${c.name}'s dashboard`}
+          >
+            <span
+              className="w-5 h-5 rounded-full overflow-hidden flex items-center justify-center text-[7px] font-black text-white shrink-0"
+              style={{ background: `linear-gradient(135deg, ${c.branding?.gradientFrom || '#0c6da4'}, ${c.branding?.gradientTo || '#4ab8ce'})` }}
+            >
+              {c.branding?.logoUrl
+                // eslint-disable-next-line @next/next/no-img-element
+                ? <img src={c.branding.logoUrl} alt="" className="w-full h-full object-cover" />
+                : (c.shortName || c.name).slice(0, 2).toUpperCase()}
+            </span>
+            <span className="text-[10px] font-bold text-white/80">{c.shortName || c.name}</span>
+          </button>
+        ))}
+      </div>
+
       {/* ═══ TOP BAR ═══════════════════════════════════════════════ */}
       <div className="jv-panel px-4 py-2.5 mb-3 flex items-center gap-4 flex-wrap">
         <div className="flex items-center gap-2.5">
@@ -412,7 +446,7 @@ export default function CommandCenterPage() {
           </div>
           <div>
             <div className="text-[15px] font-black tracking-[.3em] text-white" style={{ fontFamily: MONO }}>MOTHER</div>
-            <div className="text-[7px] font-bold tracking-[.35em] text-cyan-300/60 uppercase">MNA Command Center</div>
+            <div className="text-[7px] font-bold tracking-[.35em] text-cyan-300/60 uppercase">The Mother Board</div>
           </div>
         </div>
         <div className="flex items-center gap-2 px-3 py-1.5 rounded-full" style={{ background: 'rgba(255,255,255,.04)', border: `1px solid ${systemOptimal ? 'rgba(16,185,129,.4)' : 'rgba(244,63,94,.45)'}` }}>
