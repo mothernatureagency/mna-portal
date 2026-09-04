@@ -16,7 +16,7 @@ import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { useClient } from '@/context/ClientContext';
 
 const LINES = [
-  'Welcome to the Motherboard.',
+  'Welcome to The Mother Board.',
   'Mother Nature Agency.',
   'Where strategy meets execution.',
 ];

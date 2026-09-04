@@ -359,8 +359,8 @@ export default function CommandCenterPage() {
   // ── Derived HUD data ──────────────────────────────────────────────
   const t = feed?.tasks;
   const systemOptimal = (t?.overdue || 0) === 0;
-  const orbColor = coreState === 'online' ? '#22d3ee' : coreState === 'thinking' ? '#f59e0b' : coreState === 'speaking' ? '#10b981' : '#155e75';
-  const orbAccent = coreState === 'offline' ? '#22d3ee' : orbColor;
+  const orbColor = coreState === 'online' ? '#2e8fc0' : coreState === 'thinking' ? '#f59e0b' : coreState === 'speaking' ? '#10b981' : '#155e75';
+  const orbAccent = coreState === 'offline' ? '#2e8fc0' : orbColor;
   const statusLine =
     coreState === 'offline' ? 'Tap to bring Mother online'
       : coreState === 'thinking' ? 'Working on it…'
@@ -380,10 +380,10 @@ export default function CommandCenterPage() {
     if (intel.length === 0) intel.push({ level: 'INFO', icon: 'check_circle', text: 'All clear — nothing needs attention right now.' });
   }
 
-  const LEVEL_COLOR: Record<string, string> = { WARN: '#f59e0b', INFO: '#22d3ee', TIP: '#8b5cf6' };
+  const LEVEL_COLOR: Record<string, string> = { WARN: '#f59e0b', INFO: '#2e8fc0', TIP: '#8b5cf6' };
 
   const coreTiles = [
-    { icon: 'smart_toy', label: 'AI Core', value: coreState === 'offline' ? 'Standby' : 'Active', color: coreState === 'offline' ? '#64748b' : '#22d3ee' },
+    { icon: 'smart_toy', label: 'AI Core', value: coreState === 'offline' ? 'Standby' : 'Active', color: coreState === 'offline' ? '#64748b' : '#2e8fc0' },
     { icon: 'graphic_eq', label: 'Voice', value: voiceSupported ? (coreState === 'offline' ? 'Ready' : 'Listening') : 'Text only', color: voiceSupported ? '#10b981' : '#f59e0b' },
     { icon: 'diversity_3', label: 'Clients', value: `${feed?.clientCount ?? '—'} connected`, color: '#4ab8ce' },
     { icon: 'assignment', label: 'Team Tasks', value: `${t?.open ?? '—'} open`, color: '#0ea5e9' },
@@ -399,13 +399,13 @@ export default function CommandCenterPage() {
         @keyframes jvRing { 0% { transform: scale(1); opacity: .5; } 100% { transform: scale(1.75); opacity: 0; } }
         @keyframes jvSpin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }
         @keyframes jvSpinR { from { transform: rotate(360deg); } to { transform: rotate(0deg); } }
-        @keyframes jvGlow { 0%,100% { box-shadow: 0 0 26px var(--orb), inset 0 0 30px rgba(34,211,238,.12); } 50% { box-shadow: 0 0 52px var(--orb), inset 0 0 44px rgba(34,211,238,.2); } }
+        @keyframes jvGlow { 0%,100% { box-shadow: 0 0 26px var(--orb), inset 0 0 30px rgba(12,109,164,.12); } 50% { box-shadow: 0 0 52px var(--orb), inset 0 0 44px rgba(12,109,164,.2); } }
         @keyframes jvEq { 0%,100% { transform: scaleY(.25); } 50% { transform: scaleY(1); } }
-        .jv-panel { position: relative; background: linear-gradient(168deg, rgba(10,32,54,.92), rgba(6,16,30,.94)); border: 1px solid rgba(34,211,238,.22); border-radius: 10px; }
-        .jv-panel::before, .jv-panel::after { content: ''; position: absolute; width: 13px; height: 13px; border: 2px solid rgba(34,211,238,.85); pointer-events: none; }
+        .jv-panel { position: relative; background: linear-gradient(168deg, rgba(9,26,44,.62), rgba(4,12,24,.72)); border: 1px solid rgba(12,109,164,.45); border-radius: 14px; backdrop-filter: blur(18px) saturate(1.35); -webkit-backdrop-filter: blur(18px) saturate(1.35); box-shadow: inset 0 1px 0 rgba(255,255,255,.07), inset 0 -1px 0 rgba(0,0,0,.35), 0 8px 28px rgba(2,8,18,.45); }
+        .jv-panel::before, .jv-panel::after { content: ''; position: absolute; width: 13px; height: 13px; border: 2px solid rgba(12,109,164,.85); pointer-events: none; }
         .jv-panel::before { top: -1px; left: -1px; border-right: none; border-bottom: none; border-top-left-radius: 8px; }
         .jv-panel::after { bottom: -1px; right: -1px; border-left: none; border-top: none; border-bottom-right-radius: 8px; }
-        .jv-title { font-size: 10px; font-weight: 800; letter-spacing: .26em; text-transform: uppercase; color: rgba(103,232,249,.85); font-family: ${MONO}; }
+        .jv-title { font-size: 10px; font-weight: 800; letter-spacing: .26em; text-transform: uppercase; color: rgba(74,184,206,.85); font-family: ${MONO}; }
         .jv-chip { font-family: ${MONO}; }
         .jv-eq span { display: inline-block; width: 3px; border-radius: 2px; margin-right: 2px; transform-origin: bottom; }
       `}</style>
@@ -420,7 +420,7 @@ export default function CommandCenterPage() {
           <button
             key={c.id}
             onClick={() => { try { clientCtx?.setActiveClientId?.(c.id); } catch { /* fine */ } router.push('/'); }}
-            className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg transition-colors hover:bg-cyan-400/10"
+            className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg transition-colors hover:bg-white/5"
             style={{ background: 'rgba(255,255,255,.03)', border: `1px solid ${(c.branding?.gradientFrom || '#4ab8ce')}44` }}
             title={`Open ${c.name}'s dashboard`}
           >
@@ -441,12 +441,12 @@ export default function CommandCenterPage() {
       {/* ═══ TOP BAR ═══════════════════════════════════════════════ */}
       <div className="jv-panel px-4 py-2.5 mb-3 flex items-center gap-4 flex-wrap">
         <div className="flex items-center gap-2.5">
-          <div className="w-8 h-8 rounded-full flex items-center justify-center" style={{ border: '2px solid #22d3ee', boxShadow: '0 0 14px rgba(34,211,238,.5)' }}>
-            <span className="material-symbols-outlined text-cyan-300" style={{ fontSize: 16 }}>adjust</span>
+          <div className="w-8 h-8 rounded-full flex items-center justify-center" style={{ border: '2px solid #2e8fc0', boxShadow: '0 0 14px rgba(12,109,164,.5)' }}>
+            <span className="material-symbols-outlined text-[#4ab8ce]" style={{ fontSize: 16 }}>adjust</span>
           </div>
           <div>
             <div className="text-[15px] font-black tracking-[.3em] text-white" style={{ fontFamily: MONO }}>MOTHER</div>
-            <div className="text-[7px] font-bold tracking-[.35em] text-cyan-300/60 uppercase">The Mother Board</div>
+            <div className="text-[7px] font-bold tracking-[.35em] text-[#4ab8ce]/60 uppercase">The Mother Board</div>
           </div>
         </div>
         <div className="flex items-center gap-2 px-3 py-1.5 rounded-full" style={{ background: 'rgba(255,255,255,.04)', border: `1px solid ${systemOptimal ? 'rgba(16,185,129,.4)' : 'rgba(244,63,94,.45)'}` }}>
@@ -456,15 +456,15 @@ export default function CommandCenterPage() {
         </div>
         <div className="mx-auto text-center">
           <div className="text-[10px] text-white/40 jv-chip">{new Date().toLocaleDateString(undefined, { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' })}</div>
-          <div className="text-[22px] font-black text-cyan-300 leading-none tabular-nums" style={{ fontFamily: MONO, textShadow: '0 0 18px rgba(34,211,238,.6)' }}>{clock}</div>
+          <div className="text-[22px] font-black text-[#4ab8ce] leading-none tabular-nums" style={{ fontFamily: MONO, textShadow: '0 0 18px rgba(12,109,164,.6)' }}>{clock}</div>
         </div>
-        <div className="flex items-center gap-2 px-3 py-1.5 rounded-full ml-auto" style={{ background: 'rgba(255,255,255,.04)', border: '1px solid rgba(34,211,238,.25)' }}>
+        <div className="flex items-center gap-2 px-3 py-1.5 rounded-full ml-auto" style={{ background: 'rgba(255,255,255,.04)', border: '1px solid rgba(12,109,164,.25)' }}>
           <span className="w-6 h-6 rounded-full flex items-center justify-center text-[9px] font-black text-white" style={{ background: 'linear-gradient(135deg,#0c6da4,#4ab8ce)' }}>
             {(getDisplayName(userEmail) || 'A').slice(0, 1).toUpperCase()}
           </span>
           <div>
             <div className="text-[10px] font-bold text-white/85 leading-tight">{getDisplayName(userEmail) || 'Operator'}</div>
-            <div className="text-[7px] font-bold tracking-[.25em] text-cyan-300/60 uppercase">Commander</div>
+            <div className="text-[7px] font-bold tracking-[.25em] text-[#4ab8ce]/60 uppercase">Commander</div>
           </div>
         </div>
       </div>
@@ -476,7 +476,7 @@ export default function CommandCenterPage() {
           <div className="jv-title mb-2.5">AI Core Overview</div>
           <div className="space-y-1.5">
             {coreTiles.map((tile) => (
-              <div key={tile.label} className="flex items-center gap-2.5 px-2.5 py-2 rounded-lg" style={{ background: 'rgba(255,255,255,.03)', border: '1px solid rgba(34,211,238,.14)' }}>
+              <div key={tile.label} className="flex items-center gap-2.5 px-2.5 py-2 rounded-lg" style={{ background: 'rgba(255,255,255,.03)', border: '1px solid rgba(12,109,164,.14)' }}>
                 <span className="w-7 h-7 rounded-md flex items-center justify-center shrink-0" style={{ background: tile.color + '1a', border: `1px solid ${tile.color}55` }}>
                   <span className="material-symbols-outlined" style={{ fontSize: 15, color: tile.color }}>{tile.icon}</span>
                 </span>
@@ -491,10 +491,10 @@ export default function CommandCenterPage() {
 
         {/* The core */}
         <div className="jv-panel flex flex-col items-center justify-center py-6 overflow-hidden relative" style={{ minHeight: 380, background: 'radial-gradient(ellipse at 50% 40%, rgba(14,60,95,.9), rgba(4,12,24,.96) 75%)' }}>
-          <div className="absolute inset-0 pointer-events-none" style={{ backgroundImage: 'radial-gradient(rgba(103,232,249,.35) 1px, transparent 1px), radial-gradient(rgba(103,232,249,.18) 1px, transparent 1px)', backgroundSize: '90px 90px, 41px 41px', backgroundPosition: '0 0, 20px 30px' }} />
+          <div className="absolute inset-0 pointer-events-none" style={{ backgroundImage: 'radial-gradient(rgba(74,184,206,.35) 1px, transparent 1px), radial-gradient(rgba(74,184,206,.18) 1px, transparent 1px)', backgroundSize: '90px 90px, 41px 41px', backgroundPosition: '0 0, 20px 30px' }} />
           <button onClick={orbTap} className="relative flex items-center justify-center" style={{ width: 250, height: 250 }} title={statusLine}>
-            <span className="absolute inset-0 rounded-full" style={{ border: '1px dashed rgba(34,211,238,.35)', animation: 'jvSpin 22s linear infinite' }} />
-            <span className="absolute inset-4 rounded-full" style={{ border: '1px dashed rgba(34,211,238,.25)', animation: 'jvSpinR 15s linear infinite' }} />
+            <span className="absolute inset-0 rounded-full" style={{ border: '1px dashed rgba(12,109,164,.35)', animation: 'jvSpin 22s linear infinite' }} />
+            <span className="absolute inset-4 rounded-full" style={{ border: '1px dashed rgba(12,109,164,.25)', animation: 'jvSpinR 15s linear infinite' }} />
             {coreState !== 'offline' && coreState !== 'thinking' && (
               <>
                 <span className="absolute inset-8 rounded-full" style={{ border: `2px solid ${orbColor}`, animation: 'jvRing 1.5s ease-out infinite' }} />
@@ -504,7 +504,7 @@ export default function CommandCenterPage() {
             <span
               className="w-44 h-44 rounded-full flex flex-col items-center justify-center gap-1 transition-all duration-300"
               style={{
-                background: `radial-gradient(circle at 38% 30%, rgba(34,211,238,${coreState === 'offline' ? '.15' : '.35'}), rgba(6,20,38,.95) 70%)`,
+                background: `radial-gradient(circle at 38% 30%, rgba(12,109,164,${coreState === 'offline' ? '.15' : '.35'}), rgba(6,20,38,.95) 70%)`,
                 border: `2px solid ${orbAccent}`,
                 opacity: coreState === 'offline' ? 0.75 : 1,
                 ['--orb' as any]: orbAccent + (coreState === 'offline' ? '22' : '55'),
@@ -520,7 +520,7 @@ export default function CommandCenterPage() {
           </button>
           <div className="text-[10px] font-bold tracking-[.3em] uppercase mt-3 px-4 text-center" style={{ color: orbAccent, fontFamily: MONO }}>{statusLine}</div>
           {coreState !== 'offline' && (
-            <div className="text-[8px] text-cyan-200/40 mt-1.5 tracking-wider" style={{ fontFamily: MONO }}>
+            <div className="text-[8px] text-[#6fc3d6]/40 mt-1.5 tracking-wider" style={{ fontFamily: MONO }}>
               Wake word: “Mother” · follow-ups within 15s need no wake word
             </div>
           )}
@@ -590,12 +590,12 @@ export default function CommandCenterPage() {
               {(feed?.schedule || []).slice(0, 7).map((ev, i, arr) => (
                 <div key={ev.id} className="flex items-center gap-2.5 relative pl-1">
                   <div className="flex flex-col items-center self-stretch">
-                    <span className="w-2 h-2 rounded-full shrink-0 mt-2" style={{ background: '#22d3ee', boxShadow: '0 0 6px rgba(34,211,238,.8)' }} />
-                    {i < arr.length - 1 && <span className="w-px flex-1" style={{ background: 'rgba(34,211,238,.25)' }} />}
+                    <span className="w-2 h-2 rounded-full shrink-0 mt-2" style={{ background: '#2e8fc0', boxShadow: '0 0 6px rgba(12,109,164,.8)' }} />
+                    {i < arr.length - 1 && <span className="w-px flex-1" style={{ background: 'rgba(12,109,164,.25)' }} />}
                   </div>
                   <div className="flex-1 min-w-0 py-1.5">
                     <div className="text-[11px] font-bold text-white/90 truncate">{ev.title}</div>
-                    <div className="text-[8.5px] text-cyan-300/60" style={{ fontFamily: MONO }}>
+                    <div className="text-[8.5px] text-[#4ab8ce]/60" style={{ fontFamily: MONO }}>
                       {ev.event_date === feed?.today ? 'Today' : fmtDue(ev.event_date)}{ev.start_time ? ` · ${ev.start_time.slice(0, 5)}` : ''} · {untilLabel(ev.event_date, ev.start_time, feed?.today || '')}
                     </div>
                   </div>
@@ -619,12 +619,12 @@ export default function CommandCenterPage() {
                 key={c.label}
                 href={c.href}
                 onClick={c.act ? (e) => { e.preventDefault(); c.act!(); } : undefined}
-                className="flex items-center gap-2.5 px-3 py-2.5 rounded-lg cursor-pointer transition-colors hover:bg-cyan-400/10 block"
-                style={{ background: 'rgba(255,255,255,.03)', border: '1px solid rgba(34,211,238,.18)' }}
+                className="flex items-center gap-2.5 px-3 py-2.5 rounded-lg cursor-pointer transition-colors hover:bg-white/5 block"
+                style={{ background: 'rgba(255,255,255,.03)', border: '1px solid rgba(12,109,164,.18)' }}
               >
-                <span className="material-symbols-outlined text-cyan-300" style={{ fontSize: 16 }}>{c.icon}</span>
+                <span className="material-symbols-outlined text-[#4ab8ce]" style={{ fontSize: 16 }}>{c.icon}</span>
                 <span className="text-[11px] font-bold text-white/85">{c.label}</span>
-                <span className="material-symbols-outlined text-cyan-300/40 ml-auto" style={{ fontSize: 13 }}>chevron_right</span>
+                <span className="material-symbols-outlined text-[#4ab8ce]/40 ml-auto" style={{ fontSize: 13 }}>chevron_right</span>
               </a>
             ))}
           </div>
@@ -640,10 +640,10 @@ export default function CommandCenterPage() {
           ) : (
             <div className="space-y-1.5">
               {(feed?.content || []).map((c) => (
-                <div key={c.client_name} className="flex items-center gap-2 px-2.5 py-2 rounded-lg" style={{ background: 'rgba(255,255,255,.03)', border: '1px solid rgba(34,211,238,.14)' }}>
+                <div key={c.client_name} className="flex items-center gap-2 px-2.5 py-2 rounded-lg" style={{ background: 'rgba(255,255,255,.03)', border: '1px solid rgba(12,109,164,.14)' }}>
                   <span className="text-[11px] font-bold text-white/90 truncate flex-1">{c.client_name}</span>
                   <span className="text-[8.5px] text-white/45 shrink-0" style={{ fontFamily: MONO }}>next {fmtDue(c.next_post)}</span>
-                  <span className="text-[8.5px] font-black px-1.5 py-0.5 rounded shrink-0" style={{ background: 'rgba(34,211,238,.15)', color: '#67e8f9', fontFamily: MONO }}>{c.this_week}/wk</span>
+                  <span className="text-[8.5px] font-black px-1.5 py-0.5 rounded shrink-0" style={{ background: 'rgba(12,109,164,.15)', color: '#67e8f9', fontFamily: MONO }}>{c.this_week}/wk</span>
                   {Number(c.pending) > 0 && (
                     <span className="text-[8.5px] font-black px-1.5 py-0.5 rounded shrink-0" style={{ background: 'rgba(245,158,11,.18)', color: '#fcd34d', fontFamily: MONO }}>{c.pending} appr</span>
                   )}
@@ -659,12 +659,12 @@ export default function CommandCenterPage() {
             {!lastHeard && !lastReply && <div className="text-[10px] text-white/30">Bring Mother online and say “Mother, what&apos;s overdue?” — or type a command below.</div>}
             {lastHeard && (
               <div className="text-[10.5px] text-white/60 px-2.5 py-1.5 rounded-lg bg-white/[.04] border border-white/10">
-                <span className="text-cyan-300/60 font-black mr-1.5" style={{ fontFamily: MONO }}>YOU ›</span>{lastHeard}
+                <span className="text-[#4ab8ce]/60 font-black mr-1.5" style={{ fontFamily: MONO }}>YOU ›</span>{lastHeard}
               </div>
             )}
             {lastReply && (
-              <div className="text-[11px] text-white/90 px-2.5 py-2 rounded-lg whitespace-pre-wrap max-h-36 overflow-y-auto" style={{ background: 'rgba(34,211,238,.08)', border: '1px solid rgba(34,211,238,.3)' }}>
-                <span className="text-cyan-300 font-black mr-1.5" style={{ fontFamily: MONO }}>MOTHER ›</span>{lastReply}
+              <div className="text-[11px] text-white/90 px-2.5 py-2 rounded-lg whitespace-pre-wrap max-h-36 overflow-y-auto" style={{ background: 'rgba(12,109,164,.08)', border: '1px solid rgba(12,109,164,.3)' }}>
+                <span className="text-[#4ab8ce] font-black mr-1.5" style={{ fontFamily: MONO }}>MOTHER ›</span>{lastReply}
               </div>
             )}
           </div>
@@ -675,12 +675,12 @@ export default function CommandCenterPage() {
               onKeyDown={(e) => { if (e.key === 'Enter' && typed.trim()) { void ask(typed); setTyped(''); } }}
               placeholder='"assign Sable…" · "what&apos;s overdue?"'
               className="flex-1 text-[11px] px-3 py-2 rounded-lg bg-white/5 text-white outline-none placeholder:text-white/25"
-              style={{ border: '1px solid rgba(34,211,238,.25)', fontFamily: MONO }}
+              style={{ border: '1px solid rgba(12,109,164,.25)', fontFamily: MONO }}
             />
             <button
               onClick={() => { if (typed.trim()) { void ask(typed); setTyped(''); } }}
               className="w-9 h-9 rounded-lg flex items-center justify-center text-white shrink-0"
-              style={{ background: 'linear-gradient(135deg, #0c6da4, #22d3ee)' }}
+              style={{ background: 'linear-gradient(135deg, #0c6da4, #2e8fc0)' }}
             >
               <span className="material-symbols-outlined" style={{ fontSize: 15 }}>send</span>
             </button>
@@ -693,23 +693,23 @@ export default function CommandCenterPage() {
         <span className="text-[8.5px] text-white/35 shrink-0 hidden md:flex items-center gap-1.5" style={{ fontFamily: MONO }}>
           {weather && (
             <>
-              <span className="material-symbols-outlined text-cyan-300/70" style={{ fontSize: 13 }}>
+              <span className="material-symbols-outlined text-[#4ab8ce]/70" style={{ fontSize: 13 }}>
                 {/thunder/i.test(weather.desc) ? 'thunderstorm' : /rain|drizzl|shower/i.test(weather.desc) ? 'rainy' : /snow/i.test(weather.desc) ? 'ac_unit' : /cloud|overcast|fog/i.test(weather.desc) ? 'cloud' : 'sunny'}
               </span>
-              <span className="text-cyan-200/70">{Math.round(weather.tempF)}°F {weather.desc}</span>
+              <span className="text-[#6fc3d6]/70">{Math.round(weather.tempF)}°F {weather.desc}</span>
               <span>· H{Math.round(weather.high)} L{Math.round(weather.low)} ·</span>
             </>
           )}
           {feed?.clientCount ?? '—'} clients · {t?.open ?? '—'} open
         </span>
         <span className="flex-1 flex items-center gap-1 justify-end opacity-50">
-          {[...Array(10)].map((_, i) => <span key={i} className="w-1 h-1 rounded-full bg-cyan-400/60" style={{ animation: coreState !== 'offline' ? `jvBlink ${0.6 + (i % 4) * 0.2}s infinite` : 'none' }} />)}
+          {[...Array(10)].map((_, i) => <span key={i} className="w-1 h-1 rounded-full bg-[#2e8fc0]/60" style={{ animation: coreState !== 'offline' ? `jvBlink ${0.6 + (i % 4) * 0.2}s infinite` : 'none' }} />)}
         </span>
         <button
           onClick={orbTap}
           className="flex items-center gap-3 px-8 py-3 rounded-full shrink-0 transition-all"
           style={{
-            background: 'radial-gradient(circle at 50% 0%, rgba(34,211,238,.22), rgba(8,22,40,.95))',
+            background: 'radial-gradient(circle at 50% 0%, rgba(12,109,164,.22), rgba(8,22,40,.95))',
             border: `2px solid ${orbAccent}`,
             boxShadow: `0 0 22px ${orbAccent}55`,
           }}
@@ -725,12 +725,12 @@ export default function CommandCenterPage() {
           </span>
         </button>
         <span className="flex-1 flex items-center gap-1 opacity-50">
-          {[...Array(10)].map((_, i) => <span key={i} className="w-1 h-1 rounded-full bg-cyan-400/60" style={{ animation: coreState !== 'offline' ? `jvBlink ${0.6 + (i % 4) * 0.2}s infinite` : 'none' }} />)}
+          {[...Array(10)].map((_, i) => <span key={i} className="w-1 h-1 rounded-full bg-[#2e8fc0]/60" style={{ animation: coreState !== 'offline' ? `jvBlink ${0.6 + (i % 4) * 0.2}s infinite` : 'none' }} />)}
         </span>
         <button
           onClick={executiveBriefing}
-          className="text-[10px] font-black tracking-widest px-4 py-2.5 rounded-lg shrink-0 text-cyan-200 hover:text-white transition-colors uppercase hidden md:block"
-          style={{ background: 'rgba(34,211,238,.1)', border: '1px solid rgba(34,211,238,.35)', fontFamily: MONO }}
+          className="text-[10px] font-black tracking-widest px-4 py-2.5 rounded-lg shrink-0 text-[#6fc3d6] hover:text-white transition-colors uppercase hidden md:block"
+          style={{ background: 'rgba(12,109,164,.1)', border: '1px solid rgba(12,109,164,.35)', fontFamily: MONO }}
         >
           Executive Briefing
         </button>

@@ -16,7 +16,8 @@ import { getAssignedClientIds, getStaffByEmail, isOwner } from '@/lib/staff';
 import UserBanner from './UserBanner';
 import StaffChecklist from './StaffChecklist';
 import StaffContentCalendar from './StaffContentCalendar';
-import WelcomeHero from './WelcomeHero';
+// WelcomeHero moved to The Mother Board (/jarvis) — the animated greeting
+// lives there now instead of the home overview.
 
 // ─── REAL DATA (Niceville) ──────────────────────────────────────────
 // Source: GHL manual pull 2026-04-08
@@ -167,7 +168,6 @@ export default function AgencyOverview() {
 
   return (
     <div className="space-y-8 max-w-[1400px]">
-      <WelcomeHero />
       <UserBanner />
 
       {/* ── AGENCY GROWTH GRAPH ── */}
