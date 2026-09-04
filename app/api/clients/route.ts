@@ -3,6 +3,7 @@ import { ensureSchema, query } from '@/lib/db';
 import { createClient } from '@/lib/supabase/server';
 import { clients as staticClients, makePrimeIVClient, makeCustomClient, slugify } from '@/lib/clients';
 import { suggestMergeVars } from '@/lib/merge-vars';
+import { spawnClientTasks } from '@/lib/team-tasks';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -119,6 +120,11 @@ export async function POST(req: NextRequest) {
         }
       } catch { /* non-fatal */ }
     }
+
+    // Per-new-client Team Tasks: any recurring template marked "each new
+    // client" spawns its onboarding tasks now, assigned and dated. Idempotent
+    // (spawn log keyed by client id) and never blocks client creation.
+    try { await spawnClientTasks(client.id, client.shortName || client.name); } catch { /* non-fatal */ }
 
     return NextResponse.json({ item: rows[0], client });
   } catch (e: any) {

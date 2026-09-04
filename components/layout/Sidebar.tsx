@@ -15,6 +15,7 @@ const NAV = [
   // thing seen, rather than buried under Content and Client Mgmt.
   { sec: 'AGENDA & ASSIGNMENTS', items: [
     { label: 'Agenda', href: '/agenda', e: 'event_note' },
+    { label: 'Team Tasks', href: '/team-tasks', e: 'assignment_ind' },
     { label: 'Task Manager', href: '/client-tasks', e: 'checklist' },
   ]},
   { sec: 'CONTENT', items: [

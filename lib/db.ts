@@ -619,6 +619,51 @@ async function initSchema() {
                                           role text not null default 'viewer',
                                                 created_at timestamptz not null default now()
                                                     )`,
+                  // ── Team Tasks (Asana/Monday-style board) ──────────────────
+                  // Tasks assigned to specific portal accounts with deadlines.
+                  // recurrence records what spawned the task; template_id links
+                  // back to the recurring template (below) when it wasn't one-off.
+                  `create table if not exists team_tasks (
+                        id uuid primary key default uuid_generate_v4(),
+                        title text not null,
+                        description text,
+                        assignee_email text,
+                        client_id text,
+                        due_date date,
+                        priority text not null default 'normal',
+                        status text not null default 'todo',
+                        recurrence text not null default 'one_time',
+                        template_id uuid,
+                        created_by text,
+                        created_at timestamptz not null default now(),
+                        completed_at timestamptz
+                  )`,
+                  // Recurring task templates. recurrence:
+                  //   'monthly'        → an instance is materialized each month
+                  //                      (due_day = day-of-month it's due)
+                  //   'per_new_client' → an instance is created whenever a new
+                  //                      client is added (due_day = days after)
+                  `create table if not exists team_task_templates (
+                        id uuid primary key default uuid_generate_v4(),
+                        title text not null,
+                        description text,
+                        assignee_email text,
+                        recurrence text not null,
+                        due_day int,
+                        priority text not null default 'normal',
+                        active boolean not null default true,
+                        created_by text,
+                        created_at timestamptz not null default now()
+                  )`,
+                  // Spawn log so auto-materialization is idempotent: one row per
+                  // (template, period) — period_key is 'YYYY-MM' for monthly
+                  // templates and the client id for per_new_client ones.
+                  `create table if not exists team_task_spawns (
+                        template_id uuid not null references team_task_templates(id) on delete cascade,
+                        period_key text not null,
+                        created_at timestamptz not null default now(),
+                        primary key (template_id, period_key)
+                  )`,
                 ];
         for (const sql of statements) {
                   await pool.query(sql);
