@@ -10,13 +10,14 @@ export const dynamic = 'force-dynamic';
  *
  * Uses Open-Meteo — free, no API key. The browser passes the user's
  * coordinates when geolocation is granted; otherwise we fall back to the
- * agency's home turf (Niceville, FL — override with WEATHER_DEFAULT_LAT /
- * WEATHER_DEFAULT_LON in env). Responses are cached in memory for 10
- * minutes per rounded location so the briefing never hammers the API.
+ * agency's home base (Panama City Beach, FL — override with
+ * WEATHER_DEFAULT_LAT / WEATHER_DEFAULT_LON in env). Responses are cached
+ * in memory for 10 minutes per rounded location so the briefing never
+ * hammers the API.
  */
 
-const DEFAULT_LAT = Number(process.env.WEATHER_DEFAULT_LAT) || 30.5169;
-const DEFAULT_LON = Number(process.env.WEATHER_DEFAULT_LON) || -86.4822;
+const DEFAULT_LAT = Number(process.env.WEATHER_DEFAULT_LAT) || 30.1766;
+const DEFAULT_LON = Number(process.env.WEATHER_DEFAULT_LON) || -85.8055;
 
 // WMO weather codes → something worth saying out loud.
 function describe(code: number): string {
