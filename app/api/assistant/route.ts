@@ -3,6 +3,9 @@ import { ensureSchema, query } from '@/lib/db';
 import Anthropic from '@anthropic-ai/sdk';
 import { createCalendarEvent, isConnected } from '@/lib/google-calendar';
 import { resolveAttendees, getContactsForPrompt } from '@/lib/contacts';
+import { spawnMonthlyTasks, currentMonthKey } from '@/lib/team-tasks';
+import { STAFF } from '@/lib/staff';
+import { clients as staticClients } from '@/lib/clients';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -117,7 +120,85 @@ const tools: Anthropic.Tool[] = [
       required: [],
     },
   },
+  {
+    name: 'create_team_task',
+    description: 'Assign a task to a team member on the Team Tasks board, with a deadline and priority. Also creates recurring tasks: repeat "monthly" auto-creates it every month on its due day, and repeat "per_new_client" auto-creates it whenever a new client is onboarded. Use for "assign X to Sable", "give Vanessa a task due Friday", "every month remind us to...", "whenever we sign a new client, have someone...".',
+    input_schema: {
+      type: 'object' as const,
+      properties: {
+        title: { type: 'string', description: 'Task title' },
+        description: { type: 'string', description: 'Optional details' },
+        assignee: { type: 'string', description: 'Team member first name or email (e.g. "Sable"). Optional — omit for unassigned.' },
+        client_id: { type: 'string', description: 'Client this task is about. Use list_clients for valid ids. Optional.' },
+        due_date: { type: 'string', description: 'Deadline YYYY-MM-DD for one-time tasks. Optional.' },
+        priority: { type: 'string', enum: ['low', 'normal', 'high', 'urgent'], description: 'Default normal.' },
+        repeat: { type: 'string', enum: ['one_time', 'monthly', 'per_new_client'], description: 'Default one_time.' },
+        due_day: { type: 'number', description: 'For monthly: day of month it is due (1-28). For per_new_client: days after onboarding (default 7).' },
+      },
+      required: ['title'],
+    },
+  },
+  {
+    name: 'list_team_tasks',
+    description: 'See the team\'s assigned tasks and deadlines from the Team Tasks board. Use for "what\'s on Sable\'s plate", "what\'s overdue", "what is the team working on". Returns open tasks (to do + in progress) unless a status is given.',
+    input_schema: {
+      type: 'object' as const,
+      properties: {
+        assignee: { type: 'string', description: 'Filter to one team member by first name or email. Optional.' },
+        status: { type: 'string', enum: ['todo', 'in_progress', 'done'], description: 'Filter by status. Optional.' },
+        overdue_only: { type: 'boolean', description: 'Only tasks past their deadline and not done.' },
+        client_id: { type: 'string', description: 'Filter by client. Optional.' },
+      },
+      required: [],
+    },
+  },
+  {
+    name: 'update_team_task',
+    description: 'Update a team task: mark it done or in progress, change the deadline, reassign it, or change priority. Get the task_id from list_team_tasks first.',
+    input_schema: {
+      type: 'object' as const,
+      properties: {
+        task_id: { type: 'string', description: 'UUID of the task' },
+        status: { type: 'string', enum: ['todo', 'in_progress', 'done'] },
+        due_date: { type: 'string', description: 'New deadline YYYY-MM-DD' },
+        assignee: { type: 'string', description: 'Reassign to this team member (first name or email)' },
+        priority: { type: 'string', enum: ['low', 'normal', 'high', 'urgent'] },
+      },
+      required: ['task_id'],
+    },
+  },
+  {
+    name: 'list_clients',
+    description: 'List every client in the portal (built-in and custom) with their ids. Use when you need a client_id or the user mentions a client you don\'t recognize.',
+    input_schema: { type: 'object' as const, properties: {}, required: [] },
+  },
 ];
+
+// ── Team helpers ─────────────────────────────────────────────────────
+
+/** Static staff + anyone added to the roster, deduped by email. */
+async function teamDirectory(): Promise<Array<{ email: string; name: string }>> {
+  const seen = new Map<string, string>();
+  for (const s of STAFF) seen.set(s.email.toLowerCase(), s.name);
+  try {
+    const { rows } = await query(`select email, name from staff_members`);
+    for (const r of rows) if (r.email) seen.set(r.email.toLowerCase(), r.name || r.email);
+  } catch { /* roster table empty/unavailable — statics still work */ }
+  return Array.from(seen, ([email, name]) => ({ email, name }));
+}
+
+/** "Sable" / "sable@..." → the roster email, or null when nobody matches. */
+async function resolveTeamEmail(nameOrEmail: string): Promise<string | null> {
+  const v = (nameOrEmail || '').trim().toLowerCase();
+  if (!v) return null;
+  if (v.includes('@')) return v;
+  const dir = await teamDirectory();
+  const hit = dir.find((d) => d.name.toLowerCase() === v)
+    || dir.find((d) => d.name.toLowerCase().split(/\s+/)[0] === v)
+    || dir.find((d) => d.name.toLowerCase().startsWith(v))
+    || dir.find((d) => d.name.toLowerCase().includes(v));
+  return hit?.email || null;
+}
 
 // ── Tool execution ───────────────────────────────────────────────────
 
@@ -274,6 +355,119 @@ async function executeTool(name: string, input: any, userEmail: string): Promise
       return JSON.stringify({ posts: rows, count: rows.length });
     }
 
+    case 'create_team_task': {
+      const assigneeEmail = input.assignee ? await resolveTeamEmail(input.assignee) : null;
+      if (input.assignee && !assigneeEmail) {
+        return JSON.stringify({ success: false, error: `No team member matches "${input.assignee}" — ask the user which teammate they mean.` });
+      }
+      const priority = ['low', 'normal', 'high', 'urgent'].includes(input.priority) ? input.priority : 'normal';
+      const repeat = ['monthly', 'per_new_client'].includes(input.repeat) ? input.repeat : 'one_time';
+
+      if (repeat !== 'one_time') {
+        const dueDay = Number(input.due_day) > 0 ? Math.min(31, Math.floor(Number(input.due_day))) : null;
+        const { rows } = await query(
+          `insert into team_task_templates (title, description, assignee_email, recurrence, due_day, priority, created_by)
+           values ($1,$2,$3,$4,$5,$6,$7) returning *`,
+          [input.title, input.description || null, assigneeEmail, repeat, dueDay, priority, userEmail],
+        );
+        let createdNow = 0;
+        if (repeat === 'monthly') {
+          try { createdNow = await spawnMonthlyTasks(currentMonthKey()); } catch { /* non-fatal */ }
+        }
+        return JSON.stringify({
+          success: true,
+          template: rows[0],
+          instances_created_now: createdNow,
+          note: repeat === 'monthly'
+            ? 'Recurring monthly — this month\'s instance was just created; future months auto-create.'
+            : 'Will auto-create for every new client onboarded from now on. It can be applied to an existing client from the Team Tasks page\'s Recurring panel.',
+        });
+      }
+
+      const dueDate = /^\d{4}-\d{2}-\d{2}$/.test(input.due_date || '') ? input.due_date : null;
+      const { rows } = await query(
+        `insert into team_tasks (title, description, assignee_email, client_id, due_date, priority, status, recurrence, created_by)
+         values ($1,$2,$3,$4,$5,$6,'todo','one_time',$7) returning *`,
+        [input.title, input.description || null, assigneeEmail, input.client_id || null, dueDate, priority, userEmail],
+      );
+      return JSON.stringify({ success: true, task: rows[0] });
+    }
+
+    case 'list_team_tasks': {
+      let where = '1=1';
+      const params: any[] = [];
+      if (input.assignee) {
+        const e = await resolveTeamEmail(input.assignee);
+        if (!e) return JSON.stringify({ tasks: [], count: 0, error: `No team member matches "${input.assignee}"` });
+        params.push(e);
+        where += ` and lower(coalesce(assignee_email, '')) = $${params.length}`;
+      }
+      if (input.status) {
+        params.push(input.status);
+        where += ` and status = $${params.length}`;
+      } else {
+        where += ` and status <> 'done'`;
+      }
+      if (input.overdue_only) where += ` and due_date < current_date and status <> 'done'`;
+      if (input.client_id) {
+        params.push(input.client_id);
+        where += ` and client_id = $${params.length}`;
+      }
+      const { rows } = await query(
+        `select id, title, description, assignee_email, client_id, to_char(due_date, 'YYYY-MM-DD') as due_date, priority, status, recurrence
+           from team_tasks where ${where}
+          order by due_date asc nulls last, created_at asc limit 40`,
+        params,
+      );
+      return JSON.stringify({ tasks: rows, count: rows.length, today: new Date().toISOString().slice(0, 10) });
+    }
+
+    case 'update_team_task': {
+      const fields: string[] = [];
+      const params: any[] = [];
+      if (input.status && ['todo', 'in_progress', 'done'].includes(input.status)) {
+        params.push(input.status);
+        fields.push(`status = $${params.length}`);
+        fields.push(input.status === 'done' ? `completed_at = now()` : `completed_at = null`);
+      }
+      if (input.due_date && /^\d{4}-\d{2}-\d{2}$/.test(input.due_date)) {
+        params.push(input.due_date);
+        fields.push(`due_date = $${params.length}`);
+      }
+      if (input.assignee) {
+        const e = await resolveTeamEmail(input.assignee);
+        if (!e) return JSON.stringify({ success: false, error: `No team member matches "${input.assignee}"` });
+        params.push(e);
+        fields.push(`assignee_email = $${params.length}`);
+      }
+      if (input.priority && ['low', 'normal', 'high', 'urgent'].includes(input.priority)) {
+        params.push(input.priority);
+        fields.push(`priority = $${params.length}`);
+      }
+      if (fields.length === 0) return JSON.stringify({ success: false, error: 'Nothing to update' });
+      params.push(input.task_id);
+      const { rows } = await query(
+        `update team_tasks set ${fields.join(', ')} where id = $${params.length} returning *`,
+        params,
+      );
+      return rows.length > 0
+        ? JSON.stringify({ success: true, task: rows[0] })
+        : JSON.stringify({ success: false, error: 'Task not found' });
+    }
+
+    case 'list_clients': {
+      let custom: Array<{ id: string; name: string; short_name: string | null }> = [];
+      try {
+        const { rows } = await query(`select id, name, short_name from custom_clients order by created_at asc`);
+        custom = rows;
+      } catch { /* table empty — statics still returned */ }
+      const all = [
+        ...staticClients.map((c) => ({ id: c.id, name: c.name, short_name: c.shortName })),
+        ...custom.filter((r) => !staticClients.some((c) => c.id === r.id)),
+      ];
+      return JSON.stringify({ clients: all, count: all.length });
+    }
+
     default:
       return JSON.stringify({ error: `Unknown tool: ${name}` });
   }
@@ -306,18 +500,35 @@ export async function POST(req: NextRequest) {
       ? `\n\nThings you've been asked to remember:\n${recentMemories.map(m => `- [${m.category}] ${m.content}`).join('\n')}`
       : '';
 
-    const systemPrompt = `You are the MNA Personal Assistant — a helpful, concise AI assistant for Mother Nature Agency. You help manage schedules, tasks, campaigns, and content.
+    // Live client list (built-in + custom) so new clients are always known.
+    let clientLines = staticClients.map((c) => `- ${c.id} = ${c.name}`).join('\n');
+    try {
+      const { rows: customRows } = await query(`select id, name from custom_clients order by created_at asc`);
+      const extra = customRows.filter((r: any) => !staticClients.some((c) => c.id === r.id));
+      if (extra.length > 0) clientLines += '\n' + extra.map((r: any) => `- ${r.id} = ${r.name}`).join('\n');
+    } catch { /* non-fatal */ }
+
+    const team = await teamDirectory();
+    const teamLines = team.map((t) => `- ${t.name} <${t.email}>`).join('\n');
+
+    const systemPrompt = `You are the MNA Personal Assistant — a helpful, concise AI assistant for Mother Nature Agency. You help manage schedules, team assignments, campaigns, and content.
 
 Today is ${dayName}, ${today}. The user's email is ${userEmail}.
 
-You have access to tools to manage their schedule, store memories, and check campaigns/content. When the user asks you to do something, use the appropriate tool. Be conversational but efficient — don't over-explain.
+You have access to tools to manage their schedule, assign and track team tasks, store memories, and check campaigns/content. When the user asks you to do something, use the appropriate tool. Be conversational but efficient — don't over-explain.
 
-Client IDs for reference:
-- prime-iv = Prime IV Niceville
-- prime-iv-pinecrest = Prime IV Pinecrest
-- serenity-bayfront = Serenity Bayfront (vacation rental)
-- mna-realty = MNA Realty
-- mna = Mother Nature Agency (internal)
+TEAM TASKS (the Asana-style board at /team-tasks):
+- create_team_task assigns work to a teammate with a deadline and priority. "Assign Sable a task to shoot Chill House content, due Friday" → one call, done.
+- repeat "monthly" makes it auto-create every month on its due day; repeat "per_new_client" makes it auto-create whenever a new client is onboarded — use these when the user describes recurring duties (monthly specials deadlines, onboarding checklists).
+- list_team_tasks answers "what's on Sable's plate", "what's overdue", "what is everyone working on" (use overdue_only for overdue checks).
+- update_team_task marks tasks done, moves deadlines, or reassigns. Look the task up with list_team_tasks first to get its id.
+- Team task assignees must be team members, never clients.
+
+The team:
+${teamLines}
+
+Client IDs for reference (call list_clients if one you need is missing):
+${clientLines}
 
 When adding events, infer reasonable defaults:
 - If no time given, leave start_time null (it becomes an all-day task)
