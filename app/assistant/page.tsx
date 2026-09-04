@@ -119,10 +119,13 @@ export default function AssistantPage() {
     // Premium voice first (ElevenLabs "Lily" via /api/voice/tts) —
     // falls back to the browser voice when the key isn't configured.
     try {
+      // Same voice the globe uses — the dropdown there saves mn_voice_id.
+      let voiceId = '';
+      try { voiceId = localStorage.getItem('mn_voice_id') || ''; } catch { /* fine */ }
       const res = await fetch('/api/voice/tts', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ text: clean }),
+        body: JSON.stringify({ text: clean, voiceId: voiceId || undefined }),
       });
       if (res.ok) {
         const url = URL.createObjectURL(await res.blob());

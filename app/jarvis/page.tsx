@@ -141,10 +141,13 @@ export default function CommandCenterPage() {
     try { audioRef.current?.pause(); } catch { /* fine */ }
     try { window.speechSynthesis?.cancel(); } catch { /* fine */ }
     try {
+      // Same voice the globe uses — the dropdown there saves mn_voice_id.
+      let voiceId = '';
+      try { voiceId = localStorage.getItem('mn_voice_id') || ''; } catch { /* fine */ }
       const res = await fetch('/api/voice/tts', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ text: clean }),
+        body: JSON.stringify({ text: clean, voiceId: voiceId || undefined }),
       });
       if (res.ok) {
         const url = URL.createObjectURL(await res.blob());

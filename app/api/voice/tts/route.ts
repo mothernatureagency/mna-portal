@@ -38,7 +38,11 @@ export async function POST(req: NextRequest) {
   const text = (body?.text || '').toString().trim().slice(0, 2000);
   if (!text) return NextResponse.json({ error: 'text required' }, { status: 400 });
 
-  const voiceId = process.env.ELEVENLABS_VOICE_ID || LILY_VOICE_ID;
+  // Voice priority: the caller's saved pick (the globe's voice dropdown
+  // stores one) → env override → Lily. Keeps every Jarvis surface speaking
+  // with the same voice the user chose.
+  const requested = (body?.voiceId || '').toString().trim();
+  const voiceId = (/^[A-Za-z0-9]{10,40}$/.test(requested) ? requested : '') || process.env.ELEVENLABS_VOICE_ID || LILY_VOICE_ID;
 
   try {
     const res = await fetch(`https://api.elevenlabs.io/v1/text-to-speech/${voiceId}?output_format=mp3_44100_64`, {
