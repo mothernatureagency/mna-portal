@@ -95,6 +95,7 @@ function PhotoDropZone({
   );
 }
 import { getPlaybooksForClient } from '@/lib/agents/playbooks';
+import InstagramGridPreview from '@/components/content/InstagramGridPreview';
 import { clients as ALL_CLIENTS } from '@/lib/clients';
 
 type ApprovalStatus = 'drafting' | 'pending_review' | 'approved' | 'changes_requested' | 'scheduled';
@@ -361,6 +362,7 @@ export default function ContentPage() {
   const [newPost, setNewPost] = useState({ post_date: '', platform: 'Instagram', content_type: 'Post', title: '', caption: '' });
   // Monthly Planner — enter the month's specials (or pick Drive photos), AI drafts the plan
   const [showPlanner, setShowPlanner] = useState(false);
+  const [showGrid, setShowGrid] = useState(false);
   const [planMonth, setPlanMonth] = useState(() => {
     const d = new Date();
     return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
@@ -2061,6 +2063,31 @@ export default function ContentPage() {
           )}
         </div>
       )}
+
+      {/* Instagram Grid Mockup — how the scheduled photos will actually read as a feed */}
+      <div className="glass-card p-3" style={{ borderLeft: '3px solid #E1306C' }}>
+        <button onClick={() => setShowGrid((s) => !s)} className="w-full flex items-center gap-2 text-left">
+          <span className="material-symbols-outlined text-pink-300 shrink-0" style={{ fontSize: 18 }}>grid_on</span>
+          <span className="text-[12px] font-semibold text-white/80">Instagram Grid Mockup</span>
+          <span className="text-[11px] text-white/45">— preview the scheduled photos laid out as an Instagram feed, three across</span>
+          <span className="ml-auto text-white/40 text-[11px]">{showGrid ? '\u25b2' : '\u25bc'}</span>
+        </button>
+        {showGrid && activeClient && (
+          <div className="mt-4">
+            <InstagramGridPreview
+              client={{
+                name: activeClient.name,
+                shortName: activeClient.shortName,
+                logoUrl: activeClient.branding?.logoUrl,
+                gradientFrom: activeClient.branding?.gradientFrom,
+                gradientTo: activeClient.branding?.gradientTo,
+                instagramLink: activeClient.links?.instagram,
+              }}
+              posts={items}
+            />
+          </div>
+        )}
+      </div>
 
       {/* Planner preview — review the AI plan before it hits the calendar */}
       {isStaff && planPreview && (

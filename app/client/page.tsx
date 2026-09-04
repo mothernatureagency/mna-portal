@@ -27,6 +27,7 @@ import {
   type TopPostRow,
 } from '@/lib/portal-layout';
 import { previewSrc, photoOpenUrl, photosOf, isVideoUrl } from '@/lib/drive';
+import InstagramGridPreview from '@/components/content/InstagramGridPreview';
 
 type MonthData = {
   month: string; // 'Jan', 'Feb', etc.
@@ -559,6 +560,23 @@ export default function ClientOverviewPage() {
         <div className="text-[11px] text-white/50 mt-2">{calMonthItems.length} posts this month</div>
       </div>
 
+      </PortalSection>
+
+      <PortalSection id="overview.instagram-grid" titleKey="overview.instagram-grid" defaultTitle="Instagram Grid Mockup">
+      {/* Instagram Grid Mockup — scheduled photos previewed as a 3-across feed */}
+      <div className="glass-card p-4 md:p-6">
+        <InstagramGridPreview
+          client={{
+            name: client.name,
+            shortName: client.shortName,
+            logoUrl: client.branding?.logoUrl,
+            gradientFrom: client.branding?.gradientFrom,
+            gradientTo: client.branding?.gradientTo,
+            instagramLink: client.links?.instagram,
+          }}
+          posts={calItems}
+        />
+      </div>
       </PortalSection>
 
       <PortalSection id="overview.kpis-live" titleKey="overview.kpis-live" defaultTitle="Performance KPIs">

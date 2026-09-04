@@ -46,6 +46,7 @@ export const PORTAL_PAGES: PortalPageDef[] = [
     locked: true,
     sections: [
       { id: 'overview.calendar', label: 'Content Calendar preview', note: 'Month grid of approved posts' },
+      { id: 'overview.instagram-grid', label: 'Instagram Grid Mockup', note: 'Scheduled photos previewed as a 3-across Instagram feed' },
       { id: 'overview.kpis-live', label: 'Performance KPIs', note: 'Auto-pulled Meta metrics + manual pipeline numbers' },
       { id: 'overview.competitors', label: 'Competitor Benchmark' },
       { id: 'overview.google', label: 'Google Performance', note: 'Business Profile, Ads, website and search' },
