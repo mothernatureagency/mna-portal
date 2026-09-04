@@ -13,11 +13,11 @@ type Message = {
 
 const SUGGESTIONS = [
   "What's on my schedule today?",
-  "Add a meeting with Prime IV tomorrow at 10am",
-  "What campaigns are pending review?",
-  "Remember that Pinecrest reopening is May 1st",
-  "What content needs approval this week?",
-  "Add a task: review Serenity photos by Friday",
+  'Assign Sable a task to shoot Chill House content, due Friday',
+  "What's overdue on the team board?",
+  'Every month on the 25th, remind Vanessa to collect specials',
+  'What content needs approval this week?',
+  "What's on Vanessa's plate right now?",
 ];
 
 export default function AssistantPage() {
@@ -25,14 +25,43 @@ export default function AssistantPage() {
   const [input, setInput] = useState('');
   const [loading, setLoading] = useState(false);
   const [userEmail, setUserEmail] = useState('');
+
+  // ── Voice mode (the Jarvis part) ──────────────────────────────────
+  // Tap the mic to talk; with Voice Mode on, replies are spoken aloud and
+  // the mic re-opens after each answer for a hands-free conversation.
+  const [voiceOn, setVoiceOn] = useState(false);
+  const [listening, setListening] = useState(false);
+  const [speaking, setSpeaking] = useState(false);
+  const [voiceSupported, setVoiceSupported] = useState(true);
+
   const chatEndRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLTextAreaElement>(null);
+  const recognitionRef = useRef<any>(null);
+  const voiceOnRef = useRef(false);
+  const speakingRef = useRef(false);
+  const listeningRef = useRef(false);
+  const loadingRef = useRef(false);
+  const messagesRef = useRef<Message[]>([]);
+  const userEmailRef = useRef('');
+
+  useEffect(() => { voiceOnRef.current = voiceOn; }, [voiceOn]);
+  useEffect(() => { speakingRef.current = speaking; }, [speaking]);
+  useEffect(() => { listeningRef.current = listening; }, [listening]);
+  useEffect(() => { loadingRef.current = loading; }, [loading]);
+  useEffect(() => { messagesRef.current = messages; }, [messages]);
+  useEffect(() => { userEmailRef.current = userEmail; }, [userEmail]);
 
   useEffect(() => {
     const supabase = createClient();
-    supabase.auth.getUser().then(({ data: { user } }) => {
-      setUserEmail(user?.email || '');
+    supabase.auth.getUser().then((res: { data: { user: { email?: string | null } | null } }) => {
+      setUserEmail(res.data.user?.email || '');
     });
+    const SR = typeof window !== 'undefined' && ((window as any).webkitSpeechRecognition || (window as any).SpeechRecognition);
+    if (!SR) setVoiceSupported(false);
+    return () => {
+      try { recognitionRef.current?.stop(); } catch { /* already stopped */ }
+      try { window.speechSynthesis?.cancel(); } catch { /* unavailable */ }
+    };
   }, []);
 
   useEffect(() => {
@@ -47,9 +76,122 @@ export default function AssistantPage() {
     }
   }, [input]);
 
+  // ── Text-to-speech ────────────────────────────────────────────────
+
+  function pickVoice(): SpeechSynthesisVoice | null {
+    const voices = window.speechSynthesis?.getVoices() || [];
+    return voices.find((v) => v.name === 'Google US English')
+      || voices.find((v) => /Samantha|Karen|Ava|Allison/i.test(v.name))
+      || voices.find((v) => (v.lang || '').startsWith('en'))
+      || null;
+  }
+
+  function speak(text: string) {
+    if (!voiceOnRef.current || typeof window === 'undefined' || !window.speechSynthesis) return;
+    // Strip characters that read badly aloud (markdown, merge tags, emoji-ish).
+    const clean = text.replace(/[*_#`>|]/g, ' ').replace(/\{\{[^}]+\}\}/g, 'the link').replace(/\s+/g, ' ').trim().slice(0, 1400);
+    if (!clean) return;
+    window.speechSynthesis.cancel();
+    const u = new SpeechSynthesisUtterance(clean);
+    const v = pickVoice();
+    if (v) u.voice = v;
+    u.rate = 1.05;
+    u.onstart = () => { speakingRef.current = true; setSpeaking(true); };
+    u.onend = () => {
+      speakingRef.current = false;
+      setSpeaking(false);
+      // Hands-free loop: after answering, listen for the next request.
+      if (voiceOnRef.current) setTimeout(() => startListening(), 300);
+    };
+    u.onerror = () => { speakingRef.current = false; setSpeaking(false); };
+    window.speechSynthesis.speak(u);
+  }
+
+  function stopSpeaking() {
+    try { window.speechSynthesis?.cancel(); } catch { /* unavailable */ }
+    speakingRef.current = false;
+    setSpeaking(false);
+  }
+
+  // ── Speech-to-text ────────────────────────────────────────────────
+
+  function startListening() {
+    if (listeningRef.current || loadingRef.current || speakingRef.current) return;
+    const SR = (window as any).webkitSpeechRecognition || (window as any).SpeechRecognition;
+    if (!SR) { setVoiceSupported(false); return; }
+    try { recognitionRef.current?.stop(); } catch { /* fine */ }
+
+    const rec = new SR();
+    rec.lang = 'en-US';
+    rec.interimResults = true;
+    rec.continuous = false;
+    let finalText = '';
+
+    rec.onresult = (e: any) => {
+      let interim = '';
+      for (let i = e.resultIndex; i < e.results.length; i++) {
+        const t = e.results[i][0].transcript;
+        if (e.results[i].isFinal) finalText += t;
+        else interim += t;
+      }
+      setInput((finalText + interim).trimStart());
+    };
+    rec.onend = () => {
+      listeningRef.current = false;
+      setListening(false);
+      const msg = finalText.trim();
+      if (msg) {
+        setInput('');
+        void send(msg);
+      } else if (voiceOnRef.current && !speakingRef.current && !loadingRef.current) {
+        // Heard nothing — quietly keep the mic warm in hands-free mode.
+        setTimeout(() => { if (voiceOnRef.current && !speakingRef.current && !loadingRef.current) startListening(); }, 500);
+      }
+    };
+    rec.onerror = (e: any) => {
+      listeningRef.current = false;
+      setListening(false);
+      if (e?.error === 'not-allowed' || e?.error === 'service-not-allowed') {
+        // Mic permission refused — drop out of voice mode instead of looping.
+        voiceOnRef.current = false;
+        setVoiceOn(false);
+      }
+    };
+
+    recognitionRef.current = rec;
+    listeningRef.current = true;
+    setListening(true);
+    try { rec.start(); } catch { listeningRef.current = false; setListening(false); }
+  }
+
+  function stopListening() {
+    try { recognitionRef.current?.stop(); } catch { /* fine */ }
+    listeningRef.current = false;
+    setListening(false);
+  }
+
+  function toggleVoiceMode() {
+    if (voiceOn) {
+      voiceOnRef.current = false;
+      setVoiceOn(false);
+      stopListening();
+      stopSpeaking();
+      setInput('');
+    } else {
+      voiceOnRef.current = true;
+      setVoiceOn(true);
+      // Speaking first doubles as the user-gesture unlock for audio output;
+      // the mic opens as soon as the confirmation finishes.
+      if (window.speechSynthesis) speak("Voice mode on. I'm listening.");
+      else startListening();
+    }
+  }
+
+  // ── Chat ──────────────────────────────────────────────────────────
+
   async function send(text?: string) {
     const msg = (text || input).trim();
-    if (!msg || loading) return;
+    if (!msg || loadingRef.current) return;
     setInput('');
 
     const userMsg: Message = {
@@ -59,43 +201,46 @@ export default function AssistantPage() {
       timestamp: new Date(),
     };
 
-    const newMessages = [...messages, userMsg];
+    const newMessages = [...messagesRef.current, userMsg];
     setMessages(newMessages);
     setLoading(true);
+    loadingRef.current = true;
 
     try {
       const res = await fetch('/api/assistant', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          email: userEmail,
+          email: userEmailRef.current,
           messages: newMessages.map((m) => ({ role: m.role, content: m.content })),
         }),
       });
 
       const data = await res.json();
+      const replyText = data.reply || data.error || 'Something went wrong.';
 
       const assistantMsg: Message = {
         id: crypto.randomUUID(),
         role: 'assistant',
-        content: data.reply || data.error || 'Something went wrong.',
+        content: replyText,
         timestamp: new Date(),
       };
 
       setMessages([...newMessages, assistantMsg]);
+      loadingRef.current = false;
+      setLoading(false);
+      speak(replyText);
     } catch {
+      const failText = 'Sorry, I had trouble connecting. Try again.';
       setMessages([
         ...newMessages,
-        {
-          id: crypto.randomUUID(),
-          role: 'assistant',
-          content: 'Sorry, I had trouble connecting. Try again.',
-          timestamp: new Date(),
-        },
+        { id: crypto.randomUUID(), role: 'assistant', content: failText, timestamp: new Date() },
       ]);
-    } finally {
+      loadingRef.current = false;
       setLoading(false);
-      setTimeout(() => inputRef.current?.focus(), 100);
+      speak(failText);
+    } finally {
+      if (!voiceOnRef.current) setTimeout(() => inputRef.current?.focus(), 100);
     }
   }
 
@@ -113,8 +258,8 @@ export default function AssistantPage() {
   return (
     <div className="max-w-[900px] mx-auto flex flex-col" style={{ height: 'calc(100vh - 80px)' }}>
       {/* Header */}
-      <div className="shrink-0 pb-4">
-        <div className="flex items-center gap-3 mb-1">
+      <div className="shrink-0 pb-4 flex items-center justify-between gap-3">
+        <div className="flex items-center gap-3">
           <div
             className="w-10 h-10 rounded-xl flex items-center justify-center"
             style={{ background: 'linear-gradient(135deg, #0c6da4, #4ab8ce)' }}
@@ -123,8 +268,41 @@ export default function AssistantPage() {
           </div>
           <div>
             <h1 className="text-[20px] font-extrabold text-white tracking-tight">MNA Assistant</h1>
-            <p className="text-[12px] text-white/40">Your personal AI assistant</p>
+            <p className="text-[12px] text-white/40">
+              {voiceOn
+                ? (speaking ? 'Speaking…' : listening ? 'Listening…' : loading ? 'Thinking…' : 'Voice mode — say something')
+                : 'Your personal AI assistant'}
+            </p>
           </div>
+        </div>
+
+        <div className="flex items-center gap-2">
+          {speaking && (
+            <button
+              onClick={stopSpeaking}
+              className="w-9 h-9 rounded-xl flex items-center justify-center text-white/70 hover:text-white"
+              style={{ background: 'rgba(255,255,255,0.08)' }}
+              title="Stop speaking"
+            >
+              <span className="material-symbols-outlined" style={{ fontSize: 18 }}>stop_circle</span>
+            </button>
+          )}
+          {voiceSupported && (
+            <button
+              onClick={toggleVoiceMode}
+              className="flex items-center gap-2 px-3.5 py-2 rounded-xl text-[12px] font-bold text-white transition-all"
+              style={{
+                background: voiceOn ? 'linear-gradient(135deg, #0c6da4, #4ab8ce)' : 'rgba(255,255,255,0.08)',
+                border: voiceOn ? '1px solid rgba(74,184,206,0.6)' : '1px solid rgba(255,255,255,0.12)',
+                boxShadow: voiceOn ? '0 0 18px rgba(74,184,206,0.35)' : 'none',
+              }}
+              title={voiceOn ? 'Turn voice mode off' : 'Talk to the assistant hands-free — it speaks its answers and keeps listening'}
+            >
+              <span className="material-symbols-outlined" style={{ fontSize: 17 }}>{voiceOn ? 'headset_mic' : 'headset'}</span>
+              {voiceOn ? 'Voice On' : 'Voice Mode'}
+              {voiceOn && <span className="w-1.5 h-1.5 rounded-full bg-white animate-pulse" />}
+            </button>
+          )}
         </div>
       </div>
 
@@ -134,14 +312,19 @@ export default function AssistantPage() {
           /* Empty state */
           <div className="flex flex-col items-center justify-center h-full px-6 py-12">
             <div
-              className="w-16 h-16 rounded-2xl flex items-center justify-center mb-5"
-              style={{ background: 'linear-gradient(135deg, #0c6da4, #4ab8ce)' }}
+              className={`w-16 h-16 rounded-2xl flex items-center justify-center mb-5 ${listening ? 'animate-pulse' : ''}`}
+              style={{
+                background: 'linear-gradient(135deg, #0c6da4, #4ab8ce)',
+                boxShadow: listening ? '0 0 32px rgba(74,184,206,0.6)' : 'none',
+              }}
             >
-              <span className="material-symbols-outlined text-white" style={{ fontSize: 32 }}>smart_toy</span>
+              <span className="material-symbols-outlined text-white" style={{ fontSize: 32 }}>{listening ? 'graphic_eq' : 'smart_toy'}</span>
             </div>
             <h2 className="text-white text-[18px] font-bold mb-1">{timeGreeting}{greetingName ? `, ${greetingName}` : ''}</h2>
             <p className="text-white/40 text-[13px] mb-8 text-center max-w-md">
-              I can manage your schedule, track campaigns, remember important details, and help you stay on top of everything.
+              {voiceOn
+                ? 'Voice mode is on — just talk. I speak my answers and keep listening.'
+                : 'I can assign team tasks, manage your schedule, track campaigns, remember details, and keep you on top of everything. Hit Voice Mode to talk instead of type.'}
             </p>
 
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 w-full max-w-lg">
@@ -230,19 +413,37 @@ export default function AssistantPage() {
       {/* Input area */}
       <div className="shrink-0 pb-4">
         <div
-          className="flex items-end gap-3 rounded-2xl px-4 py-3"
-          style={{ background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.1)' }}
+          className="flex items-end gap-3 rounded-2xl px-4 py-3 transition-shadow"
+          style={{
+            background: 'rgba(255,255,255,0.06)',
+            border: listening ? '1px solid rgba(74,184,206,0.55)' : '1px solid rgba(255,255,255,0.1)',
+            boxShadow: listening ? '0 0 20px rgba(74,184,206,0.25)' : 'none',
+          }}
         >
           <textarea
             ref={inputRef}
             value={input}
             onChange={(e) => setInput(e.target.value)}
             onKeyDown={handleKeyDown}
-            placeholder="Ask me anything or tell me what to do..."
+            placeholder={listening ? 'Listening — just talk…' : 'Ask me anything or tell me what to do...'}
             rows={1}
             className="flex-1 bg-transparent text-white text-[14px] placeholder:text-white/30 focus:outline-none resize-none"
             style={{ minHeight: 24, maxHeight: 120 }}
           />
+          {voiceSupported && (
+            <button
+              onClick={() => (listening ? stopListening() : startListening())}
+              disabled={loading}
+              className={`w-9 h-9 rounded-xl flex items-center justify-center text-white shrink-0 transition-all disabled:opacity-30 ${listening ? 'animate-pulse' : ''}`}
+              style={{
+                background: listening ? 'linear-gradient(135deg, #e11d48, #f43f5e)' : 'rgba(255,255,255,0.1)',
+                boxShadow: listening ? '0 0 16px rgba(244,63,94,0.5)' : 'none',
+              }}
+              title={listening ? 'Stop listening' : 'Tap to talk'}
+            >
+              <span className="material-symbols-outlined" style={{ fontSize: 18 }}>{listening ? 'mic' : 'mic_none'}</span>
+            </button>
+          )}
           <button
             onClick={() => send()}
             disabled={!input.trim() || loading}
@@ -253,7 +454,9 @@ export default function AssistantPage() {
           </button>
         </div>
         <div className="text-[10px] text-white/20 text-center mt-2">
-          MNA Assistant can manage your schedule, remember things, and check your campaigns and content.
+          {voiceSupported
+            ? 'Tap the mic to talk, or turn on Voice Mode for a hands-free conversation — it can assign team tasks, manage your schedule, and check campaigns and content.'
+            : 'Voice needs Chrome or Edge — in this browser the assistant is text-only.'}
         </div>
       </div>
     </div>

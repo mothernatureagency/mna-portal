@@ -8,6 +8,7 @@ import { createClient } from '@/lib/supabase/client';
 const NAV = [
   { sec: 'MAIN', items: [
     { label: 'Home', href: '/', e: 'home' },
+    { label: 'Command Center', href: '/jarvis', e: 'radar' },
     { label: 'Schedule', href: '/schedule', e: 'calendar_today' },
     { label: 'Business Overview', href: '/overview', e: 'bar_chart' },
   ]},
