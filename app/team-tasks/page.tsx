@@ -3,19 +3,22 @@
 /**
  * Team Tasks — Asana/Monday-style board for internal assignments.
  *
- * The owner (or any staff member) assigns tasks to portal accounts with a
- * deadline; everyone's tasks are visible in one place, grouped by person and
- * sorted by due date with overdue highlighting. A task can be one-time,
- * repeat every month (auto-created on the 1st, or on demand), or spawn for
- * each new client the moment one is added to the portal (also appliable to
- * existing clients by hand). Recurring definitions live in the "Recurring
- * tasks" panel where they can be paused, applied, or removed.
+ * Three views of the same tasks, switchable like Monday.com:
+ *   Table    — per-person groups with real columns (task, client, due,
+ *              priority, status), colored pills, inline editing.
+ *   Board    — Asana-style kanban: To do / In progress / Done columns.
+ *   Calendar — month grid with each task on its deadline, colored by
+ *              assignee, overdue highlighted.
+ *
+ * Tasks are one-time, monthly (auto-created each month), or per-new-client
+ * (auto-created when a client is onboarded). Recurring definitions live in
+ * the "Recurring" panel where they can be paused, applied, or removed.
  */
 
 import React, { useEffect, useMemo, useState } from 'react';
 import { useClient } from '@/context/ClientContext';
 import { createClient } from '@/lib/supabase/client';
-import { STAFF } from '@/lib/staff';
+import { STAFF, isOwner } from '@/lib/staff';
 
 type TeamTask = {
   id: string;
@@ -57,7 +60,7 @@ const PRIORITY_META: Record<string, { label: string; color: string }> = {
 
 const STATUS_META: Record<string, { label: string; color: string }> = {
   todo: { label: 'To do', color: '#9ca3af' },
-  in_progress: { label: 'In progress', color: '#0ea5e9' },
+  in_progress: { label: 'Working on it', color: '#f59e0b' },
   done: { label: 'Done', color: '#10b981' },
 };
 
@@ -78,6 +81,20 @@ function fmtDue(iso: string): string {
   } catch { return iso; }
 }
 
+const MONTHS = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];
+const DOW = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
+
+/** Month grid: leading/trailing nulls pad to full weeks. */
+function monthGrid(y: number, m: number): (string | null)[] {
+  const startDow = new Date(y, m, 1).getDay();
+  const daysInMonth = new Date(y, m + 1, 0).getDate();
+  const cells: (string | null)[] = [];
+  for (let i = 0; i < startDow; i++) cells.push(null);
+  for (let d = 1; d <= daysInMonth; d++) cells.push(`${y}-${String(m + 1).padStart(2, '0')}-${String(d).padStart(2, '0')}`);
+  while (cells.length % 7) cells.push(null);
+  return cells;
+}
+
 export default function TeamTasksPage() {
   const ctx = useClient() as any;
   const allClients: Array<{ id: string; shortName: string; name: string; branding?: { gradientFrom?: string } }> = ctx?.allClients || [];
@@ -88,6 +105,8 @@ export default function TeamTasksPage() {
   const [userEmail, setUserEmail] = useState('');
   const [loading, setLoading] = useState(true);
   const [filter, setFilter] = useState<string>('All');
+  const [viewMode, setViewMode] = useState<'table' | 'board' | 'calendar'>('table');
+  const [calCursor, setCalCursor] = useState(() => { const d = new Date(); return { y: d.getFullYear(), m: d.getMonth() }; });
   const [showForm, setShowForm] = useState(false);
   const [showTemplates, setShowTemplates] = useState(false);
   const [showDone, setShowDone] = useState(false);
@@ -128,7 +147,12 @@ export default function TeamTasksPage() {
   }
 
   useEffect(() => {
-    createClient().auth.getUser().then((res: { data: { user: { email?: string | null } | null } }) => setUserEmail((res.data.user?.email || '').toLowerCase()));
+    createClient().auth.getUser().then((res: { data: { user: { email?: string | null } | null } }) => {
+      const email = (res.data.user?.email || '').toLowerCase();
+      setUserEmail(email);
+      // Teammates land on their own list; the owner sees everyone.
+      if (email && !isOwner(email)) setFilter('My Tasks');
+    });
     fetch('/api/staff').then((r) => r.json()).then((d) => setStaffRows(d.staff || [])).catch(() => {});
     load();
   }, []);
@@ -201,16 +225,17 @@ export default function TeamTasksPage() {
 
   // ── Derived views ─────────────────────────────────────────────────
   const today = todayIso();
-  const open = tasks.filter((t) => t.status !== 'done');
-  const done = tasks.filter((t) => t.status === 'done');
-
-  const shown = open.filter((t) => {
+  const inFilter = (t: TeamTask) => {
     if (filter === 'All') return true;
     if (filter === 'My Tasks') return (t.assignee_email || '') === userEmail;
     return (t.assignee_email || '') === filter;
-  });
+  };
+  const open = tasks.filter((t) => t.status !== 'done');
+  const done = tasks.filter((t) => t.status === 'done');
+  const shown = open.filter(inFilter);
+  const shownAll = tasks.filter(inFilter);
 
-  // Monday-style: one lane per person, unassigned last.
+  // Table: one Monday-style group per person, unassigned last.
   const lanes = useMemo(() => {
     const map = new Map<string, TeamTask[]>();
     for (const t of shown) {
@@ -222,11 +247,91 @@ export default function TeamTasksPage() {
     return entries;
   }, [shown]);
 
+  // Calendar: tasks bucketed by due date for the visible month.
+  const calCells = monthGrid(calCursor.y, calCursor.m);
+  const byDate = useMemo(() => {
+    const map = new Map<string, TeamTask[]>();
+    for (const t of shownAll) {
+      if (!t.due_date) continue;
+      map.set(t.due_date, [...(map.get(t.due_date) || []), t]);
+    }
+    return map;
+  }, [shownAll]);
+  const noDateCount = shown.filter((t) => !t.due_date).length;
+
   const overdueCount = (list: TeamTask[]) => list.filter((t) => t.due_date && t.due_date < today).length;
 
+  // ── Shared cell renderers ─────────────────────────────────────────
+
+  function DuePill({ task }: { task: TeamTask }) {
+    const isOverdue = !!task.due_date && task.due_date < today && task.status !== 'done';
+    const isToday = task.due_date === today && task.status !== 'done';
+    return (
+      <input type="date" value={task.due_date || ''} onChange={(e) => patchTask(task.id, { dueDate: e.target.value || null })}
+        className="text-[10px] font-semibold px-1.5 py-1 rounded-lg border outline-none bg-transparent cursor-pointer w-[112px]"
+        style={{
+          color: isOverdue ? '#fda4af' : isToday ? '#fcd34d' : 'rgba(255,255,255,0.65)',
+          borderColor: isOverdue ? 'rgba(244,63,94,0.45)' : isToday ? 'rgba(245,158,11,0.4)' : 'rgba(255,255,255,0.1)',
+          background: isOverdue ? 'rgba(244,63,94,0.1)' : isToday ? 'rgba(245,158,11,0.08)' : 'transparent',
+        }}
+        title={isOverdue ? `Overdue — was due ${fmtDue(task.due_date!)}` : 'Deadline'} />
+    );
+  }
+
+  function StatusPill({ task }: { task: TeamTask }) {
+    const s = STATUS_META[task.status] || STATUS_META.todo;
+    return (
+      <select value={task.status} onChange={(e) => patchTask(task.id, { status: e.target.value })}
+        className="text-[10px] font-bold px-2 py-1.5 rounded-lg outline-none cursor-pointer border-0 w-[118px] text-center appearance-none"
+        style={{ background: s.color + '2b', color: s.color }}>
+        {Object.entries(STATUS_META).map(([k, v]) => <option key={k} value={k} style={{ background: '#0d1b2a' }}>{v.label}</option>)}
+      </select>
+    );
+  }
+
+  function PriorityPill({ task }: { task: TeamTask }) {
+    const p = PRIORITY_META[task.priority] || PRIORITY_META.normal;
+    return (
+      <select value={task.priority} onChange={(e) => patchTask(task.id, { priority: e.target.value })}
+        className="text-[10px] font-bold px-2 py-1.5 rounded-lg outline-none cursor-pointer border-0 w-[92px] text-center appearance-none"
+        style={{ background: p.color + '2b', color: p.color }}>
+        {Object.entries(PRIORITY_META).map(([k, v]) => <option key={k} value={k} style={{ background: '#0d1b2a' }}>{v.label}</option>)}
+      </select>
+    );
+  }
+
+  function AssigneeSelect({ task }: { task: TeamTask }) {
+    const m = memberOf(task.assignee_email);
+    return (
+      <select value={task.assignee_email || ''} onChange={(e) => patchTask(task.id, { assigneeEmail: e.target.value || null })}
+        className="text-[10px] font-semibold px-2 py-1.5 rounded-lg outline-none cursor-pointer border w-[104px]"
+        style={{ color: m?.color || 'rgba(255,255,255,0.4)', borderColor: 'rgba(255,255,255,0.1)', background: m ? m.color + '14' : 'transparent' }} title="Reassign">
+        <option value="">Unassigned</option>
+        {members.map((mm) => <option key={mm.email} value={mm.email} style={{ background: '#0d1b2a' }}>{mm.name}</option>)}
+      </select>
+    );
+  }
+
+  function TitleCell({ task }: { task: TeamTask }) {
+    const c = clientOf(task.client_id);
+    return (
+      <div className="min-w-0 flex-1">
+        <div className="flex items-center gap-1.5 min-w-0">
+          <span className="text-[12px] font-semibold text-white/90 truncate">{task.title}</span>
+          {task.recurrence === 'monthly' && <span className="material-symbols-outlined text-sky-300/70 shrink-0" style={{ fontSize: 13 }} title="Repeats monthly">repeat</span>}
+          {task.recurrence === 'per_new_client' && <span className="material-symbols-outlined text-violet-300/70 shrink-0" style={{ fontSize: 13 }} title="Created for a new client">add_business</span>}
+        </div>
+        <div className="flex items-center gap-1.5 min-w-0">
+          {c && <span className="text-[9px] font-semibold px-1.5 py-0.5 rounded shrink-0" style={{ color: c.branding?.gradientFrom || '#4ab8ce', background: (c.branding?.gradientFrom || '#4ab8ce') + '18' }}>{c.shortName}</span>}
+          {task.description && <span className="text-[10px] text-white/40 truncate">{task.description}</span>}
+        </div>
+      </div>
+    );
+  }
+
   return (
-    <div className="flex flex-col gap-6 max-w-[1200px]">
-      <div className="flex items-center justify-between">
+    <div className="flex flex-col gap-6 max-w-[1250px]">
+      <div className="flex items-center justify-between flex-wrap gap-3">
         <div>
           <div className="flex items-center gap-3">
             <span className="material-symbols-outlined text-white/80" style={{ fontSize: 28 }}>assignment_ind</span>
@@ -234,19 +339,25 @@ export default function TeamTasksPage() {
           </div>
           <p className="text-white/60 mt-1">Assign work to the team with deadlines — one-time, monthly, or for every new client.</p>
         </div>
-        <div className="flex items-center gap-2">
-          <button
-            onClick={() => setShowTemplates((s) => !s)}
-            className="text-[12px] font-semibold px-3 py-2 rounded-xl bg-white/5 text-white/70 hover:text-white border border-white/10 inline-flex items-center gap-1.5"
-          >
+        <div className="flex items-center gap-2 flex-wrap">
+          {/* View switch — Monday-style */}
+          <div className="flex gap-1 p-1 rounded-xl" style={{ background: 'rgba(255,255,255,0.08)' }}>
+            {([['table', 'table_rows', 'Table'], ['board', 'view_kanban', 'Board'], ['calendar', 'calendar_month', 'Calendar']] as const).map(([mode, icon, label]) => (
+              <button key={mode} onClick={() => setViewMode(mode)}
+                className={`px-3 py-1.5 text-[12px] font-semibold rounded-lg transition-colors flex items-center gap-1.5 ${viewMode === mode ? 'bg-white/15 text-white shadow' : 'text-white/50 hover:text-white/70'}`}>
+                <span className="material-symbols-outlined" style={{ fontSize: 16 }}>{icon}</span>
+                {label}
+              </button>
+            ))}
+          </div>
+          <button onClick={() => setShowTemplates((s) => !s)}
+            className="text-[12px] font-semibold px-3 py-2 rounded-xl bg-white/5 text-white/70 hover:text-white border border-white/10 inline-flex items-center gap-1.5">
             <span className="material-symbols-outlined" style={{ fontSize: 15 }}>repeat</span>
             Recurring ({templates.length})
           </button>
-          <button
-            onClick={() => setShowForm(!showForm)}
+          <button onClick={() => setShowForm(!showForm)}
             className="text-[12px] font-bold px-4 py-2 rounded-xl text-white"
-            style={{ background: 'linear-gradient(135deg, #0c6da4, #4ab8ce)' }}
-          >
+            style={{ background: 'linear-gradient(135deg, #0c6da4, #4ab8ce)' }}>
             {showForm ? 'Cancel' : '+ New Task'}
           </button>
         </div>
@@ -343,16 +454,16 @@ export default function TeamTasksPage() {
       {/* ── Recurring templates panel ─────────────────────────────── */}
       {showTemplates && (
         <div className="glass-card p-4" style={{ borderLeft: '3px solid #8b5cf6' }}>
-          <div className="flex items-center gap-2 mb-3">
+          <div className="flex items-center gap-2 mb-3 flex-wrap">
             <span className="material-symbols-outlined text-violet-300" style={{ fontSize: 18 }}>repeat</span>
             <span className="text-[12px] font-semibold text-white/80">Recurring tasks</span>
-            <span className="text-[11px] text-white/45">— monthly ones auto-create on the 1st; "each new client" ones fire when a client is added</span>
+            <span className="text-[11px] text-white/45">— monthly ones auto-create on the 1st; &quot;each new client&quot; ones fire when a client is added</span>
             <button onClick={runMonthlyNow} className="ml-auto text-[11px] font-semibold px-3 py-1.5 rounded-lg bg-white/5 text-white/70 hover:text-white border border-white/10">
               Generate this month now
             </button>
           </div>
           {templates.length === 0 ? (
-            <div className="text-[12px] text-white/40 py-2">No recurring tasks yet — pick "Every month" or "Each new client" when creating a task.</div>
+            <div className="text-[12px] text-white/40 py-2">No recurring tasks yet — pick &quot;Every month&quot; or &quot;Each new client&quot; when creating a task.</div>
           ) : (
             <div className="space-y-1.5">
               {templates.map((t) => {
@@ -415,83 +526,188 @@ export default function TeamTasksPage() {
         })}
       </div>
 
-      {/* ── Board: one lane per person ─────────────────────────────── */}
       {loading ? (
         <div className="glass-card p-8 text-center text-[12px] text-white/40">Loading the board…</div>
-      ) : lanes.length === 0 ? (
-        <div className="glass-card p-8 text-center">
-          <div className="text-[14px] font-semibold text-white/70">No open tasks{filter !== 'All' ? ' for this filter' : ''}</div>
-          <div className="text-[11px] text-white/40 mt-1">Click "+ New Task" to assign one.</div>
-        </div>
       ) : (
-        lanes.map(([email, list]) => {
-          const m = memberOf(email || null);
-          const overdue = overdueCount(list);
-          return (
-            <div key={email || 'unassigned'}>
-              <div className="flex items-center gap-2 mb-2">
-                <span className="w-6 h-6 rounded-full flex items-center justify-center text-[9px] font-bold text-white shrink-0"
-                  style={{ background: m?.color || 'rgba(255,255,255,0.15)' }}>
-                  {(m?.name || 'Unassigned').slice(0, 2).toUpperCase()}
-                </span>
-                <span className="text-[12px] font-bold text-white/80">{m?.name || 'Unassigned'}</span>
-                <span className="text-[10px] text-white/35">{list.length} open</span>
-                {overdue > 0 && <span className="text-[10px] font-bold text-rose-300">{overdue} overdue</span>}
-              </div>
-              <div className="glass-card p-3 space-y-0.5">
-                {list.map((task) => {
-                  const c = clientOf(task.client_id);
-                  const p = PRIORITY_META[task.priority] || PRIORITY_META.normal;
-                  const isOverdue = !!task.due_date && task.due_date < today;
-                  const isToday = task.due_date === today;
-                  return (
-                    <div key={task.id} className="flex items-center gap-3 py-2 px-1 border-b border-white/5 last:border-0 group">
-                      <button onClick={() => patchTask(task.id, { status: 'done' })}
-                        className="w-5 h-5 rounded border border-white/30 shrink-0 hover:border-emerald-400 transition-colors flex items-center justify-center" title="Mark done" />
-                      <div className="flex-1 min-w-0">
-                        <div className="flex items-center gap-2 min-w-0">
-                          <span className="text-[12px] font-semibold text-white/90 truncate">{task.title}</span>
-                          {task.recurrence === 'monthly' && <span className="material-symbols-outlined text-sky-300/70 shrink-0" style={{ fontSize: 13 }} title="Repeats monthly">repeat</span>}
-                          {task.recurrence === 'per_new_client' && <span className="material-symbols-outlined text-violet-300/70 shrink-0" style={{ fontSize: 13 }} title="Created for a new client">add_business</span>}
-                        </div>
-                        <div className="flex items-center gap-2">
-                          {c && <span className="text-[9px] font-semibold px-1.5 py-0.5 rounded" style={{ color: c.branding?.gradientFrom || '#4ab8ce', background: (c.branding?.gradientFrom || '#4ab8ce') + '18' }}>{c.shortName}</span>}
-                          {task.description && <span className="text-[10px] text-white/40 truncate">{task.description}</span>}
-                        </div>
+        <>
+          {/* ══ TABLE VIEW — Monday-style groups with columns ══════════ */}
+          {viewMode === 'table' && (shown.length === 0 ? (
+            <div className="glass-card p-8 text-center">
+              <div className="text-[14px] font-semibold text-white/70">No open tasks{filter !== 'All' ? ' for this filter' : ''}</div>
+              <div className="text-[11px] text-white/40 mt-1">Click &quot;+ New Task&quot; to assign one.</div>
+            </div>
+          ) : (
+            lanes.map(([email, list]) => {
+              const m = memberOf(email || null);
+              const groupColor = m?.color || '#64748b';
+              const overdue = overdueCount(list);
+              return (
+                <div key={email || 'unassigned'} className="overflow-x-auto">
+                  <div className="min-w-[760px]">
+                    {/* Group title — Monday-style colored bar */}
+                    <div className="flex items-center gap-2 mb-1.5">
+                      <span className="w-1 h-5 rounded-full" style={{ background: groupColor }} />
+                      <span className="w-6 h-6 rounded-full flex items-center justify-center text-[9px] font-bold text-white shrink-0" style={{ background: groupColor }}>
+                        {(m?.name || 'Unassigned').slice(0, 2).toUpperCase()}
+                      </span>
+                      <span className="text-[13px] font-bold" style={{ color: groupColor }}>{m?.name || 'Unassigned'}</span>
+                      <span className="text-[10px] text-white/35">{list.length} task{list.length === 1 ? '' : 's'}</span>
+                      {overdue > 0 && <span className="text-[10px] font-bold text-rose-300 bg-rose-500/10 px-1.5 py-0.5 rounded">{overdue} overdue</span>}
+                    </div>
+                    <div className="glass-card overflow-hidden" style={{ borderLeft: `3px solid ${groupColor}` }}>
+                      {/* Column headers */}
+                      <div className="grid grid-cols-[28px_minmax(220px,1fr)_112px_92px_118px_104px_28px] gap-2 items-center px-3 py-2 border-b border-white/10 bg-white/[0.03]">
+                        <span />
+                        <span className="text-[9px] font-bold uppercase tracking-widest text-white/35">Task</span>
+                        <span className="text-[9px] font-bold uppercase tracking-widest text-white/35">Due date</span>
+                        <span className="text-[9px] font-bold uppercase tracking-widest text-white/35">Priority</span>
+                        <span className="text-[9px] font-bold uppercase tracking-widest text-white/35 text-center">Status</span>
+                        <span className="text-[9px] font-bold uppercase tracking-widest text-white/35">Owner</span>
+                        <span />
                       </div>
-                      <span className="text-[9px] font-bold uppercase tracking-wider px-1.5 py-0.5 rounded shrink-0" style={{ color: p.color, background: p.color + '18' }}>{p.label}</span>
-                      <input type="date" value={task.due_date || ''} onChange={(e) => patchTask(task.id, { dueDate: e.target.value || null })}
-                        className="text-[10px] px-1.5 py-1 rounded-lg border outline-none shrink-0 bg-transparent cursor-pointer"
-                        style={{
-                          color: isOverdue ? '#fda4af' : isToday ? '#fcd34d' : 'rgba(255,255,255,0.6)',
-                          borderColor: isOverdue ? 'rgba(244,63,94,0.4)' : isToday ? 'rgba(245,158,11,0.35)' : 'rgba(255,255,255,0.1)',
-                          background: isOverdue ? 'rgba(244,63,94,0.08)' : 'transparent',
-                        }}
-                        title={isOverdue ? `Overdue (was due ${fmtDue(task.due_date!)})` : 'Deadline'} />
-                      <select value={task.status} onChange={(e) => patchTask(task.id, { status: e.target.value })}
-                        className="text-[10px] font-semibold px-2 py-1 rounded-lg bg-transparent border border-white/10 outline-none cursor-pointer shrink-0"
-                        style={{ color: (STATUS_META[task.status] || STATUS_META.todo).color }}>
-                        {Object.entries(STATUS_META).map(([k, v]) => <option key={k} value={k}>{v.label}</option>)}
-                      </select>
-                      <select value={task.assignee_email || ''} onChange={(e) => patchTask(task.id, { assigneeEmail: e.target.value || null })}
-                        className="text-[10px] font-semibold px-2 py-1 rounded-lg bg-transparent border border-white/10 outline-none cursor-pointer shrink-0"
-                        style={{ color: m?.color || 'rgba(255,255,255,0.4)' }} title="Reassign">
-                        <option value="">Unassigned</option>
-                        {members.map((mm) => <option key={mm.email} value={mm.email}>{mm.name}</option>)}
-                      </select>
-                      <button onClick={() => deleteTask(task.id)}
-                        className="text-[10px] text-white/20 hover:text-red-400 transition-colors opacity-0 group-hover:opacity-100 shrink-0">✕</button>
+                      {list.map((task) => (
+                        <div key={task.id} className="grid grid-cols-[28px_minmax(220px,1fr)_112px_92px_118px_104px_28px] gap-2 items-center px-3 py-2 border-b border-white/5 last:border-0 hover:bg-white/[0.03] group">
+                          <button onClick={() => patchTask(task.id, { status: 'done' })}
+                            className="w-5 h-5 rounded border border-white/30 hover:border-emerald-400 transition-colors" title="Mark done" />
+                          <TitleCell task={task} />
+                          <DuePill task={task} />
+                          <PriorityPill task={task} />
+                          <StatusPill task={task} />
+                          <AssigneeSelect task={task} />
+                          <button onClick={() => deleteTask(task.id)}
+                            className="text-[11px] text-white/20 hover:text-red-400 transition-colors opacity-0 group-hover:opacity-100">✕</button>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                </div>
+              );
+            })
+          ))}
+
+          {/* ══ BOARD VIEW — Asana-style kanban ════════════════════════ */}
+          {viewMode === 'board' && (
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4 items-start">
+              {(['todo', 'in_progress', 'done'] as const).map((col) => {
+                const meta = STATUS_META[col];
+                const cards = (col === 'done' ? done.filter(inFilter).slice(0, 20) : shown.filter((t) => t.status === col));
+                return (
+                  <div key={col} className="glass-card p-3" style={{ borderTop: `3px solid ${meta.color}` }}>
+                    <div className="flex items-center gap-2 mb-3 px-1">
+                      <span className="w-2 h-2 rounded-full" style={{ background: meta.color }} />
+                      <span className="text-[12px] font-bold text-white/80">{meta.label}</span>
+                      <span className="text-[10px] text-white/35">{cards.length}</span>
+                    </div>
+                    <div className="space-y-2 min-h-[60px]">
+                      {cards.length === 0 && <div className="text-[11px] text-white/25 text-center py-4">Nothing here</div>}
+                      {cards.map((task) => {
+                        const m = memberOf(task.assignee_email);
+                        const c = clientOf(task.client_id);
+                        const p = PRIORITY_META[task.priority] || PRIORITY_META.normal;
+                        const isOverdue = !!task.due_date && task.due_date < today && task.status !== 'done';
+                        return (
+                          <div key={task.id} className="rounded-xl border border-white/10 bg-white/[0.04] hover:bg-white/[0.07] p-3 group">
+                            <div className="flex items-start gap-2">
+                              <span className={`text-[12px] font-semibold flex-1 min-w-0 ${task.status === 'done' ? 'text-white/40 line-through' : 'text-white/90'}`}>{task.title}</span>
+                              <button onClick={() => deleteTask(task.id)} className="text-[10px] text-white/20 hover:text-red-400 opacity-0 group-hover:opacity-100 shrink-0">✕</button>
+                            </div>
+                            {task.description && <div className="text-[10px] text-white/40 truncate mt-0.5">{task.description}</div>}
+                            <div className="flex items-center gap-1.5 mt-2 flex-wrap">
+                              {c && <span className="text-[9px] font-semibold px-1.5 py-0.5 rounded" style={{ color: c.branding?.gradientFrom || '#4ab8ce', background: (c.branding?.gradientFrom || '#4ab8ce') + '18' }}>{c.shortName}</span>}
+                              <span className="text-[9px] font-bold uppercase px-1.5 py-0.5 rounded" style={{ color: p.color, background: p.color + '18' }}>{p.label}</span>
+                              {task.due_date && (
+                                <span className={`text-[9px] font-semibold px-1.5 py-0.5 rounded ${isOverdue ? 'text-rose-300 bg-rose-500/15' : 'text-white/50 bg-white/5'}`}>
+                                  {isOverdue ? '⚠ ' : ''}{fmtDue(task.due_date)}
+                                </span>
+                              )}
+                              {m && (
+                                <span className="ml-auto w-5 h-5 rounded-full flex items-center justify-center text-[8px] font-bold text-white shrink-0" style={{ background: m.color }} title={m.name}>
+                                  {m.name.slice(0, 2).toUpperCase()}
+                                </span>
+                              )}
+                            </div>
+                            <div className="flex items-center gap-1.5 mt-2">
+                              {col !== 'todo' && (
+                                <button onClick={() => patchTask(task.id, { status: col === 'done' ? 'in_progress' : 'todo' })}
+                                  className="text-[9px] font-semibold px-2 py-1 rounded-lg bg-white/5 text-white/50 hover:text-white border border-white/10">← Back</button>
+                              )}
+                              {col !== 'done' && (
+                                <button onClick={() => patchTask(task.id, { status: col === 'todo' ? 'in_progress' : 'done' })}
+                                  className="text-[9px] font-bold px-2 py-1 rounded-lg text-white ml-auto"
+                                  style={{ background: col === 'todo' ? 'rgba(245,158,11,0.35)' : 'rgba(16,185,129,0.4)' }}>
+                                  {col === 'todo' ? 'Start →' : 'Done ✓'}
+                                </button>
+                              )}
+                            </div>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          )}
+
+          {/* ══ CALENDAR VIEW — deadlines on a month grid ══════════════ */}
+          {viewMode === 'calendar' && (
+            <div className="glass-card p-4">
+              <div className="flex items-center justify-between mb-3">
+                <div className="flex items-center gap-2">
+                  <button onClick={() => setCalCursor((c) => ({ y: c.m === 0 ? c.y - 1 : c.y, m: c.m === 0 ? 11 : c.m - 1 }))}
+                    className="w-7 h-7 rounded-lg bg-white/5 text-white/60 hover:text-white flex items-center justify-center">‹</button>
+                  <span className="text-[14px] font-bold text-white w-44 text-center">{MONTHS[calCursor.m]} {calCursor.y}</span>
+                  <button onClick={() => setCalCursor((c) => ({ y: c.m === 11 ? c.y + 1 : c.y, m: c.m === 11 ? 0 : c.m + 1 }))}
+                    className="w-7 h-7 rounded-lg bg-white/5 text-white/60 hover:text-white flex items-center justify-center">›</button>
+                  <button onClick={() => { const d = new Date(); setCalCursor({ y: d.getFullYear(), m: d.getMonth() }); }}
+                    className="text-[10px] font-semibold px-2.5 py-1.5 rounded-lg bg-white/5 text-white/60 hover:text-white border border-white/10">Today</button>
+                </div>
+                {noDateCount > 0 && <span className="text-[10px] text-white/40">{noDateCount} open task{noDateCount === 1 ? '' : 's'} with no deadline (not shown)</span>}
+              </div>
+              <div className="grid grid-cols-7 gap-1 mb-1">
+                {DOW.map((d) => <div key={d} className="text-[9px] font-bold uppercase tracking-widest text-white/30 text-center py-1">{d}</div>)}
+              </div>
+              <div className="grid grid-cols-7 gap-1">
+                {calCells.map((iso, i) => {
+                  if (!iso) return <div key={`pad-${i}`} className="rounded-lg min-h-[92px]" style={{ background: 'rgba(255,255,255,0.02)' }} />;
+                  const dayTasks = byDate.get(iso) || [];
+                  const isToday = iso === today;
+                  return (
+                    <div key={iso} className="rounded-lg min-h-[92px] p-1.5 flex flex-col gap-1 border"
+                      style={{
+                        background: isToday ? 'rgba(74,184,206,0.08)' : 'rgba(255,255,255,0.03)',
+                        borderColor: isToday ? 'rgba(74,184,206,0.45)' : 'transparent',
+                      }}>
+                      <span className={`text-[10px] font-bold self-end ${isToday ? 'text-cyan-300' : 'text-white/35'}`}>{Number(iso.slice(8, 10))}</span>
+                      {dayTasks.slice(0, 3).map((t) => {
+                        const m = memberOf(t.assignee_email);
+                        const isDone = t.status === 'done';
+                        const isOverdue = !isDone && iso < today;
+                        return (
+                          <div key={t.id}
+                            className={`text-[9px] font-semibold px-1.5 py-1 rounded-md truncate leading-tight ${isDone ? 'line-through opacity-40' : ''}`}
+                            style={{
+                              background: (m?.color || '#64748b') + (isDone ? '15' : '28'),
+                              color: m?.color || 'rgba(255,255,255,0.6)',
+                              border: isOverdue ? '1px solid rgba(244,63,94,0.55)' : '1px solid transparent',
+                            }}
+                            title={`${t.title}${m ? ` — ${m.name}` : ''}${isOverdue ? ' (overdue)' : ''}`}>
+                            {t.title}
+                          </div>
+                        );
+                      })}
+                      {dayTasks.length > 3 && <span className="text-[8px] text-white/35 px-1">+{dayTasks.length - 3} more</span>}
                     </div>
                   );
                 })}
               </div>
             </div>
-          );
-        })
+          )}
+        </>
       )}
 
-      {/* ── Completed ─────────────────────────────────────────────── */}
-      {done.length > 0 && (
+      {/* ── Completed (table view only — board has its own column) ── */}
+      {viewMode === 'table' && done.length > 0 && (
         <div>
           <button onClick={() => setShowDone((s) => !s)} className="text-[10px] font-bold uppercase tracking-wider text-white/30 mb-2 hover:text-white/60">
             Completed ({done.length}) {showDone ? '▲' : '▼'}
