@@ -1,16 +1,21 @@
 'use client';
 
 /**
- * JARVIS — MNA Command Center.
+ * MOTHER — MNA Command Center.
  *
- * Full sci-fi HUD over real agency data: a status bar with a live clock,
- * an AI Core overview column, the central JARVIS orb (tap to talk — Lily's
- * premium voice when ELEVENLABS_API_KEY is set, browser voice otherwise),
- * a Live Intelligence Feed derived from what actually needs attention,
- * team agent tiles, a mission timeline from the schedule, quick commands,
- * the per-client content pipeline, and a conversation log. Everything
- * re-pulls /api/command-center every 45s and right after the AI acts.
- * No fabricated numbers — every stat on screen is real portal data.
+ * Full sci-fi HUD over real agency data, with MOTHER as the always-on
+ * voice at the center. Tap the core once to bring her online: from then
+ * on the mic stays open. Say "Mother …" (the wake word) and whatever
+ * follows is the command — "Mother, what's overdue?", "Mother, assign
+ * Sable the Chill House shoot due Friday." For ~15 seconds after she
+ * answers you can keep talking without repeating her name. She speaks
+ * with the same ElevenLabs voice picked in the globe (Lily by default),
+ * goes quiet-and-deaf while she talks so she never hears herself, and
+ * ignores room conversation that isn't addressed to her. Tap again to
+ * take her offline.
+ *
+ * Panels re-pull /api/command-center every 45s and right after she acts.
+ * Every number on screen is real portal data — nothing fabricated.
  */
 
 import React, { useEffect, useRef, useState } from 'react';
@@ -43,6 +48,10 @@ function colorFor(email: string): string {
 
 const MONO = 'ui-monospace, SFMono-Regular, Menlo, monospace';
 
+// "Mother", "Mother Nature", "hey Mother", with or without a command after.
+const WAKE_RE = /^(?:hey\s+|okay\s+|ok\s+)?(?:mother\s+nature|mother)\b[\s,.!]*([\s\S]*)$/i;
+const FOLLOW_UP_MS = 15000;
+
 function fmtDue(iso: string | null): string {
   if (!iso) return '—';
   try { return new Date(`${iso}T12:00:00`).toLocaleDateString(undefined, { month: 'short', day: 'numeric' }); } catch { return iso; }
@@ -67,18 +76,20 @@ export default function CommandCenterPage() {
   const [clock, setClock] = useState('');
   const [userEmail, setUserEmail] = useState('');
 
-  const [coreState, setCoreState] = useState<'idle' | 'listening' | 'thinking' | 'speaking'>('idle');
+  const [coreState, setCoreState] = useState<'offline' | 'online' | 'thinking' | 'speaking'>('offline');
   const [lastHeard, setLastHeard] = useState('');
   const [lastReply, setLastReply] = useState('');
+  const [liveTranscript, setLiveTranscript] = useState('');
   const [typed, setTyped] = useState('');
   const [voiceSupported, setVoiceSupported] = useState(true);
 
   const historyRef = useRef<Array<{ role: 'user' | 'assistant'; content: string }>>([]);
   const recognitionRef = useRef<any>(null);
   const audioRef = useRef<HTMLAudioElement | null>(null);
-  const coreStateRef = useRef<'idle' | 'listening' | 'thinking' | 'speaking'>('idle');
+  const onlineRef = useRef(false);
+  const busyRef = useRef(false);          // thinking or speaking — mic stays closed
+  const followUpUntilRef = useRef(0);     // window where no wake word is needed
   const userEmailRef = useRef('');
-  useEffect(() => { coreStateRef.current = coreState; }, [coreState]);
   useEffect(() => { userEmailRef.current = userEmail; }, [userEmail]);
 
   const memberName = (email: string | null): string => {
@@ -111,6 +122,7 @@ export default function CommandCenterPage() {
     if (!SR) setVoiceSupported(false);
     return () => {
       clearInterval(poll); clearInterval(tick);
+      onlineRef.current = false;
       try { recognitionRef.current?.stop(); } catch { /* fine */ }
       try { window.speechSynthesis?.cancel(); } catch { /* fine */ }
       try { audioRef.current?.pause(); } catch { /* fine */ }
@@ -118,10 +130,80 @@ export default function CommandCenterPage() {
     /* eslint-disable-next-line react-hooks/exhaustive-deps */
   }, []);
 
-  // ── Voice: Lily first, browser fallback ───────────────────────────
+  // ── The always-on ear ─────────────────────────────────────────────
+  // Runs whenever Mother is online and not busy; restarts itself when the
+  // browser times the mic out, and closes while she thinks/speaks so she
+  // never transcribes her own voice.
+
+  function startRecognition() {
+    if (!onlineRef.current || busyRef.current) return;
+    const SR = (window as any).webkitSpeechRecognition || (window as any).SpeechRecognition;
+    if (!SR) { setVoiceSupported(false); return; }
+    try { recognitionRef.current?.stop(); } catch { /* fine */ }
+    const rec = new SR();
+    rec.lang = 'en-US';
+    rec.interimResults = true;
+    rec.continuous = true;
+    rec.onresult = (e: any) => {
+      let interim = '';
+      for (let i = e.resultIndex; i < e.results.length; i++) {
+        const t = e.results[i][0].transcript;
+        if (e.results[i].isFinal) handleUtterance(t.trim());
+        else interim += t;
+      }
+      setLiveTranscript(interim.trim());
+    };
+    rec.onend = () => {
+      setLiveTranscript('');
+      // Chrome stops the mic after silence — keep it warm while online.
+      if (onlineRef.current && !busyRef.current) setTimeout(() => startRecognition(), 350);
+    };
+    rec.onerror = (e: any) => {
+      if (e?.error === 'not-allowed' || e?.error === 'service-not-allowed') goOffline();
+    };
+    recognitionRef.current = rec;
+    try { rec.start(); } catch { /* an instance is already running — fine */ }
+  }
+
+  function stopRecognition() {
+    try { recognitionRef.current?.stop(); } catch { /* fine */ }
+    setLiveTranscript('');
+  }
+
+  /** One finished phrase from the mic — decide if it was meant for Mother. */
+  function handleUtterance(u: string) {
+    if (!u || busyRef.current) return;
+    const m = u.match(WAKE_RE);
+    let command = '';
+    if (m) command = (m[1] || '').trim();
+    else if (Date.now() < followUpUntilRef.current) command = u.trim();
+    else return; // room chatter, not addressed to her — ignore
+    if (!command) {
+      // Just her name: acknowledge and hold the door open.
+      followUpUntilRef.current = Date.now() + FOLLOW_UP_MS;
+      setLastHeard(u);
+      setLastReply('Yes?');
+      void speak('Yes?');
+      return;
+    }
+    void ask(command);
+  }
+
+  // ── Her voice: ElevenLabs (globe's saved pick, Lily default) ──────
+
+  function afterSpeech() {
+    busyRef.current = false;
+    if (onlineRef.current) {
+      followUpUntilRef.current = Date.now() + FOLLOW_UP_MS;
+      setCoreState('online');
+      startRecognition();
+    } else {
+      setCoreState('offline');
+    }
+  }
 
   function browserSpeak(clean: string) {
-    if (!window.speechSynthesis) { setCoreState('idle'); return; }
+    if (!window.speechSynthesis) { afterSpeech(); return; }
     window.speechSynthesis.cancel();
     const u = new SpeechSynthesisUtterance(clean);
     const voices = window.speechSynthesis.getVoices() || [];
@@ -129,19 +211,20 @@ export default function CommandCenterPage() {
     if (v) u.voice = v;
     u.rate = 1.05;
     u.onstart = () => setCoreState('speaking');
-    u.onend = () => setCoreState('idle');
-    u.onerror = () => setCoreState('idle');
+    u.onend = afterSpeech;
+    u.onerror = afterSpeech;
     window.speechSynthesis.speak(u);
   }
 
   async function speak(text: string) {
-    if (typeof window === 'undefined') { setCoreState('idle'); return; }
+    if (typeof window === 'undefined') { afterSpeech(); return; }
     const clean = text.replace(/[*_#`>|]/g, ' ').replace(/\{\{[^}]+\}\}/g, 'the link').replace(/\s+/g, ' ').trim().slice(0, 1400);
-    if (!clean) { setCoreState('idle'); return; }
+    if (!clean) { afterSpeech(); return; }
+    busyRef.current = true;      // mic closed while she talks
+    stopRecognition();
     try { audioRef.current?.pause(); } catch { /* fine */ }
     try { window.speechSynthesis?.cancel(); } catch { /* fine */ }
     try {
-      // Same voice the globe uses — the dropdown there saves mn_voice_id.
       let voiceId = '';
       try { voiceId = localStorage.getItem('mn_voice_id') || ''; } catch { /* fine */ }
       const res = await fetch('/api/voice/tts', {
@@ -154,7 +237,7 @@ export default function CommandCenterPage() {
         const audio = new Audio(url);
         audioRef.current = audio;
         audio.onplay = () => setCoreState('speaking');
-        audio.onended = () => { URL.revokeObjectURL(url); setCoreState('idle'); };
+        audio.onended = () => { URL.revokeObjectURL(url); afterSpeech(); };
         audio.onerror = () => { URL.revokeObjectURL(url); browserSpeak(clean); };
         await audio.play();
         return;
@@ -165,7 +248,9 @@ export default function CommandCenterPage() {
 
   async function ask(msg: string) {
     const text = msg.trim();
-    if (!text) return;
+    if (!text || busyRef.current) return;
+    busyRef.current = true;
+    stopRecognition();
     setLastHeard(text);
     setLastReply('');
     setCoreState('thinking');
@@ -184,45 +269,29 @@ export default function CommandCenterPage() {
       loadFeed();
     } catch {
       setLastReply('Connection trouble — try again.');
-      setCoreState('idle');
+      afterSpeech();
     }
   }
 
+  function goOnline() {
+    onlineRef.current = true;
+    setCoreState('online');
+    // Greeting doubles as the audio unlock; the ear opens when it ends.
+    void speak("I'm online. Say Mother when you need me.");
+  }
+
+  function goOffline() {
+    onlineRef.current = false;
+    busyRef.current = false;
+    stopRecognition();
+    try { audioRef.current?.pause(); } catch { /* fine */ }
+    try { window.speechSynthesis?.cancel(); } catch { /* fine */ }
+    setCoreState('offline');
+  }
+
   function orbTap() {
-    if (coreStateRef.current === 'listening') {
-      try { recognitionRef.current?.stop(); } catch { /* fine */ }
-      setCoreState('idle');
-      return;
-    }
-    if (coreStateRef.current === 'speaking') {
-      try { audioRef.current?.pause(); } catch { /* fine */ }
-      try { window.speechSynthesis?.cancel(); } catch { /* fine */ }
-      setCoreState('idle');
-      return;
-    }
-    const SR = (window as any).webkitSpeechRecognition || (window as any).SpeechRecognition;
-    if (!SR) { setVoiceSupported(false); return; }
-    const rec = new SR();
-    rec.lang = 'en-US';
-    rec.interimResults = true;
-    let finalText = '';
-    rec.onresult = (e: any) => {
-      let interim = '';
-      for (let i = e.resultIndex; i < e.results.length; i++) {
-        const t = e.results[i][0].transcript;
-        if (e.results[i].isFinal) finalText += t; else interim += t;
-      }
-      setLastHeard((finalText + interim).trim());
-    };
-    rec.onend = () => {
-      if (coreStateRef.current === 'listening') setCoreState('idle');
-      const msg = finalText.trim();
-      if (msg) void ask(msg);
-    };
-    rec.onerror = () => setCoreState('idle');
-    recognitionRef.current = rec;
-    setCoreState('listening');
-    try { rec.start(); } catch { setCoreState('idle'); }
+    if (onlineRef.current) goOffline();
+    else goOnline();
   }
 
   function executiveBriefing() {
@@ -232,10 +301,15 @@ export default function CommandCenterPage() {
   // ── Derived HUD data ──────────────────────────────────────────────
   const t = feed?.tasks;
   const systemOptimal = (t?.overdue || 0) === 0;
-  const orbColor = coreState === 'listening' ? '#f43f5e' : coreState === 'thinking' ? '#f59e0b' : coreState === 'speaking' ? '#10b981' : '#22d3ee';
-  const statusLine = coreState === 'listening' ? 'I am listening…' : coreState === 'thinking' ? 'Working on it…' : coreState === 'speaking' ? 'Speaking — tap to stop' : 'Tap to speak';
+  const orbColor = coreState === 'online' ? '#22d3ee' : coreState === 'thinking' ? '#f59e0b' : coreState === 'speaking' ? '#10b981' : '#155e75';
+  const orbAccent = coreState === 'offline' ? '#22d3ee' : orbColor;
+  const statusLine =
+    coreState === 'offline' ? 'Tap to bring Mother online'
+      : coreState === 'thinking' ? 'Working on it…'
+        : coreState === 'speaking' ? 'Speaking — tap to stop'
+          : liveTranscript ? `“${liveTranscript}”`
+            : 'Online — say “Mother…”';
 
-  // Live intelligence feed — real events ranked by urgency.
   const intel: Array<{ level: 'WARN' | 'INFO' | 'TIP'; icon: string; text: string }> = [];
   if (feed) {
     if ((t?.overdue || 0) > 0) intel.push({ level: 'WARN', icon: 'warning', text: `${t!.overdue} task${t!.overdue === 1 ? ' is' : 's are'} overdue — "${t!.overdueList[0]?.title || ''}"${t!.overdue > 1 ? ' and more' : ''}` });
@@ -251,8 +325,8 @@ export default function CommandCenterPage() {
   const LEVEL_COLOR: Record<string, string> = { WARN: '#f59e0b', INFO: '#22d3ee', TIP: '#8b5cf6' };
 
   const coreTiles = [
-    { icon: 'smart_toy', label: 'AI Core', value: 'Active', color: '#22d3ee' },
-    { icon: 'graphic_eq', label: 'Voice', value: voiceSupported ? 'Online' : 'Text only', color: voiceSupported ? '#10b981' : '#f59e0b' },
+    { icon: 'smart_toy', label: 'AI Core', value: coreState === 'offline' ? 'Standby' : 'Active', color: coreState === 'offline' ? '#64748b' : '#22d3ee' },
+    { icon: 'graphic_eq', label: 'Voice', value: voiceSupported ? (coreState === 'offline' ? 'Ready' : 'Listening') : 'Text only', color: voiceSupported ? '#10b981' : '#f59e0b' },
     { icon: 'diversity_3', label: 'Clients', value: `${feed?.clientCount ?? '—'} connected`, color: '#4ab8ce' },
     { icon: 'assignment', label: 'Team Tasks', value: `${t?.open ?? '—'} open`, color: '#0ea5e9' },
     { icon: 'today', label: 'Due Today', value: `${t?.dueToday ?? '—'}`, color: '#f59e0b' },
@@ -285,7 +359,7 @@ export default function CommandCenterPage() {
             <span className="material-symbols-outlined text-cyan-300" style={{ fontSize: 16 }}>adjust</span>
           </div>
           <div>
-            <div className="text-[15px] font-black tracking-[.3em] text-white" style={{ fontFamily: MONO }}>JARVIS</div>
+            <div className="text-[15px] font-black tracking-[.3em] text-white" style={{ fontFamily: MONO }}>MOTHER</div>
             <div className="text-[7px] font-bold tracking-[.35em] text-cyan-300/60 uppercase">MNA Command Center</div>
           </div>
         </div>
@@ -329,15 +403,13 @@ export default function CommandCenterPage() {
           </div>
         </div>
 
-        {/* The orb */}
+        {/* The core */}
         <div className="jv-panel flex flex-col items-center justify-center py-6 overflow-hidden relative" style={{ minHeight: 380, background: 'radial-gradient(ellipse at 50% 40%, rgba(14,60,95,.9), rgba(4,12,24,.96) 75%)' }}>
-          {/* starfield */}
           <div className="absolute inset-0 pointer-events-none" style={{ backgroundImage: 'radial-gradient(rgba(103,232,249,.35) 1px, transparent 1px), radial-gradient(rgba(103,232,249,.18) 1px, transparent 1px)', backgroundSize: '90px 90px, 41px 41px', backgroundPosition: '0 0, 20px 30px' }} />
           <button onClick={orbTap} className="relative flex items-center justify-center" style={{ width: 250, height: 250 }} title={statusLine}>
-            {/* rotating dashed rings */}
             <span className="absolute inset-0 rounded-full" style={{ border: '1px dashed rgba(34,211,238,.35)', animation: 'jvSpin 22s linear infinite' }} />
             <span className="absolute inset-4 rounded-full" style={{ border: '1px dashed rgba(34,211,238,.25)', animation: 'jvSpinR 15s linear infinite' }} />
-            {(coreState === 'listening' || coreState === 'speaking') && (
+            {coreState !== 'offline' && coreState !== 'thinking' && (
               <>
                 <span className="absolute inset-8 rounded-full" style={{ border: `2px solid ${orbColor}`, animation: 'jvRing 1.5s ease-out infinite' }} />
                 <span className="absolute inset-8 rounded-full" style={{ border: `2px solid ${orbColor}`, animation: 'jvRing 1.5s ease-out .5s infinite' }} />
@@ -346,20 +418,26 @@ export default function CommandCenterPage() {
             <span
               className="w-44 h-44 rounded-full flex flex-col items-center justify-center gap-1 transition-all duration-300"
               style={{
-                background: `radial-gradient(circle at 38% 30%, rgba(34,211,238,.35), rgba(6,20,38,.95) 70%)`,
-                border: `2px solid ${orbColor}`,
-                ['--orb' as any]: orbColor + '55',
+                background: `radial-gradient(circle at 38% 30%, rgba(34,211,238,${coreState === 'offline' ? '.15' : '.35'}), rgba(6,20,38,.95) 70%)`,
+                border: `2px solid ${orbAccent}`,
+                opacity: coreState === 'offline' ? 0.75 : 1,
+                ['--orb' as any]: orbAccent + (coreState === 'offline' ? '22' : '55'),
                 animation: 'jvGlow 2.8s ease-in-out infinite',
               }}
             >
-              <span className="text-[19px] font-black tracking-[.42em] text-white pl-1.5" style={{ fontFamily: MONO, textShadow: `0 0 16px ${orbColor}` }}>JARVIS</span>
-              <span className="text-[7px] font-bold tracking-[.4em] uppercase" style={{ color: orbColor, fontFamily: MONO }}>MNA AI Core</span>
-              <span className="material-symbols-outlined mt-1" style={{ fontSize: 22, color: orbColor }}>
-                {coreState === 'listening' ? 'graphic_eq' : coreState === 'thinking' ? 'neurology' : coreState === 'speaking' ? 'volume_up' : 'mic'}
+              <span className="text-[19px] font-black tracking-[.42em] text-white pl-1.5" style={{ fontFamily: MONO, textShadow: `0 0 16px ${orbAccent}` }}>MOTHER</span>
+              <span className="text-[7px] font-bold tracking-[.4em] uppercase" style={{ color: orbAccent, fontFamily: MONO }}>MNA AI Core</span>
+              <span className="material-symbols-outlined mt-1" style={{ fontSize: 22, color: orbAccent }}>
+                {coreState === 'online' ? 'graphic_eq' : coreState === 'thinking' ? 'neurology' : coreState === 'speaking' ? 'volume_up' : 'power_settings_new'}
               </span>
             </span>
           </button>
-          <div className="text-[10px] font-bold tracking-[.3em] uppercase mt-3" style={{ color: orbColor, fontFamily: MONO }}>{statusLine}</div>
+          <div className="text-[10px] font-bold tracking-[.3em] uppercase mt-3 px-4 text-center" style={{ color: orbAccent, fontFamily: MONO }}>{statusLine}</div>
+          {coreState !== 'offline' && (
+            <div className="text-[8px] text-cyan-200/40 mt-1.5 tracking-wider" style={{ fontFamily: MONO }}>
+              Wake word: “Mother” · follow-ups within 15s need no wake word
+            </div>
+          )}
           {!voiceSupported && <div className="text-[9px] text-amber-300/80 mt-1">Voice needs Chrome or Edge — use the console below.</div>}
         </div>
 
@@ -388,7 +466,6 @@ export default function CommandCenterPage() {
 
       {/* ═══ ROW 2: team agents · mission timeline · quick commands ═ */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-3 mb-3">
-        {/* Team agents */}
         <div className="jv-panel p-3">
           <div className="jv-title mb-2.5">Team Agents</div>
           <div className="grid grid-cols-1 gap-1.5">
@@ -418,7 +495,6 @@ export default function CommandCenterPage() {
           </div>
         </div>
 
-        {/* Mission timeline */}
         <div className="jv-panel p-3">
           <div className="jv-title mb-2.5">Mission Timeline</div>
           {(feed?.schedule || []).length === 0 ? (
@@ -443,12 +519,11 @@ export default function CommandCenterPage() {
           )}
         </div>
 
-        {/* Quick commands */}
         <div className="jv-panel p-3">
           <div className="jv-title mb-2.5">Quick Commands</div>
           <div className="space-y-1.5">
             {[
-              { icon: 'mic', label: 'Start Voice Chat', act: orbTap },
+              { icon: 'power_settings_new', label: coreState === 'offline' ? 'Bring Mother Online' : 'Take Mother Offline', act: orbTap },
               { icon: 'summarize', label: 'Executive Briefing', act: executiveBriefing },
               { icon: 'assignment_add', label: 'Open Team Tasks', href: '/team-tasks' },
               { icon: 'grid_view', label: 'Content Tracker', href: '/content' },
@@ -495,7 +570,7 @@ export default function CommandCenterPage() {
         <div className="jv-panel p-3 flex flex-col">
           <div className="jv-title mb-2.5">Comms Log</div>
           <div className="flex-1 space-y-1.5 overflow-y-auto min-h-[80px]">
-            {!lastHeard && !lastReply && <div className="text-[10px] text-white/30">Tap the core and speak, or type a command below.</div>}
+            {!lastHeard && !lastReply && <div className="text-[10px] text-white/30">Bring Mother online and say “Mother, what&apos;s overdue?” — or type a command below.</div>}
             {lastHeard && (
               <div className="text-[10.5px] text-white/60 px-2.5 py-1.5 rounded-lg bg-white/[.04] border border-white/10">
                 <span className="text-cyan-300/60 font-black mr-1.5" style={{ fontFamily: MONO }}>YOU ›</span>{lastHeard}
@@ -503,7 +578,7 @@ export default function CommandCenterPage() {
             )}
             {lastReply && (
               <div className="text-[11px] text-white/90 px-2.5 py-2 rounded-lg whitespace-pre-wrap max-h-36 overflow-y-auto" style={{ background: 'rgba(34,211,238,.08)', border: '1px solid rgba(34,211,238,.3)' }}>
-                <span className="text-cyan-300 font-black mr-1.5" style={{ fontFamily: MONO }}>JARVIS ›</span>{lastReply}
+                <span className="text-cyan-300 font-black mr-1.5" style={{ fontFamily: MONO }}>MOTHER ›</span>{lastReply}
               </div>
             )}
           </div>
@@ -533,27 +608,29 @@ export default function CommandCenterPage() {
           {feed?.clientCount ?? '—'} clients · {t?.open ?? '—'} open · refreshes 45s
         </span>
         <span className="flex-1 flex items-center gap-1 justify-end opacity-50">
-          {[...Array(10)].map((_, i) => <span key={i} className="w-1 h-1 rounded-full bg-cyan-400/60" style={{ animation: (coreState === 'listening' || coreState === 'speaking') ? `jvBlink ${0.6 + (i % 4) * 0.2}s infinite` : 'none' }} />)}
+          {[...Array(10)].map((_, i) => <span key={i} className="w-1 h-1 rounded-full bg-cyan-400/60" style={{ animation: coreState !== 'offline' ? `jvBlink ${0.6 + (i % 4) * 0.2}s infinite` : 'none' }} />)}
         </span>
         <button
           onClick={orbTap}
           className="flex items-center gap-3 px-8 py-3 rounded-full shrink-0 transition-all"
           style={{
             background: 'radial-gradient(circle at 50% 0%, rgba(34,211,238,.22), rgba(8,22,40,.95))',
-            border: `2px solid ${orbColor}`,
-            boxShadow: `0 0 22px ${orbColor}55`,
+            border: `2px solid ${orbAccent}`,
+            boxShadow: `0 0 22px ${orbAccent}55`,
           }}
         >
-          <span className="material-symbols-outlined" style={{ fontSize: 20, color: orbColor }}>
-            {coreState === 'listening' ? 'graphic_eq' : coreState === 'speaking' ? 'volume_up' : 'mic'}
+          <span className="material-symbols-outlined" style={{ fontSize: 20, color: orbAccent }}>
+            {coreState === 'online' ? 'graphic_eq' : coreState === 'speaking' ? 'volume_up' : coreState === 'thinking' ? 'neurology' : 'power_settings_new'}
           </span>
           <span className="text-left">
-            <span className="block text-[13px] font-black tracking-[.22em] text-white" style={{ fontFamily: MONO }}>TALK TO JARVIS</span>
-            <span className="block text-[8px] font-bold tracking-[.28em] uppercase" style={{ color: orbColor, fontFamily: MONO }}>{statusLine}</span>
+            <span className="block text-[13px] font-black tracking-[.22em] text-white" style={{ fontFamily: MONO }}>
+              {coreState === 'offline' ? 'ACTIVATE MOTHER' : 'MOTHER ONLINE'}
+            </span>
+            <span className="block text-[8px] font-bold tracking-[.28em] uppercase" style={{ color: orbAccent, fontFamily: MONO }}>{statusLine}</span>
           </span>
         </button>
         <span className="flex-1 flex items-center gap-1 opacity-50">
-          {[...Array(10)].map((_, i) => <span key={i} className="w-1 h-1 rounded-full bg-cyan-400/60" style={{ animation: (coreState === 'listening' || coreState === 'speaking') ? `jvBlink ${0.6 + (i % 4) * 0.2}s infinite` : 'none' }} />)}
+          {[...Array(10)].map((_, i) => <span key={i} className="w-1 h-1 rounded-full bg-cyan-400/60" style={{ animation: coreState !== 'offline' ? `jvBlink ${0.6 + (i % 4) * 0.2}s infinite` : 'none' }} />)}
         </span>
         <button
           onClick={executiveBriefing}
