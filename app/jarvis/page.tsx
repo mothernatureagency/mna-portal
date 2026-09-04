@@ -82,6 +82,7 @@ export default function CommandCenterPage() {
   const [liveTranscript, setLiveTranscript] = useState('');
   const [typed, setTyped] = useState('');
   const [voiceSupported, setVoiceSupported] = useState(true);
+  const [weather, setWeather] = useState<{ tempF: number; desc: string; high: number; low: number } | null>(null);
 
   const historyRef = useRef<Array<{ role: 'user' | 'assistant'; content: string }>>([]);
   const recognitionRef = useRef<any>(null);
@@ -90,7 +91,11 @@ export default function CommandCenterPage() {
   const busyRef = useRef(false);          // thinking or speaking — mic stays closed
   const followUpUntilRef = useRef(0);     // window where no wake word is needed
   const userEmailRef = useRef('');
+  const feedRef = useRef<Feed | null>(null);
+  const weatherRef = useRef<{ tempF: number; desc: string; high: number; low: number } | null>(null);
   useEffect(() => { userEmailRef.current = userEmail; }, [userEmail]);
+  useEffect(() => { feedRef.current = feed; }, [feed]);
+  useEffect(() => { weatherRef.current = weather; }, [weather]);
 
   const memberName = (email: string | null): string => {
     if (!email || email === 'unassigned') return 'Unassigned';
@@ -112,10 +117,28 @@ export default function CommandCenterPage() {
     } catch { /* next poll retries */ }
   }
 
+  function loadWeather(lat?: number, lon?: number) {
+    const q = lat != null && lon != null ? `?lat=${lat}&lon=${lon}` : '';
+    fetch(`/api/weather${q}`)
+      .then((r) => (r.ok ? r.json() : null))
+      .then((d) => { if (d && typeof d.tempF === 'number') setWeather(d); })
+      .catch(() => {});
+  }
+
   useEffect(() => {
     createClient().auth.getUser().then((res: { data: { user: { email?: string | null } | null } }) => setUserEmail(res.data.user?.email || ''));
     fetch('/api/staff').then((r) => r.json()).then((d) => setStaffRows(d.staff || [])).catch(() => {});
     loadFeed();
+    // Weather for the briefing: agency default immediately, then the user's
+    // actual location if the browser shares it.
+    loadWeather();
+    try {
+      navigator.geolocation?.getCurrentPosition(
+        (pos) => loadWeather(pos.coords.latitude, pos.coords.longitude),
+        () => { /* declined — default location stands */ },
+        { timeout: 4000, maximumAge: 600000 },
+      );
+    } catch { /* unsupported */ }
     const poll = setInterval(loadFeed, 45000);
     const tick = setInterval(() => setClock(new Date().toLocaleTimeString(undefined, { hour: '2-digit', minute: '2-digit', second: '2-digit' })), 1000);
     const SR = typeof window !== 'undefined' && ((window as any).webkitSpeechRecognition || (window as any).SpeechRecognition);
@@ -276,8 +299,37 @@ export default function CommandCenterPage() {
   function goOnline() {
     onlineRef.current = true;
     setCoreState('online');
-    // Greeting doubles as the audio unlock; the ear opens when it ends.
-    void speak("I'm online. Say Mother when you need me.");
+    // Spoken briefing on activation: greeting, weather, the board, what's
+    // next. Doubles as the audio unlock; the ear opens when it ends.
+    const name = getDisplayName(userEmailRef.current) || '';
+    const w = weatherRef.current;
+    const f = feedRef.current;
+    const hour = new Date().getHours();
+    const timeOfDay = hour < 12 ? 'Good morning' : hour < 17 ? 'Good afternoon' : 'Good evening';
+    const parts: string[] = [`${timeOfDay}${name ? `, ${name}` : ''}.`];
+    if (w) parts.push(`It's ${Math.round(w.tempF)} degrees and ${w.desc.toLowerCase()} right now, heading for a high of ${Math.round(w.high)}.`);
+    if (f) {
+      const tt = f.tasks;
+      if (tt.open === 0) {
+        parts.push('The team board is clear.');
+      } else {
+        const bits = [`The team has ${tt.open} open task${tt.open === 1 ? '' : 's'}`];
+        if (tt.dueToday > 0) {
+          const who = tt.todayList.map((x) => memberName(x.assignee_email)).filter((v, i, a) => a.indexOf(v) === i).slice(0, 3).join(' and ');
+          bits.push(`${tt.dueToday} due today${who ? ` for ${who}` : ''}`);
+        }
+        if (tt.overdue > 0) bits.push(`${tt.overdue} overdue`);
+        parts.push(bits.join(', ') + '.');
+      }
+      const ev = f.schedule[0];
+      if (ev) parts.push(`Next on your schedule: ${ev.title}, ${untilLabel(ev.event_date, ev.start_time, f.today)}.`);
+      const approvals = f.content.reduce((s, c) => s + Number(c.pending || 0), 0);
+      if (approvals > 0) parts.push(`And ${approvals} post${approvals === 1 ? ' is' : 's are'} waiting on client approval.`);
+    }
+    parts.push('Say Mother when you need me.');
+    const briefing = parts.join(' ');
+    setLastReply(briefing);
+    void speak(briefing);
   }
 
   function goOffline() {
@@ -604,8 +656,17 @@ export default function CommandCenterPage() {
 
       {/* ═══ BOTTOM: talk bar ══════════════════════════════════════ */}
       <div className="jv-panel px-4 py-3 flex items-center gap-4">
-        <span className="text-[8.5px] text-white/35 shrink-0 hidden md:block" style={{ fontFamily: MONO }}>
-          {feed?.clientCount ?? '—'} clients · {t?.open ?? '—'} open · refreshes 45s
+        <span className="text-[8.5px] text-white/35 shrink-0 hidden md:flex items-center gap-1.5" style={{ fontFamily: MONO }}>
+          {weather && (
+            <>
+              <span className="material-symbols-outlined text-cyan-300/70" style={{ fontSize: 13 }}>
+                {/thunder/i.test(weather.desc) ? 'thunderstorm' : /rain|drizzl|shower/i.test(weather.desc) ? 'rainy' : /snow/i.test(weather.desc) ? 'ac_unit' : /cloud|overcast|fog/i.test(weather.desc) ? 'cloud' : 'sunny'}
+              </span>
+              <span className="text-cyan-200/70">{Math.round(weather.tempF)}°F {weather.desc}</span>
+              <span>· H{Math.round(weather.high)} L{Math.round(weather.low)} ·</span>
+            </>
+          )}
+          {feed?.clientCount ?? '—'} clients · {t?.open ?? '—'} open
         </span>
         <span className="flex-1 flex items-center gap-1 justify-end opacity-50">
           {[...Array(10)].map((_, i) => <span key={i} className="w-1 h-1 rounded-full bg-cyan-400/60" style={{ animation: coreState !== 'offline' ? `jvBlink ${0.6 + (i % 4) * 0.2}s infinite` : 'none' }} />)}
