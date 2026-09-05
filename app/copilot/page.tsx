@@ -11,6 +11,12 @@
  */
 
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useClient } from '@/context/ClientContext';
+import { STAFF } from '@/lib/staff';
+
+// An assignment Mother heard on the call — approved onto the Team Tasks
+// board with one tap (live), or reviewed in a batch after the call.
+type MeetingTask = { id: string; title: string; assignee: string; due: string; status: 'pending' | 'added' | 'dismissed' };
 
 type Signal = {
   id: string;
@@ -88,6 +94,9 @@ const SIGNAL_STYLES: Record<string, { bg: string; border: string; text: string; 
   'PAUSE':           { bg: 'rgba(59,130,246,0.10)', border: 'rgba(96,165,250,0.45)', text: '#bfdbfe', accent: '#3b82f6', icon: 'pause_circle' },
   'CLOSE':           { bg: 'rgba(234,179,8,0.10)',  border: 'rgba(250,204,21,0.45)', text: '#fef08a', accent: '#eab308', icon: 'flag' },
   'SHIFT TOPIC':     { bg: 'rgba(148,163,184,0.10)',border: 'rgba(203,213,225,0.45)',text: '#e2e8f0', accent: '#94a3b8', icon: 'swap_horiz' },
+  'AGENDA':          { bg: 'rgba(74,184,206,0.10)', border: 'rgba(74,184,206,0.45)', text: '#c5eef5', accent: '#4ab8ce', icon: 'checklist' },
+  'DECISION':        { bg: 'rgba(16,185,129,0.10)', border: 'rgba(52,211,153,0.45)', text: '#d1fae5', accent: '#10b981', icon: 'gavel' },
+  'FOLLOW UP':       { bg: 'rgba(139,92,246,0.10)', border: 'rgba(167,139,250,0.45)', text: '#ddd6fe', accent: '#8b5cf6', icon: 'forward_to_inbox' },
 };
 
 function styleFor(type: string) {
@@ -112,7 +121,7 @@ export default function CopilotPage() {
   const [tick, setTick] = useState(0);
 
   // Interpreter mode (Spanish <-> English) + Mother Nature voice
-  const [mode, setMode] = useState<'sales' | 'interpret'>('sales');
+  const [mode, setMode] = useState<'sales' | 'interpret' | 'meeting'>('sales');
   const [mnVoice, setMnVoice] = useState(false);
   const [listenLang, setListenLang] = useState<'es-US' | 'en-US'>('es-US');
   const [interps, setInterps] = useState<Interp[]>([]);
@@ -127,7 +136,69 @@ export default function CopilotPage() {
   const [showContext, setShowContext] = useState(false);
   const [ctxSaved, setCtxSaved] = useState(false);
 
-  const modeRef = useRef<'sales' | 'interpret'>('sales');
+  // ── Meeting Mode — teleprompter for weekly meetings & lead calls ──
+  const clientCtx = useClient() as any;
+  const allClients: any[] = clientCtx?.allClients || [];
+  const [meetingClientId, setMeetingClientId] = useState('');
+  const [agenda, setAgenda] = useState<Array<{ text: string; covered: boolean }>>([]);
+  const [captureTasks, setCaptureTasks] = useState(true);
+  const [suggTasks, setSuggTasks] = useState<MeetingTask[]>([]);
+  const [staffRows, setStaffRows] = useState<Array<{ email: string; name: string }>>([]);
+  const [briefLoading, setBriefLoading] = useState(false);
+  const briefRef = useRef('');
+  const agendaRef = useRef<Array<{ text: string; covered: boolean }>>([]);
+  const captureTasksRef = useRef(true);
+  const meetingClientIdRef = useRef('');
+  useEffect(() => { agendaRef.current = agenda; }, [agenda]);
+  useEffect(() => { captureTasksRef.current = captureTasks; }, [captureTasks]);
+  useEffect(() => { meetingClientIdRef.current = meetingClientId; }, [meetingClientId]);
+  useEffect(() => { fetch('/api/staff').then((res) => res.json()).then((d) => setStaffRows(d.staff || [])).catch(() => {}); }, []);
+  const members = useMemo(() => {
+    const map = new Map<string, { email: string; name: string }>();
+    for (const s of STAFF) map.set(s.email.toLowerCase(), { email: s.email.toLowerCase(), name: s.name.split(' ')[0] });
+    for (const s of staffRows) {
+      const e = (s.email || '').toLowerCase();
+      if (e) map.set(e, { email: e, name: (s.name || e.split('@')[0]).split(' ')[0] });
+    }
+    return Array.from(map.values());
+  }, [staffRows]);
+  const membersRef = useRef(members);
+  useEffect(() => { membersRef.current = members; }, [members]);
+
+  async function loadBrief() {
+    if (!meetingClientId || briefLoading) return;
+    setBriefLoading(true);
+    try {
+      const res = await fetch(`/api/copilot/brief?clientId=${encodeURIComponent(meetingClientId)}`);
+      const d = await res.json();
+      if (res.ok) {
+        briefRef.current = d.brief || '';
+        setAgenda((Array.isArray(d.agenda) ? d.agenda : []).map((text: string) => ({ text, covered: false })));
+      }
+    } catch { /* brief is optional — the call still works without it */ }
+    finally { setBriefLoading(false); }
+  }
+
+  async function approveTask(t: MeetingTask) {
+    const who = t.assignee.toLowerCase();
+    const m = members.find((x) => x.name.toLowerCase() === who) || members.find((x) => who && x.name.toLowerCase().startsWith(who));
+    try {
+      const res = await fetch('/api/team-tasks', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          title: t.title,
+          assigneeEmail: m?.email || null,
+          clientId: meetingClientIdRef.current || null,
+          dueDate: t.due || null,
+          priority: 'normal',
+        }),
+      });
+      if (res.ok) setSuggTasks((prev) => prev.map((x) => (x.id === t.id ? { ...x, status: 'added' } : x)));
+    } catch { /* stays pending for a retry */ }
+  }
+
+  const modeRef = useRef<'sales' | 'interpret' | 'meeting'>('sales');
   const mnVoiceRef = useRef(false);
   const listenLangRef = useRef<'es-US' | 'en-US'>('es-US');
   const esVoiceRef = useRef(''); const enVoiceRef = useRef(''); const contextRef = useRef('');
@@ -264,6 +335,7 @@ export default function CopilotPage() {
         return;
       }
 
+      const meeting = modeRef.current === 'meeting';
       const res = await fetch('/api/copilot', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -271,10 +343,42 @@ export default function CopilotPage() {
           recent,
           conversationSoFar: earlierRef.current.slice(-2000),
           context: contextRef.current,
+          ...(meeting
+            ? {
+                mode: 'meeting',
+                agenda: agendaRef.current.map((a) => ({ text: a.text, covered: a.covered })),
+                captureTasks: captureTasksRef.current,
+                team: membersRef.current.map((m) => m.name).join(', '),
+                brief: briefRef.current,
+              }
+            : {}),
         }),
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || 'Copilot failed');
+
+      if (meeting) {
+        // Agenda items the AI heard get checked off live.
+        const covered: number[] = Array.isArray(data.covered) ? data.covered : [];
+        if (covered.length) setAgenda((prev) => prev.map((a, i) => (covered.includes(i) ? { ...a, covered: true } : a)));
+        // Assignments it heard queue as cards — one tap puts them on the board.
+        const heard: any[] = Array.isArray(data.tasks) ? data.tasks : [];
+        if (heard.length) {
+          setSuggTasks((prev) => {
+            const seen = new Set(prev.map((t) => t.title.toLowerCase()));
+            const add = heard
+              .filter((t) => t?.title && !seen.has(String(t.title).toLowerCase()))
+              .map((t, i) => ({
+                id: `${Date.now()}-t${i}`,
+                title: String(t.title),
+                assignee: String(t.assignee || ''),
+                due: String(t.due || ''),
+                status: 'pending' as const,
+              }));
+            return add.length ? [...prev, ...add] : prev;
+          });
+        }
+      }
       // Roll the analyzed text into the older context buffer
       earlierRef.current = (earlierRef.current + ' ' + recent).slice(-4000);
       bufferRef.current = '';
@@ -361,7 +465,7 @@ export default function CopilotPage() {
     setTimeout(() => start(), 200);
   }
 
-  function applyMode(m: 'sales' | 'interpret') {
+  function applyMode(m: 'sales' | 'interpret' | 'meeting') {
     setMode(m);
     modeRef.current = m;
     if (listening) restartListening();
@@ -503,7 +607,9 @@ export default function CopilotPage() {
           <p className="text-white/60 mt-1 text-sm">
             {mode === 'sales'
               ? 'Quiet, glanceable signals during live calls — objections, buying cues, what to say next.'
-              : 'Live Spanish ⇄ English interpreter. Mother Nature can speak the translation aloud so you go back and forth.'}
+              : mode === 'interpret'
+                ? 'Live Spanish ⇄ English interpreter. Mother Nature can speak the translation aloud so you go back and forth.'
+                : 'Meeting teleprompter — the agenda checks itself off as you talk, cues keep you on track, and assignments are captured as the call runs.'}
           </p>
 
           {/* Mode + interpreter controls */}
@@ -523,7 +629,45 @@ export default function CopilotPage() {
                 <span className="material-symbols-outlined" style={{ fontSize: 15 }}>translate</span>
                 Interpreter (ES⇄EN)
               </button>
+              <button
+                onClick={() => applyMode('meeting')}
+                className={`text-[11px] font-bold px-3 py-1.5 inline-flex items-center gap-1.5 ${mode === 'meeting' ? 'bg-white/15 text-white' : 'text-white/50 hover:text-white/80'}`}
+              >
+                <span className="material-symbols-outlined" style={{ fontSize: 15 }}>event_note</span>
+                Meeting
+              </button>
             </div>
+
+            {mode === 'meeting' && (
+              <>
+                <select
+                  value={meetingClientId}
+                  onChange={(e) => setMeetingClientId(e.target.value)}
+                  className="text-[11px] px-2.5 py-1.5 rounded-xl bg-white/5 border border-white/10 text-white outline-none"
+                >
+                  <option value="">Meeting about… (pick client)</option>
+                  {allClients.map((c: any) => (
+                    <option key={c.id} value={c.id}>{c.shortName || c.name}</option>
+                  ))}
+                </select>
+                <button
+                  onClick={loadBrief}
+                  disabled={!meetingClientId || briefLoading}
+                  className="text-[11px] font-bold px-3 py-1.5 rounded-xl border border-white/10 bg-white/5 text-white/70 hover:text-white disabled:opacity-40"
+                  title="Pulls last meeting notes, open items and content status into an agenda"
+                >
+                  {briefLoading ? 'Loading…' : agenda.length ? 'Reload brief + agenda' : 'Load brief + agenda'}
+                </button>
+                <button
+                  onClick={() => setCaptureTasks((v) => !v)}
+                  className={`text-[11px] font-bold px-3 py-1.5 rounded-xl border inline-flex items-center gap-1.5 ${captureTasks ? 'text-emerald-200 border-emerald-400/40 bg-emerald-500/15' : 'text-white/55 border-white/10 bg-white/5 hover:text-white/80'}`}
+                  title="On: assignment cards pop up live for one-tap approval. Off: they still collect quietly for review after the call."
+                >
+                  <span className="material-symbols-outlined" style={{ fontSize: 15 }}>{captureTasks ? 'bolt' : 'inbox'}</span>
+                  Live tasking {captureTasks ? 'on' : 'off — review after'}
+                </button>
+              </>
+            )}
 
             {mode === 'interpret' && (
               <>
@@ -853,6 +997,65 @@ export default function CopilotPage() {
           </div>
         ) : (
           <div className="flex flex-col gap-3">
+            {/* Meeting Mode: live agenda — checks itself off, tap to override */}
+            {mode === 'meeting' && agenda.length > 0 && (
+              <div className="glass-card p-4" style={{ borderLeft: '3px solid #4ab8ce' }}>
+                <div className="flex items-center gap-2 mb-2">
+                  <span className="text-[10px] font-bold uppercase tracking-wider text-white/55">Agenda</span>
+                  <span className="text-[10px] text-white/35">{agenda.filter((a) => a.covered).length}/{agenda.length} covered</span>
+                </div>
+                <div className="space-y-0.5">
+                  {agenda.map((a, i) => (
+                    <button
+                      key={i}
+                      onClick={() => setAgenda((prev) => prev.map((x, j) => (j === i ? { ...x, covered: !x.covered } : x)))}
+                      className="w-full flex items-center gap-2 text-left px-2 py-1.5 rounded-lg hover:bg-white/5"
+                    >
+                      <span className={`material-symbols-outlined shrink-0 ${a.covered ? 'text-emerald-400' : 'text-white/25'}`} style={{ fontSize: 16 }}>
+                        {a.covered ? 'check_circle' : 'radio_button_unchecked'}
+                      </span>
+                      <span className={`text-[12px] ${a.covered ? 'text-white/35 line-through' : 'text-white/85'}`}>{a.text}</span>
+                    </button>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {/* Meeting Mode: assignments Mother heard — one tap to the board */}
+            {mode === 'meeting' && suggTasks.some((t) => t.status !== 'dismissed') && (
+              <div className="glass-card p-4" style={{ borderLeft: '3px solid #8b5cf6' }}>
+                <div className="text-[10px] font-bold uppercase tracking-wider text-white/55 mb-2">
+                  Captured assignments{captureTasks ? '' : ' — review and approve after the call'}
+                </div>
+                <div className="space-y-1.5">
+                  {suggTasks.filter((t) => t.status !== 'dismissed').map((t) => (
+                    <div key={t.id} className="flex items-center gap-2 px-2.5 py-2 rounded-lg" style={{ background: 'rgba(139,92,246,0.08)', border: '1px solid rgba(139,92,246,0.3)', animation: 'mna-fade-up 280ms ease-out' }}>
+                      <span className="material-symbols-outlined text-violet-300 shrink-0" style={{ fontSize: 16 }}>assignment_ind</span>
+                      <div className="flex-1 min-w-0">
+                        <div className="text-[12px] font-semibold text-white/90 truncate">{t.title}</div>
+                        <div className="text-[10px] text-white/45">{t.assignee || 'Unassigned'}{t.due ? ` · due ${t.due}` : ''}</div>
+                      </div>
+                      {t.status === 'added' ? (
+                        <span className="text-[10px] font-bold text-emerald-300 shrink-0">On the board ✓</span>
+                      ) : (
+                        <>
+                          <button onClick={() => approveTask(t)} className="text-[10px] font-bold px-2.5 py-1.5 rounded-lg text-white shrink-0" style={{ background: 'rgba(16,185,129,0.4)' }}>
+                            Assign
+                          </button>
+                          <button
+                            onClick={() => setSuggTasks((prev) => prev.map((x) => (x.id === t.id ? { ...x, status: 'dismissed' } : x)))}
+                            className="text-white/25 hover:text-red-400 shrink-0 text-[11px]"
+                          >
+                            ✕
+                          </button>
+                        </>
+                      )}
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+
             {signals.length === 0 && (
               <div
                 className="glass-card p-6 text-center text-white/55 text-sm"

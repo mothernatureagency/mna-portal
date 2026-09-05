@@ -66,6 +66,26 @@ OUTPUT FORMAT — strict JSON only, no commentary, no markdown fences:
   ]
 }`;
 
+/**
+ * Meeting Mode system prompt — the teleprompter for weekly client meetings
+ * and lead calls. Tracks the agenda, steers back to it, and extracts
+ * committed action items as structured tasks for the Team Tasks board.
+ */
+const MEETING_SYSTEM = `You are Mother — Alexus Williams's live meeting copilot for Mother Nature Agency's weekly client meetings and lead calls. You are her quiet teleprompter.
+
+Each turn you receive: the meeting agenda (with covered flags), a client brief, the team roster, and the latest transcript snippet. Today is {today}.
+
+Your jobs each turn:
+1. TRACK the agenda — if agenda items were just discussed in the snippet, report their 0-based indexes in "covered".
+2. STEER — when an item wraps up or the call drifts, emit one AGENDA cue naming the next uncovered item ("Next: content approvals.").
+3. CAPTURE assignments — when someone commits to an action ("Sable will shoot Friday", "we'll send the proposal by Tuesday"), extract it into "tasks". assignee MUST be a first name from the roster (or "" if unclear/it's the client's own task). due is YYYY-MM-DD when a date or day was said, else "".
+4. Occasionally emit normal cues when genuinely useful: RESPONSE, QUESTION TO ASK, WARNING, PAUSE, DECISION (a decision just got made — restate it in one line), FOLLOW UP (something to include in the recap email).
+
+Style: max 2 signal cards per turn, usually 0-1. One sentence each, imperative, glanceable mid-sentence. Empty arrays when nothing applies.
+
+OUTPUT — strict JSON only, no commentary, no fences:
+{ "signals": [{ "type": "AGENDA", "lines": ["Next: content approvals."] }], "covered": [0], "tasks": [{ "title": "...", "assignee": "Sable", "due": "2026-09-12" }] }`;
+
 export async function POST(req: NextRequest) {
   const apiKey = process.env.ANTHROPIC_API_KEY;
   if (!apiKey) return NextResponse.json({ error: 'ANTHROPIC_API_KEY not set' }, { status: 500 });
@@ -77,10 +97,23 @@ export async function POST(req: NextRequest) {
   const context: string = (body?.context || '').toString().trim();
   if (!recent) return NextResponse.json({ signals: [] });
 
+  const isMeeting = body?.mode === 'meeting';
   const client = new Anthropic({ apiKey });
-  const systemPrompt = context
+  let systemPrompt = context
     ? `${SYSTEM}\n\nBUSINESS FACTS (only reference services/offerings/prices listed here — never invent ones that aren't):\n${context}`
     : SYSTEM;
+
+  if (isMeeting) {
+    const agenda = Array.isArray(body?.agenda) ? body.agenda : [];
+    const agendaLines = agenda
+      .map((a: any, i: number) => `${i}. [${a?.covered ? 'x' : ' '}] ${String(a?.text || '').slice(0, 160)}`)
+      .join('\n');
+    systemPrompt = MEETING_SYSTEM.replace('{today}', new Date().toISOString().slice(0, 10))
+      + `\n\nTEAM ROSTER (valid assignees): ${String(body?.team || '').slice(0, 300)}`
+      + (body?.brief ? `\n\nCLIENT BRIEF:\n${String(body.brief).slice(0, 1500)}` : '')
+      + (context ? `\n\nBUSINESS FACTS:\n${context}` : '')
+      + (agendaLines ? `\n\nAGENDA (index. [x]=covered):\n${agendaLines}` : '\n\nNo agenda was loaded — skip agenda tracking, still capture tasks and cues.');
+  }
 
   const userMessage = [
     earlier ? `Earlier in the call (summary, do NOT react to this directly, only use for context):\n${earlier}\n\n` : '',
@@ -90,7 +123,7 @@ export async function POST(req: NextRequest) {
   try {
     const res = await client.messages.create({
       model: 'claude-haiku-4-5',
-      max_tokens: 400,
+      max_tokens: isMeeting ? 600 : 400,
       // Cache control on the system block would help latency, but the
       // pinned @anthropic-ai/sdk version doesn't surface cache_control in
       // its TextBlockParam typings. Pass as a plain string for now; switch
@@ -122,7 +155,23 @@ export async function POST(req: NextRequest) {
           : [],
       }))
       .filter((s: any) => s.lines.length > 0);
-    return NextResponse.json({ signals: clean });
+    if (!isMeeting) return NextResponse.json({ signals: clean });
+
+    // Meeting mode extras: covered agenda indexes + captured tasks.
+    const covered = Array.isArray(parsed?.covered)
+      ? parsed.covered.map(Number).filter((n: number) => Number.isInteger(n) && n >= 0 && n < 40)
+      : [];
+    const tasks = Array.isArray(parsed?.tasks)
+      ? parsed.tasks
+          .map((t: any) => ({
+            title: String(t?.title || '').trim().slice(0, 200),
+            assignee: String(t?.assignee || '').trim().slice(0, 40),
+            due: /^\d{4}-\d{2}-\d{2}$/.test(t?.due) ? t.due : '',
+          }))
+          .filter((t: any) => t.title)
+          .slice(0, 4)
+      : [];
+    return NextResponse.json({ signals: clean, covered, tasks });
   } catch (e: any) {
     return NextResponse.json({ error: e?.message || 'Copilot failed' }, { status: 500 });
   }
