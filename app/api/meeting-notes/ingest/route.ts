@@ -29,8 +29,16 @@ export const maxDuration = 60;
 export async function POST(req: NextRequest) {
   await ensureSchema();
 
-  let body: any;
-  try { body = await req.json(); } catch { return NextResponse.json({ error: 'Invalid JSON' }, { status: 400 }); }
+  // Accept JSON or form-encoded — Make's HTTP module sends the latter
+  // cleanly without JSON-escaping pitfalls in long notes text.
+  let body: any = null;
+  try { body = await req.json(); } catch { /* try form below */ }
+  if (!body) {
+    try {
+      const form = await req.formData();
+      body = Object.fromEntries(Array.from(form.entries()).map(([k, v]) => [k, typeof v === 'string' ? v : '']));
+    } catch { return NextResponse.json({ error: 'Send JSON or form-encoded fields' }, { status: 400 }); }
+  }
 
   const secret = (body?.secret || req.nextUrl.searchParams.get('secret') || '').toString();
   if (!process.env.SEED_SECRET || secret !== process.env.SEED_SECRET) {
