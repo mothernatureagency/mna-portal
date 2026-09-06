@@ -151,5 +151,15 @@ Return ONLY strict JSON (no fences):
     } catch { /* non-fatal */ }
   }
 
-  return NextResponse.json({ ok: true, noteId: rows[0]?.id, clientId, meetingDate, tasksCreated });
+  // Draft the follow-up email right away — it sits on the Email Drafts
+  // page all week (send early by approving; hold by changing its status),
+  // and anything still 'drafting' auto-sends Friday at 11am Central.
+  let followupDrafted = false;
+  try {
+    const { draftFollowups } = await import('@/lib/followups');
+    const r = await draftFollowups({ clientId });
+    followupDrafted = r.drafted > 0;
+  } catch { /* the Friday cron catches anything missed */ }
+
+  return NextResponse.json({ ok: true, noteId: rows[0]?.id, clientId, meetingDate, tasksCreated, followupDrafted });
 }

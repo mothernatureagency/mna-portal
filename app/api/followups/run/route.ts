@@ -1,23 +1,31 @@
 import { NextRequest, NextResponse } from 'next/server';
-import Anthropic from '@anthropic-ai/sdk';
 import { ensureSchema, query } from '@/lib/db';
-import { clients as staticClients } from '@/lib/clients';
+import { draftFollowups } from '@/lib/followups';
+import { getClientNotificationEmail } from '@/lib/notifications';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
 export const maxDuration = 300;
 
 /**
- * Weekly follow-up email drafter (Vercel Cron, Fridays).
+ * Friday follow-up runner (Vercel Cron, 16:00 UTC = 11am Central).
  *
- * For every client with a meeting note filed in the last 8 days that
- * doesn't already have a follow-up drafted since that note, this drafts a
- * recap email — what was discussed and decided, action items with owners,
- * what we're waiting on from the client, and what's going out next week —
- * and files it in the campaigns table as status 'drafting'. It shows up
- * on the Email Drafts page for review; NOTHING sends until a human
- * approves it there. That's the training-wheels stage of "fully
- * autonomous": the drafts write themselves, the send button stays human.
+ * Drafting happens the moment a meeting note is ingested, so by Friday
+ * the drafts have been sitting on the Email Drafts page all week. This
+ * cron does two things:
+ *
+ * 1. Catch-up drafting for any note that somehow has no follow-up yet.
+ * 2. AUTO-SEND: every follow_up campaign still in status 'drafting' is
+ *    promoted to 'approved' and handed to the send rail (client_kv
+ *    weekly_email_draft, which the Make Gmail scenario polls and sends).
+ *
+ * The human controls between ingest and Friday:
+ *  - approve in the UI earlier → it sends sooner;
+ *  - edit the draft → the edited version is what goes out;
+ *  - change its status to anything other than 'drafting' → held, never
+ *    auto-sent.
+ * A client with no owner-contact email on file is skipped (reported), so
+ * nothing fires into the void.
  *
  * Auth: Vercel Cron bearer, or ?secret=SEED_SECRET for manual runs.
  */
@@ -31,94 +39,39 @@ export async function GET(req: NextRequest) {
   const okSecret = !!process.env.SEED_SECRET && secret === process.env.SEED_SECRET;
   if (!okCron && !okSecret) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
 
-  const apiKey = process.env.ANTHROPIC_API_KEY;
-  if (!apiKey) return NextResponse.json({ error: 'ANTHROPIC_API_KEY not set' }, { status: 500 });
-  const anthropic = new Anthropic({ apiKey });
+  // 1) Catch-up drafting.
+  const drafting = await draftFollowups();
 
-  // Latest note per client from the past 8 days.
-  const { rows: notes } = await query<any>(
-    `select distinct on (client_id) id, client_id, to_char(meeting_date, 'YYYY-MM-DD') as meeting_date,
-            title, summary, attendees, action_items, created_at
-       from meeting_notes
-      where created_at > now() - interval '8 days'
-      order by client_id, created_at desc`,
+  // 2) Auto-send everything still sitting in 'drafting'.
+  const { rows: pending } = await query<any>(
+    `select id, client_id, subject, body from campaigns
+      where campaign_type = 'follow_up' and status = 'drafting'
+      order by created_at asc limit 40`,
   );
 
-  // Client-name lookup (static + custom) for content-calendar joins.
-  const nameById = new Map<string, string>(staticClients.map((c) => [c.id, c.name]));
-  try {
-    const { rows } = await query<{ id: string; name: string }>(`select id, name from custom_clients`);
-    for (const r of rows) if (!nameById.has(r.id)) nameById.set(r.id, r.name);
-  } catch { /* fine */ }
-
-  let drafted = 0, skipped = 0, failed = 0;
-  const results: any[] = [];
-
-  for (const note of notes) {
+  let queued = 0, held = 0;
+  const sendResults: any[] = [];
+  for (const c of pending) {
     try {
-      // One follow-up per note: skip if a draft already exists since it.
-      const { rows: existing } = await query(
-        `select id from campaigns where client_id = $1 and campaign_type = 'follow_up' and created_at >= $2 limit 1`,
-        [note.client_id, note.created_at],
-      );
-      if (existing.length > 0) { skipped++; continue; }
-
-      const clientName = nameById.get(note.client_id) || note.client_id;
-
-      const [asksQ, contentQ] = await Promise.all([
-        query(`select title from client_requests where client_id = $1 and status = 'open' order by created_at desc limit 6`, [note.client_id]).catch(() => ({ rows: [] as any[] })),
-        query(
-          `select count(*) filter (where cc.client_approval_status = 'pending_review' and cc.post_date >= current_date)::int as pending,
-                  count(*) filter (where cc.post_date between current_date and current_date + 7)::int as this_week
-             from content_calendar cc join projects p on p.id = cc.project_id
-            where p.client_name = $1`,
-          [clientName],
-        ).catch(() => ({ rows: [{ pending: 0, this_week: 0 }] as any[] })),
-      ]);
-      const asks = (asksQ.rows as any[]).map((x) => String(x.title || '')).filter(Boolean);
-      const content: any = contentQ.rows[0] || {};
-      const actionItems = Array.isArray(note.action_items) ? note.action_items : [];
-
-      const prompt = `Draft the weekly follow-up email from Alexus at Mother Nature Agency to her client ${clientName}, after their call on ${note.meeting_date}.
-
-MEETING: ${note.title || 'Weekly call'}${note.attendees ? ` — attendees: ${note.attendees}` : ''}
-SUMMARY OF THE CALL:
-${(note.summary || '').slice(0, 2500)}
-
-ACTION ITEMS FROM THE CALL:
-${actionItems.length ? actionItems.map((a: any) => `- ${a.title} (${a.assignee === 'client' ? 'on the client' : `on our team${a.assignee && a.assignee !== 'team' ? ` — ${a.assignee}` : ''}`})`).join('\n') : '(none captured)'}
-
-STILL WAITING ON THE CLIENT: ${asks.length ? asks.join('; ') : 'nothing'}
-CONTENT: ${Number(content.pending || 0)} posts awaiting their approval; ${Number(content.this_week || 0)} going out in the next 7 days.
-
-Write it ready to send: warm but efficient, first person from Alexus, no fluff, no invented facts — only what's above. Structure: quick thanks + one-line recap, decisions made, who's doing what (theirs vs ours, with any deadlines), what we need from them, what's shipping next week, sign-off "— Alexus, Mother Nature Agency". Plain text, no markdown.
-
-Return ONLY strict JSON (no fences): { "subject": "...", "body": "..." }`;
-
-      const res = await anthropic.messages.create({
-        model: 'claude-haiku-4-5',
-        max_tokens: 1200,
-        messages: [{ role: 'user', content: prompt }],
-      });
-      const out = res.content.filter((b: any) => b.type === 'text').map((b: any) => b.text).join('');
-      const m = out.match(/\{[\s\S]*\}/);
-      const parsed = m ? JSON.parse(m[0]) : null;
-      const subject = (parsed?.subject || `Follow-up from our ${note.meeting_date} call`).toString().slice(0, 200);
-      const emailBody = (parsed?.body || '').toString().slice(0, 8000);
-      if (!emailBody) throw new Error('empty draft');
-
+      const to = await getClientNotificationEmail(c.client_id);
+      if (!to) {
+        held++;
+        sendResults.push({ clientId: c.client_id, held: 'no client contact email on file' });
+        continue;
+      }
       await query(
-        `insert into campaigns (client_id, campaign_type, name, subject, body, status, client_visible)
-         values ($1, 'follow_up', $2, $3, $4, 'drafting', false)`,
-        [note.client_id, `Follow-up — ${clientName} — ${note.meeting_date}`, subject, emailBody],
+        `insert into client_kv (client_id, key, value, updated_at)
+         values ($1, 'weekly_email_draft', $2::jsonb, now())
+         on conflict (client_id, key) do update set value = $2::jsonb, updated_at = now()`,
+        [c.client_id, JSON.stringify({ subject: c.subject, body: c.body, to, status: 'approved', approvedAt: new Date().toISOString(), sentAt: null, campaignId: c.id })],
       );
-      drafted++;
-      results.push({ clientId: note.client_id, subject });
+      await query(`update campaigns set status = 'approved', approved_at = now() where id = $1`, [c.id]);
+      queued++;
+      sendResults.push({ clientId: c.client_id, to, queued: true });
     } catch (e: any) {
-      failed++;
-      results.push({ clientId: note.client_id, error: e?.message || 'draft failed' });
+      sendResults.push({ clientId: c.client_id, error: e?.message || 'queue failed' });
     }
   }
 
-  return NextResponse.json({ drafted, skipped, failed, considered: notes.length, results });
+  return NextResponse.json({ drafting, autoSend: { queued, held, considered: pending.length, results: sendResults } });
 }
