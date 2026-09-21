@@ -4,6 +4,8 @@ import { ensureSchema, query } from '@/lib/db';
 import { getAgent } from '@/lib/agents/config';
 import { getBrand } from '@/lib/client-brand';
 import { getFormat } from '@/lib/graphic-formats';
+import { resolveBrandKit } from '@/lib/brand-kit-server';
+import { fontFamilyCss } from '@/lib/brand-kit';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -36,13 +38,20 @@ export async function POST(req: NextRequest) {
   if (!agent) return NextResponse.json({ error: 'Graphic Designer agent missing' }, { status: 500 });
 
   const brand = await getBrand(project.client_id);
+  const { fields: kit, groupKey } = await resolveBrandKit(project.client_id);
   const fmt = getFormat(project.format);
 
   const userPrompt = [
     `Write the design brief for this piece.`,
     ``,
     `Client: ${brand.name}${brand.location ? ` (${brand.location})` : ''} · ${brand.industry}`,
-    `Brand palette: ${brand.primary} / ${brand.secondary} / ${brand.accent}`,
+    kit.palette?.length
+      ? `Brand palette: ${kit.palette.map((c) => `${c.hex} (${c.label})`).join(' / ')}`
+      : `Brand palette: ${brand.primary} / ${brand.secondary} / ${brand.accent}`,
+    groupKey ? `Part of the ${groupKey} group — the group's brand kit applies.` : '',
+    kit.headlineFont ? `Headline face (fixed): ${fontFamilyCss(kit.headlineFont)}` : '',
+    kit.bodyFont ? `Body face (fixed): ${fontFamilyCss(kit.bodyFont)}` : '',
+    kit.rules?.trim() ? `\nBrand rules the brief must respect:\n${kit.rules.trim()}` : '',
     `Canvas: ${fmt.label} — ${fmt.width}x${fmt.height}px · ${fmt.usage}`,
     `Working title: ${project.title}`,
     project.topic ? `Subject / angle: ${project.topic}` : '',
