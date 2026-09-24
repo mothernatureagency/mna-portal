@@ -5,6 +5,8 @@ import { createClient } from '@/lib/supabase/client';
 import { driveThumbnailUrl, driveViewUrl } from '@/lib/drive';
 import { extractFolderId, type DriveFile } from '@/lib/google-drive-shared';
 import { KNOWN_MERGE_FIELDS } from '@/lib/merge-vars';
+import { parseCaptionOptions } from '@/lib/caption-options';
+import CaptionOptionPicker from '@/components/dashboard/CaptionOptionPicker';
 
 // Resolve a preview src for a stored photo URL. Google Drive links go through
 // the thumbnail endpoint; uploaded images (Supabase public URLs, or any plain
@@ -2145,9 +2147,16 @@ export default function ContentPage() {
                             </div>
                           </div>
                         ) : activeItem.caption ? (
-                          <div className="text-[13px] text-white/70 whitespace-pre-wrap leading-relaxed bg-white/5 rounded-xl p-4 border border-white/10 max-h-60 overflow-y-auto">
-                            {activeItem.caption}
-                          </div>
+                          isStaff && parseCaptionOptions(activeItem.caption) ? (
+                            <CaptionOptionPicker
+                              caption={activeItem.caption}
+                              onPick={async (text) => { try { await patchItem(activeItem.id, { caption: text }); } catch (e: any) { alert(e.message); } }}
+                            />
+                          ) : (
+                            <div className="text-[13px] text-white/70 whitespace-pre-wrap leading-relaxed bg-white/5 rounded-xl p-4 border border-white/10 max-h-60 overflow-y-auto">
+                              {activeItem.caption}
+                            </div>
+                          )
                         ) : (
                           <div className="text-[12px] text-white/30 italic">No caption yet — click “Add caption”.</div>
                         )}
@@ -2793,6 +2802,12 @@ export default function ContentPage() {
                             >Cancel</button>
                           </div>
                         </div>
+                      ) : isStaff && parseCaptionOptions(it.caption) ? (
+                        <CaptionOptionPicker
+                          compact
+                          caption={it.caption!}
+                          onPick={async (text) => { try { await patchItem(it.id, { caption: text }); } catch (e: any) { alert(e.message); } }}
+                        />
                       ) : (
                         <div className="text-white/85 text-xs whitespace-pre-wrap leading-relaxed bg-white/5 rounded-lg p-3 border border-white/10">
                           {it.caption}

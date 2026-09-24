@@ -171,10 +171,9 @@ export async function postformeAuthUrl(
 // with a single final version, the post must never publish — otherwise the raw
 // draft (both options, headers and all) goes live. Both the autopost runner and
 // the manual publish route check this before handing anything to Post for Me.
-export function captionHasDraftOptions(caption: string | null | undefined): boolean {
-  const c = (caption || '').toString();
-  return /(^|\n)\s*(#+\s*)?option\s+[ab]\b\s*[:\-–—]?/i.test(c);
-}
+// Definition lives in lib/caption-options.ts so the UIs' option picker and this
+// guard can never disagree about what counts as a draft.
+export { captionHasDraftOptions } from './caption-options';
 
 export type PublishInput = {
   accountIds: string[]; // the exact Post for Me accounts to post to

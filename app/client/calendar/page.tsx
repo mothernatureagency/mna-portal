@@ -11,6 +11,8 @@ function DriveThumb({ url, className }: { url: string | null | undefined; classN
   return <img src={thumb} alt="" className={className} onError={() => setFailed(true)} />;
 }
 import { useClientPortal } from '@/components/client-portal/ClientPortalContext';
+import { parseCaptionOptions } from '@/lib/caption-options';
+import CaptionOptionPicker from '@/components/dashboard/CaptionOptionPicker';
 
 function toDateOnly(s: string): string {
   if (!s) return s;
@@ -302,9 +304,17 @@ export default function ClientCalendarPage() {
                     )}
                   </div>
                   {it.caption && (
-                    <div className="text-[12px] text-white/60 whitespace-pre-wrap leading-relaxed bg-white/5 rounded-lg p-3 border border-white/10 max-h-40 overflow-y-auto">
-                      {it.caption}
-                    </div>
+                    status !== 'scheduled' && parseCaptionOptions(it.caption) ? (
+                      <CaptionOptionPicker
+                        compact
+                        caption={it.caption}
+                        onPick={async (text) => { try { await patchItem(it.id, { caption: text }); } catch (e: any) { alert(e.message); } }}
+                      />
+                    ) : (
+                      <div className="text-[12px] text-white/60 whitespace-pre-wrap leading-relaxed bg-white/5 rounded-lg p-3 border border-white/10 max-h-40 overflow-y-auto">
+                        {it.caption}
+                      </div>
+                    )
                   )}
                   {status !== 'scheduled' && (
                     <div className="pt-3 border-t border-white/10 flex flex-col gap-2">
@@ -388,9 +398,16 @@ export default function ClientCalendarPage() {
                       )}
                     </div>
                     {activeItem.caption && (
-                      <div className="text-[13px] text-white/60 whitespace-pre-wrap leading-relaxed bg-white/5 rounded-xl p-4 border border-white/10">
-                        {activeItem.caption}
-                      </div>
+                      status !== 'scheduled' && parseCaptionOptions(activeItem.caption) ? (
+                        <CaptionOptionPicker
+                          caption={activeItem.caption}
+                          onPick={async (text) => { try { await patchItem(activeItem.id, { caption: text }); } catch (e: any) { alert(e.message); } }}
+                        />
+                      ) : (
+                        <div className="text-[13px] text-white/60 whitespace-pre-wrap leading-relaxed bg-white/5 rounded-xl p-4 border border-white/10">
+                          {activeItem.caption}
+                        </div>
+                      )
                     )}
                     {activeItem.client_comments && (
                       <div className="text-[12px] bg-rose-500/15 border border-rose-500/30 rounded-lg p-3">
