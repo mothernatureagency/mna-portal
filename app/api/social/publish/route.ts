@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { ensureSchema, query } from '@/lib/db';
 import { createClient } from '@/lib/supabase/server';
 import { clients as staticClients } from '@/lib/clients';
-import { postformePublish, platformsFor, platformBase, mediaForPost, isVideoUrl, isVideoOnlyPlatform } from '@/lib/postforme';
+import { postformePublish, platformsFor, platformBase, mediaForPost, isVideoUrl, isVideoOnlyPlatform, captionHasDraftOptions } from '@/lib/postforme';
 import { applyMergeVars, effectiveVars, deriveLocation } from '@/lib/merge-vars';
 
 export const runtime = 'nodejs';
@@ -36,11 +36,35 @@ export async function POST(req: NextRequest) {
   if (!id || !clientId) return NextResponse.json({ error: 'id and clientId required' }, { status: 400 });
 
   const { rows } = await query<any>(
-    `select id, platform, caption, title, photo_drive_url, photo_urls, assigned_role from content_calendar where id = $1`,
+    `select id, platform, caption, title, photo_drive_url, photo_urls, assigned_role, client_approval_status from content_calendar where id = $1`,
     [id],
   );
   const post = rows[0];
   if (!post) return NextResponse.json({ error: 'Post not found' }, { status: 404 });
+
+  // A caption still carrying the AI draft's OPTION A / OPTION B copy is not
+  // ready — publishing it puts the raw draft on the client's page (this
+  // happened; see the Shadow Lake "ALA Amplifier" post). Refuse until a human
+  // picks one option and saves the final caption.
+  if (captionHasDraftOptions(post.caption)) {
+    return NextResponse.json(
+      { error: 'This caption still contains the draft OPTION A / OPTION B copy. Pick one option, save the final caption, then publish.' },
+      { status: 400 },
+    );
+  }
+
+  // Non-PDM posts must be approved (or already marked scheduled) before they
+  // can go out — this mirrors the autopost runner. A pending_review post was
+  // once published from here by accident; approve it in the tracker first.
+  if (
+    String(post.assigned_role || '') !== 'PDM (Brand)' &&
+    !['approved', 'scheduled'].includes(String(post.client_approval_status || ''))
+  ) {
+    return NextResponse.json(
+      { error: `This post is still "${post.client_approval_status || 'pending_review'}". Approve it in the tracker before publishing.` },
+      { status: 400 },
+    );
+  }
   if (String(post.assigned_role || '') === 'PDM (Brand)') {
     // PDM brand posts are corporate's job by default — but a client can opt in
     // to have us push them (for locations corporate isn't covering).
@@ -94,8 +118,10 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: result.error }, { status: 502 });
   }
 
+  // Once it's live on the client's public page it must also be visible on
+  // their portal calendar — never let a published post stay hidden.
   await query(
-    `update content_calendar set publish_status = 'posted', published_at = now(), publish_ref = $1, publish_error = null where id = $2`,
+    `update content_calendar set publish_status = 'posted', published_at = now(), publish_ref = $1, publish_error = null, client_visible = true where id = $2`,
     [String(result.id), id],
   );
   return NextResponse.json({ ok: true, ref: result.id, platforms });

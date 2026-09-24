@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { ensureSchema, query } from '@/lib/db';
 import { clients as staticClients } from '@/lib/clients';
-import { postformePublish, postformeRawAccounts, platformsFor, platformBase, mediaForPost, isVideoUrl, isVideoOnlyPlatform } from '@/lib/postforme';
+import { postformePublish, postformeRawAccounts, platformsFor, platformBase, mediaForPost, isVideoUrl, isVideoOnlyPlatform, captionHasDraftOptions } from '@/lib/postforme';
 import { clientTimezone, slotTimeUtc } from '@/lib/social-schedule';
 import { applyMergeVars, effectiveVars, deriveLocation, type MergeVars } from '@/lib/merge-vars';
 
@@ -51,6 +51,20 @@ export async function GET(req: NextRequest) {
   );
   const pdmOptIn = new Set(optRows.map((r) => r.client_id));
 
+  // Freshness window: a post whose date slipped more than STALE_DAYS into the
+  // past is no longer timely — publishing it weeks late (which used to happen)
+  // surprises everyone. Mark it expired so it shows up in the tracker instead
+  // of silently going out; re-dating the post makes it eligible again.
+  const STALE_DAYS = 7;
+  await query(
+    `update content_calendar
+        set publish_status = 'expired',
+            publish_error = 'Post date passed more than ${STALE_DAYS} days ago without publishing — move it to a new date to post it.'
+      where coalesce(publish_status, '') not in ('posted', 'scheduled', 'expired')
+        and auto_post = true
+        and post_date < current_date - ${STALE_DAYS}`,
+  );
+
   const { rows: normal } = await query<any>(
     `select cc.id, cc.platform, cc.caption, cc.photo_drive_url, cc.photo_urls,
             to_char(cc.post_date, 'YYYY-MM-DD') as post_date, p.client_name, false as is_pdm
@@ -61,6 +75,7 @@ export async function GET(req: NextRequest) {
         and cc.client_approval_status in ('approved', 'scheduled')
         and cc.assigned_role is distinct from 'PDM (Brand)'
         and cc.post_date <= current_date
+        and cc.post_date >= current_date - ${STALE_DAYS}
       order by cc.post_date asc, cc.id asc
       limit 50`,
   );
@@ -76,6 +91,7 @@ export async function GET(req: NextRequest) {
           where cc.assigned_role = 'PDM (Brand)'
             and coalesce(cc.publish_status, '') not in ('posted', 'scheduled')
             and cc.post_date <= current_date
+            and cc.post_date >= current_date - ${STALE_DAYS}
           order by cc.post_date asc, cc.id asc
           limit 50`,
       )).rows
@@ -140,15 +156,30 @@ export async function GET(req: NextRequest) {
     const inFuture = target.getTime() > now + 60_000; // >1 min out → hand off to Post for Me
     const scheduleISO = inFuture ? target.toISOString() : undefined;
 
+    // Never publish a caption that still carries the AI draft's two options —
+    // a human has to pick one first. Mark it failed so it surfaces in the
+    // tracker; once the caption is finalized it publishes on the next run.
+    if (captionHasDraftOptions(post.caption)) {
+      await query(
+        `update content_calendar set publish_status='failed', publish_error='Caption still contains draft OPTION A / OPTION B copy — pick one option and save the final caption, then it will post.' where id=$1`,
+        [post.id],
+      );
+      failed++;
+      continue;
+    }
+
     const vars = await varsFor(clientId, post.client_name);
     const caption = applyMergeVars((post.caption || '').toString(), vars);
     const result = await postformePublish({ accountIds, caption, mediaUrls: media, scheduleISO });
     if (result.ok) {
+      // Anything published to public social media should be visible on the
+      // client's calendar too — a post they can see on their own page must
+      // never be hidden from their portal.
       if (inFuture) {
-        await query(`update content_calendar set publish_status='scheduled', scheduled_for=$1, publish_ref=$2, publish_error=null where id=$3`, [target.toISOString(), String(result.id), post.id]);
+        await query(`update content_calendar set publish_status='scheduled', scheduled_for=$1, publish_ref=$2, publish_error=null, client_visible=true where id=$3`, [target.toISOString(), String(result.id), post.id]);
         scheduled++;
       } else {
-        await query(`update content_calendar set publish_status='posted', published_at=now(), scheduled_for=null, publish_ref=$1, publish_error=null where id=$2`, [String(result.id), post.id]);
+        await query(`update content_calendar set publish_status='posted', published_at=now(), scheduled_for=null, publish_ref=$1, publish_error=null, client_visible=true where id=$2`, [String(result.id), post.id]);
         posted++;
       }
     } else {

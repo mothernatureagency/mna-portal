@@ -166,6 +166,16 @@ export async function postformeAuthUrl(
   }
 }
 
+// The AI "write copy" step intentionally saves TWO caption options for a human
+// to pick from ("OPTION A: … OPTION B: …"). Until someone replaces the caption
+// with a single final version, the post must never publish — otherwise the raw
+// draft (both options, headers and all) goes live. Both the autopost runner and
+// the manual publish route check this before handing anything to Post for Me.
+export function captionHasDraftOptions(caption: string | null | undefined): boolean {
+  const c = (caption || '').toString();
+  return /(^|\n)\s*(#+\s*)?option\s+[ab]\b\s*[:\-–—]?/i.test(c);
+}
+
 export type PublishInput = {
   accountIds: string[]; // the exact Post for Me accounts to post to
   caption: string;
