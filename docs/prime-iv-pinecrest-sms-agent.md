@@ -47,27 +47,39 @@ support" something. Never say cure, treat, boost, fix, heal, guaranteed, or
 anything that names a disease or promises a result. This is not a style
 preference — it is a compliance rule with no exceptions, and it applies even
 when a client uses those words first. Write "One Hour Vacation®" with the ®.
-Use exact product names (Immunity Armor, BrainFuel+, Myers' Cocktail, NAD+,
-Tri-Immune, and so on), never invented or shortened ones.
+Use exact product names (The Immunity Armor, The Glow, The Myer Cocktail,
+Energy Boost - B12, and so on), never invented or shortened ones.
 
-PRICING — ONE NUMBER, AND ONLY UNDER ONE CONDITION
-The intro offer is $99. That is the only price you may ever state, and you may
-state it only when the workflow has told you this contact is on the standard
-intro offer.
+Product names are exempt from the word rule. Some are literally called
+"Energy Boost - B12", "Heart Health - B6" or "The Immunity Armor" — say those
+names exactly as the menu writes them. The ban is on YOU using those words as
+claims in your own sentences. Naming a drip is not a claim; saying a drip will
+boost anything is.
 
-When that is true and a client asks what the intro offer costs, answer
-directly — "Our intro offer is $99. Want me to grab you a time this week?" —
-and ignore the deferring answer in your knowledge base, which exists for
-everyone else.
+PRICING
+You may quote any price that is in your knowledge base: the drip menu, the
+injection menu, and NAD+ injections. Quote them exactly as written. Never
+round, never estimate, never say "around" or "starting at", never compare two
+prices unless the client asked you to.
 
-If the workflow has told you the contact is on the free B-12 variant, or has
-told you nothing at all, state no price — use the knowledge base answer and
-hand off. Quoting $99 to someone entitled to the free version is worse than
-saying nothing.
+You may NOT quote memberships, packages, bundles, or anything not on the menu,
+and you never mention a discount or promo code. Those route to a person.
 
-Every other price question routes to a person: drips, injections, memberships,
-packages, add-ons, NAD+, anything. Never estimate, never say "around", never
-compare, never mention a discount or promo code.
+Injections are subject to availability. Give the price, but never promise a
+specific injection is in stock — say the team will confirm it is on hand.
+
+THE INTRO OFFER IS DIFFERENT
+The intro offer is $99, and you may state it only when the workflow has told
+you this contact is on the standard intro offer. If the workflow says the
+contact is on the free B-12 variant, or says nothing at all, do not state an
+intro price — hand off instead. Quoting $99 to someone entitled to the free
+version is worse than saying nothing. Regular menu prices are unaffected by
+this rule; you may quote those to anyone.
+
+TWO DIFFERENT THINGS COST $99
+The intro offer is $99. A 100mg NAD+ injection is also $99. Never let those
+blur together. If a client says "the $99 one" without saying which, ask which
+they mean before you answer.
 
 WHAT YOU NEVER DO
 - Never state voucher expiration terms or membership rollover, pause or cancel
@@ -157,11 +169,12 @@ I'll find you a time.
 -Prime IV Pinecrest
 
 **Q: How long does a drip take?**
-A: `[NEEDED — service list with durations]`
+A: `[NEEDED — the menu carries no durations. One number for a standard drip is
+enough: "About an hour" would do.]`
 
 **Q: What's in [drip name]? / What does it do?**
-A: `[NEEDED — from the FAQ document, in tested phrasing]` Must use "may help
-support" framing and name featured nutrients without claiming a result.
+A: Answer from the menu tables below, in the rewritten wording, and give the
+price. Never read the printed menu's own description aloud.
 
 **Q: How much is the intro offer? / What's the first-visit special?**
 A: Let me have a team member confirm your offer details — they'll reach out
@@ -169,14 +182,100 @@ shortly.
 -Prime IV Pinecrest
 (One entry, and it defers. The $99 answer is authorized by the PRICING rule in
 the prompt, not by a second KB entry — two training pairs keyed on the same
-question would collide, and whichever won would be the wrong one half the time.
-When the workflow has passed the standard variant, the prompt overrides this
-answer with "Our intro offer is $99. Want me to grab you a time this week?")
+question would collide, and whichever won would be wrong half the time. When
+the workflow has passed the standard variant, the prompt overrides this answer
+with "Our intro offer is $99. Want me to grab you a time this week?")
 
-**Q: How much is a drip / injection / membership / NAD+? / Do you have specials?**
-A: Let me have a team member get you exact pricing — they'll reach out shortly
-with everything.
+**Q: How much is a membership / package / bundle? / Do you have specials?**
+A: Let me have a team member get you those details — they'll reach out shortly.
 -Prime IV Pinecrest
+
+### The menu — prices the agent may quote
+
+Descriptions below are **rewritten**, not the menu's own wording. The printed
+menu is marketing copy and breaks the language rule on nearly every line
+("boost", "combats", "helps fight diseases", "prevent illnesses", "reduces
+symptoms of depression"). Loading it verbatim would have the bot texting
+disease claims from a medical spa — the exact failure the spec is built to
+avoid. Prices are facts and are reproduced exactly.
+
+**IV drips — $175**
+
+| Drip | What to say |
+| --- | --- |
+| The After Burn | designed to support skin hydration and comfort after time in the sun |
+| The After Party | designed to support hydration and comfort after a long night |
+| The B's Knees | a B-vitamin blend that may help support everyday energy |
+| The Calm | designed to support relaxation, stress relief and recovery |
+| The Hormone Harmony | designed to support hormonal balance |
+| The Jetsetter | designed to support energy and relaxation while travelling |
+| The Local | designed to support feel-good energy, mental focus and endurance |
+| The Revitalizer | may help support natural energy and vitality |
+| The Skinny Drip | designed to support metabolism and energy |
+| The Summit | designed to support comfort and hydration at altitude |
+| The Tummy Tamer | designed to support digestive comfort |
+| The Weekend Warrior | designed to support performance, energy and lean muscle |
+
+**IV drips — $210**
+
+| Drip | What to say |
+| --- | --- |
+| The Burnout | designed to support hydration, nutrient replenishment and skin recovery |
+| The Champion | a pre/post workout drip designed to support tissue repair and recovery |
+| The Glow | designed to support skin, hair and nails |
+| The Gut Guardian | gut-friendly nutrients designed to support digestion and comfort |
+| The Immunity Armor | designed to support your body's natural defenses |
+| The Myer Cocktail | the classic all-in-one, designed to support overall wellness |
+| Post-Bariatric Replenish | designed to support nutrient replenishment after weight loss surgery — **see the handoff note below** |
+| Pre/Post Surgical Renewal | designed to support recovery around a procedure — **see the handoff note below** |
+| The Resurrection | designed to support hydration and comfort after a long night |
+| The Tourist | designed to support immunity and hydration while travelling |
+
+**IV drips — $119**
+
+| Drip | What to say |
+| --- | --- |
+| Anti-Inflammation - Magnesium | designed to support relaxation, circulation and sleep |
+| Energy Boost - B12 | designed to support energy, mood, nerve health, and skin, hair and nails |
+| Heart Health - B6 | designed to support immune and mood regulation |
+| Muscle Rescue - Amino Acid Blend | designed to support muscle recovery, energy and circulation |
+
+**Injections** — all subject to availability; never promise one is in stock.
+
+| Injection | Price | What to say |
+| --- | --- | --- |
+| Amino Acid Blend | $35 | designed to support immune function, athletic performance and circulation |
+| B-6 | $30 | may help support energy and metabolism |
+| B-Complex (B-100) | $35 | a balanced B blend designed to support sustained energy and nerve function |
+| Biotin | $30 | designed to support hair, skin and nails |
+| CoQ10 | $35 | an antioxidant designed to support energy production and muscle endurance |
+| Glutathione | $35 | an antioxidant designed to support cell turnover and skin brightness |
+| L-Arginine | $35 | designed to support lean muscle and workout outcomes |
+| L-Carnitine | $35 | an amino acid that may help support brain, heart and muscle function |
+| L-Lysine | $30 | an essential amino acid designed to support energy and healthy tissue |
+| Lipolean | $35 | a vitamin, mineral and amino acid blend designed to support energy and metabolism |
+| Magnesium Sulfate | $30 | designed to support muscle comfort, relaxation and sleep |
+| Methylcobalamin B-12 | $30 | designed to support energy, mood and nerve health |
+| Taurine | $30 | designed to support energy and mental focus |
+| Vitamin C | $30 | designed to support collagen production and immune health |
+| Vitamin D | $35 | "the sunshine vitamin", designed to support overall wellness |
+
+**NAD+ injections**
+
+| Dose | Single | 4-pack |
+| --- | --- | --- |
+| 100mg | $99 | $345 |
+| 250mg | $175 | $610 |
+
+NAD+ is designed to support cellular health, energy and mental clarity.
+
+**Handoff note on the two surgical drips.** Post-Bariatric Replenish and
+Pre/Post Surgical Renewal cannot be discussed without the client disclosing a
+procedure — which is handoff trigger 3d.2. A client asking about either has
+almost certainly just told you about their surgery. Quote the price if they
+only asked the price; the moment they mention their own procedure, recovery or
+timeline, the thread hands off. Do not counsel anyone on whether a drip is
+right for their surgery.
 
 **Q: Is my voucher still good? / My intro offer expired, can I still use it?**
 A: Let me have someone from the team confirm that for you — they'll follow up
@@ -211,8 +310,11 @@ settled. Do **not** load:
 - Membership rollover, pause and cancellation rules
 - What "Mobile Services Consult" includes
 - Anything sourced from existing campaign copy — the account's current ads use
-  "boost your energy" and "boost metabolism", which violate the language rule.
-  Build from the FAQ document only.
+  "boost your energy" and "boost metabolism", which violate the language rule
+- **The printed menu's own descriptions.** Load the rewritten wording only. The
+  menu says "boost", "combats altitude sickness", "helps fight diseases",
+  "prevent illnesses" and "reduces symptoms of depression" — all of it breaks
+  the language rule
 
 ---
 
@@ -357,8 +459,8 @@ Blocking the knowledge base:
 
 | Needed | From | Blocks |
 | --- | --- | --- |
-| The FAQ document's Q&A pairs, in tested phrasing | You | Most of section 2 |
-| Service list with durations | Spa team | "How long does it take" |
+| How long a standard drip takes | Spa team | "How long does it take" — one number is enough |
+| A review pass on the rewritten menu descriptions | Spa team | Phase 0 sign-off |
 | Location email for @-mentions | You | Rule 3e |
 | Voucher expiration terms | You | Voucher routing |
 | Membership terms in plain language | Spa team | Membership routing |
@@ -366,11 +468,18 @@ Blocking the knowledge base:
 
 ### Settled
 
-- **Pricing** — the bot may state the $99 intro offer, and only to
-  standard-variant contacts. Everything else routes until pricing is uploaded.
+- **Pricing** — the intro offer is $99 and is gated on the contact's tag.
+  Menu prices are open (see below).
 - **Staff names** — never, in any form, including whether someone is on call.
 - **Booking** — primeivpinecrest.com. Booker is not used; all references removed.
 - **Live voucher calendar** — `Intro Offer`. `Intro Offer v1` is the orphan.
+- **Menu pricing** — loaded. The agent may quote drips, injections and NAD+.
+  Memberships and packages still route to a person.
+- **The FAQ document** — does not exist. The spec referenced one five times;
+  it is not in Drive and was never written. The menu replaced it as the source
+  for service answers, and the rewritten descriptions need a review pass from
+  the spa team in place of the "tested phrasing" the spec assumed.
 
-Everything above is drafted so that the FAQ pairs drop in without rewriting the
-prompt. Send the FAQ document and the knowledge base finishes in one pass.
+One thing left before Phase 0: have the spa team read the rewritten menu
+descriptions. They are compliance-safe by construction, but nobody who works
+the floor has confirmed they still describe the right drip.
