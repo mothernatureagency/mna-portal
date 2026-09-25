@@ -645,6 +645,71 @@ export async function purgeExpiredMessageContent(): Promise<number> {
   return rows.length;
 }
 
+// ── Dry-run tester (Phase 0) ──────────────────────────────────────────────
+
+/**
+ * Run a message through the full decision pipeline WITHOUT touching Revive:
+ * no contact lookup, no history, no send. Lets staff test a location's
+ * knowledge base, guardrails and escalation rules before any token or
+ * webhook is wired up. Nothing is stored except an audit event.
+ */
+export async function testMessage(
+  ghlLocationId: string,
+  body: string,
+  opts: { contactName?: string; tags?: string[] } = {},
+): Promise<{
+  decision: AiDecision;
+  pre_screen: { category: string; reason: string } | null;
+  silent_spam: boolean;
+  would_auto_send: boolean;
+  hold_reasons: string[];
+}> {
+  const loc = await getLocationByGhlId(ghlLocationId);
+  if (!loc) throw new Error('Unknown location');
+
+  if (isVendorSpam(body)) {
+    return {
+      decision: {
+        suggested_response: '', confidence_score: 0, intent: 'spam', category: 'spam',
+        should_auto_send: false, escalation_reason: 'Vendor/spam — silently flagged',
+        detected_service: null, detected_offer: null, needs_human_review: false,
+        proposed_appointment: null,
+      },
+      pre_screen: null, silent_spam: true, would_auto_send: false,
+      hold_reasons: ['Silent flag: vendor/recruiter/phishing — no reply would be sent'],
+    };
+  }
+
+  const preHit = checkEscalation(body, loc.escalation_keywords);
+  const contactSummary = [
+    `Name: ${opts.contactName || 'Test Customer'}`,
+    opts.tags?.length ? `Tags: ${opts.tags.join(', ')}` : null,
+  ].filter(Boolean).join('\n');
+  const decision = await callClaude(loc, `Customer: ${body}`, contactSummary, []);
+
+  const holdReasons: string[] = [];
+  if (!loc.auto_respond_enabled) holdReasons.push('Auto-respond is disabled for this location (approval-only mode)');
+  if (loc.ai_paused) holdReasons.push('AI is paused for this location');
+  if (preHit) holdReasons.push(`Hard safety rule: ${preHit.reason}`);
+  if (decision.needs_human_review) holdReasons.push(`Model flagged for review${decision.escalation_reason ? `: ${decision.escalation_reason}` : ''}`);
+  const threshold = Number(loc.confidence_threshold || 0.75);
+  if (decision.confidence_score < threshold) holdReasons.push(`Confidence ${Math.round(decision.confidence_score * 100)}% below threshold ${Math.round(threshold * 100)}%`);
+  if (!decision.should_auto_send) holdReasons.push('Model chose not to auto-send');
+  if (decision.proposed_appointment) holdReasons.push('Proposed an appointment — live availability not checked in test mode');
+
+  await audit({
+    ghlLocationId, event: 'test_message',
+    detail: { category: preHit?.category || decision.category, confidence: decision.confidence_score, would_auto_send: holdReasons.length === 0 },
+    actor: 'staff',
+  });
+
+  return {
+    decision, pre_screen: preHit, silent_spam: false,
+    would_auto_send: holdReasons.length === 0,
+    hold_reasons: holdReasons,
+  };
+}
+
 // ── Polling fallback ──────────────────────────────────────────────────────
 
 /**

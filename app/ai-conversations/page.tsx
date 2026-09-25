@@ -594,6 +594,30 @@ function LocationsTab({ locations, reload, notify }: { locations: Loc[]; reload:
   const [editing, setEditing] = useState<(Partial<Loc> & { id?: string; token?: string; webhook_secret?: string }) | null>(null);
   const [saving, setSaving] = useState(false);
   const [servicesText, setServicesText] = useState('');
+  const [testMsg, setTestMsg] = useState('');
+  const [testTags, setTestTags] = useState('first time');
+  const [testing, setTesting] = useState(false);
+  const [testResult, setTestResult] = useState<any>(null);
+
+  async function runTest() {
+    if (!editing?.ghl_location_id || !testMsg.trim()) return;
+    setTesting(true); setTestResult(null);
+    try {
+      const res = await fetch('/api/ai-crm/test', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          ghlLocationId: editing.ghl_location_id,
+          message: testMsg.trim(),
+          tags: testTags.split(',').map((s) => s.trim()).filter(Boolean),
+        }),
+      });
+      const d = await res.json();
+      if (!res.ok) throw new Error(d.error || 'Test failed');
+      setTestResult(d);
+    } catch (e: any) { notify(e.message); }
+    setTesting(false);
+  }
 
   function startEdit(loc?: Loc) {
     const base = loc ? { ...loc, token: '' } : { ...EMPTY_LOC };
@@ -786,6 +810,56 @@ function LocationsTab({ locations, reload, notify }: { locations: Loc[]; reload:
           </div>
           <div className="text-xs text-gray-400">1–2★ and flagged reviews (medical, legal, privacy, billing, discrimination) always require approval.</div>
         </div>
+
+        {editing.id && (
+          <div className="space-y-3">
+            <div className="text-xs font-bold text-gray-400 uppercase tracking-wide">Test the AI (dry run — nothing is sent, save your changes first)</div>
+            <div className="flex gap-2 flex-wrap items-end">
+              <label className="block flex-1 min-w-[220px]">
+                <span className="text-xs font-semibold text-gray-500">Pretend a customer texts…</span>
+                <input value={testMsg} onChange={(e) => setTestMsg(e.target.value)}
+                  onKeyDown={(e) => { if (e.key === 'Enter') runTest(); }}
+                  placeholder="how much is the intro offer?"
+                  className="mt-1 w-full border border-gray-200 rounded-lg px-2.5 py-1.5 text-sm" />
+              </label>
+              <label className="block w-48">
+                <span className="text-xs font-semibold text-gray-500">Contact tags</span>
+                <input value={testTags} onChange={(e) => setTestTags(e.target.value)}
+                  className="mt-1 w-full border border-gray-200 rounded-lg px-2.5 py-1.5 text-sm" />
+              </label>
+              <button onClick={runTest} disabled={testing || !testMsg.trim()}
+                className="px-4 py-2 rounded-xl bg-blue-600 text-white text-sm font-semibold disabled:opacity-40">
+                {testing ? 'Thinking…' : 'Test'}
+              </button>
+            </div>
+            {testResult && (
+              <div className="space-y-2 bg-gray-50 rounded-xl p-3">
+                {testResult.silent_spam ? (
+                  <div className="text-sm text-gray-600">🔇 Silent flag — this looks like vendor/recruiter/phishing. No reply would be sent.</div>
+                ) : (
+                  <>
+                    <div className="text-sm text-gray-800 bg-white border border-gray-200 rounded-lg px-3 py-2">
+                      🤖 {testResult.decision?.suggested_response || '(no reply drafted)'}
+                    </div>
+                    <div className="flex gap-2 flex-wrap text-xs">
+                      <span className={`px-2 py-0.5 rounded-full font-semibold ${testResult.would_auto_send ? 'bg-emerald-100 text-emerald-700' : 'bg-amber-100 text-amber-700'}`}>
+                        {testResult.would_auto_send ? 'would auto-send' : 'would hold for approval'}
+                      </span>
+                      <span className="px-2 py-0.5 rounded-full bg-gray-200 text-gray-600">confidence {Math.round((testResult.decision?.confidence_score || 0) * 100)}%</span>
+                      {testResult.decision?.category && <span className="px-2 py-0.5 rounded-full bg-blue-50 text-blue-600">{testResult.decision.category}</span>}
+                      {testResult.decision?.intent && <span className="px-2 py-0.5 rounded-full bg-gray-100 text-gray-500">{testResult.decision.intent}</span>}
+                    </div>
+                    {(testResult.hold_reasons || []).length > 0 && (
+                      <ul className="text-xs text-gray-500 list-disc pl-4 space-y-0.5">
+                        {testResult.hold_reasons.map((r: string, i: number) => <li key={i}>{r}</li>)}
+                      </ul>
+                    )}
+                  </>
+                )}
+              </div>
+            )}
+          </div>
+        )}
 
         <div className="flex gap-2">
           <button onClick={save} disabled={saving || !editing.name || !editing.ghl_location_id}
