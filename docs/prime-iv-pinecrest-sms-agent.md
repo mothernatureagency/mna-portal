@@ -168,9 +168,10 @@ A: You can book right at primeivpinecrest.com, or tell me a day that works and
 I'll find you a time.
 -Prime IV Pinecrest
 
-**Q: How long does a drip take?**
-A: `[NEEDED — the menu carries no durations. One number for a standard drip is
-enough: "About an hour" would do.]`
+**Q: How long does a drip take? / How much time should I set aside?**
+A: About an hour — we call it your One Hour Vacation®. Zero-gravity chair,
+a blanket, and the hour is yours. Want me to find you a time?
+-Prime IV Pinecrest
 
 **Q: What's in [drip name]? / What does it do?**
 A: Answer from the menu tables below, in the rewritten wording, and give the
@@ -459,7 +460,6 @@ Blocking the knowledge base:
 
 | Needed | From | Blocks |
 | --- | --- | --- |
-| How long a standard drip takes | Spa team | "How long does it take" — one number is enough |
 | A review pass on the rewritten menu descriptions | Spa team | Phase 0 sign-off |
 | Location email for @-mentions | You | Rule 3e |
 | Voucher expiration terms | You | Voucher routing |
@@ -475,6 +475,7 @@ Blocking the knowledge base:
 - **Live voucher calendar** — `Intro Offer`. `Intro Offer v1` is the orphan.
 - **Menu pricing** — loaded. The agent may quote drips, injections and NAD+.
   Memberships and packages still route to a person.
+- **Duration** — about an hour, answered as the One Hour Vacation®.
 - **The FAQ document** — does not exist. The spec referenced one five times;
   it is not in Drive and was never written. The menu replaced it as the source
   for service answers, and the rewritten descriptions need a review pass from
