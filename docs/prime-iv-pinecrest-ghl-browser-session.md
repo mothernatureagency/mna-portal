@@ -27,6 +27,20 @@ ends 25 minutes after close, and the weekends are missing entirely.
 
 "Intro Offer" is the live voucher calendar. "Intro Offer v1" is an orphan.
 
+The homepage embeds six booking widgets. These are the calendar IDs it loads,
+so they are the calendars actually reachable by a client:
+
+  Intro Offer        E4ABdKZvxxZeddla5KGZ
+  Member Appointment oRZeRkyavE37L54bgnt4
+  IV Therapy         oRZeRkyavE37L54bgnt4   <-- same id as Member Appointment
+  Injections         s8IIIyGejdkR1arB4ovd
+  Peptide Consult    5gMBFSK3O0ZRPwfStOsf
+  NAD+ Consult       pjt0JEGF9TkEHk2rpsPs
+
+The IV Therapy and Member Appointment tabs load the SAME calendar. Report
+whether that is deliberate or a copy-paste error on the page, because a
+non-member booking IV therapy currently lands on the member calendar.
+
 === THIS ACCOUNT CONTAINS PROTECTED HEALTH INFORMATION ===
 It is a medical spa. Clients text about symptoms, conditions, medications and
 reactions, and appointments tie named people to treatments.
@@ -51,9 +65,11 @@ HARD RULES
 
 === PHASE 1: RECONNAISSANCE — change nothing, then report and wait ===
 
-1. CALENDARS. List every calendar in this sub-account. For each: name, its
-   availability schedule (days and hours), whether it is client-facing, and
-   what booking link points at it. Flag any that look like near-duplicates.
+1. CALENDARS. List every calendar in this sub-account. For each: its name, its
+   ID, its availability schedule (days and hours), whether it is client-facing,
+   and what booking link points at it. Match them against the six IDs above and
+   tell me which of those six each one is. Flag any near-duplicates, and flag
+   any calendar NOT in that list that still looks client-facing.
 
 2. VERIFY THE LIVE VOUCHER CALENDAR. I have been told "Intro Offer" is the
    live one. Confirm it by following the public booking links at
@@ -80,18 +96,23 @@ HARD RULES
 5. HIPAA MODULE. Report whether it shows as active on this account. Do not
    purchase or activate it.
 
-6. USERS AND NOTIFICATIONS. Report whether pinecrest@primeivhydration.com
+6. HOURS CONFLICT. The homepage advertises "Open Daily 10AM - 6PM" in four
+   places, but I have been told the real hours are 10-5. Do not change the
+   website. Just report what the calendars currently say, so we can see which
+   version the booking system already believes.
+
+7. USERS AND NOTIFICATIONS. Report whether pinecrest@primeivhydration.com
    exists as a user on this sub-account (a workflow needs to @-mention it) and
    whether jkulkusky@primeivhydration.com does too. Also report, for the
    notification settings you can see, whether notification emails include the
    message body or only a link to the conversation. Do not add, remove or
    change any user.
 
-Write up 1-6 and stop. Do not proceed to Phase 2 until I confirm.
+Write up 1-7 and stop. Do not proceed to Phase 2 until I confirm.
 
 === PHASE 2: THE ONE EDIT — only after I confirm ===
 
-6. On the client-facing booking calendars only, set availability to
+8. On the client-facing booking calendars only, set availability to
    10:00 AM - 5:00 PM, Sunday through Saturday. "Intro Offer" is one of
    them. Leave "Intro Offer v1" alone — it is being retired, not fixed.
 
