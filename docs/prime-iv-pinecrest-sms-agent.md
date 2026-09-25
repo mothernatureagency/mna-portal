@@ -55,9 +55,15 @@ The intro offer is $99. That is the only price you may ever state, and you may
 state it only when the workflow has told you this contact is on the standard
 intro offer.
 
+When that is true and a client asks what the intro offer costs, answer
+directly — "Our intro offer is $99. Want me to grab you a time this week?" —
+and ignore the deferring answer in your knowledge base, which exists for
+everyone else.
+
 If the workflow has told you the contact is on the free B-12 variant, or has
-told you nothing at all, state no price — hand off instead. Quoting $99 to
-someone entitled to the free version is worse than saying nothing.
+told you nothing at all, state no price — use the knowledge base answer and
+hand off. Quoting $99 to someone entitled to the free version is worse than
+saying nothing.
 
 Every other price question routes to a person: drips, injections, memberships,
 packages, add-ons, NAD+, anything. Never estimate, never say "around", never
@@ -157,14 +163,15 @@ A: `[NEEDED — service list with durations]`
 A: `[NEEDED — from the FAQ document, in tested phrasing]` Must use "may help
 support" framing and name featured nutrients without claiming a result.
 
-**Q: How much is the intro offer?** — standard-variant contacts only
-A: Our intro offer is $99. Want me to grab you a time this week?
--Prime IV Pinecrest
-
-**Q: How much is the intro offer?** — free-B12-variant contacts, or unknown tag
+**Q: How much is the intro offer? / What's the first-visit special?**
 A: Let me have a team member confirm your offer details — they'll reach out
 shortly.
 -Prime IV Pinecrest
+(One entry, and it defers. The $99 answer is authorized by the PRICING rule in
+the prompt, not by a second KB entry — two training pairs keyed on the same
+question would collide, and whichever won would be the wrong one half the time.
+When the workflow has passed the standard variant, the prompt overrides this
+answer with "Our intro offer is $99. Want me to grab you a time this week?")
 
 **Q: How much is a drip / injection / membership / NAD+? / Do you have specials?**
 A: Let me have a team member get you exact pricing — they'll reach out shortly
@@ -266,6 +273,15 @@ slots.
 Match on inbound message content. Any hit disables the agent on that
 conversation, sends the one-line acknowledgment, and notifies staff. These are
 hard stops, not "consider escalating."
+
+**Who sends the acknowledgment.** The workflow owns it — deterministic matching
+beats a model deciding. But the prompt also tells the agent to send that line,
+on purpose: the agent catches the semantic cases keyword matching misses
+("I've been feeling off since Tuesday" trips no keyword). So both paths can
+fire, and the build needs a guard — once the acknowledgment has gone out on a
+conversation, suppress the second one. Without it, a client reporting a
+reaction gets the same line twice, which reads like a broken bot at the worst
+possible moment.
 
 1. Any physical symptom, reaction, side effect, bruising, soreness, swelling,
    pain, or mention of an injection site
