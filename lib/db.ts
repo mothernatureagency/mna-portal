@@ -664,6 +664,28 @@ async function initSchema() {
                         created_at timestamptz not null default now(),
                         primary key (template_id, period_key)
                   )`,
+                  // MCP access tokens — the credential an MCP client (Claude
+                  // Desktop/Code, or one of our own agents) presents to
+                  // /api/mcp. The raw token is shown once at mint time and only
+                  // its sha256 is stored, so a leaked row can't be replayed.
+                  // scopes is the authority: the role is only a label for
+                  // humans reading the list. client_ids null = every client;
+                  // otherwise the token can only read those clients' rows.
+                  `create table if not exists mcp_tokens (
+                        id uuid primary key default uuid_generate_v4(),
+                        name text not null,
+                        token_hash text not null unique,
+                        token_prefix text not null,
+                        subject_email text not null,
+                        role text not null default 'staff',
+                        scopes text[] not null default '{}',
+                        client_ids text[],
+                        created_by text,
+                        created_at timestamptz not null default now(),
+                        last_used_at timestamptz,
+                        revoked_at timestamptz
+                  )`,
+                  `create index if not exists mcp_tokens_active_idx on mcp_tokens (token_hash) where revoked_at is null`,
                 ];
         for (const sql of statements) {
                   await pool.query(sql);
