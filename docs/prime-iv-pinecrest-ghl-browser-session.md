@@ -20,9 +20,10 @@ CRM). I need you to inspect the Prime IV Pinecrest sub-account and make one
 specific configuration fix.
 
 BUSINESS TRUTH
-Prime IV Pinecrest is open 10:00 AM to 6:00 PM, seven days a week.
+Prime IV Pinecrest is open 10:00 AM to 5:00 PM, seven days a week.
 The booking calendars currently read Mon-Fri 9:00 AM - 5:25 PM with weekends
-unavailable. That is wrong and is what we are fixing.
+unavailable. Every part of that is wrong: the day starts an hour too early,
+ends 25 minutes after close, and the weekends are missing entirely.
 
 "Intro Offer" is the live voucher calendar. "Intro Offer v1" is an orphan.
 
@@ -84,7 +85,7 @@ Write up 1-5 and stop. Do not proceed to Phase 2 until I confirm.
 === PHASE 2: THE ONE EDIT — only after I confirm ===
 
 6. On the client-facing booking calendars only, set availability to
-   10:00 AM - 6:00 PM, Sunday through Saturday. "Intro Offer" is one of
+   10:00 AM - 5:00 PM, Sunday through Saturday. "Intro Offer" is one of
    them. Leave "Intro Offer v1" alone — it is being retired, not fixed.
 
    One calendar at a time. Screenshot the schedule before and after each

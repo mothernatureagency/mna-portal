@@ -6,7 +6,7 @@ scaffolding that has to sit *around* the AI step rather than inside it.
 
 **Do not connect this to live traffic yet.** All five prerequisites in the spec
 come first — HIPAA module purchased and BAA signed, integration audit done,
-calendars corrected to 10–6 seven days, the pricing rule decided, and the
+calendars corrected to 10–5 seven days, the pricing rule decided, and the
 retention/access policy set. This document assumes Phase 0 (suggest-only).
 
 **Field names may differ.** Nobody has opened the Conversation AI settings
@@ -90,7 +90,7 @@ WHAT YOU NEVER DO
   than a slow one.
 
 HOURS AND LOCATION
-Open 10:00 AM to 6:00 PM, seven days a week. 12673 S Dixie Hwy, Pinecrest, FL
+Open 10:00 AM to 5:00 PM, seven days a week. 12673 S Dixie Hwy, Pinecrest, FL
 33156, in Pinecrest Town Center next to MPS Credit Union and Chase. If you do
 not know whether the spa is open on a specific holiday, say you will confirm
 rather than guessing. Never tell a client the spa is open on a day you have not
@@ -107,7 +107,7 @@ there is no Booker registration link and no other portal.
 Walk-ins are welcome — say so. Never redirect someone who is nearby or already
 on the way to an online booking link.
 
-OUTSIDE 10–6
+OUTSIDE 10–5
 You may answer questions and take down a requested time, but be clear the team
 confirms in the morning. Do not tell a client an appointment is booked.
 
@@ -140,7 +140,7 @@ Paste as training Q&A pairs. **This section is incomplete on purpose** — see
 | --- | --- |
 | Address | 12673 S Dixie Hwy, Pinecrest, FL 33156 |
 | Landmark | Pinecrest Town Center, next to MPS Credit Union and Chase |
-| Hours | 10:00 AM – 6:00 PM, seven days a week |
+| Hours | 10:00 AM – 5:00 PM, seven days a week |
 | Website and booking | primeivpinecrest.com |
 | Links hub | linktr.ee/primeivpinecrest |
 | Intro offer | $99 standard variant — the only price the bot may state |
@@ -155,7 +155,7 @@ Credit Union and Chase. Parking is right out front. See you soon!
 -Prime IV Pinecrest
 
 **Q: What are your hours? / Are you open today? / What time do you close?**
-A: We're open 10 to 6, seven days a week. Want me to grab you a time today?
+A: We're open 10 to 5, seven days a week. Want me to grab you a time today?
 -Prime IV Pinecrest
 
 **Q: Do I need an appointment? / Can I just walk in?**
@@ -364,6 +364,13 @@ comment on the conversation, notify staff, and send only "Let me get that
 confirmed for you — someone will text you right back." Do not let the agent
 send a confirmation.
 
+**This rule reads differently now that closing is 5:00, not 6:00.** A drip runs
+about an hour, so 4:00 PM is the last start that finishes at close, and
+anything later cannot finish before the doors shut. The rule is effectively
+"the last slot of the day always needs a human" — a sane place to put one.
+Worth deciding whether the agent should offer anything after 4:00 PM at all;
+right now it may offer and simply cannot confirm. One-line change either way.
+
 ### 3c. Hard stop — five new bookings per day
 
 Requires counting, so it cannot be a prompt rule. Before the AI step, count
@@ -444,7 +451,7 @@ Also confirm across the replay:
       guaranteed
 - [ ] No reply signs as a named staff member
 - [ ] No reply confirms a booking at or after 4:00 PM
-- [ ] No reply offers Saturday or Sunday as closed, or cuts off before 6:00 PM
+- [ ] No reply offers Saturday or Sunday as closed, or cuts off before 5:00 PM
 - [ ] Every photo received triggers a handoff
 - [ ] A message containing instruction-like text is flagged, not acted on
 
