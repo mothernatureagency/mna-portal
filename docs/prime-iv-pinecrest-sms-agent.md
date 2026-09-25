@@ -188,8 +188,8 @@ that apply. Do not give the agent every variant and ask it to choose.
 
 | Tag state | Intro offer passed to agent | Calendar |
 | --- | --- | --- |
-| `first time` + free-B12 entitlement tag | Free B-12 variant | Intro calendar |
-| `first time`, no entitlement tag | Standard $99 variant (agent still never quotes it) | Intro calendar |
+| `first time` + free-B12 entitlement tag | Free B-12 variant | `Intro Offer` |
+| `first time`, no entitlement tag | Standard $99 variant (agent still never quotes it) | `Intro Offer` |
 | `sold` / `client-status` active | None | Member calendar |
 | `nad` / `interested-nad` | None | NAD+ consultation |
 | Injection-only history | None | Injection therapy |
@@ -198,8 +198,11 @@ A wrong pick here means promising something free that isn't, or omitting
 something that was. An if/else cannot make that mistake; a model occasionally
 can.
 
-**Blocker:** confirm whether `Intro Offer` or `Intro Offer v1` is the live
-voucher calendar before wiring this. Route nothing until that's settled.
+**Confirmed:** `Intro Offer` is the live voucher calendar. `Intro Offer v1` is
+the orphan — retire it rather than leaving it in place, or routing will drift
+back to it the next time someone edits calendars by name. Have the browser
+session verify the public voucher links actually land on `Intro Offer` before
+this goes live; the links are the real test, not the calendar name.
 
 ### 3b. Hard stop — bookings at 4:00 PM or later
 
@@ -282,7 +285,6 @@ Blocking the knowledge base:
 | The FAQ document's Q&A pairs, in tested phrasing | You | Most of section 2 |
 | Service list with durations | Spa team | "How long does it take" |
 | Booker registration URL | You | Booking handoffs |
-| Which Intro Offer calendar is live | You or me | All of 3a |
 | Pricing policy — may the bot ever quote? | You | Prompt + KB |
 | May the bot name staff members? | You | Prompt persona section |
 
