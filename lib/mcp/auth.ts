@@ -18,6 +18,14 @@ import { getStaffByEmail } from '@/lib/staff';
 export const MCP_SCOPES = [
   'tasks:read',
   'tasks:write',
+  // Personal to whoever the token acts as: their own schedule and their own
+  // stored notes, never anyone else's.
+  'schedule:read',
+  'schedule:write',
+  'memory:read',
+  'memory:write',
+  // The content calendar and campaign pipeline.
+  'marketing:read',
   'approvals:read',
   'approvals:decide',
   'team:notify',
@@ -52,11 +60,12 @@ export function defaultScopesForRole(role: string): McpScope[] {
       return [...MCP_SCOPES];
     case 'staff':
     case 'manager':
-      return ['tasks:read', 'tasks:write', 'approvals:read', 'team:notify'];
+      // Everything except deciding approvals — that stays with the owner.
+      return MCP_SCOPES.filter((s) => s !== 'approvals:decide');
     case 'agent':
-      return ['tasks:read', 'approvals:read'];
+      return ['tasks:read', 'marketing:read', 'approvals:read'];
     default:
-      return ['tasks:read'];
+      return ['tasks:read', 'marketing:read'];
   }
 }
 

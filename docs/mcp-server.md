@@ -5,23 +5,44 @@ Claude can read the team task board, the staff roster and the client list —
 through the same `lib/` code the portal pages use, so there is no second copy of
 the rules to keep in sync.
 
-One server, many clients. The same URL serves Claude Code, Claude Desktop, and
-(once wired) our own in-portal agents, so a tool added here shows up everywhere
-at once.
+One registry, many clients. The tools live in `lib/mcp/tools.ts` and are reached
+two ways:
 
-## What it can do today
+- **over the wire** by Claude Code, Claude Desktop and anything else speaking
+  MCP, through `app/api/mcp/route.ts`;
+- **in-process** by the portal's own agents — Jarvis/MOTHER at `/jarvis` and
+  `/assistant` — through `lib/mcp/local.ts`, which skips the network entirely
+  since they already share the process and the database.
 
-| Tool | Answers |
-| --- | --- |
-| `list_tasks` | "What is Sable working on?", "What's overdue for Prime IV?" |
-| `get_task` | Full detail on one task, plus the recurring template it came from |
-| `team_workload` | Open / overdue / due-this-week / done-this-month, per teammate |
-| `whats_blocked` | Standing status check: overdue tasks, unowned tasks, stale client requests |
-| `list_staff` | The roster, with the emails the board actually stores |
-| `list_clients` | Every client id the portal knows |
+So a tool added once shows up in the voice HUD and in Claude Code together.
+Jarvis used to define its own twelve tools inside `app/api/assistant/route.ts`;
+those moved here, and four of them were duplicates of tools this registry
+already had.
 
-All read-only. Writes (creating and assigning tasks, the approval queue,
-notifying teammates) land in the next pass — the scopes for them already exist.
+## The tools
+
+| Tool | Scope | Answers |
+| --- | --- | --- |
+| `list_tasks` | `tasks:read` | "What is Sable working on?", "What's overdue for Prime IV?" |
+| `get_task` | `tasks:read` | Full detail on one task, plus the template it came from |
+| `team_workload` | `tasks:read` | Open / overdue / due-this-week / done-this-month, per teammate |
+| `whats_blocked` | `tasks:read` | Overdue tasks, unowned tasks, stale client requests |
+| `list_staff` | `tasks:read` | The roster, with the emails the board stores |
+| `list_clients` | `tasks:read` | Every client id the portal knows |
+| `create_task` | `tasks:write` | Assign work, including monthly / per-new-client recurring |
+| `update_task` | `tasks:write` | Mark done, move a deadline, reassign, re-prioritize |
+| `add_event` | `schedule:write` | Put a meeting or reminder on the caller's schedule (syncs to Google) |
+| `list_events` | `schedule:read` | "What's on my schedule this week" |
+| `complete_event` / `delete_event` | `schedule:write` | Close or drop one of the caller's events |
+| `remember` / `recall` | `memory:write` / `memory:read` | The caller's own long-term notes |
+| `list_campaigns` | `marketing:read` | Email and SMS pipeline |
+| `list_content` | `marketing:read` | Content calendar posts and approval status |
+
+Schedule and memory tools are **personal**: they act on the caller's own rows
+and can't reach anyone else's.
+
+Still to come: the approval queue (`approvals:read`, `approvals:decide`) and
+teammate notifications (`team:notify`). Their scopes exist; the tools don't yet.
 
 ## Minting a token
 
@@ -49,16 +70,14 @@ Authority is the token's scope list. `role` is a label that only picks the
 *default* scopes at mint time; once minted, the stored scopes are the whole
 truth.
 
-| Scope | Grants |
-| --- | --- |
-| `tasks:read` | Every tool above |
-| `tasks:write` | Creating, assigning and updating tasks (next pass) |
-| `approvals:read` | Seeing the approval queue (next pass) |
-| `approvals:decide` | Approving or denying — owner default only (next pass) |
-| `team:notify` | Emailing a teammate through the existing notification rail (next pass) |
+Scopes are listed in the tool table above. Defaults by role: `owner` gets
+everything, `staff`/`manager` get everything except `approvals:decide`, `agent`
+gets `tasks:read` + `marketing:read` + `approvals:read`, `readonly` gets
+`tasks:read` + `marketing:read`.
 
-Defaults: `owner` gets everything, `staff`/`manager` get everything except
-`approvals:decide`, `agent` gets read-only, `readonly` gets `tasks:read`.
+A portal session gets the same treatment: `lib/mcp/local.ts` builds an identity
+from the session cookie and hands it `defaultScopesForRole('owner' | 'staff')`.
+Client, contractor, student and creator accounts get no tool identity at all.
 
 Pass `clientIds` to pin a token to specific clients:
 
@@ -93,6 +112,11 @@ a separate piece of work if we want it.
 - `lib/mcp/auth.ts` — token hashing, minting, and the identity a request resolves to.
 - `lib/mcp/tools.ts` — the tool registry. Each tool declares the scope it needs;
   the route hides it from `tools/list` and refuses the call without that scope.
+- `lib/mcp/local.ts` — the in-process bridge for the portal's own agents:
+  converts the registry to Messages API `tools`, resolves the caller from their
+  session cookie, and runs handlers directly.
+- `app/api/assistant/route.ts` — Jarvis/MOTHER. Keeps its voice, its pre-loaded
+  context and its tool loop; owns no tool definitions.
 - `middleware.ts` — `/api/mcp` is matched **exactly** as a public route, so the
   owner-only `/api/mcp-tokens` keeps going through cookie auth.
 - `lib/db.ts` — the `mcp_tokens` table.
