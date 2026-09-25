@@ -394,7 +394,9 @@ export async function processMessage(messageId: string): Promise<string> {
 
     // Generate.
     const decision = await callClaude(loc, transcript, contactSummary);
-    await audit({ ghlLocationId: locId, messageId, event: 'ai_decision', detail: { ...decision, pre_screen: preHit } });
+    // PHI hygiene: log decision metadata only — never the message or reply text.
+    const { suggested_response: _sr, ...decisionMeta } = decision;
+    await audit({ ghlLocationId: locId, messageId, event: 'ai_decision', detail: { ...decisionMeta, pre_screen: preHit } });
 
     const needsReview = decision.needs_human_review || !!preHit;
     const escalationReason = preHit?.reason || decision.escalation_reason;
@@ -430,10 +432,12 @@ export async function processMessage(messageId: string): Promise<string> {
       await finalize(messageId, { ...base, status });
       await audit({ ghlLocationId: locId, messageId, event: status, detail: { reason: escalationReason || 'below threshold or auto-respond disabled' } });
       if (needsReview) {
+        // PHI hygiene: this email transits Make + Gmail (no BAA), so it carries
+        // no message content — only the location and a category-level reason.
         await queueEmailNotification({
           to: STAFF_NOTIFY_EMAIL,
           subject: `⚠️ AI escalation — ${loc.name}`,
-          body: `A message from ${contactName || contact?.phone || 'a customer'} needs human review.\n\nMessage: "${inboundBody}"\n\nReason: ${escalationReason || 'Model flagged for review'}\n\nSuggested reply (not sent): "${decision.suggested_response}"\n\nReview it in the portal → AI Conversations.`,
+          body: `A text conversation at ${loc.name} was escalated (${category || 'needs review'}) and is waiting for human review.\n\nOpen the portal → AI Conversations to read it and respond:\nhttps://portal.mothernatureagency.com/ai-conversations`,
           eventType: 'ai_crm_escalation',
           clientId: loc.client_id || undefined,
           relatedId: messageId,
@@ -484,6 +488,32 @@ export async function processDueMessages(limit = 10): Promise<Record<string, num
     results[outcome] = (results[outcome] || 0) + 1;
   }
   return results;
+}
+
+/**
+ * PHI retention: scrub message/response text from RESOLVED conversations
+ * older than AI_CRM_RETAIN_DAYS (default 30; 0 disables retention of text
+ * entirely — scrubs as soon as a row is resolved). Metadata (status,
+ * confidence, category, timestamps) is kept for the dashboard and audit.
+ * Rows still awaiting human action keep their text until resolved — staff
+ * need it to approve/edit. Revive remains the system of record for full
+ * transcripts.
+ */
+export async function purgeExpiredMessageContent(): Promise<number> {
+  const days = Math.max(0, Number(process.env.AI_CRM_RETAIN_DAYS ?? 30));
+  const { rows } = await query<{ id: string }>(
+    `update ai_messages
+        set inbound_body = null, context_used = null,
+            suggested_response = null, final_response = null,
+            contact_name = null, contact_phone = null,
+            updated_at = now()
+      where status in ('auto_sent','sent_manual','rejected','canceled','skipped','failed','human_takeover')
+        and inbound_body is not null
+        and updated_at < now() - ($1 || ' days')::interval
+      returning id`,
+    [String(days)],
+  );
+  return rows.length;
 }
 
 // ── Polling fallback ──────────────────────────────────────────────────────

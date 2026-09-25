@@ -17,6 +17,7 @@ Customer → Revive/GHL location → webhook (or polling) → portal
 | `AI_TOKEN_ENCRYPTION_KEY` | **new, required** | Any long random string. Encrypts GHL tokens at rest (AES-256-GCM). Rotating it invalidates saved tokens — re-enter them in the UI after rotating. |
 | `AI_CRM_WEBHOOK_SECRET` | optional | Global fallback webhook key; per-location `webhook_secret` (set in the UI) takes precedence. |
 | `AI_CRM_MODEL` | optional | Defaults to `claude-sonnet-5`. |
+| `AI_CRM_RETAIN_DAYS` | optional | Days resolved conversations keep their message text before it's scrubbed (default 30; `0` = scrub as soon as resolved). Metadata is kept. |
 | `SYNC_SECRET` | already set | Also guards `/api/ai-crm/process` and `/api/ai-crm/reviews/sync` for manual triggers (Vercel cron calls pass automatically). |
 | `POSTGRES_URL`, Supabase vars, `GOOGLE_CLIENT_ID/SECRET` | already set | Reused as-is. |
 
@@ -119,3 +120,27 @@ verified Business Profile and API access enabled on the Google Cloud project
   restricted claims, escalation keywords/instructions, custom prompt,
   auto-respond toggle, confidence threshold, response delay, polling, GBP
   mapping. All editable without code changes.
+
+## 7. HIPAA posture (lean setup)
+
+Decided 2026-09: Revive's HIPAA add-on is active (their agency covers it), and
+we run the portal in a data-minimizing mode rather than buying BAAs across the
+whole hosting chain.
+
+- **Revive/GHL** stays the system of record for all message content (covered
+  by their HIPAA compliance). Patients consent to SMS through Revive opt-in.
+- **Anthropic**: request a BAA with zero data retention for the API key used
+  here (contact Anthropic sales). Until it's signed, keep auto-respond in
+  approval-only mode for any location treating messages as PHI.
+- **No PHI leaves the pipeline sideways**: escalation emails (which transit
+  Make + Gmail, no BAA) carry only the location name and a category — never
+  message text, names, or numbers. Audit logs store decision metadata
+  (scores, categories, char counts), never message or reply text.
+- **Retention**: `purgeExpiredMessageContent` (runs with the process cron)
+  scrubs message text, contact name and phone from resolved conversations
+  after `AI_CRM_RETAIN_DAYS` (default 30). Rows awaiting approval keep text
+  until a human acts on them.
+- Remaining known exposure: message text transits Vercel functions and rests
+  in Supabase for up to the retention window. If counsel wants that closed,
+  the options are Vercel Enterprise + Supabase HIPAA add-on, or moving the
+  app to a host with a free BAA (e.g., AWS). Code is host-agnostic.

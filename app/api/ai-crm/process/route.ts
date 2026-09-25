@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { ensureSchema } from '@/lib/db';
-import { pollLocationsForInbound, processDueMessages } from '@/lib/ai-crm/engine';
+import { pollLocationsForInbound, processDueMessages, purgeExpiredMessageContent } from '@/lib/ai-crm/engine';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -30,7 +30,8 @@ async function run(req: NextRequest) {
   const skipPoll = req.nextUrl.searchParams.get('poll') === '0';
   const polled = skipPoll ? { ingested: 0 } : await pollLocationsForInbound();
   const processed = await processDueMessages(10);
-  return NextResponse.json({ ok: true, polled: polled.ingested, processed });
+  const purged = await purgeExpiredMessageContent();
+  return NextResponse.json({ ok: true, polled: polled.ingested, processed, purged });
 }
 
 export async function GET(req: NextRequest) { return run(req); }

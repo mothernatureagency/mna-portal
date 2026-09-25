@@ -45,7 +45,9 @@ export async function POST(req: NextRequest, { params }: { params: { id: string 
     const text = String(body?.text || '').trim();
     if (!text) return NextResponse.json({ error: 'text required' }, { status: 400 });
     await query(`update ai_messages set final_response = $2, edited_by = $3, updated_at = now() where id = $1`, [id, text, actor]);
-    await audit({ ghlLocationId: msg.ghl_location_id, messageId: id, event: 'response_edited', detail: { text }, actor });
+    // Audit records that an edit happened, not the text (PHI hygiene —
+    // the edited reply itself lives on the ai_messages row until purge).
+    await audit({ ghlLocationId: msg.ghl_location_id, messageId: id, event: 'response_edited', detail: { chars: text.length }, actor });
     return NextResponse.json({ ok: true });
   }
 
@@ -86,7 +88,7 @@ export async function POST(req: NextRequest, { params }: { params: { id: string 
       await audit({
         ghlLocationId: msg.ghl_location_id, messageId: id,
         event: action === 'approve' ? 'approved_and_sent' : 'custom_sent',
-        detail: { text, ghl_message_id: sent.messageId }, actor,
+        detail: { chars: text.length, edited: text !== msg.suggested_response, ghl_message_id: sent.messageId }, actor,
       });
       return NextResponse.json({ ok: true, sent: true });
     } catch (e: any) {
