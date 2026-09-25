@@ -57,12 +57,18 @@ export async function POST(req: NextRequest) {
   const externalMessageId: string | undefined = data?.messageId || data?.message?.id || data?.id;
   if (!externalMessageId) return NextResponse.json({ error: 'message id required' }, { status: 400 });
 
+  // Inbound photos/attachments force human review downstream (in this inbox,
+  // photos have meant reaction images) — mark them in the body text.
+  const hasAttachment = Array.isArray(data?.attachments) && data.attachments.length > 0;
+  const bodyText = typeof data?.body === 'string' ? data.body : '';
+  const body = hasAttachment ? `${bodyText}\n[client sent a photo or attachment]`.trim() : bodyText || null;
+
   const { id, duplicate } = await ingestInboundMessage({
     ghlLocationId: locationId,
     externalMessageId: String(externalMessageId),
     conversationId: data?.conversationId || null,
     contactId: data?.contactId || null,
-    body: typeof data?.body === 'string' ? data.body : null,
+    body,
     channel: data?.messageType || 'SMS',
     source: 'webhook',
   });

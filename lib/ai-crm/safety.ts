@@ -20,9 +20,11 @@ const RULES: Rule[] = [
     category: 'medical',
     reason: 'Medical symptoms or individualized medical advice',
     patterns: [
-      /\b(symptom|dizzy|dizziness|nausea|nauseous|vomit|fever|rash|swelling|swollen|infection|infected|chest pain|shortness of breath|faint(ed|ing)?|numb(ness)?|blood pressure|heart rate|palpitation)/i,
+      /\b(symptom|dizzy|dizziness|nausea|nauseous|vomit|fever|rash|swelling|swollen|infection|infected|chest pain|shortness of breath|faint(ed|ing)?|numb(ness)?|blood pressure|heart rate|palpitation|injection site|sore(ness)? (at|near|around))/i,
       /\b(should i (take|get|do)|is it safe (for me|to)|can i (take|mix|combine)).{0,60}\b(iv|vitamin|medication|drip|injection|shot|treatment)/i,
-      /\b(diagnos|prescri|dosage|dose for)/i,
+      /\b(diagnos|prescri|dosage|dose for|dos(e|ing)\b|change (my )?dose|how many (units|mg|ml))/i,
+      /\b\d{2,3}\s?(lbs|pounds|kg)\b/i,
+      /\b(er visit|emergency room|recent(ly had)? (a )?(surgery|procedure|operation)|post.?op)\b/i,
     ],
   },
   {
@@ -71,8 +73,8 @@ const RULES: Rule[] = [
     category: 'billing_dispute',
     reason: 'Refund dispute or chargeback',
     patterns: [
-      /\b(refund|charge ?back|dispute[sd]? (the|a|this)? ?charge|charged (me )?(twice|wrong|incorrectly)|money back|cancel (my )?(membership|subscription))/i,
-      /\b(billing (issue|problem|error))/i,
+      /\b(refund|charge ?back|dispute[sd]? (the|a|this)? ?charge|charged (me )?(twice|wrong|incorrectly)|money back|(cancel|pause|suspend|downgrade|freeze) (my )?(membership|subscription|plan))/i,
+      /\b(billing (issue|problem|error)|declined card|card (was )?declined|charge (my|the) card)/i,
     ],
   },
   {
@@ -99,7 +101,30 @@ const RULES: Rule[] = [
       /\b(job|hiring|apply(ing)? (for|to)|resume|position open|employment|work (for|with) you|career)/i,
     ],
   },
+  {
+    category: 'photo',
+    reason: 'Client sent a photo — in this inbox photos have meant reaction images',
+    patterns: [/\[client sent a photo or attachment\]/i],
+  },
+  {
+    category: 'staff_schedule',
+    reason: 'Asking about a specific staff member or who is on call',
+    patterns: [
+      /\bwho('s| is)? (on call|working|in) (today|tonight|right now|tomorrow)?\b/i,
+      /\bis \w+ (working|in|there) (today|tonight|tomorrow)\b/i,
+      /\bon call\b/i,
+    ],
+  },
 ];
+
+/**
+ * Vendor pitches, recruiters, lead-gen and phishing get a SILENT flag —
+ * no reply at all, per the build spec. Checked separately from escalation
+ * so the engine can skip generation entirely.
+ */
+export function isVendorSpam(text: string): boolean {
+  return /\b(seo (services|expert)|lead gen(eration)?|guaranteed (leads|ranking)|marketing (agency|proposal)|business (proposal|loan|funding)|collaboration opportunity|sponsorship|influencer|we can grow your|book a demo|white.?label|reseller|recruit(er|ing)|job opportunity|your (ad|facebook|meta) account (has been|was) (restricted|suspended)|verify your (account|page)\b)/i.test(text || '');
+}
 
 /** Opt-out keywords — never respond, mark contact opted out. */
 export function isOptOutMessage(text: string): boolean {

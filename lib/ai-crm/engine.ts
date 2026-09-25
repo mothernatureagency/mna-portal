@@ -17,7 +17,7 @@ import {
   localTimeOfDay,
   GhlMessage,
 } from './ghl';
-import { checkEscalation, isOptOutMessage } from './safety';
+import { checkEscalation, isOptOutMessage, isVendorSpam } from './safety';
 
 /**
  * Core AI CRM pipeline:
@@ -388,6 +388,17 @@ export async function processMessage(messageId: string): Promise<string> {
       return 'skipped';
     }
 
+    // Silent flag: vendor pitches, recruiters, phishing — no reply at all,
+    // no model call. Flagged for staff in the dashboard (status: skipped).
+    if (isVendorSpam(msg.inbound_body || '')) {
+      await finalize(messageId, {
+        status: 'skipped', error: 'Vendor/spam — silently flagged, no reply sent',
+        contact_name: contactName, contact_phone: contact?.phone || null, conversation_id: conversationId,
+      });
+      await audit({ ghlLocationId: locId, messageId, event: 'silent_flag_spam' });
+      return 'skipped';
+    }
+
     // Pull recent history from the location's own subaccount only.
     const history = await getConversationMessages(token, conversationId, 25);
 
@@ -483,6 +494,22 @@ export async function processMessage(messageId: string): Promise<string> {
       if (!check.ok) {
         autoSend = false;
         bookingHold = check.reason;
+      }
+    }
+
+    // Three-message rule: after two AI auto-replies in a conversation within
+    // 24h, the third goes to a human. Repeated bot replies to a confused
+    // client is the worst failure mode.
+    if (autoSend) {
+      const { rows: prior } = await query<{ n: number }>(
+        `select count(*)::int as n from ai_messages
+          where conversation_id = $1 and status = 'auto_sent'
+            and created_at > now() - interval '24 hours'`,
+        [conversationId],
+      );
+      if ((prior[0]?.n || 0) >= 2) {
+        autoSend = false;
+        bookingHold = bookingHold || 'Three-message rule: handing to a human';
       }
     }
 
