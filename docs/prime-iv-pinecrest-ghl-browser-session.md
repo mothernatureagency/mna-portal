@@ -80,7 +80,14 @@ HARD RULES
 5. HIPAA MODULE. Report whether it shows as active on this account. Do not
    purchase or activate it.
 
-Write up 1-5 and stop. Do not proceed to Phase 2 until I confirm.
+6. USERS AND NOTIFICATIONS. Report whether pinecrest@primeivhydration.com
+   exists as a user on this sub-account (a workflow needs to @-mention it) and
+   whether jkulkusky@primeivhydration.com does too. Also report, for the
+   notification settings you can see, whether notification emails include the
+   message body or only a link to the conversation. Do not add, remove or
+   change any user.
+
+Write up 1-6 and stop. Do not proceed to Phase 2 until I confirm.
 
 === PHASE 2: THE ONE EDIT — only after I confirm ===
 

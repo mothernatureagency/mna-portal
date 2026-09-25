@@ -145,7 +145,7 @@ Paste as training Q&A pairs. **This section is incomplete on purpose** — see
 | Links hub | linktr.ee/primeivpinecrest |
 | Intro offer | $99 standard variant — the only price the bot may state |
 | Walk-ins | Welcome |
-| Location email (for internal comments) | `[NEEDED]` |
+| Location email (internal only, never texted) | pinecrest@primeivhydration.com |
 
 ### Q&A pairs — ready to load
 
@@ -416,11 +416,13 @@ working, who is on call, or for a specific staff member's schedule:
 1. Agent replies with the standard "let me get a team member connected with
    you" line. It never confirms or denies who is in.
 2. The workflow writes an **internal comment** on the conversation,
-   @-mentioning the location email so it notifies.
+   @-mentioning **pinecrest@primeivhydration.com** so it notifies.
 3. Thread stays open — this is a nudge, not a shutdown, unless another trigger
    in 3d also fires.
 
-**Needed:** the location email to @-mention. Nothing else blocks this rule.
+For the @-mention to fire, pinecrest@primeivhydration.com has to exist as a
+user on the Pinecrest sub-account. Worth confirming in the browser session
+before this is wired.
 
 ### 3f. Silent flag — no reply at all
 
@@ -434,6 +436,32 @@ If a client sends three messages without the thread resolving, hand to a human.
 Repeated bot replies to a confused client is the worst failure mode here.
 
 ---
+
+### 3h. Where notifications go — and what they may contain
+
+Every rule above ends in "notify staff". These are the addresses, and a limit
+on what the notification may carry.
+
+| Trigger | Notify |
+| --- | --- |
+| Handoffs 3d.1–3d.7 (symptoms, meds, dosing, photos, billing, membership, complaints) | pinecrest@primeivhydration.com |
+| Handoff 3d.8 — legal, media, regulatory | pinecrest@primeivhydration.com **and** jkulkusky@primeivhydration.com |
+| 3e — on-call and staff-schedule asks | pinecrest@primeivhydration.com |
+| 3f — vendor, recruiter, phishing | pinecrest@primeivhydration.com |
+| 3g — three-message rule | pinecrest@primeivhydration.com |
+
+**The notification must not carry message content.** Your own data boundary
+puts inbound and outbound SMS, and AI conversation transcripts, in "GHL only".
+An email that quotes what a client said moves protected health information out
+of GHL and into a Google mailbox that may or may not be covered. Notifications
+say *there is a thread waiting and here is the link* — never what it says.
+Prefer GHL's in-app notification over email wherever the setting allows it.
+
+**mn@mothernatureagency.com is deliberately absent from that table.** It is an
+agency domain, outside the BAA boundary, and conversation notifications should
+not land there even though the same person co-owns the location. Pinecrest-side
+visibility belongs on a Prime IV account. This is the spec's own rule applied
+to ourselves: if a workflow touches the conversation, it stays inside.
 
 ## 4. Phase 0 test checklist
 
@@ -468,7 +496,6 @@ Blocking the knowledge base:
 | Needed | From | Blocks |
 | --- | --- | --- |
 | A review pass on the rewritten menu descriptions | Spa team | Phase 0 sign-off |
-| Location email for @-mentions | You | Rule 3e |
 | Voucher expiration terms | You | Voucher routing |
 | Membership terms in plain language | Spa team | Membership routing |
 | What "Mobile Services Consult" includes | Spa team | Service questions |
@@ -483,6 +510,10 @@ Blocking the knowledge base:
 - **Menu pricing** — loaded. The agent may quote drips, injections and NAD+.
   Memberships and packages still route to a person.
 - **Duration** — about an hour, answered as the One Hour Vacation®.
+- **Hours** — 10:00 AM to 5:00 PM, seven days a week.
+- **Notifications** — pinecrest@primeivhydration.com, with
+  jkulkusky@primeivhydration.com added for legal, media and regulatory.
+  Content stays out of the notification.
 - **The FAQ document** — does not exist. The spec referenced one five times;
   it is not in Drive and was never written. The menu replaced it as the source
   for service answers, and the rewritten descriptions need a review pass from
