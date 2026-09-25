@@ -705,6 +705,11 @@ async function initSchema() {
                   )`,
                   `create index if not exists ai_messages_due_idx on ai_messages (status, process_after)`,
                   `create index if not exists ai_messages_loc_idx on ai_messages (ghl_location_id, created_at desc)`,
+                  // Calendar-aware booking (added after initial release).
+                  `alter table ghl_locations add column if not exists booking_calendar_id text`,
+                  `alter table ghl_locations add column if not exists booking_rules jsonb not null default '{}'`,
+                  `alter table ai_messages add column if not exists proposed_appointment text`,
+                  `alter table ai_messages add column if not exists appointment_id text`,
                   // Full audit trail for every AI decision + human action.
                   `create table if not exists ai_audit_logs (
                         id uuid primary key default uuid_generate_v4(),

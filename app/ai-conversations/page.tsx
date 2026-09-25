@@ -46,6 +46,8 @@ type Loc = {
   gbp_auth_email: string | null;
   review_auto_enabled: boolean;
   review_auto_3_star: boolean;
+  booking_calendar_id: string | null;
+  booking_rules: { max_per_day?: number; latest_auto_time?: string; new_client_latest_time?: string; new_client_tags?: string[] } | null;
 };
 
 type Msg = {
@@ -69,6 +71,8 @@ type Msg = {
   human_takeover: boolean | null;
   contact_ai_paused: boolean | null;
   opted_out: boolean | null;
+  proposed_appointment: string | null;
+  appointment_id: string | null;
   error: string | null;
   sent_at: string | null;
   created_at: string;
@@ -353,6 +357,12 @@ function ConversationsTab({ locations, notify }: { locations: Loc[]; notify: (t:
               {selected.detected_service && <span className="text-xs px-2 py-0.5 rounded-full bg-blue-50 text-blue-600">{selected.detected_service}</span>}
               {selected.detected_offer && <span className="text-xs px-2 py-0.5 rounded-full bg-emerald-50 text-emerald-600">{selected.detected_offer}</span>}
             </div>
+            {selected.proposed_appointment && (
+              <div className={`text-sm rounded-xl px-3 py-2 border ${selected.appointment_id ? 'bg-emerald-50 border-emerald-100 text-emerald-700' : 'bg-blue-50 border-blue-100 text-blue-700'}`}>
+                📅 {selected.appointment_id ? 'Appointment booked: ' : 'Proposed appointment (booked on approve): '}
+                {new Date(selected.proposed_appointment).toLocaleString('en-US', { weekday: 'short', month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' })}
+              </div>
+            )}
             {selected.escalation_reason && (
               <div className="text-sm bg-red-50 border border-red-100 text-red-700 rounded-xl px-3 py-2">⚠ {selected.escalation_reason}</div>
             )}
@@ -577,6 +587,7 @@ const EMPTY_LOC: Partial<Loc> & { token?: string } = {
   custom_prompt: '', auto_respond_enabled: false, confidence_threshold: 0.75,
   response_delay_seconds: 60, ai_paused: false, polling_enabled: false,
   gbp_account_id: '', gbp_location_id: '', gbp_auth_email: '', review_auto_enabled: false, review_auto_3_star: false,
+  booking_calendar_id: '', booking_rules: {},
 };
 
 function LocationsTab({ locations, reload, notify }: { locations: Loc[]; reload: () => void; notify: (t: string) => void }) {
@@ -726,6 +737,40 @@ function LocationsTab({ locations, reload, notify }: { locations: Loc[]; reload:
                 className="mt-1 w-full border border-gray-200 rounded-lg px-2.5 py-1.5 text-sm" />
             </label>
           </div>
+        </div>
+
+        <div className="space-y-3">
+          <div className="text-xs font-bold text-gray-400 uppercase tracking-wide">Booking (optional — AI offers &amp; books real calendar slots)</div>
+          <div className="grid md:grid-cols-2 gap-3">
+            <Field label="Booking calendar ID (from Revive)" k="booking_calendar_id" placeholder="calendar id — leave blank to disable booking" />
+          </div>
+          <div className="flex gap-4 flex-wrap items-end">
+            <label className="block w-40">
+              <span className="text-xs font-semibold text-gray-500">Max AI bookings / day</span>
+              <input type="number" min={0} value={editing.booking_rules?.max_per_day ?? 0}
+                onChange={(e) => set('booking_rules', { ...(editing.booking_rules || {}), max_per_day: Number(e.target.value) })}
+                className="mt-1 w-full border border-gray-200 rounded-lg px-2.5 py-1.5 text-sm" />
+            </label>
+            <label className="block w-44">
+              <span className="text-xs font-semibold text-gray-500">Latest auto-book time</span>
+              <input type="time" value={editing.booking_rules?.latest_auto_time ?? ''}
+                onChange={(e) => set('booking_rules', { ...(editing.booking_rules || {}), latest_auto_time: e.target.value })}
+                className="mt-1 w-full border border-gray-200 rounded-lg px-2.5 py-1.5 text-sm" />
+            </label>
+            <label className="block w-44">
+              <span className="text-xs font-semibold text-gray-500">New-client latest time</span>
+              <input type="time" value={editing.booking_rules?.new_client_latest_time ?? ''}
+                onChange={(e) => set('booking_rules', { ...(editing.booking_rules || {}), new_client_latest_time: e.target.value })}
+                className="mt-1 w-full border border-gray-200 rounded-lg px-2.5 py-1.5 text-sm" />
+            </label>
+            <label className="block flex-1 min-w-[180px]">
+              <span className="text-xs font-semibold text-gray-500">New-client tags (comma separated)</span>
+              <input value={(editing.booking_rules?.new_client_tags || []).join(', ')}
+                onChange={(e) => set('booking_rules', { ...(editing.booking_rules || {}), new_client_tags: e.target.value.split(',').map((s) => s.trim()).filter(Boolean) })}
+                placeholder="first time" className="mt-1 w-full border border-gray-200 rounded-lg px-2.5 py-1.5 text-sm" />
+            </label>
+          </div>
+          <div className="text-xs text-gray-400">These are hard rules enforced in code — later slots and over-cap days always escalate to staff instead of booking.</div>
         </div>
 
         <div className="space-y-3">

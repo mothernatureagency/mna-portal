@@ -12,6 +12,9 @@ import {
   getConversationMessages,
   searchConversations,
   sendMessage,
+  getFreeSlots,
+  createAppointment,
+  localTimeOfDay,
   GhlMessage,
 } from './ghl';
 import { checkEscalation, isOptOutMessage } from './safety';
@@ -35,6 +38,7 @@ export type AiDecision = {
   detected_service: string | null;
   detected_offer: string | null;
   needs_human_review: boolean;
+  proposed_appointment: string | null;
 };
 
 export async function audit(params: {
@@ -216,15 +220,22 @@ const REPLY_TOOL: Anthropic.Tool = {
       detected_service: { type: ['string', 'null'] },
       detected_offer: { type: ['string', 'null'] },
       needs_human_review: { type: 'boolean' },
+      proposed_appointment: {
+        type: ['string', 'null'],
+        description: 'ONLY when the customer has explicitly agreed to one exact offered time: that slot, copied verbatim from AVAILABLE TIMES. Otherwise null.',
+      },
     },
     required: ['suggested_response', 'confidence_score', 'intent', 'category', 'should_auto_send', 'needs_human_review'],
   },
 };
 
-async function callClaude(loc: GhlLocation, transcript: string, contactSummary: string): Promise<AiDecision> {
+async function callClaude(loc: GhlLocation, transcript: string, contactSummary: string, availability?: string[]): Promise<AiDecision> {
   const apiKey = process.env.ANTHROPIC_API_KEY;
   if (!apiKey) throw new Error('ANTHROPIC_API_KEY not set');
   const client = new Anthropic({ apiKey });
+  const availabilityBlock = availability && availability.length
+    ? `\n\nAVAILABLE TIMES (live from the booking calendar — the ONLY times you may offer; offer at most TWO, never a long list):\n${availability.join('\n')}\n\nIf the customer clearly agrees to one exact time from this list, set proposed_appointment to that slot verbatim and confirm it in your reply. If they name a time NOT on this list, offer the two nearest available times instead. Never confirm a time that is not on this list.`
+    : '\n\nNo live availability is loaded. Do NOT confirm, promise, or propose specific appointment times — collect their preferred day/time and say the team will confirm.';
   const res = await client.messages.create({
     model: MODEL,
     max_tokens: 1024,
@@ -234,7 +245,7 @@ async function callClaude(loc: GhlLocation, transcript: string, contactSummary: 
     messages: [
       {
         role: 'user',
-        content: `CONTACT:\n${contactSummary}\n\nCONVERSATION (oldest first, last line is the new inbound message to answer):\n${transcript}`,
+        content: `CONTACT:\n${contactSummary}\n\nCONVERSATION (oldest first, last line is the new inbound message to answer):\n${transcript}${availabilityBlock}`,
       },
     ],
   });
@@ -251,7 +262,49 @@ async function callClaude(loc: GhlLocation, transcript: string, contactSummary: 
     detected_service: d.detected_service ? String(d.detected_service) : null,
     detected_offer: d.detected_offer ? String(d.detected_offer) : null,
     needs_human_review: !!d.needs_human_review,
+    proposed_appointment: d.proposed_appointment ? String(d.proposed_appointment) : null,
   };
+}
+
+// ── Booking gate (hard rules, enforced in code per the build spec) ────────
+
+export type BookingCheck = { ok: true } | { ok: false; reason: string };
+
+/**
+ * Validate a proposed appointment against the location's hard rules.
+ * A prompt cannot count bookings or refuse a time; this can.
+ */
+export async function checkBookingRules(
+  loc: GhlLocation,
+  proposedIso: string,
+  freeSlots: string[],
+  contactTags: string[],
+): Promise<BookingCheck> {
+  if (!loc.booking_calendar_id) return { ok: false, reason: 'No booking calendar configured' };
+  if (!freeSlots.includes(proposedIso)) return { ok: false, reason: 'Proposed time is not an offered free slot' };
+  const rules = (loc.booking_rules || {}) as import('./locations').BookingRules;
+  const tz = loc.timezone || 'America/Chicago';
+  const t = localTimeOfDay(proposedIso, tz);
+  if (rules.latest_auto_time && t > rules.latest_auto_time) {
+    return { ok: false, reason: `Slots after ${rules.latest_auto_time} need staff confirmation` };
+  }
+  const newClientTags = (rules.new_client_tags || []).map((s) => s.toLowerCase());
+  const isNewClient = newClientTags.length > 0 &&
+    contactTags.some((tag) => newClientTags.includes(tag.toLowerCase()));
+  if (isNewClient && rules.new_client_latest_time && t > rules.new_client_latest_time) {
+    return { ok: false, reason: `New clients book no later than ${rules.new_client_latest_time}` };
+  }
+  const cap = Number(rules.max_per_day || 0);
+  if (cap > 0) {
+    const { rows } = await query<{ n: number }>(
+      `select count(*)::int as n from ai_audit_logs
+        where ghl_location_id = $1 and event = 'appointment_booked'
+          and created_at >= date_trunc('day', now())`,
+      [loc.ghl_location_id],
+    );
+    if ((rows[0]?.n || 0) >= cap) return { ok: false, reason: `Daily AI booking cap (${cap}) reached` };
+  }
+  return { ok: true };
 }
 
 // ── Processing ────────────────────────────────────────────────────────────
@@ -389,11 +442,23 @@ export async function processMessage(messageId: string): Promise<string> {
       knowledge_base_fields: ['hours', 'services', 'pricing', 'offers', 'faqs', 'booking_url'].filter((f) => (loc as any)[f === 'hours' ? 'business_hours' : f]),
     };
 
+    // Live availability: only when a booking calendar is configured. The
+    // model may only offer times from this list; the gate below re-checks.
+    let freeSlots: string[] = [];
+    if (loc.booking_calendar_id) {
+      try {
+        const now = Date.now();
+        freeSlots = (await getFreeSlots(token, loc.booking_calendar_id, now, now + 7 * 86400_000, loc.timezone || undefined)).slice(0, 40);
+      } catch (e) {
+        await audit({ ghlLocationId: locId, messageId, event: 'availability_error', detail: { error: String((e as any)?.message || e).slice(0, 200) } });
+      }
+    }
+
     // Pre-model hard safety screen on the inbound text.
     const preHit = checkEscalation(inboundBody, loc.escalation_keywords);
 
     // Generate.
-    const decision = await callClaude(loc, transcript, contactSummary);
+    const decision = await callClaude(loc, transcript, contactSummary, freeSlots);
     // PHI hygiene: log decision metadata only — never the message or reply text.
     const { suggested_response: _sr, ...decisionMeta } = decision;
     await audit({ ghlLocationId: locId, messageId, event: 'ai_decision', detail: { ...decisionMeta, pre_screen: preHit } });
@@ -403,12 +468,23 @@ export async function processMessage(messageId: string): Promise<string> {
     const category = preHit?.category || decision.category;
     const threshold = Number(loc.confidence_threshold || 0.75);
 
-    const autoSend =
+    let autoSend =
       loc.auto_respond_enabled &&
       !needsReview &&
       decision.should_auto_send &&
       decision.confidence_score >= threshold &&
       !!decision.suggested_response;
+
+    // Booking gate: a reply that confirms an appointment may only auto-send
+    // if the hard rules pass AND the appointment is actually created first.
+    let bookingHold: string | null = null;
+    if (decision.proposed_appointment) {
+      const check = await checkBookingRules(loc, decision.proposed_appointment, freeSlots, contact?.tags || []);
+      if (!check.ok) {
+        autoSend = false;
+        bookingHold = check.reason;
+      }
+    }
 
     const base = {
       contact_name: contactName,
@@ -421,17 +497,18 @@ export async function processMessage(messageId: string): Promise<string> {
       intent: decision.intent,
       category,
       should_auto_send: autoSend,
-      needs_human_review: needsReview,
-      escalation_reason: escalationReason,
+      needs_human_review: needsReview || !!bookingHold,
+      escalation_reason: bookingHold ? `Booking needs staff confirmation: ${bookingHold}` : escalationReason,
       detected_service: decision.detected_service,
       detected_offer: decision.detected_offer,
+      proposed_appointment: decision.proposed_appointment,
     };
 
     if (!autoSend) {
-      const status = needsReview ? 'escalated' : 'awaiting_approval';
+      const status = needsReview || bookingHold ? 'escalated' : 'awaiting_approval';
       await finalize(messageId, { ...base, status });
-      await audit({ ghlLocationId: locId, messageId, event: status, detail: { reason: escalationReason || 'below threshold or auto-respond disabled' } });
-      if (needsReview) {
+      await audit({ ghlLocationId: locId, messageId, event: status, detail: { reason: base.escalation_reason || 'below threshold or auto-respond disabled' } });
+      if (needsReview || bookingHold) {
         // PHI hygiene: this email transits Make + Gmail (no BAA), so it carries
         // no message content — only the location and a category-level reason.
         await queueEmailNotification({
@@ -457,6 +534,30 @@ export async function processMessage(messageId: string): Promise<string> {
       return 'canceled';
     }
 
+    // Booking first, then the confirmation text — never confirm an
+    // appointment that wasn't actually created.
+    let appointmentId: string | null = null;
+    if (decision.proposed_appointment && loc.booking_calendar_id) {
+      try {
+        const appt = await createAppointment(token, {
+          calendarId: loc.booking_calendar_id,
+          locationId: locId,
+          contactId,
+          startTime: decision.proposed_appointment,
+        });
+        appointmentId = appt.id || null;
+        await audit({ ghlLocationId: locId, messageId, event: 'appointment_booked', detail: { start: decision.proposed_appointment, appointment_id: appointmentId } });
+      } catch (e) {
+        const err = String((e as any)?.message || e).slice(0, 300);
+        await finalize(messageId, {
+          ...base, status: 'escalated', needs_human_review: true,
+          escalation_reason: `Booking failed — confirm manually: ${err}`,
+        });
+        await audit({ ghlLocationId: locId, messageId, event: 'booking_failed', detail: { error: err } });
+        return 'escalated';
+      }
+    }
+
     const sent = await sendMessage(token, { contactId, message: decision.suggested_response, type: 'SMS' });
     await finalize(messageId, {
       ...base,
@@ -464,6 +565,7 @@ export async function processMessage(messageId: string): Promise<string> {
       final_response: decision.suggested_response,
       sent_at: new Date().toISOString(),
       ghl_message_id: sent.messageId || null,
+      appointment_id: appointmentId,
     });
     await audit({ ghlLocationId: locId, messageId, event: 'auto_sent', detail: { ghl_message_id: sent.messageId } });
     return 'auto_sent';

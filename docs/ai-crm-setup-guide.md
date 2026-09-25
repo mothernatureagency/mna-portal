@@ -33,6 +33,9 @@ In each Revive subaccount: **Settings → Private Integrations → New**, with s
 - `conversations.readonly` — find conversations
 - `conversations/message.readonly` — read history
 - `conversations/message.write` — send replies from the client's number
+- `calendars.readonly`, `calendars/events.readonly`, `calendars/events.write` —
+  read real availability and create appointments (only needed when the
+  location uses AI booking)
 
 Copy the `pit-…` token into the portal: **AI Conversations → Locations →
 Connect location**. The token is encrypted server-side and never returned to
@@ -144,3 +147,25 @@ whole hosting chain.
   in Supabase for up to the retention window. If counsel wants that closed,
   the options are Vercel Enterprise + Supabase HIPAA add-on, or moving the
   app to a host with a free BAA (e.g., AWS). Code is host-agnostic.
+
+## 8. Calendar-aware booking
+
+Set a location's **Booking calendar ID** (Revive → Calendars → the client-facing
+calendar's ID) to enable booking. The engine then:
+
+1. Pulls the next 7 days of real free slots before every AI reply. The model
+   may only offer times from that list (max two), per the build spec.
+2. When the customer explicitly agrees to one exact offered time, the model
+   returns it as `proposed_appointment`.
+3. **Hard rules run in code, not the prompt** (Booking section of the location
+   editor): daily AI-booking cap, latest auto-book time, and a separate
+   earlier cutoff for new clients (matched by contact tags). Any rule failure
+   escalates to staff instead of booking — the reply is held too, so the AI
+   never texts a confirmation for an appointment that wasn't created.
+4. Auto mode books first, then sends the confirmation text. Approval mode
+   stores the proposed slot; clicking Approve books it and then sends (if the
+   slot was taken in the meantime, the approve fails loudly and nothing sends).
+
+Fix the calendars before enabling booking (the Pinecrest spec: real hours are
+10–6 seven days, but the calendars read 9:00–5:25 weekdays only — an AI
+reading them would refuse weekend bookings).

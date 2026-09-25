@@ -42,8 +42,25 @@ export type GhlLocation = {
   gbp_auth_email: string | null;
   review_auto_enabled: boolean;
   review_auto_3_star: boolean;
+  booking_calendar_id: string | null;
+  booking_rules: BookingRules;
   created_at: string;
   updated_at: string;
+};
+
+/**
+ * Hard booking constraints, enforced in code around the model — never as
+ * prompt suggestions (a prompt can't count bookings or refuse a time).
+ */
+export type BookingRules = {
+  /** Max AI-created bookings per day for this location (0/absent = no cap). */
+  max_per_day?: number;
+  /** Latest slot ("HH:MM", location time) the AI may book unassisted; later slots escalate to staff. */
+  latest_auto_time?: string;
+  /** Latest slot for brand-new clients ("HH:MM"). */
+  new_client_latest_time?: string;
+  /** Contact tags that mark a brand-new client (e.g. ["first time"]). */
+  new_client_tags?: string[];
 };
 
 // Fields the browser is allowed to edit via the settings UI.
@@ -56,6 +73,7 @@ const EDITABLE_FIELDS = [
   'confidence_threshold', 'response_delay_seconds', 'ai_paused',
   'polling_enabled', 'webhook_secret', 'gbp_account_id', 'gbp_location_id',
   'gbp_auth_email', 'review_auto_enabled', 'review_auto_3_star',
+  'booking_calendar_id', 'booking_rules',
 ] as const;
 
 /** Strip secrets before anything leaves the server. */
@@ -113,6 +131,7 @@ export async function upsertLocation(payload: Record<string, unknown>, id?: stri
     if (!(key in payload)) continue;
     let v = payload[key];
     if (key === 'services') v = JSON.stringify(Array.isArray(v) ? v : []);
+    if (key === 'booking_rules') v = JSON.stringify(v && typeof v === 'object' ? v : {});
     fields.push(key);
     values.push(v === '' ? null : v);
   }

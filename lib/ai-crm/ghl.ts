@@ -142,3 +142,72 @@ export async function sendMessage(
   );
   return data;
 }
+
+// ── Calendars (requires calendars.readonly, calendars/events.readonly,
+//    calendars/events.write on the Private Integration) ────────────────────
+
+export async function listCalendars(
+  token: string,
+  locationId: string,
+): Promise<Array<{ id: string; name: string; isActive?: boolean }>> {
+  const data = await ghlFetch<{ calendars: any[] }>(token, `/calendars/?locationId=${encodeURIComponent(locationId)}`);
+  return (data.calendars || []).map((c) => ({ id: c.id, name: c.name, isActive: c.isActive }));
+}
+
+/**
+ * Real availability for a calendar between two times. Returns ISO slot start
+ * strings (with the calendar's own UTC offset), flattened across days.
+ */
+export async function getFreeSlots(
+  token: string,
+  calendarId: string,
+  startMs: number,
+  endMs: number,
+  timezone?: string,
+): Promise<string[]> {
+  const qs = new URLSearchParams({ startDate: String(startMs), endDate: String(endMs) });
+  if (timezone) qs.set('timezone', timezone);
+  const data = await ghlFetch<Record<string, any>>(token, `/calendars/${calendarId}/free-slots?${qs.toString()}`);
+  const slots: string[] = [];
+  for (const [key, val] of Object.entries(data || {})) {
+    if (key === 'traceId') continue;
+    if (Array.isArray((val as any)?.slots)) slots.push(...(val as any).slots);
+  }
+  return slots.sort();
+}
+
+export async function createAppointment(
+  token: string,
+  params: {
+    calendarId: string;
+    locationId: string;
+    contactId: string;
+    startTime: string; // ISO with offset, must be a returned free slot
+    title?: string;
+  },
+): Promise<{ id?: string }> {
+  const data = await ghlFetch<{ id?: string; event?: { id?: string } }>(token, `/calendars/events/appointments`, {
+    method: 'POST',
+    body: {
+      calendarId: params.calendarId,
+      locationId: params.locationId,
+      contactId: params.contactId,
+      startTime: params.startTime,
+      title: params.title,
+      appointmentStatus: 'confirmed',
+    },
+  });
+  return { id: data.id || data.event?.id };
+}
+
+/** Hour+minute of an ISO timestamp in a given IANA timezone, as "HH:MM". */
+export function localTimeOfDay(iso: string, timezone: string): string {
+  try {
+    const fmt = new Intl.DateTimeFormat('en-US', {
+      hour: '2-digit', minute: '2-digit', hour12: false, timeZone: timezone,
+    });
+    return fmt.format(new Date(iso)).replace(/^24/, '00');
+  } catch {
+    return '00:00';
+  }
+}

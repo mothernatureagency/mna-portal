@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { ensureSchema, query } from '@/lib/db';
 import { getLocationByGhlId, locationToken } from '@/lib/ai-crm/locations';
-import { sendMessage } from '@/lib/ai-crm/ghl';
+import { createAppointment, sendMessage } from '@/lib/ai-crm/ghl';
 import { audit } from '@/lib/ai-crm/engine';
 import { createClient } from '@/lib/supabase/server';
 
@@ -78,12 +78,32 @@ export async function POST(req: NextRequest, { params }: { params: { id: string 
     const token = loc ? locationToken(loc) : null;
     if (!token) return NextResponse.json({ error: 'Location token not configured' }, { status: 400 });
 
+    // If the AI proposed an appointment, create it before sending the
+    // confirmation text (approve only — a custom reply may say something else).
+    let appointmentId: string | null = null;
+    if (action === 'approve' && msg.proposed_appointment && loc?.booking_calendar_id && !msg.appointment_id) {
+      try {
+        const appt = await createAppointment(token, {
+          calendarId: loc.booking_calendar_id,
+          locationId: msg.ghl_location_id,
+          contactId: msg.contact_id,
+          startTime: msg.proposed_appointment,
+        });
+        appointmentId = appt.id || null;
+        await audit({ ghlLocationId: msg.ghl_location_id, messageId: id, event: 'appointment_booked', detail: { start: msg.proposed_appointment, appointment_id: appointmentId, approved: true }, actor });
+      } catch (e: any) {
+        const err = `Booking failed (slot may be taken) — text not sent: ${String(e?.message || e).slice(0, 300)}`;
+        await audit({ ghlLocationId: msg.ghl_location_id, messageId: id, event: 'booking_failed', detail: { error: err }, actor });
+        return NextResponse.json({ error: err }, { status: 502 });
+      }
+    }
+
     try {
       const sent = await sendMessage(token, { contactId: msg.contact_id, message: text, type: 'SMS' });
       await query(
         `update ai_messages set status = 'sent_manual', final_response = $2, sent_at = now(),
-                ghl_message_id = $3, edited_by = $4, updated_at = now() where id = $1`,
-        [id, text, sent.messageId || null, actor],
+                ghl_message_id = $3, edited_by = $4, appointment_id = coalesce($5, appointment_id), updated_at = now() where id = $1`,
+        [id, text, sent.messageId || null, actor, appointmentId],
       );
       await audit({
         ghlLocationId: msg.ghl_location_id, messageId: id,
