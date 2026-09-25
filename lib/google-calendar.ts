@@ -17,6 +17,9 @@ const SCOPES = [
   // Also requires a reconnect for consent to re-prompt.
   'https://www.googleapis.com/auth/analytics.readonly',
   'https://www.googleapis.com/auth/webmasters.readonly',
+  // Google Business Profile — used by the AI Reviews module to read reviews
+  // and post replies. Adding this scope requires staff to reconnect Google.
+  'https://www.googleapis.com/auth/business.manage',
 ];
 
 /**

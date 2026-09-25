@@ -1,20 +1,10 @@
 {
   "crons": [
-    {
-      "path": "/api/social/run",
-      "schedule": "0 14 * * *"
-    },
-    {
-      "path": "/api/meta/refresh-kpis",
-      "schedule": "0 8 1 * *"
-    },
-    {
-      "path": "/api/reviews/run",
-      "schedule": "0 13 * * *"
-    },
-    {
-      "path": "/api/followups/run",
-      "schedule": "0 16 * * 5"
-    }
+    { "path": "/api/social/run", "schedule": "0 14 * * *" },
+    { "path": "/api/meta/refresh-kpis", "schedule": "0 8 1 * *" },
+    { "path": "/api/reviews/run", "schedule": "0 13 * * *" },
+    { "path": "/api/followups/run", "schedule": "0 16 * * 5" },
+    { "path": "/api/ai-crm/process", "schedule": "0 12 * * *" },
+    { "path": "/api/ai-crm/reviews/sync", "schedule": "0 15 * * *" }
   ]
 }
