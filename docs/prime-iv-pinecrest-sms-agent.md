@@ -6,7 +6,7 @@ scaffolding that has to sit *around* the AI step rather than inside it.
 
 **Do not connect this to live traffic yet.** All five prerequisites in the spec
 come first — HIPAA module purchased and BAA signed, integration audit done,
-calendars corrected to 10–5 seven days, the pricing rule decided, and the
+calendars corrected to 10–6 seven days, the pricing rule decided, and the
 retention/access policy set. This document assumes Phase 0 (suggest-only).
 
 **Field names may differ.** Nobody has opened the Conversation AI settings
@@ -90,7 +90,7 @@ WHAT YOU NEVER DO
   than a slow one.
 
 HOURS AND LOCATION
-Open 10:00 AM to 5:00 PM, seven days a week. 12673 S Dixie Hwy, Pinecrest, FL
+Open 10:00 AM to 6:00 PM, seven days a week. 12673 S Dixie Hwy, Pinecrest, FL
 33156, in Pinecrest Town Center next to MPS Credit Union and Chase. The phone
 is (786) 741-7477 and it takes calls and texts. If you do
 not know whether the spa is open on a specific holiday, say you will confirm
@@ -109,7 +109,7 @@ Walk-ins are welcome but chairs are limited, so tell them to call
 (786) 741-7477 ahead. Never turn someone who is nearby or already on the way
 into an online booking link — get them a chair or get them a person.
 
-OUTSIDE 10–5
+OUTSIDE 10–6
 You may answer questions and take down a requested time, but be clear the team
 confirms in the morning. Do not tell a client an appointment is booked.
 
@@ -142,7 +142,7 @@ Paste as training Q&A pairs. **This section is incomplete on purpose** — see
 | --- | --- |
 | Address | 12673 S Dixie Hwy, Pinecrest, FL 33156 |
 | Landmark | Pinecrest Town Center, next to MPS Credit Union and Chase |
-| Hours | 10:00 AM – 5:00 PM, seven days a week |
+| Hours | 10:00 AM – 6:00 PM, seven days a week |
 | Website and booking | primeivpinecrest.com |
 | Links hub | linktr.ee/primeivpinecrest |
 | Intro offer | $99 standard variant — the only price the bot may state |
@@ -162,7 +162,7 @@ Credit Union and Chase. Parking is right out front. See you soon!
 -Prime IV Pinecrest
 
 **Q: What are your hours? / Are you open today? / What time do you close?**
-A: We're open 10 to 5, seven days a week. Want me to grab you a time today?
+A: We're open 10 to 6, seven days a week. Want me to grab you a time today?
 -Prime IV Pinecrest
 
 **Q: Do I need an appointment? / Can I just walk in?**
@@ -433,12 +433,9 @@ comment on the conversation, notify staff, and send only "Let me get that
 confirmed for you — someone will text you right back." Do not let the agent
 send a confirmation.
 
-**This rule reads differently now that closing is 5:00, not 6:00.** A drip runs
-about an hour, so 4:00 PM is the last start that finishes at close, and
-anything later cannot finish before the doors shut. The rule is effectively
-"the last slot of the day always needs a human" — a sane place to put one.
-Worth deciding whether the agent should offer anything after 4:00 PM at all;
-right now it may offer and simply cannot confirm. One-line change either way.
+At a 6:00 close a 4:00 PM drip finishes an hour before the doors shut, so this
+rule is about staffing rather than closing time. It is the client's rule, kept
+as written.
 
 ### 3c. Hard stop — five new bookings per day
 
@@ -548,7 +545,7 @@ Also confirm across the replay:
       guaranteed
 - [ ] No reply signs as a named staff member
 - [ ] No reply confirms a booking at or after 4:00 PM
-- [ ] No reply offers Saturday or Sunday as closed, or cuts off before 5:00 PM
+- [ ] No reply offers Saturday or Sunday as closed, or cuts off before 6:00 PM
 - [ ] Every photo received triggers a handoff
 - [ ] A message containing instruction-like text is flagged, not acted on
 
@@ -566,7 +563,6 @@ Blocking the knowledge base:
 | --- | --- | --- |
 | A review pass on the rewritten menu descriptions | Spa team | Phase 0 sign-off |
 | Voucher expiration terms | You | Voucher routing |
-| The hours conflict above | You | The agent's single most-asked fact |
 | Membership terms in plain language | Spa team | Membership routing |
 
 ### Conflicts the website turned up — decide these
@@ -576,7 +572,6 @@ decision, and two of them are customer-facing errors today.
 
 | Conflict | The website says | We were told / wrote | Why it matters |
 | --- | --- | --- | --- |
-| **Hours** | "Open Daily 10AM – 6PM" in four places | 10–5 seven days | One of them is wrong right now. If the site is wrong, clients arrive at 5:30 to a closed door — the exact thing that already happened once. If 10–5 is wrong, the bot is turning away an hour of bookings a day. |
 | **Walk-ins** | "Walk-ins limited — call now", five times | Spec: "Walk-ins get welcomed, not redirected" | Reconciled in the KB — welcome them, ask them to call ahead. Confirm that is right. |
 | **One-Hour Vacation** | ™ | Brand guide says ® | Different marks with different legal meaning. The agent now uses ™ to match the site; correct it if the brand guide wins. |
 | **Booking calendars** | "IV Therapy" and "Member Appointment" tabs both load calendar `oRZeRkyavE37L54bgnt4` | Separate calendars in the routing table | A non-member booking IV therapy lands on the member calendar. Either deliberate or a copy-paste error, and the tag routing in 3a depends on knowing which. |
@@ -601,7 +596,8 @@ rule exists.
 - **Menu pricing** — loaded. The agent may quote drips, injections and NAD+.
   Memberships and packages still route to a person.
 - **Duration** — about an hour, answered as the One-Hour Vacation™.
-- **Hours** — 10:00 AM to 5:00 PM, seven days a week.
+- **Hours** — 10:00 AM to 6:00 PM, seven days a week. The website was right;
+  an earlier 10–5 was wrong and everything built on it has been reverted.
 - **Notifications** — pinecrest@primeivhydration.com, with
   jkulkusky@primeivhydration.com added for legal, media and regulatory.
   Content stays out of the notification.
