@@ -9,6 +9,11 @@ function isPublicRoute(pathname: string) {
     pathname.startsWith('/auth/callback') ||
     pathname.startsWith('/api/google/callback') ||
     pathname.startsWith('/api/lock') ||
+    // The MCP server authenticates with its own bearer token (lib/mcp/auth.ts),
+    // not the session cookie. Matched exactly so /api/mcp-tokens — the owner-only
+    // admin route, which DOES use the cookie — keeps going through this
+    // middleware and gets its session refreshed.
+    pathname === '/api/mcp' ||
     pathname.startsWith('/api/seed-users') ||
     pathname.startsWith('/api/hospitable-sync') ||
     pathname.startsWith('/api/google-reviews-sync') ||
