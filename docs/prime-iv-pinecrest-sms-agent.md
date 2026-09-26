@@ -562,6 +562,8 @@ Blocking the knowledge base:
 | Needed | From | Blocks |
 | --- | --- | --- |
 | A review pass on the rewritten menu descriptions | Spa team | Phase 0 sign-off |
+| BAA signed, and confirmed to cover the Pinecrest sub-account | You | Every phase — the module being paid for is not the same as being covered |
+| Whether MNA needs its own BAA with Pinecrest | You | Agency access to the inbox |
 | Voucher expiration terms | You | Voucher routing |
 | Membership terms in plain language | Spa team | Membership routing |
 
@@ -596,6 +598,9 @@ rule exists.
 - **Menu pricing** — loaded. The agent may quote drips, injections and NAD+.
   Memberships and packages still route to a person.
 - **Duration** — about an hour, answered as the One-Hour Vacation™.
+- **HIPAA module** — already paid for. The BAA signature and sub-account
+  coverage are separate from the purchase and still need confirming; the
+  browser session reports on both.
 - **Hours** — 10:00 AM to 6:00 PM, seven days a week. The website was right;
   an earlier 10–5 was wrong and everything built on it has been reverted.
 - **Notifications** — pinecrest@primeivhydration.com, with
