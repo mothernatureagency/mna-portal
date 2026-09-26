@@ -427,6 +427,31 @@ export default function SettingsPage() {
           Daily briefing emails are sent via your Make.com automation. Contact your admin to adjust email frequency or recipients.
         </div>
       </Card>
+
+      {/* MCP access tokens — owner only; the page itself enforces that. */}
+      <Card className="p-6">
+        <div className="flex items-center gap-3 mb-4">
+          <div className="w-10 h-10 rounded-xl flex items-center justify-center bg-sky-50 text-sky-600">
+            <span className="material-symbols-outlined" style={{ fontSize: 20 }}>key</span>
+          </div>
+          <div>
+            <h2 className="text-[15px] font-bold text-gray-900">MCP access tokens</h2>
+            <p className="text-[12px] text-gray-400">Let Claude reach the portal from outside the browser</p>
+          </div>
+        </div>
+        <div className="text-[12px] text-gray-400 mb-4">
+          Create a token to connect Claude Code, then ask it about the task board, the
+          schedule or who is overloaded. Each token acts as one person and can be revoked
+          on its own.
+        </div>
+        <a
+          href="/settings/mcp"
+          className="inline-flex items-center gap-1.5 rounded-lg bg-[#0c6da4] px-4 py-2 text-[13px] font-medium text-white hover:bg-[#0a5c8c]"
+        >
+          Manage tokens
+          <span className="material-symbols-outlined" style={{ fontSize: 16 }}>arrow_forward</span>
+        </a>
+      </Card>
     </div>
   );
 }
