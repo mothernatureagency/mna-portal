@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import Anthropic from '@anthropic-ai/sdk';
+import { anthropicFor } from '@/lib/anthropic';
 import { ensureSchema, query } from '@/lib/db';
 import { getContactsForPrompt } from '@/lib/contacts';
 import { STAFF } from '@/lib/staff';
@@ -22,8 +23,6 @@ export const dynamic = 'force-dynamic';
  * it pre-loads (memories, roster, client ids, contacts), and the tool loop.
  */
 
-const anthropic = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY! });
-
 const MODEL = 'claude-haiku-4-5';
 const MAX_TOKENS = 1024;
 /** Hard stop on the tool loop so a confused turn can't bill forever. */
@@ -41,6 +40,9 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: 'Staff sign-in required' }, { status: 403 });
     }
     const userEmail = identity.email;
+
+    // Constructed per request so the spend is attributed to whoever asked.
+    const anthropic = anthropicFor({ source: 'assistant', actor: userEmail });
 
     const body = await req.json();
     const { messages } = body;

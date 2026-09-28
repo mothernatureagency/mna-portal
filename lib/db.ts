@@ -818,6 +818,48 @@ async function initSchema() {
                         revoked_at timestamptz
                   )`,
                   `create index if not exists mcp_tokens_active_idx on mcp_tokens (token_hash) where revoked_at is null`,
+                  // Anthropic spend. One row per model call, priced from the
+                  // token counts the API returns, so "what did the AI cost
+                  // this month, and which feature spent it" is answerable
+                  // without logging into Anthropic. Recording is best-effort:
+                  // a failure here never fails the call it was measuring.
+                  `create table if not exists ai_usage (
+                        id uuid primary key default uuid_generate_v4(),
+                        at timestamptz not null default now(),
+                        source text not null,
+                        model text not null,
+                        client_id text,
+                        actor text,
+                        input_tokens integer not null default 0,
+                        output_tokens integer not null default 0,
+                        cache_write_tokens integer not null default 0,
+                        cache_read_tokens integer not null default 0,
+                        cost_usd numeric(12,6) not null default 0,
+                        ok boolean not null default true,
+                        error text
+                  )`,
+                  `create index if not exists ai_usage_at_idx on ai_usage (at desc)`,
+                  `create index if not exists ai_usage_source_idx on ai_usage (source, at desc)`,
+                  // Credit the agency has bought. Anthropic has no balance
+                  // endpoint, so the balance is this ledger minus ai_usage.
+                  // A negative amount is a correction, which is why the sign
+                  // is not constrained.
+                  `create table if not exists ai_credit_ledger (
+                        id uuid primary key default uuid_generate_v4(),
+                        at timestamptz not null default now(),
+                        amount_usd numeric(12,2) not null,
+                        note text,
+                        created_by text
+                  )`,
+                  // Single row, keyed on a constant, so the settings can be
+                  // upserted without first checking whether they exist.
+                  `create table if not exists ai_credit_settings (
+                        id boolean primary key default true check (id),
+                        low_balance_usd numeric(12,2) not null default 25,
+                        hard_stop boolean not null default false,
+                        updated_at timestamptz,
+                        updated_by text
+                  )`,
                 ];
         for (const sql of statements) {
                   await pool.query(sql);

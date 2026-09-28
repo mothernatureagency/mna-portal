@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import Anthropic from '@anthropic-ai/sdk';
+import { anthropicFor } from '@/lib/anthropic';
 
 export const runtime = 'nodejs';
 
@@ -23,7 +23,7 @@ export async function POST(req: NextRequest) {
   const plat = String(platform || 'tiktok').toLowerCase();
   const refs = Array.isArray(references) ? references.filter(Boolean).slice(0, 6) : [];
 
-  const client = new Anthropic({ apiKey });
+  const client = anthropicFor({ source: 'video-projects/script' });
   const prompt = `You are a senior short-form video writer producing a ${plat} video.
 
 TOPIC: ${topic}

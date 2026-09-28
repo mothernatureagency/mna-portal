@@ -428,6 +428,30 @@ export default function SettingsPage() {
         </div>
       </Card>
 
+      {/* Anthropic credit — owner only; the page itself enforces that. */}
+      <Card className="p-6">
+        <div className="flex items-center gap-3 mb-4">
+          <div className="w-10 h-10 rounded-xl flex items-center justify-center bg-emerald-50 text-emerald-600">
+            <span className="material-symbols-outlined" style={{ fontSize: 20 }}>account_balance_wallet</span>
+          </div>
+          <div>
+            <h2 className="text-[15px] font-bold text-gray-900">Anthropic credit</h2>
+            <p className="text-[12px] text-gray-400">What the AI has to spend, and what it has spent</p>
+          </div>
+        </div>
+        <div className="text-[12px] text-gray-400 mb-4">
+          Every agent, campaign draft and content plan bills against one balance. Record a
+          top-up after buying credit, and see which features are spending it.
+        </div>
+        <a
+          href="/settings/ai-credit"
+          className="inline-flex items-center gap-1.5 rounded-lg bg-[#0c6da4] px-4 py-2 text-[13px] font-medium text-white hover:bg-[#0a5c8c]"
+        >
+          View credit
+          <span className="material-symbols-outlined" style={{ fontSize: 16 }}>arrow_forward</span>
+        </a>
+      </Card>
+
       {/* MCP access tokens — owner only; the page itself enforces that. */}
       <Card className="p-6">
         <div className="flex items-center gap-3 mb-4">

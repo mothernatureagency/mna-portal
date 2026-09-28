@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import Anthropic from '@anthropic-ai/sdk';
+import { anthropicFor } from '@/lib/anthropic';
 import { ensureSchema, query } from '@/lib/db';
 import { clients as staticClients } from '@/lib/clients';
 import { STAFF } from '@/lib/staff';
@@ -68,7 +68,7 @@ export async function POST(req: NextRequest) {
     }
   } catch { /* fine */ }
 
-  const anthropic = new Anthropic({ apiKey });
+  const anthropic = anthropicFor({ source: 'meeting-notes/ingest' });
   const prompt = `You are filing a Google Meet notes document into Mother Nature Agency's portal. Today is ${new Date().toISOString().slice(0, 10)}.
 
 CLIENTS (id = name):

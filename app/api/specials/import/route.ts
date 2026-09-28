@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import Anthropic from '@anthropic-ai/sdk';
+import { anthropicFor } from '@/lib/anthropic';
 import { createClient } from '@/lib/supabase/server';
 import { blockFromRequest } from '@/lib/specials-read';
 
@@ -63,7 +64,7 @@ export async function POST(req: NextRequest) {
   }
 
   try {
-    const anthropic = new Anthropic({ apiKey });
+    const anthropic = anthropicFor({ source: 'specials/import' });
     const res = await anthropic.messages.create({
       model: 'claude-opus-5',
       max_tokens: 16000,

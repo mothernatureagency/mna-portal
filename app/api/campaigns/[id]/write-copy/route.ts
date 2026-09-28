@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { ensureSchema, query } from '@/lib/db';
 import { clients } from '@/lib/clients';
 import Anthropic from '@anthropic-ai/sdk';
+import { anthropicFor } from '@/lib/anthropic';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -155,7 +156,7 @@ Rules:
 - Align messaging with the social content themes when relevant (reference promotions, topics, or hooks from the calendar)${guidanceBlock}`;
   }
 
-  const client = new Anthropic();
+  const client = anthropicFor({ source: 'campaigns/[id]/write-copy' });
   const message = await client.messages.create({
     model: MODEL,
     max_tokens: 1500,

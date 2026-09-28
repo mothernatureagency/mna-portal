@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import Anthropic from '@anthropic-ai/sdk';
+import { anthropicFor } from '@/lib/anthropic';
 import { getAgent } from '@/lib/agents/config';
 
 export const runtime = 'nodejs';
@@ -28,7 +28,7 @@ export async function POST(req: NextRequest, { params }: { params: { id: string 
     return NextResponse.json({ error: 'messages required' }, { status: 400 });
   }
 
-  const client = new Anthropic({ apiKey });
+  const client = anthropicFor({ source: `agents/${agent.id}` });
 
   try {
     const res = await client.messages.create({

@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { ensureSchema, query } from '@/lib/db';
 import { clients } from '@/lib/clients';
 import Anthropic from '@anthropic-ai/sdk';
+import { anthropicFor } from '@/lib/anthropic';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -120,7 +121,7 @@ Return your answer as a JSON array. Example format:
 
 Only return the JSON array, no other text.`;
 
-    const anthropic = new Anthropic();
+    const anthropic = anthropicFor({ source: 'campaigns/recommend', clientId });
     const message = await anthropic.messages.create({
       model: MODEL,
       max_tokens: 1500,

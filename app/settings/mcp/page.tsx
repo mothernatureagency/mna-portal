@@ -123,14 +123,14 @@ export default function McpTokensPage() {
     load();
   }
 
-  if (loading) return <div className="p-8 text-slate-500">Loading…</div>;
+  if (loading) return <div className="p-8 text-white/50">Loading…</div>;
 
   if (denied) {
     return (
       <div className="p-8">
         <Card className="p-8 max-w-xl">
-          <h1 className="text-xl font-semibold text-slate-900">Owner only</h1>
-          <p className="mt-2 text-slate-600">
+          <h1 className="text-xl font-semibold text-white">Owner only</h1>
+          <p className="mt-2 text-white/70">
             MCP tokens grant standing access to the portal&rsquo;s data, so only the owner can
             create or revoke them.
           </p>
@@ -145,50 +145,50 @@ export default function McpTokensPage() {
   return (
     <div className="p-6 md:p-8 max-w-5xl space-y-6">
       <header>
-        <h1 className="text-2xl font-bold text-slate-900">MCP access tokens</h1>
-        <p className="mt-1 text-slate-600">
+        <h1 className="text-2xl font-bold text-white">MCP access tokens</h1>
+        <p className="mt-1 text-white/70">
           A token lets Claude reach the portal&rsquo;s task board, schedule and client list from
           outside the browser. Each one acts as a single person and can be revoked on its own.
         </p>
       </header>
 
       <Card className="p-6">
-        <h2 className="text-lg font-semibold text-slate-900 mb-4">Create a token</h2>
+        <h2 className="text-lg font-semibold text-white mb-4">Create a token</h2>
         <form onSubmit={create} className="space-y-4">
           <div className="grid gap-4 md:grid-cols-2">
             <label className="block">
-              <span className="text-sm font-medium text-slate-700">What it&rsquo;s for</span>
+              <span className="text-sm font-medium text-white/80">What it&rsquo;s for</span>
               <input
                 value={name} onChange={(e) => setName(e.target.value)} required
                 placeholder="Alexus laptop"
-                className="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2 text-slate-900"
+                className="mt-1 w-full rounded-lg border border-white/15 bg-white/5 px-3 py-2 text-white outline-none placeholder:text-white/30"
               />
             </label>
             <label className="block">
-              <span className="text-sm font-medium text-slate-700">Acts as</span>
+              <span className="text-sm font-medium text-white/80">Acts as</span>
               <input
                 value={subjectEmail} onChange={(e) => setSubjectEmail(e.target.value)} required
                 type="email" placeholder="name@mothernatureagency.com"
-                className="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2 text-slate-900"
+                className="mt-1 w-full rounded-lg border border-white/15 bg-white/5 px-3 py-2 text-white outline-none placeholder:text-white/30"
               />
-              <span className="mt-1 block text-xs text-slate-500">
+              <span className="mt-1 block text-xs text-white/50">
                 Whose schedule and notes this token reads, and who its writes are attributed to.
               </span>
             </label>
           </div>
 
           <div>
-            <span className="text-sm font-medium text-slate-700">Access level</span>
+            <span className="text-sm font-medium text-white/80">Access level</span>
             <div className="mt-2 grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
               {ROLES.map((r) => (
                 <button
                   key={r.id} type="button" onClick={() => setRole(r.id)}
                   className={`rounded-lg border px-3 py-2 text-left transition ${
-                    role === r.id ? 'border-[#0c6da4] bg-[#0c6da4]/5' : 'border-slate-200 hover:border-slate-300'
+                    role === r.id ? 'border-sky-400/60 bg-sky-400/15' : 'border-white/10 hover:border-white/15'
                   }`}
                 >
-                  <span className="block text-sm font-medium text-slate-900">{r.label}</span>
-                  <span className="block text-xs text-slate-500">{r.hint}</span>
+                  <span className="block text-sm font-medium text-white">{r.label}</span>
+                  <span className="block text-xs text-white/50">{r.hint}</span>
                 </button>
               ))}
             </div>
@@ -196,8 +196,8 @@ export default function McpTokensPage() {
 
           {clients.length > 0 && (
             <div>
-              <span className="text-sm font-medium text-slate-700">Limit to clients</span>
-              <span className="ml-2 text-xs text-slate-500">Optional. Leave empty for the full portfolio.</span>
+              <span className="text-sm font-medium text-white/80">Limit to clients</span>
+              <span className="ml-2 text-xs text-white/50">Optional. Leave empty for the full portfolio.</span>
               <div className="mt-2 flex flex-wrap gap-2">
                 {clients.map((c) => {
                   const on = clientIds.includes(c.id);
@@ -206,7 +206,7 @@ export default function McpTokensPage() {
                       key={c.id} type="button"
                       onClick={() => setClientIds(on ? clientIds.filter((x) => x !== c.id) : [...clientIds, c.id])}
                       className={`rounded-full border px-3 py-1 text-sm transition ${
-                        on ? 'border-[#0c6da4] bg-[#0c6da4] text-white' : 'border-slate-300 text-slate-700 hover:border-slate-400'
+                        on ? 'border-[#0c6da4] bg-[#0c6da4] text-white' : 'border-white/15 text-white/80 hover:border-white/30'
                       }`}
                     >
                       {c.name}
@@ -215,14 +215,14 @@ export default function McpTokensPage() {
                 })}
               </div>
               {clientIds.length > 0 && (
-                <p className="mt-2 text-xs text-slate-500">
+                <p className="mt-2 text-xs text-white/50">
                   This token will not see tasks with no client attached — those are agency business.
                 </p>
               )}
             </div>
           )}
 
-          {error && <p className="text-sm text-red-600">{error}</p>}
+          {error && <p className="text-sm text-red-300">{error}</p>}
 
           <button
             type="submit" disabled={creating}
@@ -234,31 +234,31 @@ export default function McpTokensPage() {
       </Card>
 
       <Card className="p-6">
-        <h2 className="text-lg font-semibold text-slate-900 mb-4">
-          Active tokens {active.length > 0 && <span className="text-slate-400 font-normal">({active.length})</span>}
+        <h2 className="text-lg font-semibold text-white mb-4">
+          Active tokens {active.length > 0 && <span className="text-white/40 font-normal">({active.length})</span>}
         </h2>
         {active.length === 0 ? (
-          <p className="text-slate-500">No active tokens yet.</p>
+          <p className="text-white/50">No active tokens yet.</p>
         ) : (
           <div className="space-y-3">
             {active.map((t) => (
-              <div key={t.id} className="flex flex-wrap items-start justify-between gap-3 rounded-lg border border-slate-200 p-4">
+              <div key={t.id} className="flex flex-wrap items-start justify-between gap-3 rounded-lg border border-white/10 p-4">
                 <div className="min-w-0">
-                  <div className="font-medium text-slate-900">{t.name}</div>
-                  <div className="text-sm text-slate-600">
+                  <div className="font-medium text-white">{t.name}</div>
+                  <div className="text-sm text-white/70">
                     {t.subject_email} · {t.role}
                     {t.client_ids?.length ? ` · limited to ${t.client_ids.join(', ')}` : ''}
                   </div>
-                  <div className="mt-1 text-xs text-slate-500">
+                  <div className="mt-1 text-xs text-white/50">
                     Created {fmt(t.created_at)} · Last used {t.last_used_at ? fmt(t.last_used_at) : 'never'}
                   </div>
                   <div className="mt-2 flex flex-wrap gap-1">
                     {(t.scopes || []).map((s) => (
-                      <span key={s} className="rounded bg-slate-100 px-2 py-0.5 text-xs text-slate-600">{s}</span>
+                      <span key={s} className="rounded bg-white/10 px-2 py-0.5 text-xs text-white/70">{s}</span>
                     ))}
                   </div>
                 </div>
-                <button onClick={() => revoke(t)} className="rounded-lg border border-red-200 px-3 py-1.5 text-sm font-medium text-red-600 hover:bg-red-50">
+                <button onClick={() => revoke(t)} className="rounded-lg border border-red-200 px-3 py-1.5 text-sm font-medium text-red-300 hover:bg-red-50">
                   Revoke
                 </button>
               </div>
@@ -269,11 +269,11 @@ export default function McpTokensPage() {
 
       {revoked.length > 0 && (
         <Card className="p-6">
-          <h2 className="text-lg font-semibold text-slate-900 mb-1">Revoked</h2>
-          <p className="mb-4 text-sm text-slate-500">Kept so &ldquo;who had access, and when&rdquo; survives.</p>
+          <h2 className="text-lg font-semibold text-white mb-1">Revoked</h2>
+          <p className="mb-4 text-sm text-white/50">Kept so &ldquo;who had access, and when&rdquo; survives.</p>
           <div className="space-y-2">
             {revoked.map((t) => (
-              <div key={t.id} className="flex flex-wrap justify-between gap-2 text-sm text-slate-500">
+              <div key={t.id} className="flex flex-wrap justify-between gap-2 text-sm text-white/50">
                 <span>{t.name} · {t.subject_email}</span>
                 <span>revoked {fmt(t.revoked_at)}</span>
               </div>
@@ -283,14 +283,14 @@ export default function McpTokensPage() {
       )}
 
       {fresh && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/50 p-4" role="dialog" aria-modal="true">
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/80 p-4" role="dialog" aria-modal="true">
           <Card className="w-full max-w-2xl p-7">
-            <h2 className="text-xl font-semibold text-slate-900">Copy this now</h2>
-            <p className="mt-2 text-slate-600">
+            <h2 className="text-xl font-semibold text-white">Copy this now</h2>
+            <p className="mt-2 text-white/70">
               This is the only time <strong>{fresh.name}</strong> can be shown. Only its
               fingerprint is stored, so it cannot be recovered — a lost token is replaced, not found.
             </p>
-            <div className="mt-4 rounded-lg bg-slate-900 p-4">
+            <div className="mt-4 rounded-lg bg-slate-950/70 p-4">
               <code className="block break-all font-mono text-sm text-emerald-300">{fresh.token}</code>
             </div>
             <div className="mt-4 flex flex-wrap gap-3">
@@ -307,14 +307,14 @@ export default function McpTokensPage() {
               </button>
               <button
                 onClick={() => { setFresh(null); setCopied(false); }}
-                className="rounded-lg border border-slate-300 px-5 py-2.5 font-medium text-slate-700 hover:bg-slate-50"
+                className="rounded-lg border border-white/15 px-5 py-2.5 font-medium text-white/80 hover:bg-white/5"
               >
                 Done
               </button>
             </div>
-            <div className="mt-5 border-t border-slate-200 pt-4">
-              <p className="text-sm font-medium text-slate-700">Connect Claude Code</p>
-              <code className="mt-2 block overflow-x-auto rounded bg-slate-50 p-3 font-mono text-xs text-slate-700">
+            <div className="mt-5 border-t border-white/10 pt-4">
+              <p className="text-sm font-medium text-white/80">Connect Claude Code</p>
+              <code className="mt-2 block overflow-x-auto rounded bg-white/5 p-3 font-mono text-xs text-white/80">
                 claude mcp add --transport http mna https://portal.mothernatureagency.com/api/mcp --header &quot;Authorization: Bearer {fresh.token.slice(0, 16)}…&quot;
               </code>
             </div>

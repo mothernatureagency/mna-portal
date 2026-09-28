@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import Anthropic from '@anthropic-ai/sdk';
+import { anthropicFor } from '@/lib/anthropic';
 import { ensureSchema, query } from '@/lib/db';
 import { getAgent } from '@/lib/agents/config';
 import { getBrand } from '@/lib/client-brand';
@@ -56,7 +56,7 @@ export async function POST(req: NextRequest) {
     `No preamble, don't restate the request back to me.`,
   ].filter((l) => l !== '').join('\n');
 
-  const client = new Anthropic({ apiKey });
+  const client = anthropicFor({ source: 'graphic-projects/brief' });
   try {
     const res = await client.messages.create({
       model: agent.model,

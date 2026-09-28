@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import Anthropic from '@anthropic-ai/sdk';
+import { anthropicFor } from '@/lib/anthropic';
 
 export const runtime = 'nodejs';
 
@@ -21,7 +21,7 @@ export async function POST(req: NextRequest) {
   const { url, notes } = b || {};
   if (!url) return NextResponse.json({ error: 'url required' }, { status: 400 });
 
-  const client = new Anthropic({ apiKey });
+  const client = anthropicFor({ source: 'video-projects/references' });
   const prompt = `Analyze this short-form video reference URL and describe its style so a video team can replicate the pattern.
 
 URL: ${url}

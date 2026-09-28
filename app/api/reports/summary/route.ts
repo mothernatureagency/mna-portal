@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import Anthropic from '@anthropic-ai/sdk';
+import { anthropicFor } from '@/lib/anthropic';
 import { ensureSchema, query } from '@/lib/db';
 import { createClient } from '@/lib/supabase/server';
 
@@ -116,7 +117,7 @@ export async function GET(req: NextRequest) {
   const apiKey = process.env.ANTHROPIC_API_KEY;
   if (!apiKey) return NextResponse.json({ summary: '', highlights: [], facts, generated: false });
 
-  const anthropic = new Anthropic({ apiKey });
+  const anthropic = anthropicFor({ source: 'reports/summary', clientId });
   const prompt = `Write a short performance brief for a business owner who does not read marketing dashboards.
 
 CLIENT: ${clientName}

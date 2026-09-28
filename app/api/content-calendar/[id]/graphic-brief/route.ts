@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import Anthropic from '@anthropic-ai/sdk';
+import { anthropicFor } from '@/lib/anthropic';
 import { ensureSchema, query } from '@/lib/db';
 import { getAgent } from '@/lib/agents/config';
 
@@ -46,7 +46,7 @@ ${item.caption ? `\nApproved caption the artwork has to sit with:\n${item.captio
 Give the brief in your standard format. Keep it to what a designer needs to start
 work — no preamble, no restating this request back to me.`;
 
-  const client = new Anthropic({ apiKey });
+  const client = anthropicFor({ source: 'content-calendar/[id]/graphic-brief' });
   try {
     const res = await client.messages.create({
       model: agent.model,

@@ -1,4 +1,5 @@
 import Anthropic from '@anthropic-ai/sdk';
+import { anthropicFor } from '@/lib/anthropic';
 import { query } from '@/lib/db';
 import { getAccessToken } from '@/lib/google-calendar';
 import { queueEmailNotification, STAFF_NOTIFY_EMAIL } from '@/lib/notifications';
@@ -80,7 +81,7 @@ export async function syncLocationReviews(loc: GhlLocation): Promise<{ inserted:
 async function generateReviewReply(loc: GhlLocation, review: { author_name: string | null; rating: number | null; review_text: string | null }): Promise<{ reply: string; confidence: number }> {
   const apiKey = process.env.ANTHROPIC_API_KEY;
   if (!apiKey) throw new Error('ANTHROPIC_API_KEY not set');
-  const client = new Anthropic({ apiKey });
+  const client = anthropicFor({ source: 'lib/ai-crm/reviews' });
   const system = `You write replies to Google reviews on behalf of ${loc.name}, posted publicly from the business's own profile.
 
 Business facts you may reference (nothing else):
