@@ -49,7 +49,7 @@ function LoginForm() {
         setLoading(false);
         return;
       }
-      const next = searchParams.get('next') ?? '/';
+      const next = safeNext(searchParams.get('next'));
       router.push(next);
       router.refresh();
       return;
@@ -85,7 +85,7 @@ function LoginForm() {
     }
 
     // Refresh the page so middleware can detect the new session
-    const next = searchParams.get('next') ?? '/';
+    const next = safeNext(searchParams.get('next'));
     router.push(next);
     router.refresh();
   }
@@ -243,6 +243,17 @@ function LoginForm() {
       </form>
     </main>
   );
+}
+
+/**
+ * `next` comes from the URL, so it can be anything. Only same-site paths are
+ * followed — an absolute URL here would make the login page an open redirect
+ * that hands the visitor to somebody else's site right after they sign in.
+ */
+function safeNext(raw: string | null): string {
+  if (!raw) return '/';
+  if (!raw.startsWith('/') || raw.startsWith('//')) return '/';
+  return raw;
 }
 
 export default function LoginPage() {

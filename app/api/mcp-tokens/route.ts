@@ -10,12 +10,18 @@ export const dynamic = 'force-dynamic';
 /**
  * MCP token administration — owner only.
  *
- * GET    /api/mcp-tokens                → { tokens } (never the raw values)
+ * GET    /api/mcp-tokens                → { tokens, connections } (never the
+ *                                         raw values)
  * POST   /api/mcp-tokens                → mint; the raw token is in the
  *          { name, subjectEmail, role?,   response ONCE and is unrecoverable
  *            scopes?, clientIds? }        afterwards, because only its hash
  *                                         is stored.
- * DELETE /api/mcp-tokens?id=            → revoke (kept for the audit trail)
+ * DELETE /api/mcp-tokens?id=            → revoke a token (kept for the audit
+ *                                         trail)
+ * DELETE /api/mcp-tokens?connection=&subject=
+ *                                       → revoke an OAuth grant: every token
+ *                                         that application holds for that
+ *                                         person, in one go
  *
  * Minting a token hands out standing access to the portal's data, so this is
  * restricted to the owner rather than all staff.
@@ -43,7 +49,28 @@ export async function GET() {
             created_by, created_at, last_used_at, revoked_at
        from mcp_tokens order by created_at desc`,
   );
-  return NextResponse.json({ tokens: rows, availableScopes: MCP_SCOPES, roles: ROLES });
+  // Applications connected over OAuth. Refresh rotation means one grant is
+  // many rows, so they are folded back into one line per application and
+  // person — which is how someone thinks about revoking it.
+  const { rows: connections } = await query(
+    `select t.client_id,
+            t.subject_email,
+            coalesce(c.client_name, 'Unnamed application') as client_name,
+            min(t.created_at) as connected_at,
+            max(t.last_used_at) as last_used_at,
+            -- Unnested before aggregating: array_agg over a text[] builds a
+            -- two-dimensional array, which subscripts to null rather than to
+            -- the scope list you wanted.
+            array_remove(array_agg(distinct s), null) as scopes
+       from oauth_tokens t
+       join oauth_clients c on c.client_id = t.client_id
+       left join lateral unnest(t.scopes) as s on true
+      where t.revoked_at is null and t.refresh_expires_at > now()
+      group by t.client_id, t.subject_email, c.client_name
+      order by 4 desc`,
+  );
+
+  return NextResponse.json({ tokens: rows, connections, availableScopes: MCP_SCOPES, roles: ROLES });
 }
 
 export async function POST(req: NextRequest) {
@@ -94,8 +121,24 @@ export async function DELETE(req: NextRequest) {
   await ensureSchema();
   if (!(await requireOwner())) return NextResponse.json({ error: 'Owner only' }, { status: 403 });
 
+  // Revoking an OAuth grant: kill every live token that application holds for
+  // that person, so the connection is gone rather than merely expiring later.
+  const connection = req.nextUrl.searchParams.get('connection') || '';
+  if (connection) {
+    const subject = req.nextUrl.searchParams.get('subject') || '';
+    if (!subject) return NextResponse.json({ error: 'subject is required alongside connection' }, { status: 400 });
+    const { rows } = await query(
+      `update oauth_tokens set revoked_at = now()
+        where client_id = $1 and subject_email = $2 and revoked_at is null
+        returning id`,
+      [connection, subject],
+    );
+    if (!rows.length) return NextResponse.json({ error: 'No active connection to revoke' }, { status: 404 });
+    return NextResponse.json({ revokedTokens: rows.length });
+  }
+
   const id = req.nextUrl.searchParams.get('id') || '';
-  if (!id) return NextResponse.json({ error: 'id is required' }, { status: 400 });
+  if (!id) return NextResponse.json({ error: 'id or connection is required' }, { status: 400 });
 
   // Revoked, not deleted: the row stays so "who had access, and when" survives.
   const { rows } = await query(

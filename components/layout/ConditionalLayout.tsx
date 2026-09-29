@@ -3,7 +3,10 @@ import { usePathname } from 'next/navigation';
 import DashboardLayout from './DashboardLayout';
 
 // Routes that should render without the dashboard shell
-const AUTH_ROUTES = ['/login', '/lock', '/reset-password', '/auth', '/book'];
+// /oauth/authorize is the OAuth consent screen. It renders standalone: the
+// question is "do you want to grant this?", and wrapping it in the whole
+// portal makes it read like a page of the app rather than a decision.
+const AUTH_ROUTES = ['/login', '/lock', '/reset-password', '/auth', '/book', '/oauth'];
 // The /client and /contractor portals render their own minimal layouts —
 // no staff sidebar, no agency-wide chrome. Match exact path or sub-paths,
 // but NOT /client-tasks (which is a staff-only page).
