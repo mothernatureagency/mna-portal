@@ -10,10 +10,19 @@ function isPublicRoute(pathname: string) {
     pathname.startsWith('/api/google/callback') ||
     pathname.startsWith('/api/lock') ||
     // The MCP server authenticates with its own bearer token (lib/mcp/auth.ts),
-    // not the session cookie. Matched exactly so /api/mcp-tokens — the owner-only
-    // admin route, which DOES use the cookie — keeps going through this
-    // middleware and gets its session refreshed.
+    // not the session cookie. Matched exactly (with an optional trailing slash)
+    // so /api/mcp-tokens — the owner-only admin route, which DOES use the
+    // cookie — keeps going through this middleware and gets its session
+    // refreshed. /api/mcp/health is the unauthenticated liveness probe.
     pathname === '/api/mcp' ||
+    pathname === '/api/mcp/' ||
+    pathname === '/api/mcp/health' ||
+    // MCP clients probe /.well-known/oauth-* to discover how to authenticate.
+    // This server uses static bearer tokens and publishes no OAuth metadata,
+    // so the honest answer is 404. Without this the middleware redirects the
+    // probe to /login, and the client reads an HTML page where it expected
+    // JSON and concludes the server is unreachable.
+    pathname.startsWith('/.well-known/') ||
     pathname.startsWith('/api/seed-users') ||
     pathname.startsWith('/api/hospitable-sync') ||
     pathname.startsWith('/api/google-reviews-sync') ||
