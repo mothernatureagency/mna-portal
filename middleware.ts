@@ -23,6 +23,15 @@ function isPublicRoute(pathname: string) {
     // probe to /login, and the client reads an HTML page where it expected
     // JSON and concludes the server is unreachable.
     pathname.startsWith('/.well-known/') ||
+    // OAuth endpoints a client must reach before anyone has signed in:
+    // registration, the token exchange, revocation and the two discovery
+    // documents. /oauth/authorize is deliberately NOT here — it is the
+    // consent screen and needs the session.
+    pathname === '/api/oauth/register' ||
+    pathname === '/api/oauth/token' ||
+    pathname === '/api/oauth/revoke' ||
+    pathname === '/api/oauth/protected-resource' ||
+    pathname === '/api/oauth/authorization-server' ||
     pathname.startsWith('/api/seed-users') ||
     pathname.startsWith('/api/hospitable-sync') ||
     pathname.startsWith('/api/google-reviews-sync') ||
@@ -92,8 +101,15 @@ export async function middleware(request: NextRequest) {
       return NextResponse.json({ error: 'Not authenticated' }, { status: 401 });
     }
     const url = request.nextUrl.clone();
+    const target = pathname + request.nextUrl.search;
     url.pathname = '/login';
-    url.searchParams.set('next', pathname);
+    // Clear first: cloning carries the original query across, which would
+    // scatter the request's own parameters over the login URL beside `next`.
+    url.search = '';
+    // `next` keeps the query string. /oauth/authorize carries the whole
+    // authorization request in it, so dropping it would send the user back to
+    // a bare page that can't continue.
+    url.searchParams.set('next', target);
     return NextResponse.redirect(url);
   }
 

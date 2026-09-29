@@ -853,6 +853,58 @@ async function initSchema() {
                   )`,
                   // Single row, keyed on a constant, so the settings can be
                   // upserted without first checking whether they exist.
+                  // ── OAuth 2.1, so Claude's connectors can sign in ──────────
+                  // The portal is both the resource server (/api/mcp) and the
+                  // authorization server. Clients register themselves at
+                  // runtime (RFC 7591) because an MCP client can't be told a
+                  // client id in advance.
+                  `create table if not exists oauth_clients (
+                        client_id text primary key,
+                        client_name text,
+                        redirect_uris text[] not null,
+                        grant_types text[] not null default '{authorization_code,refresh_token}',
+                        response_types text[] not null default '{code}',
+                        token_endpoint_auth_method text not null default 'none',
+                        scope text,
+                        client_uri text,
+                        created_at timestamptz not null default now()
+                  )`,
+                  // Authorization codes: single use, short lived, and bound to
+                  // the PKCE challenge the client committed to up front.
+                  `create table if not exists oauth_auth_codes (
+                        code_hash text primary key,
+                        client_id text not null references oauth_clients(client_id) on delete cascade,
+                        subject_email text not null,
+                        redirect_uri text not null,
+                        scopes text[] not null default '{}',
+                        resource text,
+                        code_challenge text not null,
+                        code_challenge_method text not null default 'S256',
+                        expires_at timestamptz not null,
+                        used_at timestamptz,
+                        created_at timestamptz not null default now()
+                  )`,
+                  // Access and refresh tokens, stored only as hashes. resource
+                  // is the audience: a token minted for this server is refused
+                  // anywhere else, which is what stops token replay across
+                  // services.
+                  `create table if not exists oauth_tokens (
+                        id uuid primary key default uuid_generate_v4(),
+                        access_token_hash text not null unique,
+                        refresh_token_hash text unique,
+                        client_id text not null references oauth_clients(client_id) on delete cascade,
+                        subject_email text not null,
+                        scopes text[] not null default '{}',
+                        resource text,
+                        access_expires_at timestamptz not null,
+                        refresh_expires_at timestamptz,
+                        revoked_at timestamptz,
+                        last_used_at timestamptz,
+                        created_at timestamptz not null default now()
+                  )`,
+                  `create index if not exists oauth_tokens_access_idx on oauth_tokens (access_token_hash) where revoked_at is null`,
+                  `create index if not exists oauth_tokens_refresh_idx on oauth_tokens (refresh_token_hash) where revoked_at is null`,
+                  `create index if not exists oauth_tokens_subject_idx on oauth_tokens (subject_email, created_at desc)`,
                   `create table if not exists ai_credit_settings (
                         id boolean primary key default true check (id),
                         low_balance_usd numeric(12,2) not null default 25,

@@ -38,11 +38,21 @@ type TokenRow = {
   revoked_at: string | null;
 };
 
+type Connection = {
+  client_id: string;
+  subject_email: string;
+  client_name: string;
+  connected_at: string;
+  last_used_at: string | null;
+  scopes: string[] | null;
+};
+
 const fmt = (d: string | null) =>
   d ? new Date(d).toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' }) : '—';
 
 export default function McpTokensPage() {
   const [tokens, setTokens] = useState<TokenRow[]>([]);
+  const [connections, setConnections] = useState<Connection[]>([]);
   // Static roster plus anything staff added; /api/clients returns only the
   // custom ones, so the built-ins have to come from lib/clients.ts.
   const [clients, setClients] = useState<Array<{ id: string; name: string }>>(
@@ -68,6 +78,7 @@ export default function McpTokensPage() {
       if (res.status === 403 || res.status === 401) { setDenied(true); return; }
       const data = await res.json();
       setTokens(data.tokens || []);
+      setConnections(data.connections || []);
     } catch {
       setError('Could not load tokens.');
     } finally {
@@ -123,6 +134,15 @@ export default function McpTokensPage() {
     load();
   }
 
+  async function disconnect(c: Connection) {
+    if (!confirm(`Disconnect ${c.client_name} for ${c.subject_email}? It stops working immediately and has to be approved again.`)) return;
+    await fetch(
+      `/api/mcp-tokens?connection=${encodeURIComponent(c.client_id)}&subject=${encodeURIComponent(c.subject_email)}`,
+      { method: 'DELETE' },
+    );
+    load();
+  }
+
   if (loading) return <div className="p-8 text-white/50">Loading…</div>;
 
   if (denied) {
@@ -147,8 +167,9 @@ export default function McpTokensPage() {
       <header>
         <h1 className="text-2xl font-bold text-white">MCP access tokens</h1>
         <p className="mt-1 text-white/70">
-          A token lets Claude reach the portal&rsquo;s task board, schedule and client list from
-          outside the browser. Each one acts as a single person and can be revoked on its own.
+          Two ways for Claude to reach the portal&rsquo;s task board, schedule and client list
+          from outside the browser: an app can sign in and ask your permission, or you can hand
+          it a token. Either way it acts as a single person and can be cut off on its own.
         </p>
       </header>
 
@@ -231,6 +252,53 @@ export default function McpTokensPage() {
             {creating ? 'Creating…' : 'Create token'}
           </button>
         </form>
+      </Card>
+
+      {/* Applications that signed in with OAuth rather than a pasted token.
+          The consent screen promises these can be revoked here. */}
+      <Card className="p-6">
+        <h2 className="text-lg font-semibold text-white mb-1">
+          Connected applications {connections.length > 0 && <span className="text-white/40 font-normal">({connections.length})</span>}
+        </h2>
+        <p className="mb-4 text-sm text-white/50">
+          Apps that connected by signing in, rather than with a token pasted from above.
+        </p>
+        {connections.length === 0 ? (
+          <p className="text-sm text-white/50">
+            Nothing connected yet. An app that supports it will send you to a permission screen
+            instead of asking for a token.
+          </p>
+        ) : (
+          <ul className="space-y-3">
+            {connections.map((c) => (
+              <li key={`${c.client_id}:${c.subject_email}`}
+                  className="flex items-start justify-between gap-4 rounded-lg border border-white/10 p-4">
+                <div className="min-w-0">
+                  <div className="font-medium text-white">{c.client_name}</div>
+                  <div className="text-sm text-white/70">
+                    acting as {c.subject_email}
+                  </div>
+                  <div className="text-xs text-white/50">
+                    Connected {fmt(c.connected_at)} · Last used {c.last_used_at ? fmt(c.last_used_at) : 'never'}
+                  </div>
+                  {c.scopes && c.scopes.length > 0 && (
+                    <div className="mt-2 flex flex-wrap gap-1">
+                      {c.scopes.map((sc) => (
+                        <span key={sc} className="rounded bg-white/10 px-2 py-0.5 text-xs text-white/70">{sc}</span>
+                      ))}
+                    </div>
+                  )}
+                </div>
+                <button
+                  onClick={() => disconnect(c)}
+                  className="shrink-0 rounded-lg border border-white/15 px-3 py-1.5 text-sm text-white/80 hover:border-red-400/60 hover:text-red-300"
+                >
+                  Disconnect
+                </button>
+              </li>
+            ))}
+          </ul>
+        )}
       </Card>
 
       <Card className="p-6">

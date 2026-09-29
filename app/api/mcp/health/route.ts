@@ -34,11 +34,11 @@ export async function GET(request: NextRequest) {
     transport: 'streamable-http',
     protocolVersions: SUPPORTED_PROTOCOLS,
     auth: {
-      // The portal issues static bearer tokens rather than running OAuth, so
-      // there is no /.well-known/oauth-* metadata to discover. A client that
-      // probes for it gets a 404, which is the correct "no OAuth here".
+      // Two ways in: a standing token pasted into a client, or OAuth, where
+      // the client registers itself and a member of staff approves it.
       type: 'bearer',
-      oauth: false,
+      oauth: true,
+      oauthMetadata: '/.well-known/oauth-protected-resource/api/mcp',
       headerPresent: !!authHeader,
       scheme: scheme,
       // Filled in below when a header was actually sent.

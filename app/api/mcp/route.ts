@@ -2,6 +2,8 @@ import { NextRequest, NextResponse } from 'next/server';
 import { ensureSchema } from '@/lib/db';
 import { resolveMcpIdentity, type McpIdentity } from '@/lib/mcp/auth';
 import { toolsFor, findTool, ToolError } from '@/lib/mcp/tools';
+import { identityFromAccessToken, looksLikeOAuthAccessToken, mcpResourceUri } from '@/lib/mcp/oauth';
+import { publicOrigin } from '@/lib/mcp/origin';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -150,16 +152,43 @@ async function dispatch(req: RpcRequest, identity: McpIdentity, protocol: string
 
 // ── HTTP surface ──────────────────────────────────────────────────────
 
+/**
+ * Two kinds of credential reach this server.
+ *
+ * A token minted on /settings/mcp is a standing secret someone pasted into a
+ * client. An OAuth access token was issued by this same host after a member
+ * of staff approved a named application on a consent screen, and it expires.
+ * Both end at the same identity; which one arrived is not the tools' concern.
+ */
+async function authenticate(request: NextRequest, origin: string): Promise<McpIdentity | null> {
+  const header = request.headers.get('authorization');
+  const raw = (header || '').trim().replace(/^Bearer\s+/i, '');
+
+  if (raw && looksLikeOAuthAccessToken(raw)) {
+    // Audience is checked inside: a token minted for another resource is
+    // refused here even though this server issued it.
+    return identityFromAccessToken(raw, mcpResourceUri(origin));
+  }
+  return resolveMcpIdentity(header);
+}
+
 export async function POST(request: NextRequest) {
   const protocol = request.headers.get('mcp-protocol-version') || LATEST_PROTOCOL;
+  const origin = publicOrigin(request);
 
-  const identity = await resolveMcpIdentity(request.headers.get('authorization')).catch((err) => {
+  const identity = await authenticate(request, origin).catch((err) => {
     console.error('[mcp] identity lookup failed:', err);
     return null;
   });
   if (!identity) {
     const res = NextResponse.json(fail(null, INVALID_REQUEST, 'Unauthorized'), { status: 401 });
-    res.headers.set('WWW-Authenticate', 'Bearer realm="mna-portal-mcp"');
+    // RFC 9728: the 401 is how a client discovers where to get a token. Without
+    // resource_metadata it has nowhere to go and reports the server as
+    // unreachable rather than as needing a sign-in.
+    res.headers.set(
+      'WWW-Authenticate',
+      `Bearer realm="mna-portal-mcp", resource_metadata="${origin}/.well-known/oauth-protected-resource/api/mcp"`,
+    );
     return withHeaders(res, protocol);
   }
   if (identity.scopes.length === 0) {
