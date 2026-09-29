@@ -1,4 +1,4 @@
-import Anthropic from '@anthropic-ai/sdk';
+import { anthropicFor } from '@/lib/anthropic';
 import { query } from '@/lib/db';
 import { clients as staticClients } from '@/lib/clients';
 
@@ -20,7 +20,7 @@ import { clients as staticClients } from '@/lib/clients';
 export async function draftFollowups(opts: { clientId?: string } = {}): Promise<{ drafted: number; skipped: number; failed: number; results: any[] }> {
   const apiKey = process.env.ANTHROPIC_API_KEY;
   if (!apiKey) return { drafted: 0, skipped: 0, failed: 0, results: [{ error: 'ANTHROPIC_API_KEY not set' }] };
-  const anthropic = new Anthropic({ apiKey });
+  const anthropic = anthropicFor({ source: 'lib/followups' });
 
   const params: any[] = [];
   let clientClause = '';

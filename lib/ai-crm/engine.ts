@@ -1,4 +1,5 @@
 import Anthropic from '@anthropic-ai/sdk';
+import { anthropicFor } from '@/lib/anthropic';
 import { query } from '@/lib/db';
 import { queueEmailNotification, STAFF_NOTIFY_EMAIL } from '@/lib/notifications';
 import {
@@ -232,7 +233,7 @@ const REPLY_TOOL: Anthropic.Tool = {
 async function callClaude(loc: GhlLocation, transcript: string, contactSummary: string, availability?: string[]): Promise<AiDecision> {
   const apiKey = process.env.ANTHROPIC_API_KEY;
   if (!apiKey) throw new Error('ANTHROPIC_API_KEY not set');
-  const client = new Anthropic({ apiKey });
+  const client = anthropicFor({ source: 'lib/ai-crm/engine', clientId: loc.client_id });
   const availabilityBlock = availability && availability.length
     ? `\n\nAVAILABLE TIMES (live from the booking calendar — the ONLY times you may offer; offer at most TWO, never a long list):\n${availability.join('\n')}\n\nIf the customer clearly agrees to one exact time from this list, set proposed_appointment to that slot verbatim and confirm it in your reply. If they name a time NOT on this list, offer the two nearest available times instead. Never confirm a time that is not on this list.`
     : '\n\nNo live availability is loaded. Do NOT confirm, promise, or propose specific appointment times — collect their preferred day/time and say the team will confirm.';

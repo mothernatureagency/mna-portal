@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import Anthropic from '@anthropic-ai/sdk';
+import { anthropicFor } from '@/lib/anthropic';
 
 export const runtime = 'nodejs';
 
@@ -20,7 +20,7 @@ export async function POST(req: NextRequest) {
   const subject = String(body?.subject || 'General').trim();
   if (!text) return NextResponse.json({ error: 'text required' }, { status: 400 });
 
-  const client = new Anthropic({ apiKey });
+  const client = anthropicFor({ source: 'student-memory/extract-card' });
   try {
     const res = await client.messages.create({
       model: 'claude-haiku-4-5',

@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import Anthropic from '@anthropic-ai/sdk';
+import { anthropicFor } from '@/lib/anthropic';
 import { createClient } from '@/lib/supabase/server';
 
 export const runtime = 'nodejs';
@@ -47,7 +48,7 @@ export async function POST(req: NextRequest) {
   const industry = String(b?.industry || '').slice(0, 120);
   const location = String(b?.location || '').slice(0, 120);
 
-  const client = new Anthropic({ apiKey });
+  const client = anthropicFor({ source: 'content-ideas' });
 
   const prompt = `You are a content producer at Mother Nature Agency planning a shoot for a client.
 

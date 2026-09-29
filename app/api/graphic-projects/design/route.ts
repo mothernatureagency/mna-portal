@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import Anthropic from '@anthropic-ai/sdk';
+import { anthropicFor } from '@/lib/anthropic';
 import { ensureSchema, query } from '@/lib/db';
 import { getAgent } from '@/lib/agents/config';
 import { getBrand } from '@/lib/client-brand';
@@ -140,7 +140,7 @@ export async function POST(req: NextRequest) {
 
   const userPrompt = `${parts}${revisionBlock}\n${artboardContract(fmt.width, fmt.height)}`;
 
-  const client = new Anthropic({ apiKey });
+  const client = anthropicFor({ source: 'graphic-projects/design' });
   let raw = '';
   try {
     // Streamed: an artboard runs to thousands of tokens, and the SDK refuses a

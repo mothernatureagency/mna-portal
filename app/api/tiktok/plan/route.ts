@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import Anthropic from '@anthropic-ai/sdk';
+import { anthropicFor } from '@/lib/anthropic';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -50,7 +50,7 @@ export async function POST(req: NextRequest) {
   const topBlock = top.map(fmtVid).join('\n');
   const bottomBlock = bottom.map(fmtVid).join('\n');
 
-  const client = new Anthropic({ apiKey });
+  const client = anthropicFor({ source: 'tiktok/plan' });
   const prompt = `You are a TikTok content strategist. Read this creator's real performance data and produce a deep, opinionated 30-day content plan grounded in what's already working.
 
 ACCOUNT: @${handle}

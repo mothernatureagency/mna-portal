@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import Anthropic from '@anthropic-ai/sdk';
+import { anthropicFor } from '@/lib/anthropic';
 import { ensureSchema, query } from '@/lib/db';
 import { getAgent } from '@/lib/agents/config';
 import { createClient } from '@/lib/supabase/server';
@@ -74,7 +74,6 @@ export async function POST(req: NextRequest) {
   const files: PickedFile[] = Array.isArray(body?.files)
     ? body.files.filter((f: any) => f && typeof f.id === 'string').slice(0, MAX_PHOTOS)
     : [];
-  void clientId;
 
   if (!clientName || !/^\d{4}-\d{2}$/.test(month)) {
     return NextResponse.json({ error: 'clientName and month (YYYY-MM) required' }, { status: 400 });
@@ -109,7 +108,7 @@ export async function POST(req: NextRequest) {
 
   const agent = getAgent('social-media');
   if (!agent) return NextResponse.json({ error: 'Agent missing' }, { status: 500 });
-  const anthropic = new Anthropic({ apiKey });
+  const anthropic = anthropicFor({ source: 'content-calendar/plan-month-photos', clientId });
   const userEmail = user?.email || null;
 
   const existingLines = existing.map((e) => `- ${e.post_date} (${e.platform}): ${(e.title || '').slice(0, 120)}`).join('\n');

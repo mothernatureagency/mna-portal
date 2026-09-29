@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import Anthropic from '@anthropic-ai/sdk';
+import { anthropicFor } from '@/lib/anthropic';
 import { ensureSchema, query } from '@/lib/db';
 import { getAgent } from '@/lib/agents/config';
 
@@ -32,7 +32,7 @@ export async function POST(req: NextRequest, { params }: { params: { id: string 
   const agent = getAgent('social-media');
   if (!agent) return NextResponse.json({ error: 'Agent missing' }, { status: 500 });
 
-  const client = new Anthropic({ apiKey });
+  const client = anthropicFor({ source: 'content-calendar/[id]/write-copy' });
 
   const guidanceBlock = guidance
     ? `\n\nIMPORTANT — the team is redoing this copy. Here are their notes on what to change:\n"${guidance}"\nPlease follow these notes closely while still keeping the caption polished and ready to post.`

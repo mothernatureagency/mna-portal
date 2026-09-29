@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import Anthropic from '@anthropic-ai/sdk';
+import { anthropicFor } from '@/lib/anthropic';
 import { ensureSchema, query } from '@/lib/db';
 import { clients } from '@/lib/clients';
 
@@ -40,7 +40,7 @@ export async function POST(req: NextRequest) {
     projectId = rows[0].id;
   }
 
-  const client = new Anthropic({ apiKey });
+  const client = anthropicFor({ source: 'content-calendar/generate' });
 
   // Pull the client's saved Concepts so the generator can ground itself
   // in real angles/themes/holidays MNA has noted. Map the ClientName

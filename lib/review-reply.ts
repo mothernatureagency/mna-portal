@@ -1,4 +1,4 @@
-import Anthropic from '@anthropic-ai/sdk';
+import { anthropicFor } from '@/lib/anthropic';
 
 /**
  * AI drafting for Google-review replies. Shared by the manual drafter route and
@@ -32,7 +32,7 @@ export async function draftReplies(businessName: string, reviews: ReviewForDraft
     `#${i} — ${r.author || 'Anonymous'} · ${r.rating || '?'}★\n"${(r.text || '').toString().slice(0, 600) || '(no text)'}"`,
   ).join('\n\n');
 
-  const client = new Anthropic({ apiKey });
+  const client = anthropicFor({ source: 'lib/review-reply' });
   const res = await client.messages.create({
     model: 'claude-haiku-4-5',
     max_tokens: 1600,

@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import Anthropic from '@anthropic-ai/sdk';
+import { anthropicFor } from '@/lib/anthropic';
 import { ensureSchema, query } from '@/lib/db';
 import { getAgent } from '@/lib/agents/config';
 import { createClient } from '@/lib/supabase/server';
@@ -135,7 +135,7 @@ export async function POST(req: NextRequest) {
 
   const agent = getAgent('social-media');
   if (!agent) return NextResponse.json({ error: 'Agent missing' }, { status: 500 });
-  const anthropic = new Anthropic({ apiKey });
+  const anthropic = anthropicFor({ source: 'content-calendar/plan-month', clientId });
 
   const userPrompt = `Plan a month of social content for ${clientName}.
 

@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import Anthropic from '@anthropic-ai/sdk';
+import { anthropicFor } from '@/lib/anthropic';
 import { getStudentAgent } from '@/lib/students';
 
 export const runtime = 'nodejs';
@@ -27,7 +27,7 @@ export async function POST(req: NextRequest, { params }: { params: { id: string 
   const messages = Array.isArray(body?.messages) ? body.messages : [];
   if (messages.length === 0) return NextResponse.json({ error: 'messages required' }, { status: 400 });
 
-  const client = new Anthropic({ apiKey });
+  const client = anthropicFor({ source: `student-agent/${agent.id}` });
   try {
     const res = await client.messages.create({
       model: 'claude-haiku-4-5',

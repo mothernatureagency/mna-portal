@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import Anthropic from '@anthropic-ai/sdk';
+import { anthropicFor } from '@/lib/anthropic';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -58,7 +58,7 @@ export async function POST(req: NextRequest) {
     ? `${SYSTEM}\n\nBUSINESS FACTS (the ONLY services/details you may reference in sayNext — never invent services, prices, or offerings not listed here):\n${context}`
     : SYSTEM;
 
-  const client = new Anthropic({ apiKey });
+  const client = anthropicFor({ source: 'copilot/translate' });
   try {
     const res = await client.messages.create({
       model: 'claude-haiku-4-5',

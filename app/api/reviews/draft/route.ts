@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import Anthropic from '@anthropic-ai/sdk';
+import { anthropicFor } from '@/lib/anthropic';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -41,7 +41,7 @@ export async function POST(req: NextRequest) {
     `#${i} — ${r.author || 'Anonymous'} · ${r.rating || '?'}★\n"${(r.text || '').toString().slice(0, 600) || '(no text)'}"`,
   ).join('\n\n');
 
-  const client = new Anthropic({ apiKey });
+  const client = anthropicFor({ source: 'reviews/draft' });
   try {
     const res = await client.messages.create({
       model: 'claude-haiku-4-5',
