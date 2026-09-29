@@ -1758,7 +1758,170 @@ Book your end-of-summer reset and ask your Prime IV team about The Glow Getter.
   ],
 };
 
+// ─── PDM — OCTOBER 2026 CONTENT CALENDAR ────────────────────────────
+// Actual October 2026 tab from PDM (verbatim). Theme: Autumn Wellness.
+// Featured micronutrients: Alpha Lipoic Acid + B-Complex (also Glutathione,
+// Vitamin C, Zinc, Magnesium). Observances: Breast Cancer Awareness Month,
+// National Health Education Week (10/19), Halloween (10/31). Cascade posts
+// render blue (reference); the 2 reels are local (the location posts them).
+// Load with startDate=2026-10-01 for October dates.
+export const PRIME_IV_PDM_OCT_2026: Playbook = {
+  id: 'prime-iv-pdm-oct-2026',
+  name: 'Prime IV — PDM October 2026 Calendar',
+  description:
+    'Actual October 2026 social content calendar from PDM. Autumn Wellness theme (Alpha Lipoic Acid + B-Complex; Glutathione, Vitamin C, Zinc, Magnesium; Calm, Jetsetter, Clean Slate, Specialty Drips, Amplifiers, Memberships, Halloween). Captions verbatim. 12 cascading reference posts + 2 local reels.',
+  items: [
+    // Wk 10/4
+    { day: 4, platform: 'Instagram', content_type: 'Post', phase: 'PDM · Brand Cascade',
+      title: 'IV Therapy Is More Than a Hydration Boost',
+      hook: 'Yes, IV therapy supports hydration. But that’s only part of the story.',
+      cta: 'Let’s get you Primed',
+      caption: `Yes, IV therapy supports hydration. 💧 But that’s only part of the story. Prime IV treatments combine fluids with targeted vitamins, minerals, antioxidants, amino acids and other micronutrients designed around different wellness goals. 
+
+⚡ Energy 
+🧠 Focus 
+💪 Recovery + performance 
+🛡️ Immune support 
+✨ Healthy aging + antioxidant support 
+😌 Relaxation + stress support. 
+
+Different formulas do different things, which means your Prime IV experience can look very different depending on what you want to support. Ready to feel better, perform better and take your wellness routine further? Let’s get you Primed. 
+
+#PrimeIV #GetPrimed #IVTherapy #Micronutrients #PersonalizedWellness #WellnessSupport` },
+    { day: 6, platform: 'Instagram', content_type: 'Post', phase: 'PDM · Brand Cascade',
+      title: 'Alpha Lipoic Acid: Meet ALA',
+      hook: 'Tiny name. Pretty impressive résumé.',
+      cta: 'Ask about ALA options',
+      caption: `Tiny name. Pretty impressive résumé. ✨ Alpha Lipoic Acid (ALA) is an antioxidant that may help support metabolic health while helping protect cells from oxidative stress. At Prime IV, you’ll find ALA incorporated into select wellness options, including Clean Slate and BrainFuel+, with additional ALA options available at participating locations. 💧 
+
+#PrimeIV #GetPrimed #AlphaLipoicAcid #ALA #Micronutrients #WellnessEducation` },
+    { day: 8, platform: 'Instagram', content_type: 'Post', phase: 'PDM · Brand Cascade',
+      title: 'Calm for the Kind of Month October Becomes',
+      hook: 'October starts with pumpkins and somehow ends with your calendar booked through December.',
+      cta: 'Book Calm + your One Hour Vacation',
+      caption: `October starts with pumpkins and somehow ends with your calendar booked through December. 😅 Calm is designed to support relaxation, stress management and recovery with a blend of micronutrients including Magnesium, Taurine, B vitamins and Vitamin C. Add a massage chair and an hour where nobody needs anything from you? Even better. 😌 
+
+#PrimeIV #GetPrimed #Calm #StressSupport #IVTherapy #OneHourVacation` },
+
+    // Wk 10/11
+    { day: 11, platform: 'Instagram', content_type: 'Post', phase: 'PDM · Brand Cascade',
+      title: 'Okay, But What’s an IV Amplifier?',
+      hook: 'Think of an IV Amplifier as a little more targeted support.',
+      cta: 'Ask your team about Amplifiers',
+      caption: `Think of an IV Amplifier as a little more targeted support added to your Prime IV experience. 💧✨ Amplifiers combine additional fluids with curated micronutrients around a specific goal, like antioxidant support, energy, stress relief, skin renewal, liver support or immune support. Already have a drip in mind? Ask your Prime IV team whether an available Amplifier makes sense for what you’re looking to support that day. 
+
+#PrimeIV #GetPrimed #IVTherapy #Micronutrients #WellnessEducation #PersonalizedWellness` },
+
+    // Non-cascading local Reel #1
+    { day: 13, platform: 'Instagram', content_type: 'Reel', phase: 'Local Reel · post from our page',
+      title: '[LOCAL REEL] What People Think IV Therapy Feels Like vs. Prime IV',
+      hook: 'If you’re picturing fluorescent lights and an uncomfortable chair… Prime IV might surprise you.',
+      cta: 'Book your One Hour Vacation',
+      caption: `If you’re picturing fluorescent lights and an uncomfortable chair when you hear “IV therapy”… Prime IV might surprise you. 👀💧 A relaxing spa environment. Massage chairs. A team to guide you through your options. And a little uninterrupted time to actually slow down. 😌 Wellness support that feels like somewhere you want to be. 
+
+#PrimeIV #GetPrimed #IVTherapy #OneHourVacation #WellnessExperience #SelfCare` },
+
+    { day: 14, platform: 'Instagram', content_type: 'Post', phase: 'PDM · Brand Cascade',
+      title: 'Holiday Travel Starts Before the Holidays',
+      hook: 'The holiday travel calendar may still say “November,” but the planning starts now.',
+      cta: 'Ask about Jetsetter',
+      caption: `The holiday travel calendar may still say “November,” but the planning starts now. ✈️ Long travel days can throw off your normal sleep, energy and wellness routine fast. Jetsetter was designed with travel in mind, combining B vitamins, Vitamin C and Magnesium to support energy and relaxation. Consider this your reminder to put yourself on the packing list, too. 💧 
+
+#PrimeIV #GetPrimed #Jetsetter #TravelWellness #IVTherapy #HolidayTravel` },
+    { day: 16, platform: 'Instagram', content_type: 'Post', phase: 'PDM · Brand Cascade',
+      title: 'Why Is B-Complex in So Many Drips?',
+      hook: 'B-Complex shows up a lot on the Prime IV menu. There’s a reason.',
+      cta: 'Ask about B-Complex',
+      caption: `If you’ve looked closely at the Prime IV menu, you may have noticed B-Complex shows up a lot. ⚡ There’s a reason. B vitamins help support natural energy production and metabolism, normal brain and nerve function, and the way your body processes carbohydrates, fats and proteins. That versatility is why B-Complex appears in Prime IV favorites ranging from Clean Slate and Calm to Jetsetter, Champion and more. One micronutrient. A whole lot happening behind the scenes. 💚 
+
+#PrimeIV #GetPrimed #BComplex #Micronutrients #EnergySupport #IVTherapy` },
+
+    // Wk 10/18 — post 10/19 for the start of National Health Education Week
+    { day: 19, platform: 'Instagram', content_type: 'Post', phase: 'PDM · Brand Cascade',
+      title: '3 Questions Worth Asking About Your IV',
+      hook: 'A little IV therapy education for National Health Education Week.',
+      cta: 'Ask questions. Know what you’re getting.',
+      caption: `A little IV therapy education for National Health Education Week. 📚💧 Three good questions to ask before your treatment: 
+
+1️⃣ What’s in my drip? Know which micronutrients you’re receiving. 
+2️⃣ What is this formula designed to support? Different drips are built around different wellness goals. 
+3️⃣ Are there ways to tailor it to me? Available micronutrient add-ons can sometimes help personalize your treatment further. 
+
+Ask questions. Know what you’re getting. Be part of the conversation. 🙌 
+
+#PrimeIV #GetPrimed #HealthEducation #IVTherapy #WellnessEducation #Micronutrients` },
+    { day: 21, platform: 'Instagram', content_type: 'Post', phase: 'PDM · Brand Cascade',
+      title: 'Clean Slate: More Than a “Reset”',
+      hook: 'Clean Slate was built with antioxidant and liver-health support in mind.',
+      cta: 'Ask about Clean Slate',
+      caption: `Clean Slate was built with antioxidant and liver-health support in mind. 💧 Its micronutrient lineup includes October favorites Alpha Lipoic Acid + B-Complex, alongside Vitamin C, Magnesium, Glutathione and NAC.* Translation? A thoughtfully built formula designed to support your body’s natural processes from the inside out. ✨ *Formulas may vary by location. 
+
+#PrimeIV #GetPrimed #CleanSlate #IVTherapy #AntioxidantSupport #Micronutrients` },
+
+    // Non-cascading local Reel #2
+    { day: 22, platform: 'Instagram', content_type: 'Reel', phase: 'Local Reel · post from our page',
+      title: '[LOCAL REEL] Why Do IV Drips Have So Many Ingredients?',
+      hook: 'Why not just put one vitamin in the bag and call it a day?',
+      cta: 'Learn what’s in your treatment',
+      caption: `Why not just put one vitamin in the bag and call it a day? 👀 Different micronutrients play different roles in the body. Prime IV Specialty Drips bring together ingredients around a specific goal, whether that’s energy, stress support, travel, recovery, immune health, antioxidant support or overall wellness. It’s one of the reasons learning what’s actually in your treatment matters. 💧✨ 
+
+#PrimeIV #GetPrimed #IVTherapy #Micronutrients #WellnessEducation #SpecialtyDrips` },
+
+    { day: 23, platform: 'Instagram', content_type: 'Post', phase: 'PDM · Brand Cascade',
+      title: 'Memberships Have Their Perks',
+      hook: 'If Prime IV is already part of your routine, our memberships have some pretty good perks.',
+      cta: 'Ask which membership fits your routine',
+      caption: `If Prime IV is already becoming part of your routine, our memberships have some pretty good perks. 👀💧 Depending on your membership: monthly IV therapy, injection support, VIP status + massage chair access, savings on additional treatments, and 50% off eligible IV drip additives. Less “should I book?” More “see you next time.” ✨ Ask your local spa which membership fits your routine. *Some exclusions may apply. 
+
+#PrimeIV #GetPrimed #PrimeIVMembership #IVTherapy #WellnessRoutine #VIPWellness` },
+
+    // Wk 10/25
+    { day: 25, platform: 'Instagram', content_type: 'Post', phase: 'PDM · Brand Cascade',
+      title: 'What Does “Antioxidant Support” Actually Mean?',
+      hook: '“Antioxidant support” gets thrown around a lot in wellness. So what are we actually talking about?',
+      cta: 'Understand what’s in your drip',
+      caption: `“Antioxidant support” gets thrown around a lot in wellness. So what are we actually talking about? 🔬✨
+
+Everyday processes in the body can create oxidative stress. Antioxidants help defend cells against that stress.
+
+Prime IV offers a variety of ingredients that may help support the body’s antioxidant defenses, including options like Alpha Lipoic Acid, Glutathione and Vitamin C. You’ll find antioxidant-supporting ingredients across a range of Prime IV wellness options. 💧
+
+The more you understand what’s in your drip, the more your menu starts to make sense.
+
+#PrimeIV #GetPrimed #Antioxidants #Micronutrients #WellnessEducation` },
+    { day: 27, platform: 'Instagram', content_type: 'Post', phase: 'PDM · Brand Cascade',
+      title: 'What Makes a Specialty Drip…Special?',
+      hook: 'Each Specialty Drip combines 4–7 micronutrients selected around a specific wellness goal.',
+      cta: 'Ask about Specialty Drips + add-ons',
+      caption: `What makes a Specialty Drip…special? 💧
+
+Each Prime IV Specialty Drip combines 4–7 micronutrients selected around a specific wellness goal, giving every formula its own unique mix and purpose.
+
+Calm is designed around stress and relaxation support. Jetsetter is built with travel in mind. Clean Slate supports antioxidant and liver health. Champion supports an active lifestyle and recovery.
+
+Different goals call for different combinations, and available add-ons can personalize your experience even further when appropriate. ✨
+
+#PrimeIV #GetPrimed #IVTherapy #SpecialtyDrips #Micronutrients #WellnessEducation` },
+    { day: 31, platform: 'Instagram', content_type: 'Post', phase: 'PDM · Brand Cascade',
+      title: 'Halloween: Pick Your Potion 🎃',
+      hook: 'Pick your potion.',
+      cta: 'Pick your drip',
+      caption: `Pick your potion. 🧙‍♀️🪄🔮
+
+⚡ Running on fumes? Revitalizer
+😌 Need to slow down? Calm
+🧠 Brain has 37 tabs open? BrainFuel+
+✈️ Holiday travel on your mind? Jetsetter
+✨ Ready for a reset? Clean Slate
+
+Happy Halloween from Prime IV! 🎃👻
+
+#PrimeIV #GetPrimed #HappyHalloween #IVTherapy #FallWellness #WellnessGoals` },
+  ],
+};
+
 export const PLAYBOOKS: Playbook[] = [
+  PRIME_IV_PDM_OCT_2026,
   PRIME_IV_PDM_AUG_2026,
   VORTEX_SUMMER_2026,
   PRIME_IV_PDM_JUL_2026,
@@ -1781,11 +1944,11 @@ export function getPlaybook(id: string): Playbook | undefined {
  */
 export const CLIENT_PLAYBOOKS: Record<string, string[]> = {
   // Corporate cascade first so it's the top one-click load each month
-  'prime-iv':              ['prime-iv-pdm-aug-2026', 'prime-iv-pdm-jul-2026', 'prime-iv-pdm-jun-2026', 'prime-iv-pdm-apr-2026', 'niceville-spring-reset', 'prime-iv-memberships'],
-  'prime-iv-pinecrest':    ['prime-iv-pdm-aug-2026', 'prime-iv-pdm-jul-2026', 'prime-iv-pdm-jun-2026', 'prime-iv-pdm-apr-2026', 'pinecrest-reopening',    'prime-iv-memberships'],
-  'prime-iv-high-street':  ['prime-iv-pdm-aug-2026', 'prime-iv-pdm-jul-2026', 'prime-iv-memberships'],
-  'prime-iv-holland-mi':   ['prime-iv-pdm-aug-2026', 'prime-iv-pdm-jul-2026', 'prime-iv-memberships'],
-  'prime-iv-papillion-ne': ['prime-iv-pdm-aug-2026', 'prime-iv-pdm-jul-2026', 'prime-iv-memberships'],
+  'prime-iv':              ['prime-iv-pdm-oct-2026', 'prime-iv-pdm-aug-2026', 'prime-iv-pdm-jul-2026', 'prime-iv-pdm-jun-2026', 'prime-iv-pdm-apr-2026', 'niceville-spring-reset', 'prime-iv-memberships'],
+  'prime-iv-pinecrest':    ['prime-iv-pdm-oct-2026', 'prime-iv-pdm-aug-2026', 'prime-iv-pdm-jul-2026', 'prime-iv-pdm-jun-2026', 'prime-iv-pdm-apr-2026', 'pinecrest-reopening',    'prime-iv-memberships'],
+  'prime-iv-high-street':  ['prime-iv-pdm-oct-2026', 'prime-iv-pdm-aug-2026', 'prime-iv-pdm-jul-2026', 'prime-iv-memberships'],
+  'prime-iv-holland-mi':   ['prime-iv-pdm-oct-2026', 'prime-iv-pdm-aug-2026', 'prime-iv-pdm-jul-2026', 'prime-iv-memberships'],
+  'prime-iv-papillion-ne': ['prime-iv-pdm-oct-2026', 'prime-iv-pdm-aug-2026', 'prime-iv-pdm-jul-2026', 'prime-iv-memberships'],
   'serenity-bayfront':     ['serenity-vrbo-launch'],
   'vortex':                ['vortex-summer-2026'],
 };
