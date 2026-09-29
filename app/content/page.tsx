@@ -7,6 +7,7 @@ import { extractFolderId, type DriveFile } from '@/lib/google-drive-shared';
 import { KNOWN_MERGE_FIELDS } from '@/lib/merge-vars';
 import { parseCaptionOptions } from '@/lib/caption-options';
 import CaptionOptionPicker from '@/components/dashboard/CaptionOptionPicker';
+import { channelsForLabel, labelForChannels, CHANNEL_NAMES, TOGGLEABLE_CHANNELS } from '@/lib/platform-channels';
 
 // Resolve a preview src for a stored photo URL. Google Drive links go through
 // the thumbnail endpoint; uploaded images (Supabase public URLs, or any plain
@@ -430,6 +431,24 @@ export default function ContentPage() {
     const data = await res.json();
     if (!res.ok) throw new Error(data.error || 'Update failed');
     setItems((prev) => prev.map((it) => (it.id === id ? { ...it, ...data.item } : it)));
+  }
+
+  // Duplicate a post as a fresh draft (pending review, auto-post off) and
+  // jump straight into the copy so edits start immediately.
+  const [duplicating, setDuplicating] = useState(false);
+  async function duplicateItem(id: string) {
+    setDuplicating(true);
+    try {
+      const res = await fetch(`/api/content-calendar/${id}/duplicate`, { method: 'POST' });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || 'Duplicate failed');
+      setItems((prev) => [data.item, ...prev]);
+      setActiveId(data.item.id);
+    } catch (e: any) {
+      alert(e.message);
+    } finally {
+      setDuplicating(false);
+    }
   }
 
   // ── Social auto-posting (Post for Me) ────────────────────────────
@@ -2049,6 +2068,9 @@ export default function ContentPage() {
                             title="Change platform — Meta posts to Facebook + Instagram together"
                             className="text-[11px] font-bold uppercase tracking-wider bg-white/10 border border-white/25 rounded px-1.5 py-0.5 text-white outline-none cursor-pointer hover:bg-white/15"
                           >
+                            {!PLATFORMS.includes(activeItem.platform) && (
+                              <option value={activeItem.platform} className="bg-slate-800 text-white">{activeItem.platform || '—'}</option>
+                            )}
                             {PLATFORMS.map((p) => <option key={p} value={p} className="bg-slate-800 text-white">{p}</option>)}
                           </select>
                         ) : (
@@ -2057,6 +2079,16 @@ export default function ContentPage() {
                         <span>&nbsp;· {activeItem.content_type || 'Post'}</span>
                       </div>
                       <div className="flex items-center gap-1">
+                        {isStaff && (
+                          <button
+                            onClick={() => duplicateItem(activeItem.id)}
+                            disabled={duplicating}
+                            className="text-white/40 hover:text-white transition-colors p-1 disabled:opacity-50"
+                            title="Duplicate this post as a new draft"
+                          >
+                            <span className="material-symbols-outlined">{duplicating ? 'hourglass_top' : 'content_copy'}</span>
+                          </button>
+                        )}
                         {isStaff && (
                           <button
                             onClick={() => deleteItem(activeItem.id)}
@@ -2176,6 +2208,43 @@ export default function ContentPage() {
                             <span className="text-[9px] font-bold px-2 py-0.5 rounded-full bg-sky-500/20 text-sky-300">Auto-post on</span>
                           ) : null}
                         </div>
+                        {(() => {
+                          const chs = channelsForLabel(activeItem.platform);
+                          const locked = activeItem.publish_status === 'posted' || activeItem.publish_status === 'scheduled';
+                          return (
+                            <div className="mb-2">
+                              <div className="text-[10px] text-white/40 font-semibold mb-1">
+                                Posts to{locked ? ' (locked — already handed off)' : ' — tap to toggle channels'}
+                              </div>
+                              <div className="flex gap-1.5 flex-wrap">
+                                {TOGGLEABLE_CHANNELS.map((c) => {
+                                  const on = chs.includes(c);
+                                  return (
+                                    <button
+                                      key={c}
+                                      disabled={locked}
+                                      onClick={async () => {
+                                        const next = on ? chs.filter((x) => x !== c) : [...chs, c];
+                                        try { await patchItem(activeItem.id, { platform: labelForChannels(next) }); }
+                                        catch (e: any) { alert(e.message); }
+                                      }}
+                                      className={`text-[10px] font-bold px-2.5 py-1 rounded-full border transition-colors disabled:opacity-40 disabled:cursor-not-allowed ${
+                                        on
+                                          ? 'bg-sky-500/25 border-sky-400/50 text-sky-200'
+                                          : 'bg-white/5 border-white/15 text-white/40 hover:text-white/70'
+                                      }`}
+                                    >
+                                      {on ? '✓ ' : ''}{CHANNEL_NAMES[c]}
+                                    </button>
+                                  );
+                                })}
+                              </div>
+                              {chs.length === 0 && (
+                                <div className="text-[10px] text-amber-300 mt-1">No channels selected — this post won&apos;t publish anywhere until one is picked.</div>
+                              )}
+                            </div>
+                          );
+                        })()}
                         <div className="flex items-center gap-3 flex-wrap">
                           <label className="flex items-center gap-1.5 text-[11px] text-white/70 cursor-pointer">
                             <input type="checkbox" checked={!!activeItem.auto_post} onChange={(e) => toggleAutoPost(activeItem.id, e.target.checked)} />

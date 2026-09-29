@@ -44,11 +44,11 @@ export function platformBase(p: string): string {
 }
 
 // A post's platform label → the Post for Me platforms to publish to.
+// Delegates to the shared label↔channel mapping so the tracker's channel
+// toggles and the publisher can never disagree. Handles combined labels
+// ("Instagram + Facebook") as well as single ones and the legacy "Meta".
 export function platformsFor(platform: string): string[] {
-  const p = (platform || '').toLowerCase();
-  if (p === 'meta') return ['facebook', 'instagram'];
-  const one = postformePlatform(platform);
-  return one ? [one] : [];
+  return channelsForLabel(platform);
 }
 
 // The set of platforms the portal offers a connect button for.
@@ -174,6 +174,7 @@ export async function postformeAuthUrl(
 // Definition lives in lib/caption-options.ts so the UIs' option picker and this
 // guard can never disagree about what counts as a draft.
 export { captionHasDraftOptions } from './caption-options';
+import { channelsForLabel } from './platform-channels';
 
 export type PublishInput = {
   accountIds: string[]; // the exact Post for Me accounts to post to
