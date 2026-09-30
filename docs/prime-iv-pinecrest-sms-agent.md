@@ -373,9 +373,16 @@ timeline, the thread hands off. Do not counsel anyone on whether a drip is
 right for their surgery.
 
 **Q: Is my voucher still good? / My intro offer expired, can I still use it?**
-A: Let me have someone from the team confirm that for you — they'll follow up
-shortly.
+A: We can usually extend it — I'd rather get you in than have you lose it.
+What day works best for you?
 -Prime IV Pinecrest
+(The agent books them. It does not quote the expiry window, ever: windows vary
+by promotion, and a bot telling someone their voucher is dead when it isn't
+loses a client over a number it had no business stating. The client asked
+whether they can still come in; the answer they need is a time, not a policy.
+Nor does it say the extension is "approved" — "we can usually extend it" is a
+statement about how the desk behaves, and it is followed immediately by a
+booking, which is the thing that actually settles it.)
 
 **Q: Can I pause / cancel / downgrade my membership? / Do my injections roll over?**
 A: Thank you for letting me know — I'm having a team member reach out to you
@@ -401,7 +408,8 @@ Per the spec, the agent routes rather than answers on anything the team hasn't
 settled. Do **not** load:
 
 - Pricing of any kind, including "starting at" language
-- Voucher expiration terms
+- Voucher expiration terms — the *number* stays out. The behaviour is settled:
+  offer to extend and book them (see the voucher Q&A). Never state the window.
 - Membership rollover, pause and cancellation rules
 - What "Mobile Services Consult" includes
 - Anything sourced from existing campaign copy — the account's current ads use
@@ -439,6 +447,16 @@ free B-12 variant is promising the wrong thing to the one person who should
 have heard better news. The workflow passes the permission; the agent never
 infers it. When no tag matches, the answer is silence and a handoff, not a
 guess.
+
+**Expired vouchers land in the `first time` row.** Someone whose voucher
+lapsed never redeemed it, so they still carry the first-visit tag — which
+means the agent may say "$99" to them, and the voucher Q&A has it book them.
+That is the intended behaviour as long as an extended voucher is honoured at
+$99. If it isn't, this branch is wrong: an expired-voucher contact needs a tag
+of its own and a "no" in the price column, or the agent promises a price the
+desk then has to take back in front of the client. Worth settling before
+Phase 0, because it is the one place where the extension policy and the
+pricing rule touch.
 
 A wrong pick here means promising something free that isn't, or omitting
 something that was. An if/else cannot make that mistake; a model occasionally
@@ -614,7 +632,8 @@ Blocking the knowledge base:
 | A review pass on the rewritten menu descriptions | Spa team | Phase 0 sign-off |
 | BAA signed, and confirmed to cover the Pinecrest sub-account | You | Every phase — the module being paid for is not the same as being covered |
 | Whether MNA needs its own BAA with Pinecrest | You | Agency access to the inbox |
-| Voucher expiration terms | You | Voucher routing |
+| The voucher window, in days, for the internal record | You | Nothing — the agent never states it. Staff reference only |
+| Whether an extended voucher is still honoured at $99 | You | See the note under 3a. Today the agent would say $99 to these contacts |
 | Membership terms in plain language | Spa team | Membership routing |
 | The duplicate booking calendar on the site, repaired | Whoever owns the site | Nothing here — but it is wrong for customers today, and 3a stays a compromise until it is fixed |
 | Public names that tell NAD+ infusion and NAD+ injection apart | Spa team | NAD+ answers beyond "from $595" |
