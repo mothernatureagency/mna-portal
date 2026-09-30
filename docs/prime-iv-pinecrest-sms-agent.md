@@ -148,6 +148,7 @@ Paste as training Q&A pairs. **This section is incomplete on purpose** — see
 | Intro offer | $99 standard variant — the only price the bot may state |
 | Intro offer, regular price | $199, so the site's "up to 50% off" holds |
 | Intro offer eligibility | First-time clients only; no credit card to book |
+| Voucher window | Seven days, as stated in the first text. Soft in practice: a client who never came in has not really lost it, and the desk extends on request |
 | Intro offer includes | 1 litre of fluids, one add-on of the client's choice (B-12, Amino Blend, B-6 or Magnesium), and a nurse consultation |
 | GHL location id | `ULbDlPppTQ3UnuOhXEnO` (from the site's asset paths — for the build, never texted) |
 | Phone (call or text) | (786) 741-7477 |
@@ -372,17 +373,31 @@ only asked the price; the moment they mention their own procedure, recovery or
 timeline, the thread hands off. Do not counsel anyone on whether a drip is
 right for their surgery.
 
+**Q: How long do I have to use it? / When does my offer expire?**
+A: Seven days from when we sent it — but tell me a day that works and I'll get
+you on the books now so it isn't a worry.
+-Prime IV Pinecrest
+(Asked *before* the week is up, so the honest answer is the same seven days the
+first text already gave them. Saying something vaguer here would contradict the
+campaign and throw away the urgency the seven days exists to create. What it
+does not do is stop at the number — the question is answered and the booking
+is offered in the same breath.)
+
 **Q: Is my voucher still good? / My intro offer expired, can I still use it?**
 A: We can usually extend it — I'd rather get you in than have you lose it.
 What day works best for you?
 -Prime IV Pinecrest
-(The agent books them. It does not quote the expiry window, ever: windows vary
-by promotion, and a bot telling someone their voucher is dead when it isn't
-loses a client over a number it had no business stating. The client asked
-whether they can still come in; the answer they need is a time, not a policy.
-Nor does it say the extension is "approved" — "we can usually extend it" is a
-statement about how the desk behaves, and it is followed immediately by a
-booking, which is the thing that actually settles it.)
+(The agent books them, and never says the words "expired" or "too late". The
+seven days is what the first text promises, not what the desk enforces: a
+client who never came in has not really lost anything, and extensions are
+granted on request. So a bot that counted days and turned someone away would
+be enforcing a rule the business does not have, and losing the client to its
+own arithmetic.
+
+Note the split with the question above. Asked *before* the week is out, the
+answer is seven days, because that is true and the urgency is the point.
+Asked *after*, the number stops being useful and the booking is the answer.
+Same fact, two jobs — which is why they are two entries and not one.)
 
 **Q: Can I pause / cancel / downgrade my membership? / Do my injections roll over?**
 A: Thank you for letting me know — I'm having a team member reach out to you
@@ -408,8 +423,10 @@ Per the spec, the agent routes rather than answers on anything the team hasn't
 settled. Do **not** load:
 
 - Pricing of any kind, including "starting at" language
-- Voucher expiration terms — the *number* stays out. The behaviour is settled:
-  offer to extend and book them (see the voucher Q&A). Never state the window.
+- ~~Voucher expiration terms~~ — **settled, and no longer excluded.** Seven days,
+  as the first text says, quotable while the week is still running. After it,
+  the agent never says "expired" — it offers the extension and books them. Two
+  entries, because the same fact does two different jobs.
 - Membership rollover, pause and cancellation rules
 - What "Mobile Services Consult" includes
 - Anything sourced from existing campaign copy — the account's current ads use
@@ -451,12 +468,15 @@ guess.
 **Expired vouchers land in the `first time` row.** Someone whose voucher
 lapsed never redeemed it, so they still carry the first-visit tag — which
 means the agent may say "$99" to them, and the voucher Q&A has it book them.
-That is the intended behaviour as long as an extended voucher is honoured at
-$99. If it isn't, this branch is wrong: an expired-voucher contact needs a tag
-of its own and a "no" in the price column, or the agent promises a price the
-desk then has to take back in front of the client. Worth settling before
-Phase 0, because it is the one place where the extension policy and the
-pricing rule touch.
+That is the intended behaviour, and it holds: the desk extends on request, and
+an extension that did not carry the $99 would not be an extension of anything.
+So the branch is right as written — these contacts get $99 and get booked.
+
+Keep the reasoning visible, because it is the one place the extension policy
+and the pricing rule touch. If "extend" ever comes to mean *the visit is still
+welcome but the price has moved*, this branch becomes wrong immediately: those
+contacts would need a tag of their own and a "no" in the price column, or the
+agent quotes a price the desk has to take back in front of the client.
 
 A wrong pick here means promising something free that isn't, or omitting
 something that was. An if/else cannot make that mistake; a model occasionally
@@ -632,8 +652,8 @@ Blocking the knowledge base:
 | A review pass on the rewritten menu descriptions | Spa team | Phase 0 sign-off |
 | BAA signed, and confirmed to cover the Pinecrest sub-account | You | Every phase — the module being paid for is not the same as being covered |
 | Whether MNA needs its own BAA with Pinecrest | You | Agency access to the inbox |
-| The voucher window, in days, for the internal record | You | Nothing — the agent never states it. Staff reference only |
-| Whether an extended voucher is still honoured at $99 | You | See the note under 3a. Today the agent would say $99 to these contacts |
+| ~~The voucher window~~ | ~~You~~ | **Answered: seven days, told at first contact, soft in practice** |
+| ~~Whether an extended voucher is honoured at $99~~ | ~~You~~ | **Taken as yes** — extending a $99 voucher that is no longer worth $99 would extend nothing. Correct this if the desk means something else by "extend" |
 | Membership terms in plain language | Spa team | Membership routing |
 | The duplicate booking calendar on the site, repaired | Whoever owns the site | Nothing here — but it is wrong for customers today, and 3a stays a compromise until it is fixed |
 | Public names that tell NAD+ infusion and NAD+ injection apart | Spa team | NAD+ answers beyond "from $595" |

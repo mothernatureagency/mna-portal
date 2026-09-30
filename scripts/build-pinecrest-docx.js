@@ -175,7 +175,7 @@ k.push(h2('Explicitly excluded from the knowledge base'));
 k.push(p('The agent routes rather than answers on anything the team has not settled. Do not load:'));
 ['Membership, package and bundle pricing, discounts, promo codes and “starting at” language — menu prices are fine',
  'The printed menu’s own descriptions. Load the rewritten wording only.',
- 'Voucher expiration terms — the number stays out. The behaviour is settled: offer to extend and book them. Never state the window.',
+ 'Voucher expiration terms are no longer excluded — settled. Seven days, as the first text says, quotable while the week is still running. After it, the agent never says “expired”: it offers the extension and books them.',
  'Membership rollover, pause and cancellation rules',
  'What “Mobile Services Consult” includes',
  'Anything sourced from existing campaign copy. The account’s current ads use “boost your energy” and “boost metabolism”, which violate the language rule.'
@@ -250,7 +250,7 @@ k.push(p('The site breaks the language rule too: "Boost metabolism and optimize 
 k.push(h1('5. What is still needed'));
 k.push(table(['Needed','From','Blocks'],[
  ['A review pass on the rewritten menu descriptions','Spa team','Phase 0 sign-off'],
- ['Voucher expiration terms','You','Voucher routing'],
+
  ['Membership terms in plain language','Spa team','Membership routing'],
  ['What “Mobile Services Consult” includes','Spa team','Service questions'],
 ],[4400,1900,3000]));
@@ -273,9 +273,12 @@ function assertProseMatchesSource(){
   if(!hours) throw new Error('Could not find the Hours row in the markdown.');
   const closesAtSix = /6:00 PM/.test(hours);
 
-  const wrong = closesAtSix
+  const wrong = (closesAtSix
     ? [/10\s*[–-]\s*5\b/, /closing is 5:00/, /\b5:00 close\b/]
-    : [/10\s*[–-]\s*6\b/, /closing is 6:00/, /\b6:00 close\b/];
+    : [/10\s*[–-]\s*6\b/, /closing is 6:00/, /\b6:00 close\b/])
+    // Superseded rules that would contradict the knowledge base if they
+    // survived anywhere in the prose.
+    .concat([/Never state the window/, /the number stays out/]);
 
   // Omissions, not just contradictions. Decisions that were settled in the
   // markdown have twice failed to reach this file; these are the ones whose
@@ -283,7 +286,7 @@ function assertProseMatchesSource(){
   const emitted = PROSE.join('\n');
   const required = [
     ['the expired-voucher pricing edge', /Expired vouchers land in the first-time row/],
-    ['the rule against stating the voucher window', /Never state the window/],
+    ['the settled voucher rule', /never says .expired.: it offers the extension/],
     ['the duplicate calendar being a site bug', /one id pasted twice/],
     ['which drip menu the agent may name', /names only what the website lists/],
   ];
