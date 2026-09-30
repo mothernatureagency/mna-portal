@@ -70,7 +70,22 @@ export async function GET() {
       order by 4 desc`,
   );
 
-  return NextResponse.json({ tokens: rows, connections, availableScopes: MCP_SCOPES, roles: ROLES });
+  // Clients that registered and never connected. Registration is open — it is
+  // how an MCP client gets a client_id without anyone typing one — so these
+  // accumulate, from abandoned attempts and from probes. They hold no access
+  // on their own, but there should be a way to see and clear them.
+  const { rows: staleClients } = await query(
+    `select c.client_id, c.client_name, c.redirect_uris, c.created_at
+       from oauth_clients c
+      where not exists (
+        select 1 from oauth_tokens t
+         where t.client_id = c.client_id and t.revoked_at is null
+      )
+      order by c.created_at desc
+      limit 50`,
+  );
+
+  return NextResponse.json({ tokens: rows, connections, staleClients, availableScopes: MCP_SCOPES, roles: ROLES });
 }
 
 export async function POST(req: NextRequest) {
@@ -137,8 +152,33 @@ export async function DELETE(req: NextRequest) {
     return NextResponse.json({ revokedTokens: rows.length });
   }
 
+  // Delete a registration that never connected. Guarded by the same check the
+  // listing uses, so this can't be used to cut off a live connection by the
+  // back door — that goes through ?connection= above, which revokes rather
+  // than deletes and leaves the trail intact.
+  const client = req.nextUrl.searchParams.get('client') || '';
+  if (client) {
+    const { rows } = await query(
+      `delete from oauth_clients c
+        where c.client_id = $1
+          and not exists (
+            select 1 from oauth_tokens t
+             where t.client_id = c.client_id and t.revoked_at is null
+          )
+        returning c.client_id`,
+      [client],
+    );
+    if (!rows.length) {
+      return NextResponse.json(
+        { error: 'No such registration, or it has a live connection. Disconnect it first.' },
+        { status: 404 },
+      );
+    }
+    return NextResponse.json({ deletedClient: rows[0].client_id });
+  }
+
   const id = req.nextUrl.searchParams.get('id') || '';
-  if (!id) return NextResponse.json({ error: 'id or connection is required' }, { status: 400 });
+  if (!id) return NextResponse.json({ error: 'id, connection or client is required' }, { status: 400 });
 
   // Revoked, not deleted: the row stays so "who had access, and when" survives.
   const { rows } = await query(
