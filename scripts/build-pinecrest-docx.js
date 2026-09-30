@@ -110,7 +110,7 @@ k.push(new Paragraph({spacing:{after:200},children:[new TextRun({
 k.push(rule());
 
 k.push(p('This is the paste-ready half of the build spec: the Conversation AI system prompt, the knowledge-base entries, and the workflow conditions that have to sit around the AI step rather than inside it.'));
-k.push(p('Do not connect this to live traffic yet. All five prerequisites in the spec come first — HIPAA module purchased and BAA signed, integration audit done, calendars corrected to 10–5 seven days, the pricing rule applied, and the retention and access policy set. This document assumes Phase 0, suggest-only.',{bold:true}));
+k.push(p('Do not connect this to live traffic yet. All five prerequisites in the spec come first — HIPAA module purchased and BAA signed, integration audit done, calendars corrected to 10–6 seven days, the pricing rule applied, and the retention and access policy set. This document assumes Phase 0, suggest-only.',{bold:true}));
 k.push(p('Field names may differ. Nobody has opened the Conversation AI settings screen on this account yet, so the headings below follow HighLevel’s usual layout. Each block is self-contained, so if a field is named differently on this plan, the block still pastes somewhere sensible.'));
 
 k.push(h1('Decisions applied in this version'));
@@ -122,7 +122,9 @@ k.push(table(['Decision','Effect on the build'],[
  ['“Intro Offer” is the live voucher calendar','Tag routing targets it. “Intro Offer v1” is the orphan and should be retired, not left in place.'],
  ['Website facts loaded','Phone, cancellation policy, age limits, HSA/FSA, what the intro offer includes, the Essentials membership price and mobile IV all came off the homepage. Nine new Q&A pairs. Six conflicts with what we had are listed in their own section.'],
  ['Notification routing set','pinecrest@primeivhydration.com for everything, plus jkulkusky@primeivhydration.com for legal, media and regulatory. Notifications carry a link, never message content — and the agency address is deliberately not on the list.'],
- ['Hours are 10-5, not 10-6','Corrected everywhere: the prompt, the hard facts, the hours answer, the Phase 0 checklist and the calendar fix the browser session performs. A 5:00 close also changes what rule 3b means.'],
+ ['Hours are 10-6, seven days','The website was right and an earlier ten-to-five was wrong. Corrected everywhere: the prompt, the hard facts, the hours answer, the Phase 0 checklist and the calendar fix the browser session performs.'],
+ ['The duplicate booking calendar is a site bug','The Member Appointment and IV Therapy tabs load the same widget under audience-specific descriptions — one id pasted twice. Non-members book onto the member calendar today. Rule 3a treats them as one calendar until the site is repaired.'],
+ ['Which drip menu governs','Both menus use the same price tiers, so there is no pricing conflict. The agent names only what the website lists, recognises anything on either list, and hands off a name on neither.'],
  ['Full menu pricing loaded','The agent may now quote drips, injections and NAD+ at the exact menu prices. Memberships and packages still route. Every menu description was rewritten — the printed copy breaks the language rule throughout.'],
  ['The FAQ document does not exist','The spec referenced one five times; it is not in Drive and was never written. The menu replaced it, and a spa-team review pass replaces the “tested phrasing” the spec assumed.'],
  ['Corrected since the first Word version','The intro-offer price is one KB entry that defers, overridden by the prompt — two entries keyed on the same question would collide. Rule 3d now names who sends the handoff line, so it cannot go out twice.'],
@@ -196,7 +198,7 @@ k.push(p('“Intro Offer” is confirmed as the live voucher calendar. “Intro 
 
 k.push(h2('3b. Hard stop — bookings at 4:00 PM or later'));
 k.push(p('The agent may offer a 4:00 PM or later slot but must never confirm one. After the AI step: if the requested time is 16:00 or later, write an internal comment on the conversation, notify staff, and send only “Let me get that confirmed for you — someone will text you right back.”'));
-k.push(p('This rule reads differently now that closing is 5:00, not 6:00. A drip runs about an hour, so 4:00 PM is the last start that finishes at close, and anything later cannot finish before the doors shut. The rule is effectively “the last slot of the day always needs a human” — a sane place to put one. Worth deciding whether the agent should offer anything after 4:00 PM at all; right now it may offer and simply cannot confirm.'));
+k.push(p('With a 6:00 close and a drip running about an hour, 4:00 PM is not the last slot that fits — so this rule is about staffing rather than closing time. It is the client’s rule, kept as given. Worth deciding whether the agent should offer anything after 4:00 PM at all; right now it may offer and simply cannot confirm.'));
 
 k.push(h2('3c. Hard stop — five new bookings per day'));
 k.push(p('Requires counting, so it cannot be a prompt rule. Before the AI step, count today’s bookings on the intro calendar. At five or more, set a flag the agent sees, and have it collect a preferred time and hand off instead of offering slots.'));
@@ -250,7 +252,38 @@ k.push(table(['Needed','From','Blocks'],[
  ['What “Mobile Services Consult” includes','Spa team','Service questions'],
 ],[4400,1900,3000]));
 k.push(gap());
-k.push(p('Everything above is drafted so the FAQ pairs drop in without rewriting the prompt. Send the FAQ document and the knowledge base finishes in one pass.'));
+k.push(p('There is no FAQ document — the spec referenced one five times and it was never written. The menu replaced it as the source for service answers, so what finishes the knowledge base is a spa-team review pass over the rewritten descriptions, not a file.'));
+
+/**
+ * The prose below is hand-written, while the tables and Q&A come out of the
+ * markdown. That split has already shipped a document asserting both 10-6 and
+ * 10-5 hours, because the markdown was corrected and this file was not. So:
+ * read the load-bearing facts out of the markdown and refuse to build if the
+ * hard-coded prose still disagrees with them.
+ */
+function assertProseMatchesSource(){
+  const self = fs.readFileSync(__filename, 'utf8');
+  // strip this function so its own example strings can't trip it
+  const prose = self.replace(/\/\*\*[\s\S]*?function assertProseMatchesSource[\s\S]*?\n}\n/, '');
+
+  const hours = (MD.match(/^\| Hours \| (.+?) \|$/m) || [])[1] || '';
+  if(!hours) throw new Error('Could not find the Hours row in the markdown.');
+  const closesAtSix = /6:00 PM/.test(hours);
+
+  const wrong = closesAtSix
+    ? [/10\s*[–-]\s*5\b/, /closing is 5:00/, /\b5:00 close\b/]
+    : [/10\s*[–-]\s*6\b/, /closing is 6:00/, /\b6:00 close\b/];
+
+  const hits = wrong.filter(re => re.test(prose)).map(String);
+  if(hits.length){
+    throw new Error(
+      'The hard-coded prose contradicts the markdown.\n' +
+      '  markdown says Hours = ' + hours + '\n' +
+      '  but this script still contains: ' + hits.join(', ') + '\n' +
+      'Fix the prose rather than the check.');
+  }
+}
+assertProseMatchesSource();
 
 const doc=new Document({
   numbering:{config:[{reference:'b',levels:[{level:0,format:LevelFormat.BULLET,text:'•',alignment:AlignmentType.LEFT,

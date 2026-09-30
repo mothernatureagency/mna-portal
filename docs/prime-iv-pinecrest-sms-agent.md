@@ -146,6 +146,10 @@ Paste as training Q&A pairs. **This section is incomplete on purpose** — see
 | Website and booking | primeivpinecrest.com |
 | Links hub | linktr.ee/primeivpinecrest |
 | Intro offer | $99 standard variant — the only price the bot may state |
+| Intro offer, regular price | $199, so the site's "up to 50% off" holds |
+| Intro offer eligibility | First-time clients only; no credit card to book |
+| Intro offer includes | 1 litre of fluids, one add-on of the client's choice (B-12, Amino Blend, B-6 or Magnesium), and a nurse consultation |
+| GHL location id | `ULbDlPppTQ3UnuOhXEnO` (from the site's asset paths — for the build, never texted) |
 | Phone (call or text) | (786) 741-7477 |
 | Walk-ins | Limited — welcome them, but say to call ahead |
 | Cancellation | 24 hours' notice to avoid a fee |
@@ -255,6 +259,27 @@ change and I don't want to quote you something that's ended.
 -Prime IV Pinecrest
 
 ### The menu — prices the agent may quote
+
+**Which menu governs.** Two are live, and they agree on price but not on
+contents. The website lists ten drips at the same $119 / $175 / $210 tiers as
+the printed menu, so there is no pricing conflict to resolve — but it includes
+two the printed menu doesn't (Pure Hydration $119, Clean Slate $175) and omits
+sixteen that it does.
+
+The rule that follows from that:
+
+- **Name proactively only what the website lists.** A drip on the site is one
+  the client can see and book today. Offering something from the printed menu
+  unprompted risks naming a drip that has quietly been retired.
+- **Recognise anything on either list.** If the client names a printed-menu
+  drip, the price tier is still correct and the agent may quote it.
+- **A name on neither list is a handoff**, not a guess.
+
+The ten on the site, for the proactive case: Immunity Armor $210, Myers'
+Cocktail $210, Champion $210, Glow $210, Resurrection $210, Skinny Drip $175,
+Jetsetter $175, Clean Slate $175, Pure Hydration $119, plus the $99 Intro Drip.
+NAD+ is sold there as an **infusion from $595**, which is a different product
+from the printed menu's NAD+ injection — see the NAD+ note below.
 
 Descriptions below are **rewritten**, not the menu's own wording. The printed
 menu is marketing copy and breaks the language rule on nearly every line
@@ -419,6 +444,31 @@ A wrong pick here means promising something free that isn't, or omitting
 something that was. An if/else cannot make that mistake; a model occasionally
 can.
 
+**Confirmed — and this one is a live defect.** The "Member Appointment" and
+"IV Therapy" tabs on primeivpinecrest.com both load the same booking widget,
+`oRZeRkyavE37L54bgnt4`:
+
+```html
+<div class="pane cal" data-tab="member">
+  <p class="desc">Welcome back! Book your member IV appointment.</p>
+  <iframe src=".../widget/booking/oRZeRkyavE37L54bgnt4" id="oRZeRkyavE37L54bgnt4_pivmember">
+
+<div class="pane cal" data-tab="non">
+  <p class="desc">Book your IV therapy session — drips, add-ons and packages.</p>
+  <iframe src=".../widget/booking/oRZeRkyavE37L54bgnt4" id="oRZeRkyavE37L54bgnt4_pivnon">
+```
+
+The two panes carry descriptions written for different audiences, which is what
+settles it: someone intended two calendars and pasted one id twice. A
+non-member booking IV therapy lands on the member calendar today.
+
+Two consequences for this build. The routing table's "Member calendar" row is
+correct as written. But the row that would send a non-member to a separate IV
+therapy calendar has nowhere distinct to send them until the site is fixed, so
+**the agent must not describe them as different calendars** — it books members
+and non-members into the same place, because that is what currently happens.
+Fixing the site is a separate job from this one, and worth doing first.
+
 **Confirmed:** `Intro Offer` is the live voucher calendar. `Intro Offer v1` is
 the orphan — retire it rather than leaving it in place, or routing will drift
 back to it the next time someone edits calendars by name. Have the browser
@@ -566,19 +616,37 @@ Blocking the knowledge base:
 | Whether MNA needs its own BAA with Pinecrest | You | Agency access to the inbox |
 | Voucher expiration terms | You | Voucher routing |
 | Membership terms in plain language | Spa team | Membership routing |
+| The duplicate booking calendar on the site, repaired | Whoever owns the site | Nothing here — but it is wrong for customers today, and 3a stays a compromise until it is fixed |
+| Public names that tell NAD+ infusion and NAD+ injection apart | Spa team | NAD+ answers beyond "from $595" |
 
-### Conflicts the website turned up — decide these
+### Conflicts the website turned up
 
 The homepage disagrees with things we have already written down. Each needs a
 decision, and two of them are customer-facing errors today.
 
-| Conflict | The website says | We were told / wrote | Why it matters |
-| --- | --- | --- | --- |
-| **Walk-ins** | "Walk-ins limited — call now", five times | Spec: "Walk-ins get welcomed, not redirected" | Reconciled in the KB — welcome them, ask them to call ahead. Confirm that is right. |
-| **One-Hour Vacation** | ™ | Brand guide says ® | Different marks with different legal meaning. The agent now uses ™ to match the site; correct it if the brand guide wins. |
-| **Booking calendars** | "IV Therapy" and "Member Appointment" tabs both load calendar `oRZeRkyavE37L54bgnt4` | Separate calendars in the routing table | A non-member booking IV therapy lands on the member calendar. Either deliberate or a copy-paste error, and the tag routing in 3a depends on knowing which. |
-| **Drip menu** | 12 drips, including Pure Hydration ($119) and Clean Slate ($175) | Printed menu's 26 drips, which include neither | Two different menus are live. The agent currently answers from the printed one. |
-| **NAD+ pricing** | Infusion "from $595" | Menu's injection, $99–$175 | Same word, a $500 gap. Handled in the menu section, but the products should be named differently in public. |
+A second read of the live site closed three of these. What is left is a
+decision or a repair, not a question about the facts.
+
+| Conflict | Status | What remains |
+| --- | --- | --- |
+| **Booking calendars** | **Settled — it's a bug.** Both tabs load `oRZeRkyavE37L54bgnt4`, under descriptions written for different audiences. A copy-paste error, not a shared calendar. | Someone fixes the site. Until then the agent treats them as one calendar, per 3a. Customer-facing error today. |
+| **Drip menu** | **Settled — narrower than it looked.** Both menus use the same $119 / $175 / $210 tiers. The site lists ten, two of which (Pure Hydration, Clean Slate) are not on the printed menu; the printed menu has sixteen the site omits. No pricing conflict. | Nothing blocking. The menu section now says which list the agent may name proactively and which it may merely recognise. |
+| **One-Hour Vacation** | **Settled — ™.** The site uses ™ in all four places it appears. | Only if the brand guide is meant to win over the live site, which would make the site wrong rather than the agent. |
+| **Walk-ins** | Site is consistent: "Walk-ins limited — call now", in the header, the hours block, the booking section and the footer. The KB's "welcome them, ask them to call ahead" matches it. | Confirm that is the policy you want, since the spec's original wording said the opposite. |
+| **NAD+ pricing** | Two genuinely different products: the site's **NAD+ Infusion from $595** (500mg or 1000mg) and the printed menu's NAD+ **injection** at $99–$175. | They need different public names. Until then the agent quotes the infusion at "from $595" and hands off anything else — a $500 gap behind one word is not a thing to guess at. |
+
+### This month's specials, as the site lists them
+
+The agent still defers on specials — they change, and a stale quote is worse
+than a slow answer. Recorded here so whoever answers has it to hand, and
+rewritten to the language rule because the site's own wording does not meet it.
+
+| Special | Price | Compliant phrasing |
+| --- | --- | --- |
+| Skinny Mermaid (featured infusion) | $199 | designed to support metabolism and everyday energy |
+| Liver Cleanse (September amplifier) | $49 | designed to support the body's natural detox processes |
+| High-Dose Vitamin C | Ask — 12g and 25g | designed to support immune function, skin and recovery |
+| Oral Peptide Stack — Glow Pack or Wolverine Pack | Ask | limited release; the front desk confirms availability |
 
 **The site breaks the language rule too.** "Boost metabolism and optimize
 energy" on the Skinny Mermaid special, "Energy & Vitality Boost", "supercharge
@@ -606,11 +674,29 @@ rule exists.
 - **Notifications** — pinecrest@primeivhydration.com, with
   jkulkusky@primeivhydration.com added for legal, media and regulatory.
   Content stays out of the notification.
+- **Booking calendars** — the site's "Member Appointment" and "IV Therapy"
+  tabs load the same widget. Confirmed a copy-paste error from the page source,
+  not a shared calendar: the two panes carry descriptions written for different
+  audiences. Recorded in 3a; the repair is the site's, not this build's.
+- **The two drip menus** — no pricing conflict. Both use $119 / $175 / $210.
+  The site lists ten drips, two of them absent from the printed menu. The menu
+  section says which list the agent may name unprompted and which it may only
+  recognise.
+- **One-Hour Vacation™** — ™, in all four places the site uses it.
+- **Intro offer terms** — $99 against a $199 regular price, first-time clients
+  only, no card to book.
 - **The FAQ document** — does not exist. The spec referenced one five times;
   it is not in Drive and was never written. The menu replaced it as the source
   for service answers, and the rewritten descriptions need a review pass from
   the spa team in place of the "tested phrasing" the spec assumed.
 
-One thing left before Phase 0: have the spa team read the rewritten menu
-descriptions. They are compliance-safe by construction, but nobody who works
-the floor has confirmed they still describe the right drip.
+Two things left before Phase 0.
+
+**Have the spa team read the rewritten menu descriptions.** They are
+compliance-safe by construction, but nobody who works the floor has confirmed
+they still describe the right drip.
+
+**Fix the duplicate calendar on the site**, or accept that members and
+non-members book into the same place and that the agent will describe it that
+way. It is the one item here that is wrong for customers right now, and it is
+a two-character edit on the page.
