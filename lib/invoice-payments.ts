@@ -9,10 +9,10 @@ import { query } from './db';
 export const PORTAL_URL = (process.env.NEXT_PUBLIC_SITE_URL || 'https://portal.mothernatureagency.com').replace(/\/$/, '');
 
 // Percent added when a client pays by credit card. Bank (ACH) payments carry no fee.
-// Set INVOICE_CARD_FEE_PERCENT=0 to absorb card fees instead of passing them on.
+// Default 0: the agency absorbs card fees. Set INVOICE_CARD_FEE_PERCENT to pass them on.
 export const CARD_FEE_PERCENT = (() => {
-  const n = Number(process.env.INVOICE_CARD_FEE_PERCENT ?? 3);
-  return Number.isFinite(n) && n >= 0 ? n : 3;
+  const n = Number(process.env.INVOICE_CARD_FEE_PERCENT ?? 0);
+  return Number.isFinite(n) && n >= 0 ? n : 0;
 })();
 
 export function cardFee(total: number): number {
