@@ -38,6 +38,13 @@ type TokenRow = {
   revoked_at: string | null;
 };
 
+type StaleClient = {
+  client_id: string;
+  client_name: string | null;
+  redirect_uris: string[] | null;
+  created_at: string;
+};
+
 type Connection = {
   client_id: string;
   subject_email: string;
@@ -53,6 +60,7 @@ const fmt = (d: string | null) =>
 export default function McpTokensPage() {
   const [tokens, setTokens] = useState<TokenRow[]>([]);
   const [connections, setConnections] = useState<Connection[]>([]);
+  const [staleClients, setStaleClients] = useState<StaleClient[]>([]);
   // Static roster plus anything staff added; /api/clients returns only the
   // custom ones, so the built-ins have to come from lib/clients.ts.
   const [clients, setClients] = useState<Array<{ id: string; name: string }>>(
@@ -79,6 +87,7 @@ export default function McpTokensPage() {
       const data = await res.json();
       setTokens(data.tokens || []);
       setConnections(data.connections || []);
+      setStaleClients(data.staleClients || []);
     } catch {
       setError('Could not load tokens.');
     } finally {
@@ -140,6 +149,12 @@ export default function McpTokensPage() {
       `/api/mcp-tokens?connection=${encodeURIComponent(c.client_id)}&subject=${encodeURIComponent(c.subject_email)}`,
       { method: 'DELETE' },
     );
+    load();
+  }
+
+  async function removeRegistration(c: StaleClient) {
+    if (!confirm(`Remove the registration for ${c.client_name || 'this application'}? It holds no access, so nothing stops working.`)) return;
+    await fetch(`/api/mcp-tokens?client=${encodeURIComponent(c.client_id)}`, { method: 'DELETE' });
     load();
   }
 
@@ -300,6 +315,37 @@ export default function McpTokensPage() {
           </ul>
         )}
       </Card>
+
+      {/* Registrations that never became a connection. Open registration is how
+          an MCP client gets an id without anyone typing one, so these collect. */}
+      {staleClients.length > 0 && (
+        <Card className="p-6">
+          <h2 className="text-lg font-semibold text-white mb-1">
+            Registered, never connected <span className="text-white/40 font-normal">({staleClients.length})</span>
+          </h2>
+          <p className="mb-4 text-sm text-white/50">
+            Apps that asked for an id and never came back. They hold no access and can do
+            nothing, but you can clear them out.
+          </p>
+          <ul className="space-y-2">
+            {staleClients.map((c) => (
+              <li key={c.client_id}
+                  className="flex items-center justify-between gap-4 rounded-lg border border-white/10 px-4 py-3">
+                <div className="min-w-0">
+                  <span className="text-sm text-white/80">{c.client_name || 'Unnamed application'}</span>
+                  <span className="ml-2 text-xs text-white/40">registered {fmt(c.created_at)}</span>
+                </div>
+                <button
+                  onClick={() => removeRegistration(c)}
+                  className="shrink-0 text-xs text-white/50 hover:text-red-300"
+                >
+                  Remove
+                </button>
+              </li>
+            ))}
+          </ul>
+        </Card>
+      )}
 
       <Card className="p-6">
         <h2 className="text-lg font-semibold text-white mb-4">

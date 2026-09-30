@@ -104,9 +104,14 @@ rather than guessing. Never tell a client the spa is open on a day you have not
 verified.
 
 BOOKING
-Offer two specific times, never a list of options. Prefer a slot where both
-chairs are free. For a first-time client, offer times before 3:30 PM. If a
-client names a day or time, repeat it back and ask them to confirm.
+Offer two specific times, never a list of options, and only times you have been
+given as free. For a first-time client, offer times before 3:30 PM. If a client
+names a day or time, repeat it back and ask them to confirm.
+
+If no live availability has been loaded, do not propose or confirm a time at
+all. Ask which day and rough time suits them, say the team will confirm, and
+stop. Never invent a slot. A plausible-sounding time that turns out to be
+taken is worse than asking, because the client turns up to a full room.
 
 Booking is at primeivpinecrest.com. That is the only booking link you give —
 there is no Booker registration link and no other portal.
@@ -524,7 +529,28 @@ At a 6:00 close a 4:00 PM drip finishes an hour before the doors shut, so this
 rule is about staffing rather than closing time. It is the client's rule, kept
 as written.
 
-### 3c. Hard stop — five new bookings per day
+### 3c. Live availability — the agent must be handed free slots
+
+The prompt tells the agent to offer two specific times. That is only safe if
+something upstream hands it the times that are actually free, which is a
+workflow job rather than a prompt one: a model asked to suggest a slot with no
+calendar in front of it will produce something that sounds right.
+
+Before the AI step, read free slots from the calendar the tag routing in 3a
+selected, and pass them in as the only times the agent may offer. If the read
+fails or returns nothing, pass a flag instead, and the agent falls back to
+collecting a preferred day and handing off. Both behaviours are written into
+the prompt's BOOKING block already.
+
+This is how the portal's own CRM engine does it, and the same shape applies
+here: live slots or no times at all, never a guess in between.
+
+**Confirm before Phase 0 that HighLevel's Conversation AI on this account can
+actually see the calendar.** If it cannot, the agent collects preferences and
+hands off every booking, which still works and is still useful. What it must
+not do is offer times it has not been given.
+
+### 3c-bis. Hard stop — five new bookings per day
 
 Requires counting, so it cannot be a prompt rule. Before the AI step, count
 today's bookings on the intro calendar. At five or more, set a flag the agent
@@ -655,6 +681,7 @@ Blocking the knowledge base:
 | ~~Whether an extended voucher is honoured at $99~~ | ~~You~~ | **Taken as yes** — extending a $99 voucher that is no longer worth $99 would extend nothing. Correct this if the desk means something else by "extend" |
 | Membership terms in plain language | Spa team | Membership routing |
 | Public names that tell NAD+ infusion and NAD+ injection apart | Spa team | NAD+ answers beyond "from $595" |
+| Whether HighLevel's Conversation AI can read the booking calendar on this account | Browser session | Whether the agent offers times at all, or only collects a preference and hands off. See 3c |
 
 ### Conflicts the website turned up
 
