@@ -494,6 +494,7 @@ async function initSchema() {
                     ALTER TABLE schedule_events ADD COLUMN IF NOT EXISTS recurrence text DEFAULT 'none';
                     ALTER TABLE schedule_events ADD COLUMN IF NOT EXISTS recurrence_end date;
                     ALTER TABLE schedule_events ADD COLUMN IF NOT EXISTS recurring_parent_id uuid;
+                    ALTER TABLE schedule_events ADD COLUMN IF NOT EXISTS color text;
                   EXCEPTION WHEN others THEN NULL;
                   END $$`,
                   // Invoices

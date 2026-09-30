@@ -1,676 +1,547 @@
 'use client';
-import React, { useEffect, useState, useMemo } from 'react';
+import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { useClient } from '@/context/ClientContext';
 import { createClient } from '@/lib/supabase/client';
+import TimeGrid from '@/components/calendar/TimeGrid';
+import MonthGrid from '@/components/calendar/MonthGrid';
+import TaskList from '@/components/calendar/TaskList';
+import EventModal, { EventDraft, blankDraft, draftFrom } from '@/components/calendar/EventModal';
+import {
+  ScheduleEvent, ViewMode, ColorBy, EVENT_TYPES, PRIORITIES, addDays, addMonths, clientHex, legendKey,
+  rangeTitle, startOfWeek, timeToMin, minToTime, todayStr, viewRange, isAllDay,
+} from '@/components/calendar/calendarUtils';
 
-type ScheduleEvent = {
-  id: string;
-  user_email: string;
-  client_id: string | null;
-  title: string;
-  description: string | null;
-  event_date: string;
-  start_time: string | null;
-  end_time: string | null;
-  event_type: string;
-  priority: string;
-  completed: boolean;
-  reminder_sent: boolean;
-  attendees: string | null;
-  meeting_mode: string | null;
-  location: string | null;
-  meet_link: string | null;
-  recurrence: string | null;
-  recurrence_end: string | null;
-  recurring_parent_id: string | null;
-  created_at: string;
-};
-
-const EVENT_TYPES = [
-  { value: 'meeting', label: 'Meeting', icon: 'groups', color: 'bg-violet-500/20 text-violet-300' },
-  { value: 'call', label: 'Call', icon: 'call', color: 'bg-sky-500/20 text-sky-300' },
-  { value: 'task', label: 'Task', icon: 'task_alt', color: 'bg-emerald-500/20 text-emerald-300' },
-  { value: 'deadline', label: 'Deadline', icon: 'alarm', color: 'bg-rose-500/20 text-rose-300' },
-  { value: 'review', label: 'Review', icon: 'rate_review', color: 'bg-amber-500/20 text-amber-300' },
-  { value: 'personal', label: 'Personal', icon: 'person', color: 'bg-white/10 text-white/60' },
-  { value: 'blocked', label: 'Blocked', icon: 'block', color: 'bg-red-500/20 text-red-300' },
-  { value: 'google', label: 'Google Calendar', icon: 'event', color: 'bg-sky-500/20 text-sky-300' },
+const VIEWS: { value: ViewMode; label: string }[] = [
+  { value: 'day', label: 'Day' },
+  { value: 'week', label: 'Week' },
+  { value: 'month', label: 'Month' },
 ];
 
-const PRIORITIES = [
-  { value: 'low', label: 'Low', color: 'text-white/40' },
-  { value: 'normal', label: 'Normal', color: 'text-white/70' },
-  { value: 'high', label: 'High', color: 'text-rose-300' },
-];
+// The task list looks this far either side of today, so overdue items stay visible.
+const TASK_LOOKBACK = 60;
+const TASK_LOOKAHEAD = 60;
 
-function fmtDate(iso: string) {
+function isTask(ev: ScheduleEvent) {
+  return ev.event_type === 'task' || ev.event_type === 'deadline';
+}
+
+function readPref<T extends string>(key: string, allowed: readonly T[], fallback: T): T {
   try {
-    const d = new Date(`${iso}T12:00:00`);
-    return d.toLocaleDateString(undefined, { weekday: 'short', month: 'short', day: 'numeric' });
-  } catch { return iso; }
+    const v = localStorage.getItem(key) as T | null;
+    return v && allowed.includes(v) ? v : fallback;
+  } catch { return fallback; }
 }
-
-function fmtTime(t: string | null) {
-  if (!t) return '';
-  const [h, m] = t.split(':').map(Number);
-  const ampm = h >= 12 ? 'PM' : 'AM';
-  const hr = h % 12 || 12;
-  return `${hr}:${String(m).padStart(2, '0')} ${ampm}`;
-}
-
-function todayStr() {
-  const d = new Date();
-  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
-}
-
-function addDays(iso: string, n: number) {
-  const d = new Date(`${iso}T12:00:00`);
-  d.setDate(d.getDate() + n);
-  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+function writePref(key: string, v: string) {
+  try { localStorage.setItem(key, v); } catch { /* private mode */ }
 }
 
 export default function SchedulePage() {
   const ctx = useClient() as any;
-  const activeClient = ctx?.activeClient;
-  const allClients = ctx?.allClients || [];
+  const allClients: { id: string; shortName: string }[] = (ctx?.allClients || []).filter((c: any) => c.id !== 'mna');
 
-  const [events, setEvents] = useState<ScheduleEvent[]>([]);
-  const [loading, setLoading] = useState(true);
   const [userEmail, setUserEmail] = useState('');
-  const [showAdd, setShowAdd] = useState(false);
-  const [viewMode, setViewMode] = useState<'day' | 'week'>('day');
-  const [selectedDate, setSelectedDate] = useState(todayStr());
+  const [view, setView] = useState<ViewMode>('week');
+  const [colorBy, setColorBy] = useState<ColorBy>('type');
+  const [anchor, setAnchor] = useState(todayStr());
+  const [events, setEvents] = useState<ScheduleEvent[]>([]);
+  const [googleEvents, setGoogleEvents] = useState<ScheduleEvent[]>([]);
+  const [tasks, setTasks] = useState<ScheduleEvent[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [reloadKey, setReloadKey] = useState(0);
+  const [hidden, setHidden] = useState<Set<string>>(new Set());
+  const [hideDone, setHideDone] = useState(false);
 
   const [gcalConnected, setGcalConnected] = useState(false);
   const [gcalLoading, setGcalLoading] = useState(false);
-  const [googleEvents, setGoogleEvents] = useState<any[]>([]);
 
-  const [showBlock, setShowBlock] = useState(false);
-  const [blockForm, setBlockForm] = useState({
-    date: todayStr(), start_time: '09:00', end_time: '17:00', title: 'Blocked', allDay: false,
-  });
+  const [modalDraft, setModalDraft] = useState<EventDraft | null>(null);
+  const [modalSource, setModalSource] = useState<ScheduleEvent | null>(null);
 
-  const [newEvent, setNewEvent] = useState({
-    title: '', description: '', event_date: todayStr(), start_time: '09:00', end_time: '10:00',
-    event_type: 'task', priority: 'normal', client_id: '', attendees: '',
-    meeting_mode: 'none' as 'none' | 'google_meet' | 'in_person', location: '',
-    recurrence: 'none' as 'none' | 'daily' | 'weekly' | 'biweekly' | 'monthly',
-    recurrence_end: '',
-  });
+  // Restore view + colour preferences.
+  useEffect(() => {
+    setView(readPref('mna.schedule.view', ['day', 'week', 'month'] as const, 'week'));
+    setColorBy(readPref('mna.schedule.colorBy', ['type', 'client', 'priority'] as const, 'type'));
+  }, []);
+  useEffect(() => { writePref('mna.schedule.view', view); }, [view]);
+  useEffect(() => { writePref('mna.schedule.colorBy', colorBy); setHidden(new Set()); }, [colorBy]);
 
   useEffect(() => {
     createClient().auth.getUser().then(({ data: { user } }) => {
       const email = user?.email || '';
       setUserEmail(email);
-      // Check Google Calendar connection
       if (email) {
         fetch(`/api/google/status?email=${encodeURIComponent(email)}`)
-          .then(r => r.json())
-          .then(d => setGcalConnected(d.connected))
+          .then((r) => r.json())
+          .then((d) => setGcalConnected(!!d.connected))
           .catch(() => {});
       }
     });
   }, []);
 
+  const [from, to] = viewRange(view, anchor);
+
+  // Calendar range
   useEffect(() => {
     if (!userEmail) return;
+    let cancelled = false;
     setLoading(true);
-    const from = viewMode === 'week' ? selectedDate : selectedDate;
-    const to = viewMode === 'week' ? addDays(selectedDate, 6) : selectedDate;
-
-    // Fetch MNA events
-    const mnaFetch = fetch(`/api/schedule?email=${encodeURIComponent(userEmail)}&from=${from}&to=${to}`)
+    fetch(`/api/schedule?email=${encodeURIComponent(userEmail)}&from=${from}&to=${to}`)
       .then((r) => r.json())
-      .then((d) => setEvents(d.events || []));
+      .then((d) => { if (!cancelled) setEvents(d.events || []); })
+      .catch(() => {})
+      .finally(() => { if (!cancelled) setLoading(false); });
 
-    // Fetch Google Calendar events if connected
     if (gcalConnected) {
       fetch(`/api/google/sync?email=${encodeURIComponent(userEmail)}&from=${from}&to=${to}`)
-        .then(r => r.json())
-        // /api/google/sync returns `date`, the rest of this page groups by
-        // `event_date` — normalize on arrival like the home dashboard does.
-        .then(d => setGoogleEvents((d.events || []).map((e: any) => ({
-          ...e,
-          event_date: e.date || e.event_date,
-          event_type: 'google',
-          completed: false,
-        }))))
-        .catch(() => setGoogleEvents([]));
+        .then((r) => r.json())
+        // /api/google/sync returns `date`; the calendar groups by `event_date`.
+        .then((d) => {
+          if (cancelled) return;
+          setGoogleEvents((d.events || []).map((e: any) => ({
+            ...e,
+            event_date: e.date || e.event_date,
+            event_type: 'google',
+            priority: 'normal',
+            client_id: null,
+            completed: false,
+          })));
+        })
+        .catch(() => { if (!cancelled) setGoogleEvents([]); });
+    } else {
+      setGoogleEvents([]);
     }
+    return () => { cancelled = true; };
+  }, [userEmail, from, to, gcalConnected, reloadKey]);
 
-    mnaFetch.finally(() => setLoading(false));
-  }, [userEmail, selectedDate, viewMode, gcalConnected]);
+  // Task list range
+  useEffect(() => {
+    if (!userEmail) return;
+    const t = todayStr();
+    fetch(`/api/schedule?email=${encodeURIComponent(userEmail)}&from=${addDays(t, -TASK_LOOKBACK)}&to=${addDays(t, TASK_LOOKAHEAD)}`)
+      .then((r) => r.json())
+      .then((d) => setTasks((d.events || []).filter(isTask)))
+      .catch(() => {});
+  }, [userEmail, reloadKey]);
 
-  async function createEvent() {
-    if (!newEvent.title || !newEvent.event_date) { alert('Title and date required'); return; }
-    const res = await fetch('/api/schedule', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        email: userEmail,
-        clientId: newEvent.client_id || null,
-        title: newEvent.title,
-        description: newEvent.description || null,
-        eventDate: newEvent.event_date,
-        startTime: newEvent.start_time || null,
-        endTime: newEvent.end_time || null,
-        eventType: newEvent.event_type,
-        priority: newEvent.priority,
-        attendees: newEvent.attendees || null,
-        meetingMode: newEvent.meeting_mode,
-        location: newEvent.location || null,
-        recurrence: newEvent.recurrence,
-        recurrenceEnd: newEvent.recurrence_end || null,
-      }),
+  const clientName = useCallback((id: string | null) => allClients.find((c) => c.id === id)?.shortName, [allClients]);
+
+  // ─── Mutations (optimistic across both lists) ───
+  function applyLocal(id: string, patch: Partial<ScheduleEvent>) {
+    const up = (list: ScheduleEvent[]) => list.map((e) => (e.id === id ? { ...e, ...patch } : e));
+    setEvents(up);
+    setTasks((prev) => {
+      const next = up(prev);
+      const ev = next.find((e) => e.id === id);
+      return ev && !isTask(ev) ? next.filter((e) => e.id !== id) : next;
     });
-    const data = await res.json();
-    if (!res.ok) { alert(data.error); return; }
-    setEvents((prev) => [...prev, data.event].sort((a, b) => (a.start_time || '').localeCompare(b.start_time || '')));
-    setNewEvent({ title: '', description: '', event_date: selectedDate, start_time: '09:00', end_time: '10:00', event_type: 'task', priority: 'normal', client_id: '', attendees: '', meeting_mode: 'none', location: '', recurrence: 'none', recurrence_end: '' });
-    setShowAdd(false);
   }
 
-  async function blockTime() {
-    const startTime = blockForm.allDay ? '00:00' : blockForm.start_time;
-    const endTime = blockForm.allDay ? '23:59' : blockForm.end_time;
-    const res = await fetch('/api/schedule', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        email: userEmail,
-        title: blockForm.title || 'Blocked',
-        eventDate: blockForm.date,
-        startTime,
-        endTime,
-        eventType: 'blocked',
-        priority: 'normal',
-        meetingMode: 'none',
-      }),
-    });
-    const data = await res.json();
-    if (!res.ok) { alert(data.error); return; }
-    setEvents((prev) => [...prev, data.event].sort((a, b) => (a.start_time || '').localeCompare(b.start_time || '')));
-    setBlockForm({ date: selectedDate, start_time: '09:00', end_time: '17:00', title: 'Blocked', allDay: false });
-    setShowBlock(false);
-  }
-
-  async function toggleComplete(id: string, completed: boolean) {
+  async function patchEvent(ev: ScheduleEvent, patch: Record<string, any>) {
+    const before = { ...ev };
+    applyLocal(ev.id, patch);
     const res = await fetch('/api/schedule', {
       method: 'PATCH',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ id, completed }),
+      body: JSON.stringify({ id: ev.id, ...patch }),
+    });
+    if (!res.ok) {
+      applyLocal(ev.id, before);
+      const data = await res.json().catch(() => ({}));
+      alert(data.error || 'Could not update the event');
+      return null;
+    }
+    const data = await res.json();
+    applyLocal(ev.id, data.event);
+    return data.event as ScheduleEvent;
+  }
+
+  function toggleComplete(ev: ScheduleEvent) {
+    if (ev.event_type === 'google' || ev.event_type === 'blocked') return;
+    patchEvent(ev, { completed: !ev.completed });
+    if (modalSource?.id === ev.id) setModalSource({ ...ev, completed: !ev.completed });
+  }
+
+  function moveEvent(ev: ScheduleEvent, date: string, start: string | null) {
+    if (ev.event_type === 'google') return;
+    const patch: Record<string, any> = { event_date: date };
+    if (start && !isAllDay(ev)) {
+      const dur = ev.end_time ? timeToMin(ev.end_time) - timeToMin(ev.start_time) : 60;
+      patch.start_time = start;
+      patch.end_time = minToTime(timeToMin(start) + Math.max(dur, 15));
+    }
+    if (date === ev.event_date && patch.start_time === ev.start_time) return;
+    patchEvent(ev, patch);
+  }
+
+  async function quickAddTask(title: string, date: string, priority: string) {
+    const res = await fetch('/api/schedule', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ email: userEmail, title, eventDate: date, eventType: 'task', priority, meetingMode: 'none' }),
     });
     const data = await res.json();
-    if (res.ok) setEvents((prev) => prev.map((e) => (e.id === id ? { ...e, ...data.event } : e)));
+    if (!res.ok) { alert(data.error); return; }
+    setTasks((prev) => [...prev, data.event]);
+    if (data.event.event_date >= from && data.event.event_date <= to) setEvents((prev) => [...prev, data.event]);
+  }
+
+  async function saveDraft(d: EventDraft) {
+    const blocked = d.event_type === 'blocked';
+    const startTime = d.all_day ? (blocked ? '00:00' : null) : d.start_time || null;
+    const endTime = d.all_day ? (blocked ? '23:59' : null) : d.end_time || null;
+
+    if (d.id && modalSource) {
+      const updated = await patchEvent(modalSource, {
+        title: d.title.trim(),
+        description: d.description || null,
+        event_date: d.event_date,
+        start_time: startTime,
+        end_time: endTime,
+        event_type: d.event_type,
+        priority: d.priority,
+        client_id: d.client_id || null,
+        color: d.color || null,
+        attendees: d.attendees || null,
+        location: d.location || null,
+      });
+      if (updated) closeModal();
+      return;
+    }
+
+    const res = await fetch('/api/schedule', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        email: userEmail,
+        clientId: d.client_id || null,
+        title: d.title.trim(),
+        description: d.description || null,
+        eventDate: d.event_date,
+        startTime,
+        endTime,
+        eventType: d.event_type,
+        priority: blocked ? 'normal' : d.priority,
+        attendees: d.attendees || null,
+        meetingMode: d.meeting_mode,
+        location: d.location || null,
+        recurrence: d.recurrence,
+        recurrenceEnd: d.recurrence_end || null,
+        color: d.color || null,
+      }),
+    });
+    const data = await res.json();
+    if (!res.ok) { alert(data.error); return; }
+    closeModal();
+    // Recurring series create rows server-side — reload rather than guess them.
+    setReloadKey((k) => k + 1);
   }
 
   async function deleteEvent(ev: ScheduleEvent) {
     const isRecurring = (ev.recurrence && ev.recurrence !== 'none') || ev.recurring_parent_id;
-    let deleteSeries = false;
-
+    let series = false;
     if (isRecurring) {
-      const choice = confirm('Delete entire recurring series? (OK = whole series, Cancel = just this one)');
-      if (choice) {
-        deleteSeries = true;
-      } else {
-        if (!confirm('Delete just this occurrence?')) return;
-      }
-    } else {
-      if (!confirm('Delete this event?')) return;
-    }
+      if (confirm('Delete the entire recurring series?\n\nOK = whole series · Cancel = choose just this one')) series = true;
+      else if (!confirm('Delete just this occurrence?')) return;
+    } else if (!confirm(`Delete “${ev.title}”?`)) return;
 
     const parentId = ev.recurring_parent_id || ev.id;
-    const qs = deleteSeries ? `?id=${parentId}&series=true` : `?id=${ev.id}`;
-    await fetch(`/api/schedule${qs}`, { method: 'DELETE' });
-
-    if (deleteSeries) {
-      setEvents((prev) => prev.filter((e) => e.id !== parentId && e.recurring_parent_id !== parentId));
-    } else {
-      setEvents((prev) => prev.filter((e) => e.id !== ev.id));
-    }
+    const res = await fetch(`/api/schedule?id=${series ? parentId : ev.id}${series ? '&series=true' : ''}`, { method: 'DELETE' });
+    if (!res.ok) { alert('Could not delete the event'); return; }
+    const keep = (e: ScheduleEvent) => (series ? e.id !== parentId && e.recurring_parent_id !== parentId : e.id !== ev.id);
+    setEvents((prev) => prev.filter(keep));
+    setTasks((prev) => prev.filter(keep));
+    closeModal();
   }
 
-  const today = todayStr();
-  const isToday = selectedDate === today;
+  // ─── Modal helpers ───
+  function openCreate(date: string, start = '09:00', overrides: Partial<EventDraft> = {}) {
+    setModalSource(null);
+    setModalDraft(blankDraft(date, start, overrides));
+  }
+  function openEvent(ev: ScheduleEvent) {
+    setModalSource(ev);
+    setModalDraft(draftFrom(ev));
+  }
+  const closeModal = useCallback(() => { setModalDraft(null); setModalSource(null); }, []);
 
-  // Week days for week view
-  const weekDays = useMemo(() => {
-    return Array.from({ length: 7 }, (_, i) => addDays(selectedDate, i));
-  }, [selectedDate]);
+  // ─── Navigation ───
+  const step = useCallback((dir: 1 | -1) => {
+    setAnchor((a) => (view === 'day' ? addDays(a, dir) : view === 'week' ? addDays(a, 7 * dir) : addMonths(a, dir)));
+  }, [view]);
+  const openDay = (d: string) => { setAnchor(d); setView('day'); };
 
-  // Group events by date for week view
-  // Google events were being fetched into state and never rendered, so the
-  // Schedule page showed nothing while the home dashboard showed the same
-  // calendar fine. Merge them in, sorted by start time within each day.
-  const allEvents = useMemo(
-    () => [...events, ...(googleEvents as ScheduleEvent[])],
-    [events, googleEvents],
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      const el = e.target as HTMLElement;
+      if (modalDraft || e.metaKey || e.ctrlKey || e.altKey) return;
+      if (el && (el.tagName === 'INPUT' || el.tagName === 'TEXTAREA' || el.tagName === 'SELECT' || el.isContentEditable)) return;
+      const k = e.key.toLowerCase();
+      if (k === 'd') setView('day');
+      else if (k === 'w') setView('week');
+      else if (k === 'm') setView('month');
+      else if (k === 't') setAnchor(todayStr());
+      else if (k === 'n') openCreate(anchor);
+      else if (e.key === 'ArrowLeft') step(-1);
+      else if (e.key === 'ArrowRight') step(1);
+      else return;
+      e.preventDefault();
+    };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  });
+
+  // ─── Derived ───
+  const legend = useMemo(() => {
+    if (colorBy === 'priority') return PRIORITIES.map((p) => ({ key: p.value, label: p.label, hex: p.hex }));
+    if (colorBy === 'client') {
+      const ids = Array.from(new Set([...events, ...googleEvents].map((e) => e.client_id || '__none')));
+      return ids.map((id) => ({
+        key: id,
+        label: id === '__none' ? 'No client' : clientName(id) || id,
+        hex: id === '__none' ? clientHex(null) : clientHex(id),
+      }));
+    }
+    const present = new Set([...events, ...googleEvents].map((e) => e.event_type));
+    return EVENT_TYPES.filter((t) => present.has(t.value) || ['meeting', 'call', 'task', 'deadline'].includes(t.value))
+      .map((t) => ({ key: t.value, label: t.label, hex: t.hex }));
+  }, [colorBy, events, googleEvents, clientName]);
+
+  const visible = useMemo(
+    () => [...events, ...googleEvents].filter((e) => !hidden.has(legendKey(e, colorBy)) && !(hideDone && e.completed)),
+    [events, googleEvents, hidden, colorBy, hideDone],
   );
 
   const eventsByDate = useMemo(() => {
     const map: Record<string, ScheduleEvent[]> = {};
-    allEvents.forEach((e) => {
-      if (!e?.event_date) return;
-      if (!map[e.event_date]) map[e.event_date] = [];
-      map[e.event_date].push(e);
-    });
-    for (const day of Object.keys(map)) {
-      map[day].sort((a, b) => (a.start_time || '').localeCompare(b.start_time || ''));
+    for (const e of visible) {
+      if (!e?.event_date) continue;
+      (map[e.event_date] ||= []).push(e);
     }
+    for (const k of Object.keys(map)) map[k].sort((a, b) => (a.start_time || '').localeCompare(b.start_time || ''));
     return map;
-  }, [allEvents]);
+  }, [visible]);
 
-  // Time slots for day view
-  const hours = Array.from({ length: 16 }, (_, i) => i + 6); // 6 AM to 9 PM
+  const today = todayStr();
+  const todays = [...events, ...googleEvents].filter((e) => e.event_date === today);
+  const nextUp = todays
+    .filter((e) => !e.completed && e.start_time && !isAllDay(e) && timeToMin(e.end_time || e.start_time) >= new Date().getHours() * 60 + new Date().getMinutes())
+    .sort((a, b) => (a.start_time || '').localeCompare(b.start_time || ''))[0];
+  const overdueCount = tasks.filter((t) => !t.completed && t.event_date < today).length;
+
+  const days = view === 'day' ? [anchor] : Array.from({ length: 7 }, (_, i) => addDays(startOfWeek(anchor), i));
+  const inRange = today >= from && today <= to;
+
+  async function connectGoogle() {
+    setGcalLoading(true);
+    try {
+      const res = await fetch(`/api/google/connect?email=${encodeURIComponent(userEmail)}`);
+      const data = await res.json();
+      if (data.url) window.location.href = data.url;
+    } finally {
+      setGcalLoading(false);
+    }
+  }
 
   return (
-    <div className="flex flex-col gap-6">
+    <div className="flex flex-col gap-5">
       {/* Header */}
-      <div className="flex items-center justify-between flex-wrap gap-3">
+      <div className="flex items-end justify-between flex-wrap gap-4">
         <div>
           <div className="flex items-center gap-3">
-            <span className="material-symbols-outlined text-white/80" style={{ fontSize: 28 }}>calendar_month</span>
-            <h1 className="text-3xl font-bold text-white tracking-tight">Schedule</h1>
+            <span
+              className="w-11 h-11 rounded-2xl flex items-center justify-center"
+              style={{ background: 'linear-gradient(145deg, rgba(255,255,255,0.28), rgba(255,255,255,0.06))', border: '1px solid rgba(255,255,255,0.3)', boxShadow: 'inset 0 1px 0 rgba(255,255,255,0.5), 0 6px 18px rgba(0,0,0,0.2)' }}
+            >
+              <span className="material-symbols-outlined text-white" style={{ fontSize: 24 }}>calendar_month</span>
+            </span>
+            <div>
+              <h1 className="text-3xl font-bold text-white tracking-tight leading-none">Schedule</h1>
+              <p className="text-white/55 text-[13px] mt-1.5 flex items-center gap-2 flex-wrap">
+                <span>{todays.length} today</span>
+                {nextUp && (
+                  <span className="text-cyan-200">· Next: <b className="font-semibold">{nextUp.title}</b> at {nextUp.start_time?.slice(0, 5)}</span>
+                )}
+                {overdueCount > 0 && <span className="text-rose-300 font-semibold">· {overdueCount} overdue task{overdueCount > 1 ? 's' : ''}</span>}
+              </p>
+            </div>
           </div>
-          <p className="text-white/60 mt-1">
-            {fmtDate(selectedDate)} {isToday && <span className="text-emerald-300 font-semibold">· Today</span>}
-            {' · '}{allEvents.filter((e) => !e.completed).length} active events
-          </p>
         </div>
-        <div className="flex items-center gap-2">
-          <div className="flex gap-1 p-1 rounded-xl" style={{ background: 'rgba(255,255,255,0.08)' }}>
-            <button
-              onClick={() => setViewMode('day')}
-              className={`px-3 py-1.5 text-[12px] font-semibold rounded-lg transition-colors ${viewMode === 'day' ? 'bg-white/15 text-white' : 'text-white/50 hover:text-white/70'}`}
-            >
-              Day
-            </button>
-            <button
-              onClick={() => setViewMode('week')}
-              className={`px-3 py-1.5 text-[12px] font-semibold rounded-lg transition-colors ${viewMode === 'week' ? 'bg-white/15 text-white' : 'text-white/50 hover:text-white/70'}`}
-            >
-              Week
-            </button>
-          </div>
-          {/* Google Calendar connect */}
+
+        <div className="flex items-center gap-2 flex-wrap">
           {gcalConnected ? (
-            <div className="flex items-center gap-1.5">
-              <span className="flex items-center gap-1.5 px-3 py-2 rounded-xl text-[11px] font-semibold text-emerald-400" style={{ background: 'rgba(34,197,94,0.1)', border: '1px solid rgba(34,197,94,0.2)' }}>
-                <span className="material-symbols-outlined" style={{ fontSize: 14 }}>check_circle</span>
-                Google Calendar
-              </span>
-              <button
-                onClick={async () => {
-                  setGcalLoading(true);
-                  const res = await fetch(`/api/google/connect?email=${encodeURIComponent(userEmail)}`);
-                  const data = await res.json();
-                  if (data.url) window.location.href = data.url;
-                  setGcalLoading(false);
-                }}
-                disabled={gcalLoading || !userEmail}
-                title="Re-authorize Google to grant Drive access for the content picker"
-                className="flex items-center gap-1.5 px-3 py-2 rounded-xl text-[11px] font-semibold text-white/60 hover:text-white transition-colors disabled:opacity-40"
-                style={{ background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.1)' }}
-              >
-                <span className="material-symbols-outlined" style={{ fontSize: 14 }}>sync</span>
-                {gcalLoading ? 'Connecting...' : 'Reconnect / grant Drive'}
-              </button>
-            </div>
-          ) : (
             <button
-              onClick={async () => {
-                setGcalLoading(true);
-                const res = await fetch(`/api/google/connect?email=${encodeURIComponent(userEmail)}`);
-                const data = await res.json();
-                if (data.url) window.location.href = data.url;
-                setGcalLoading(false);
-              }}
+              onClick={connectGoogle}
               disabled={gcalLoading || !userEmail}
-              className="flex items-center gap-1.5 px-3 py-2 rounded-xl text-[11px] font-semibold text-white/60 hover:text-white transition-colors disabled:opacity-40"
-              style={{ background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.1)' }}
+              title="Google Calendar is connected — click to reconnect / grant Drive access"
+              className="lg-btn px-3 py-2 text-[11px] font-semibold !text-emerald-200 disabled:opacity-40"
             >
-              <span className="material-symbols-outlined" style={{ fontSize: 14 }}>calendar_month</span>
-              {gcalLoading ? 'Connecting...' : 'Connect Google Calendar'}
+              <span className="material-symbols-outlined" style={{ fontSize: 15 }}>check_circle</span>
+              {gcalLoading ? 'Connecting…' : 'Google synced'}
+            </button>
+          ) : (
+            <button onClick={connectGoogle} disabled={gcalLoading || !userEmail} className="lg-btn px-3 py-2 text-[11px] font-semibold disabled:opacity-40">
+              <span className="material-symbols-outlined" style={{ fontSize: 15 }}>add_link</span>
+              {gcalLoading ? 'Connecting…' : 'Connect Google Calendar'}
             </button>
           )}
           <button
-            onClick={() => { setShowBlock(!showBlock); setShowAdd(false); setBlockForm((b) => ({ ...b, date: selectedDate })); }}
-            className={`text-[12px] font-bold px-4 py-2 rounded-xl transition-colors ${
-              showBlock ? 'bg-red-500/20 text-red-300 border border-red-500/30' : 'text-white/70 hover:text-white border border-white/15'
-            }`}
-            style={!showBlock ? { background: 'rgba(255,255,255,0.06)' } : undefined}
+            onClick={() => openCreate(anchor, '09:00', { event_type: 'blocked', title: 'Blocked', meeting_mode: 'none', end_time: '17:00' })}
+            className="lg-btn px-3 py-2 text-[12px] font-semibold"
+            title="Block time so clients can't book it"
           >
-            <span className="material-symbols-outlined mr-1" style={{ fontSize: 14, verticalAlign: 'middle' }}>block</span>
-            {showBlock ? 'Cancel' : 'Block Time'}
+            <span className="material-symbols-outlined text-rose-300" style={{ fontSize: 16 }}>block</span>
+            Block time
           </button>
           <button
-            onClick={() => { setShowAdd(!showAdd); setShowBlock(false); setNewEvent((n) => ({ ...n, event_date: selectedDate })); }}
-            className="text-[12px] font-bold px-4 py-2 rounded-xl text-white"
-            style={{ background: 'linear-gradient(135deg, #0c6da4, #4ab8ce)' }}
+            onClick={() => openCreate(anchor)}
+            className="flex items-center gap-1.5 px-4 py-2 rounded-full text-[12px] font-bold text-white transition-transform active:scale-95"
+            style={{ background: 'linear-gradient(135deg, #0c6da4, #4ab8ce)', boxShadow: 'inset 0 1px 0 rgba(255,255,255,0.4), 0 6px 18px rgba(12,109,164,0.45)' }}
+            title="New event (N)"
           >
-            {showAdd ? 'Cancel' : '+ Add Event'}
+            <span className="material-symbols-outlined" style={{ fontSize: 16 }}>add</span>
+            New
           </button>
         </div>
       </div>
 
-      {/* Date nav */}
-      <div className="flex items-center gap-2">
-        <button onClick={() => setSelectedDate(addDays(selectedDate, viewMode === 'week' ? -7 : -1))} className="w-8 h-8 rounded-lg bg-white/10 flex items-center justify-center text-white hover:bg-white/15">
-          <span className="material-symbols-outlined" style={{ fontSize: 18 }}>chevron_left</span>
-        </button>
-        <button onClick={() => setSelectedDate(today)} className={`text-[12px] font-bold px-3 py-1.5 rounded-lg ${isToday ? 'bg-emerald-500/20 text-emerald-300' : 'bg-white/10 text-white/60 hover:bg-white/15'}`}>
-          Today
-        </button>
-        <input
-          type="date"
-          value={selectedDate}
-          onChange={(e) => setSelectedDate(e.target.value)}
-          className="text-[12px] px-3 py-1.5 rounded-lg bg-white/10 border border-white/15 text-white outline-none"
-        />
-        <button onClick={() => setSelectedDate(addDays(selectedDate, viewMode === 'week' ? 7 : 1))} className="w-8 h-8 rounded-lg bg-white/10 flex items-center justify-center text-white hover:bg-white/15">
-          <span className="material-symbols-outlined" style={{ fontSize: 18 }}>chevron_right</span>
-        </button>
-      </div>
-
-      {/* Block time form */}
-      {showBlock && (
-        <div className="glass-card p-5 space-y-3" style={{ borderLeft: '3px solid #ef4444' }}>
-          <div className="flex items-center gap-2 mb-1">
-            <span className="material-symbols-outlined text-red-400" style={{ fontSize: 18 }}>block</span>
-            <div className="text-[13px] font-bold text-white">Block Time Off</div>
-            <span className="text-[11px] text-white/40">— prevents clients from booking during this time</span>
+      {/* Toolbar */}
+      <div className="lg-surface !rounded-full px-2 py-2 flex items-center justify-between gap-3 flex-wrap">
+        <div className="flex items-center gap-1.5">
+          <button onClick={() => setAnchor(todayStr())} className={`lg-btn px-3.5 py-1.5 text-[12px] font-semibold ${inRange ? '!text-cyan-100' : ''}`} title="Today (T)">
+            Today
+          </button>
+          <button onClick={() => step(-1)} className="lg-btn w-8 h-8" aria-label="Previous" title="Previous (←)">
+            <span className="material-symbols-outlined" style={{ fontSize: 18 }}>chevron_left</span>
+          </button>
+          <button onClick={() => step(1)} className="lg-btn w-8 h-8" aria-label="Next" title="Next (→)">
+            <span className="material-symbols-outlined" style={{ fontSize: 18 }}>chevron_right</span>
+          </button>
+          <div className="relative ml-1">
+            <div className="text-[16px] font-semibold text-white px-1 whitespace-nowrap">{rangeTitle(view, anchor)}</div>
+            <input
+              type="date"
+              value={anchor}
+              onChange={(e) => e.target.value && setAnchor(e.target.value)}
+              className="absolute inset-0 opacity-0 cursor-pointer"
+              aria-label="Jump to date"
+            />
           </div>
-          <div className="grid grid-cols-1 md:grid-cols-4 gap-3 items-end">
-            <div>
-              <label className="text-[10px] font-bold uppercase tracking-wider text-white/40 mb-1 block">Label</label>
-              <input type="text" placeholder="e.g. Lunch, Out of Office" value={blockForm.title}
-                onChange={(e) => setBlockForm({ ...blockForm, title: e.target.value })}
-                className="w-full text-[12px] px-3 py-2 rounded-xl bg-white/5 border border-white/15 text-white outline-none placeholder:text-white/30" />
-            </div>
-            <div>
-              <label className="text-[10px] font-bold uppercase tracking-wider text-white/40 mb-1 block">Date</label>
-              <input type="date" value={blockForm.date}
-                onChange={(e) => setBlockForm({ ...blockForm, date: e.target.value })}
-                className="w-full text-[12px] px-3 py-2 rounded-xl bg-white/5 border border-white/15 text-white outline-none" />
-            </div>
-            {!blockForm.allDay && (
-              <>
-                <div>
-                  <label className="text-[10px] font-bold uppercase tracking-wider text-white/40 mb-1 block">From</label>
-                  <input type="time" value={blockForm.start_time}
-                    onChange={(e) => setBlockForm({ ...blockForm, start_time: e.target.value })}
-                    className="w-full text-[12px] px-3 py-2 rounded-xl bg-white/5 border border-white/15 text-white outline-none" />
-                </div>
-                <div>
-                  <label className="text-[10px] font-bold uppercase tracking-wider text-white/40 mb-1 block">To</label>
-                  <input type="time" value={blockForm.end_time}
-                    onChange={(e) => setBlockForm({ ...blockForm, end_time: e.target.value })}
-                    className="w-full text-[12px] px-3 py-2 rounded-xl bg-white/5 border border-white/15 text-white outline-none" />
-                </div>
-              </>
-            )}
-          </div>
-          <div className="flex items-center justify-between">
-            <label className="flex items-center gap-2 cursor-pointer">
-              <input type="checkbox" checked={blockForm.allDay}
-                onChange={(e) => setBlockForm({ ...blockForm, allDay: e.target.checked })}
-                className="rounded border-white/30 bg-white/5 text-red-500 focus:ring-red-500/30" />
-              <span className="text-[12px] font-semibold text-white/60">Block entire day</span>
-            </label>
-            <button onClick={blockTime} className="text-[12px] font-bold px-5 py-2 rounded-xl text-white bg-red-500/80 hover:bg-red-500 transition-colors">
-              Block Time
-            </button>
-          </div>
+          {loading && <span className="w-3.5 h-3.5 ml-1 rounded-full border-2 border-white/20 border-t-white/80 animate-spin" />}
         </div>
-      )}
 
-      {/* Add event form */}
-      {showAdd && (
-        <div className="glass-card p-5 space-y-3">
-          <div className="text-[13px] font-bold text-white mb-1">New Event</div>
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
-            <input type="text" placeholder="Event title" value={newEvent.title} onChange={(e) => setNewEvent({ ...newEvent, title: e.target.value })}
-              className="text-[12px] px-3 py-2 rounded-xl bg-white/5 border border-white/15 text-white outline-none placeholder:text-white/30 col-span-1 md:col-span-2" />
-            <input type="date" value={newEvent.event_date} onChange={(e) => setNewEvent({ ...newEvent, event_date: e.target.value })}
-              className="text-[12px] px-3 py-2 rounded-xl bg-white/5 border border-white/15 text-white outline-none" />
-          </div>
-          <div className="grid grid-cols-2 md:grid-cols-5 gap-3">
-            <input type="time" value={newEvent.start_time} onChange={(e) => setNewEvent({ ...newEvent, start_time: e.target.value })}
-              className="text-[12px] px-3 py-2 rounded-xl bg-white/5 border border-white/15 text-white outline-none" />
-            <input type="time" value={newEvent.end_time} onChange={(e) => setNewEvent({ ...newEvent, end_time: e.target.value })}
-              className="text-[12px] px-3 py-2 rounded-xl bg-white/5 border border-white/15 text-white outline-none" />
-            <select value={newEvent.event_type} onChange={(e) => {
-              const t = e.target.value;
-              const mode = (t === 'meeting' || t === 'call') ? 'google_meet' : 'none';
-              setNewEvent({ ...newEvent, event_type: t, meeting_mode: mode });
-            }}
-              className="text-[12px] px-3 py-2 rounded-xl bg-white/5 border border-white/15 text-white outline-none">
-              {EVENT_TYPES.map((t) => <option key={t.value} value={t.value}>{t.label}</option>)}
-            </select>
-            <select value={newEvent.priority} onChange={(e) => setNewEvent({ ...newEvent, priority: e.target.value })}
-              className="text-[12px] px-3 py-2 rounded-xl bg-white/5 border border-white/15 text-white outline-none">
-              {PRIORITIES.map((p) => <option key={p.value} value={p.value}>{p.label}</option>)}
-            </select>
-            <select value={newEvent.client_id} onChange={(e) => setNewEvent({ ...newEvent, client_id: e.target.value })}
-              className="text-[12px] px-3 py-2 rounded-xl bg-white/5 border border-white/15 text-white outline-none">
-              <option value="">No client</option>
-              {allClients.filter((c: any) => c.id !== 'mna').map((c: any) => <option key={c.id} value={c.id}>{c.shortName}</option>)}
-            </select>
-          </div>
-          {/* Meeting mode — only show for meetings/calls */}
-          {(newEvent.event_type === 'meeting' || newEvent.event_type === 'call') && (
-            <div className="flex gap-2">
+        <div className="flex items-center gap-2">
+          <select
+            value={colorBy}
+            onChange={(e) => setColorBy(e.target.value as ColorBy)}
+            className="lg-input !w-auto !rounded-full !py-1.5 !text-[12px]"
+            title="Color code by"
+          >
+            <option value="type">Color by type</option>
+            <option value="client">Color by client</option>
+            <option value="priority">Color by priority</option>
+          </select>
+          <div className="lg-segment" role="tablist">
+            <span
+              className="lg-segment-thumb"
+              style={{ width: `calc((100% - 8px) / ${VIEWS.length})`, transform: `translateX(${VIEWS.findIndex((v) => v.value === view) * 100}%)` }}
+            />
+            {VIEWS.map((v) => (
               <button
-                type="button"
-                onClick={() => setNewEvent({ ...newEvent, meeting_mode: 'google_meet' })}
-                className={`flex-1 flex items-center justify-center gap-2 text-[12px] font-semibold px-3 py-2.5 rounded-xl border transition-colors ${
-                  newEvent.meeting_mode === 'google_meet'
-                    ? 'bg-blue-500/20 border-blue-500/40 text-blue-300'
-                    : 'bg-white/5 border-white/15 text-white/50 hover:text-white/70'
-                }`}
+                key={v.value}
+                role="tab"
+                aria-selected={view === v.value}
+                onClick={() => setView(v.value)}
+                className={`px-4 py-1.5 text-[12px] font-semibold transition-colors ${view === v.value ? 'text-white' : 'text-white/55 hover:text-white/80'}`}
+                title={`${v.label} (${v.label[0]})`}
               >
-                <span className="material-symbols-outlined" style={{ fontSize: 16 }}>videocam</span>
-                Google Meet
-              </button>
-              <button
-                type="button"
-                onClick={() => setNewEvent({ ...newEvent, meeting_mode: 'in_person' })}
-                className={`flex-1 flex items-center justify-center gap-2 text-[12px] font-semibold px-3 py-2.5 rounded-xl border transition-colors ${
-                  newEvent.meeting_mode === 'in_person'
-                    ? 'bg-amber-500/20 border-amber-500/40 text-amber-300'
-                    : 'bg-white/5 border-white/15 text-white/50 hover:text-white/70'
-                }`}
-              >
-                <span className="material-symbols-outlined" style={{ fontSize: 16 }}>location_on</span>
-                In-Person
-              </button>
-            </div>
-          )}
-          {newEvent.meeting_mode === 'in_person' && (
-            <input type="text" placeholder="Location (e.g. Office, Coffee shop, 123 Main St)" value={newEvent.location} onChange={(e) => setNewEvent({ ...newEvent, location: e.target.value })}
-              className="w-full text-[12px] px-3 py-2 rounded-xl bg-white/5 border border-white/15 text-white outline-none placeholder:text-white/30" />
-          )}
-          <input type="text" placeholder="Attendees (e.g. Justin, Sable, jkulkusky@primeivhydration.com)" value={newEvent.attendees} onChange={(e) => setNewEvent({ ...newEvent, attendees: e.target.value })}
-            className="w-full text-[12px] px-3 py-2 rounded-xl bg-white/5 border border-white/15 text-white outline-none placeholder:text-white/30" />
-          {/* Recurrence */}
-          <div className="flex gap-2 flex-wrap">
-            <div className="text-[11px] text-white/40 font-semibold self-center mr-1">Repeat:</div>
-            {([
-              { value: 'none', label: 'None' },
-              { value: 'daily', label: 'Daily' },
-              { value: 'weekly', label: 'Weekly' },
-              { value: 'biweekly', label: 'Every 2 Weeks' },
-              { value: 'monthly', label: 'Monthly' },
-            ] as const).map((opt) => (
-              <button
-                key={opt.value}
-                type="button"
-                onClick={() => setNewEvent({ ...newEvent, recurrence: opt.value })}
-                className={`text-[11px] font-semibold px-3 py-1.5 rounded-lg border transition-colors ${
-                  newEvent.recurrence === opt.value
-                    ? 'bg-purple-500/20 border-purple-500/40 text-purple-300'
-                    : 'bg-white/5 border-white/15 text-white/50 hover:text-white/70'
-                }`}
-              >
-                {opt.label}
+                {v.label}
               </button>
             ))}
           </div>
-          {newEvent.recurrence !== 'none' && (
-            <div className="flex items-center gap-2">
-              <span className="text-[11px] text-white/40 font-semibold">Until:</span>
-              <input type="date" value={newEvent.recurrence_end} onChange={(e) => setNewEvent({ ...newEvent, recurrence_end: e.target.value })}
-                className="text-[12px] px-3 py-1.5 rounded-xl bg-white/5 border border-white/15 text-white outline-none" />
-              <span className="text-[10px] text-white/30">(leave blank for 3 months)</span>
-            </div>
-          )}
-          <textarea placeholder="Description (optional)" value={newEvent.description} onChange={(e) => setNewEvent({ ...newEvent, description: e.target.value })}
-            rows={2} className="w-full text-[12px] px-3 py-2 rounded-xl bg-white/5 border border-white/15 text-white outline-none placeholder:text-white/30" />
-          <button onClick={createEvent} className="text-[12px] font-bold px-5 py-2 rounded-xl text-white" style={{ background: 'linear-gradient(135deg, #0c6da4, #4ab8ce)' }}>
-            Create Event
-          </button>
         </div>
-      )}
+      </div>
 
-      {loading && <div className="text-white/50 text-center py-8">Loading schedule...</div>}
-
-      {/* Day view */}
-      {!loading && viewMode === 'day' && (
-        <div className="glass-card overflow-hidden">
-          {allEvents.length === 0 ? (
-            <div className="p-8 text-center text-white/40">
-              <span className="material-symbols-outlined block mb-2" style={{ fontSize: 32 }}>event_available</span>
-              No events for {fmtDate(selectedDate)}
-            </div>
-          ) : (
-            <div className="divide-y divide-white/5">
-              {allEvents.map((ev) => {
-                const type = EVENT_TYPES.find((t) => t.value === ev.event_type) || EVENT_TYPES[2];
-                const pri = PRIORITIES.find((p) => p.value === ev.priority) || PRIORITIES[1];
-                const clientName = allClients.find((c: any) => c.id === ev.client_id)?.shortName;
-                return (
-                  <div key={ev.id} className={`flex items-start gap-3 p-4 transition-colors hover:bg-white/5 ${ev.completed ? 'opacity-50' : ''} ${ev.event_type === 'blocked' ? 'bg-red-500/5 border-l-2 border-l-red-500/40' : ''}`}>
-                    {/* Checkbox (not for blocked) */}
-                    {ev.event_type === 'google' ? (
-                      <span className="mt-0.5 w-5 h-5 rounded-md flex items-center justify-center shrink-0 bg-sky-500/20" title="From your Google Calendar">
-                        <span className="material-symbols-outlined text-sky-300" style={{ fontSize: 14 }}>event</span>
-                      </span>
-                    ) : ev.event_type === 'blocked' ? (
-                      <span className="mt-0.5 w-5 h-5 rounded-md flex items-center justify-center shrink-0 bg-red-500/20">
-                        <span className="material-symbols-outlined text-red-400" style={{ fontSize: 14 }}>block</span>
-                      </span>
-                    ) : (
-                    <button onClick={() => toggleComplete(ev.id, !ev.completed)} className={`mt-0.5 w-5 h-5 rounded-md border-2 flex items-center justify-center shrink-0 transition-colors ${ev.completed ? 'bg-emerald-500/30 border-emerald-400' : 'border-white/30 hover:border-white/50'}`}>
-                      {ev.completed && <span className="material-symbols-outlined text-emerald-300" style={{ fontSize: 14 }}>check</span>}
-                    </button>
-                    )}
-
-                    {/* Time */}
-                    <div className="w-20 shrink-0 text-right">
-                      {ev.start_time ? (
-                        <>
-                          <div className="text-[12px] font-bold text-white">{fmtTime(ev.start_time)}</div>
-                          {ev.end_time && <div className="text-[10px] text-white/40">{fmtTime(ev.end_time)}</div>}
-                        </>
-                      ) : (
-                        <div className="text-[11px] text-white/30 italic">All day</div>
-                      )}
-                    </div>
-
-                    {/* Content */}
-                    <div className="flex-1 min-w-0">
-                      <div className="flex items-center gap-2 flex-wrap">
-                        <span className={`${ev.completed ? 'line-through text-white/40' : pri.color} text-[13px] font-semibold`}>{ev.title}</span>
-                        <span className={`text-[9px] font-bold px-2 py-0.5 rounded-full ${type.color}`}>
-                          <span className="material-symbols-outlined mr-0.5" style={{ fontSize: 10, verticalAlign: 'middle' }}>{type.icon}</span>
-                          {type.label}
-                        </span>
-                        {ev.priority === 'high' && <span className="text-[9px] font-bold px-2 py-0.5 rounded-full bg-rose-500/20 text-rose-300">High</span>}
-                        {clientName && <span className="text-[9px] font-bold px-2 py-0.5 rounded-full bg-sky-500/15 text-sky-300">{clientName}</span>}
-                        {ev.recurrence && ev.recurrence !== 'none' && (
-                          <span className="text-[9px] font-bold px-2 py-0.5 rounded-full bg-purple-500/15 text-purple-300">
-                            <span className="material-symbols-outlined mr-0.5" style={{ fontSize: 10, verticalAlign: 'middle' }}>repeat</span>
-                            {ev.recurrence === 'daily' ? 'Daily' : ev.recurrence === 'weekly' ? 'Weekly' : ev.recurrence === 'biweekly' ? 'Biweekly' : 'Monthly'}
-                          </span>
-                        )}
-                      </div>
-                      {ev.attendees && (
-                        <div className="flex items-center gap-1 mt-0.5">
-                          <span className="material-symbols-outlined text-white/30" style={{ fontSize: 12 }}>group</span>
-                          <span className="text-[11px] text-white/40">{ev.attendees}</span>
-                        </div>
-                      )}
-                      {ev.meet_link && (
-                        <a href={ev.meet_link} target="_blank" rel="noopener noreferrer"
-                          className="inline-flex items-center gap-1 mt-0.5 text-[11px] text-blue-400 hover:text-blue-300 transition-colors">
-                          <span className="material-symbols-outlined" style={{ fontSize: 12 }}>videocam</span>
-                          Join Google Meet
-                        </a>
-                      )}
-                      {ev.location && (
-                        <div className="flex items-center gap-1 mt-0.5">
-                          <span className="material-symbols-outlined text-amber-400/60" style={{ fontSize: 12 }}>location_on</span>
-                          <span className="text-[11px] text-white/40">{ev.location}</span>
-                        </div>
-                      )}
-                      {ev.description && <div className="text-[11px] text-white/40 mt-0.5">{ev.description}</div>}
-                    </div>
-
-                    {/* Delete — Google events aren't ours to remove */}
-                    {ev.event_type === 'google' ? (
-                      <span className="text-[9px] font-bold px-2 py-0.5 rounded-full bg-sky-500/15 text-sky-300 shrink-0">Google</span>
-                    ) : (
-                      <button onClick={() => deleteEvent(ev)} className="text-white/20 hover:text-rose-300 transition-colors shrink-0">
-                        <span className="material-symbols-outlined" style={{ fontSize: 16 }}>close</span>
-                      </button>
-                    )}
-                  </div>
-                );
+      {/* Colour legend / filters */}
+      <div className="flex items-center gap-1.5 flex-wrap -mt-1">
+        {legend.map((l) => {
+          const off = hidden.has(l.key);
+          return (
+            <button
+              key={l.key}
+              onClick={() => setHidden((prev) => {
+                const next = new Set(prev);
+                if (next.has(l.key)) next.delete(l.key); else next.add(l.key);
+                return next;
               })}
-            </div>
-          )}
-        </div>
-      )}
+              className={`flex items-center gap-1.5 text-[11px] font-semibold px-2.5 py-1 rounded-full border transition-all ${off ? 'opacity-40 line-through' : ''}`}
+              style={{ background: off ? 'transparent' : `${l.hex}1f`, borderColor: `${l.hex}55`, color: 'rgba(255,255,255,0.85)' }}
+              title={off ? 'Show' : 'Hide'}
+            >
+              <span className="w-2 h-2 rounded-full" style={{ background: l.hex, boxShadow: off ? 'none' : `0 0 6px ${l.hex}` }} />
+              {l.label}
+            </button>
+          );
+        })}
+        <button
+          onClick={() => setHideDone(!hideDone)}
+          className={`ml-auto flex items-center gap-1 text-[11px] font-semibold px-2.5 py-1 rounded-full border transition-colors ${hideDone ? 'bg-white/15 border-white/30 text-white' : 'border-white/12 text-white/50 hover:text-white/80'}`}
+        >
+          <span className="material-symbols-outlined" style={{ fontSize: 13 }}>{hideDone ? 'visibility_off' : 'visibility'}</span>
+          {hideDone ? 'Completed hidden' : 'Hide completed'}
+        </button>
+      </div>
 
-      {/* Week view */}
-      {!loading && viewMode === 'week' && (
-        <div className="grid grid-cols-1 md:grid-cols-7 gap-3">
-          {weekDays.map((day) => {
-            const dayEvents = eventsByDate[day] || [];
-            const isT = day === today;
-            return (
-              <div key={day} className={`glass-card p-3 min-h-[200px] ${isT ? 'ring-1 ring-emerald-400/30' : ''}`}>
-                <div className={`text-[11px] font-bold uppercase tracking-wider mb-2 ${isT ? 'text-emerald-300' : 'text-white/40'}`}>
-                  {new Date(`${day}T12:00:00`).toLocaleDateString(undefined, { weekday: 'short' })}
-                  <span className="ml-1 text-[13px]">{new Date(`${day}T12:00:00`).getDate()}</span>
-                </div>
-                {dayEvents.length === 0 && <div className="text-[10px] text-white/20 italic">No events</div>}
-                {dayEvents.map((ev) => {
-                  const type = EVENT_TYPES.find((t) => t.value === ev.event_type) || EVENT_TYPES[2];
-                  return (
-                    <div key={ev.id} className={`mb-1.5 rounded-lg p-2 border border-white/10 ${ev.completed ? 'opacity-40' : ''}`} style={{ background: 'rgba(255,255,255,0.04)' }}>
-                      <div className="flex items-center gap-1">
-                        {ev.event_type === 'google' ? (
-                          <span className="w-3.5 h-3.5 rounded shrink-0 flex items-center justify-center bg-sky-500/20" title="From your Google Calendar">
-                            <span className="material-symbols-outlined text-sky-300" style={{ fontSize: 10 }}>event</span>
-                          </span>
-                        ) : (
-                          <button onClick={() => toggleComplete(ev.id, !ev.completed)} className={`w-3.5 h-3.5 rounded border shrink-0 flex items-center justify-center ${ev.completed ? 'bg-emerald-500/30 border-emerald-400' : 'border-white/30'}`}>
-                            {ev.completed && <span className="material-symbols-outlined text-emerald-300" style={{ fontSize: 10 }}>check</span>}
-                          </button>
-                        )}
-                        <span className={`text-[10px] font-semibold truncate ${ev.completed ? 'line-through text-white/40' : 'text-white/80'}`}>{ev.title}</span>
-                      </div>
-                      {ev.start_time && <div className="text-[9px] text-white/40 mt-0.5 ml-5">{fmtTime(ev.start_time)}</div>}
-                      <span className={`text-[7px] font-bold px-1 py-0.5 rounded ml-5 mt-0.5 inline-block ${type.color}`}>{type.label}</span>
-                    </div>
-                  );
-                })}
-              </div>
-            );
-          })}
+      {/* Calendar + task list */}
+      <div className="grid grid-cols-1 xl:grid-cols-[minmax(0,1fr)_330px] gap-5 items-start">
+        <div className="min-w-0">
+          {view === 'month' ? (
+            <MonthGrid
+              anchor={anchor}
+              eventsByDate={eventsByDate}
+              colorBy={colorBy}
+              onSelectEvent={openEvent}
+              onCreateOn={(d) => openCreate(d)}
+              onMove={(ev, d) => moveEvent(ev, d, null)}
+              onToggleComplete={toggleComplete}
+              onOpenDay={openDay}
+            />
+          ) : (
+            <TimeGrid
+              days={days}
+              eventsByDate={eventsByDate}
+              colorBy={colorBy}
+              onSelectEvent={openEvent}
+              onCreateAt={(d, start) => openCreate(d, start)}
+              onMove={moveEvent}
+              onToggleComplete={toggleComplete}
+              onOpenDay={openDay}
+            />
+          )}
+          <div className="text-[10px] text-white/30 mt-2 px-2 hidden md:block">
+            Tip: click an empty slot to add · drag events to reschedule · keys D / W / M switch views, T jumps to today, N adds an event
+          </div>
         </div>
-      )}
+
+        <TaskList
+          tasks={tasks}
+          colorBy={colorBy}
+          clientName={clientName}
+          onToggle={toggleComplete}
+          onSelect={(t) => openEvent(t)}
+          onQuickAdd={quickAddTask}
+        />
+      </div>
+
+      <EventModal
+        open={!!modalDraft}
+        draft={modalDraft}
+        source={modalSource}
+        clients={allClients}
+        onClose={closeModal}
+        onSave={saveDraft}
+        onDelete={deleteEvent}
+        onToggleComplete={toggleComplete}
+      />
     </div>
   );
 }

@@ -90,7 +90,7 @@ function generateRecurrenceDates(startDate: string, recurrence: string, endDate?
 export async function POST(req: NextRequest) {
   await ensureSchema();
   const body = await req.json();
-  const { email, clientId, title, description, eventDate, startTime, endTime, eventType, priority, attendees, meetingMode, location, recurrence, recurrenceEnd } = body;
+  const { email, clientId, title, description, eventDate, startTime, endTime, eventType, priority, attendees, meetingMode, location, recurrence, recurrenceEnd, color } = body;
 
   if (!email || !title || !eventDate) {
     return NextResponse.json({ error: 'email, title, and eventDate required' }, { status: 400 });
@@ -107,9 +107,9 @@ export async function POST(req: NextRequest) {
 
   // Create the parent event
   const { rows } = await query(
-    `insert into schedule_events (user_email, client_id, title, description, event_date, start_time, end_time, event_type, priority, attendees, meeting_mode, location, recurrence, recurrence_end)
-     values ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14) returning *`,
-    [email, clientId || null, title, description || null, eventDate, startTime || null, endTime || null, eventType || 'task', priority || 'normal', attendeesStr, meetingMode || 'none', location || null, rec, recEnd]
+    `insert into schedule_events (user_email, client_id, title, description, event_date, start_time, end_time, event_type, priority, attendees, meeting_mode, location, recurrence, recurrence_end, color)
+     values ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15) returning *`,
+    [email, clientId || null, title, description || null, eventDate, startTime || null, endTime || null, eventType || 'task', priority || 'normal', attendeesStr, meetingMode || 'none', location || null, rec, recEnd, color || null]
   );
 
   const parentId = rows[0].id;
@@ -119,9 +119,9 @@ export async function POST(req: NextRequest) {
     const futureDates = generateRecurrenceDates(eventDate, rec, recEnd);
     for (const d of futureDates) {
       await query(
-        `insert into schedule_events (user_email, client_id, title, description, event_date, start_time, end_time, event_type, priority, attendees, meeting_mode, location, recurrence, recurring_parent_id, meet_link)
-         values ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15)`,
-        [email, clientId || null, title, description || null, d, startTime || null, endTime || null, eventType || 'task', priority || 'normal', attendeesStr, meetingMode || 'none', location || null, rec, parentId, null]
+        `insert into schedule_events (user_email, client_id, title, description, event_date, start_time, end_time, event_type, priority, attendees, meeting_mode, location, recurrence, recurring_parent_id, meet_link, color)
+         values ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16)`,
+        [email, clientId || null, title, description || null, d, startTime || null, endTime || null, eventType || 'task', priority || 'normal', attendeesStr, meetingMode || 'none', location || null, rec, parentId, null, color || null]
       );
     }
   }
@@ -177,7 +177,7 @@ export async function PATCH(req: NextRequest) {
 
   const fields: string[] = [];
   const values: any[] = [];
-  const patchable = ['title', 'description', 'event_date', 'start_time', 'end_time', 'event_type', 'priority', 'completed', 'client_id', 'reminder_sent', 'attendees', 'meeting_mode', 'location', 'meet_link', 'recurrence', 'recurrence_end'];
+  const patchable = ['title', 'description', 'event_date', 'start_time', 'end_time', 'event_type', 'priority', 'completed', 'client_id', 'reminder_sent', 'attendees', 'meeting_mode', 'location', 'meet_link', 'recurrence', 'recurrence_end', 'color'];
 
   for (const key of patchable) {
     if (body[key] !== undefined) {
