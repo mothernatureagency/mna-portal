@@ -67,14 +67,16 @@ const PROMPT_TEXT=MD.match(/## 1\. System prompt[\s\S]*?```\n([\s\S]*?)```/)[1].
 const BODY='Calibri', MONO='Consolas';
 const NAVY='1C3D6E', GREY='595959', SHADE='F2F5F8';
 
+const PROSE=[];
+const rec=t=>{PROSE.push(t);return t;};
 const p=(t,o={})=>new Paragraph({spacing:{after:o.after??140,line:280},
-  children:[new TextRun({text:t,font:BODY,size:21,bold:o.bold,italics:o.italics,color:o.color})]});
+  children:[new TextRun({text:rec(t),font:BODY,size:21,bold:o.bold,italics:o.italics,color:o.color})]});
 const h1=t=>new Paragraph({heading:HeadingLevel.HEADING_1,spacing:{before:360,after:150},
   children:[new TextRun({text:t,font:BODY,size:30,bold:true,color:NAVY})]});
 const h2=t=>new Paragraph({heading:HeadingLevel.HEADING_2,spacing:{before:260,after:110},
   children:[new TextRun({text:t,font:BODY,size:23,bold:true,color:NAVY})]});
 const bul=t=>new Paragraph({numbering:{reference:'b',level:0},spacing:{after:70,line:280},
-  children:[new TextRun({text:t,font:BODY,size:21})]});
+  children:[new TextRun({text:rec(t),font:BODY,size:21})]});
 const nl=(t,i)=>new Paragraph({spacing:{after:70,line:280},indent:{left:420,hanging:420},
   children:[new TextRun({text:i+'.',font:BODY,size:21,bold:true}),
             new TextRun({text:'\t'+t,font:BODY,size:21})]});
@@ -92,7 +94,7 @@ function table(headers,rows,widths){
     shading:{type:ShadingType.CLEAR,color:'auto',fill:hdr?NAVY:'FFFFFF'},
     margins:{top:90,bottom:90,left:120,right:120},
     children:[new Paragraph({spacing:{after:0,line:250},
-      children:[new TextRun({text:t,font:BODY,size:19,bold:!!hdr,color:hdr?'FFFFFF':'000000'})]})]})) });
+      children:[new TextRun({text:rec(t),font:BODY,size:19,bold:!!hdr,color:hdr?'FFFFFF':'000000'})]})]})) });
   return new Table({columnWidths:widths,width:{size:total,type:WidthType.DXA},
     rows:[row(headers,true),...rows.map(r=>row(r,false))]});
 }
@@ -173,10 +175,10 @@ k.push(h2('Explicitly excluded from the knowledge base'));
 k.push(p('The agent routes rather than answers on anything the team has not settled. Do not load:'));
 ['Membership, package and bundle pricing, discounts, promo codes and “starting at” language — menu prices are fine',
  'The printed menu’s own descriptions. Load the rewritten wording only.',
- 'Voucher expiration terms',
+ 'Voucher expiration terms — the number stays out. The behaviour is settled: offer to extend and book them. Never state the window.',
  'Membership rollover, pause and cancellation rules',
  'What “Mobile Services Consult” includes',
- 'Anything sourced from existing campaign copy. The account’s current ads use “boost your energy” and “boost metabolism”, which violate the language rule. Build from the FAQ document only.'
+ 'Anything sourced from existing campaign copy. The account’s current ads use “boost your energy” and “boost metabolism”, which violate the language rule.'
 ].forEach(t=>k.push(bul(t)));
 
 k.push(h1('3. Workflow scaffolding'));
@@ -194,6 +196,7 @@ k.push(table(['Tag state','Offer passed to agent','May say “$99”?','Calendar
 ],[2500,2400,2000,2400]));
 k.push(gap());
 k.push(p('The price column is why this branch matters more now than it did before. The agent is allowed to say “$99” — but saying it to a contact entitled to the free B-12 variant is promising the wrong thing to the one person who should have heard better news. The workflow passes the permission; the agent never infers it. When no tag matches, the answer is silence and a handoff, not a guess.'));
+k.push(p('Expired vouchers land in the first-time row. Someone whose voucher lapsed never redeemed it, so they still carry the first-visit tag — which means the agent may say “$99” to them, and the voucher answer has it book them. That is intended as long as an extended voucher is honoured at $99. If it is not, this branch is wrong: those contacts need a tag of their own and a “no” in the price column, or the agent promises a price the desk then has to take back in front of the client.'));
 k.push(p('“Intro Offer” is confirmed as the live voucher calendar. “Intro Offer v1” is the orphan — retire it, or routing drifts back to it the next time someone edits calendars by name.'));
 
 k.push(h2('3b. Hard stop — bookings at 4:00 PM or later'));
@@ -273,6 +276,21 @@ function assertProseMatchesSource(){
   const wrong = closesAtSix
     ? [/10\s*[–-]\s*5\b/, /closing is 5:00/, /\b5:00 close\b/]
     : [/10\s*[–-]\s*6\b/, /closing is 6:00/, /\b6:00 close\b/];
+
+  // Omissions, not just contradictions. Decisions that were settled in the
+  // markdown have twice failed to reach this file; these are the ones whose
+  // absence would change what somebody builds.
+  const emitted = PROSE.join('\n');
+  const required = [
+    ['the expired-voucher pricing edge', /Expired vouchers land in the first-time row/],
+    ['the rule against stating the voucher window', /Never state the window/],
+    ['the duplicate calendar being a site bug', /one id pasted twice/],
+    ['which drip menu the agent may name', /names only what the website lists/],
+  ];
+  const missing = required.filter(([, re]) => !re.test(emitted)).map(([label]) => label);
+  if(missing.length){
+    throw new Error('The document is missing settled decisions:\n  - ' + missing.join('\n  - '));
+  }
 
   const hits = wrong.filter(re => re.test(prose)).map(String);
   if(hits.length){
