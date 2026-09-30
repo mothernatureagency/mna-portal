@@ -150,8 +150,8 @@ export default function SettingsPage() {
   return (
     <div className="space-y-6 max-w-3xl">
       <div>
-        <h1 className="text-2xl font-black text-gray-900">Settings</h1>
-        <p className="text-sm text-gray-400 mt-0.5">Manage your account preferences, timezone, and integrations</p>
+        <h1 className="text-2xl font-black text-white">Settings</h1>
+        <p className="text-sm text-white/50 mt-0.5">Manage your account preferences, timezone, and integrations</p>
       </div>
 
       {/* Account Info */}
@@ -162,8 +162,8 @@ export default function SettingsPage() {
             <span className="material-symbols-outlined" style={{ fontSize: 20 }}>person</span>
           </div>
           <div>
-            <h2 className="text-[15px] font-bold text-gray-900">Account</h2>
-            <p className="text-[12px] text-gray-400">{email || 'Loading...'}</p>
+            <h2 className="text-[15px] font-bold text-white">Account</h2>
+            <p className="text-[12px] text-white/50">{email || 'Loading...'}</p>
           </div>
         </div>
       </Card>
@@ -175,8 +175,8 @@ export default function SettingsPage() {
             <span className="material-symbols-outlined" style={{ fontSize: 20 }}>schedule</span>
           </div>
           <div>
-            <h2 className="text-[15px] font-bold text-gray-900">Timezone</h2>
-            <p className="text-[12px] text-gray-400">Controls greetings, schedule display, and calendar events</p>
+            <h2 className="text-[15px] font-bold text-white">Timezone</h2>
+            <p className="text-[12px] text-white/50">Controls greetings, schedule display, and calendar events</p>
           </div>
         </div>
 
@@ -184,8 +184,8 @@ export default function SettingsPage() {
           <select
             value={timezone}
             onChange={(e) => saveTimezone(e.target.value)}
-            className="w-full text-[13px] font-medium border rounded-xl px-4 py-3 bg-white text-gray-700 focus:outline-none focus:ring-2 focus:ring-indigo-200"
-            style={{ border: '1px solid rgba(0,0,0,0.1)' }}
+            className="w-full text-[13px] font-medium border rounded-xl px-4 py-3 bg-white/10 text-white focus:outline-none focus:ring-2 focus:ring-white/30"
+            style={{ border: '1px solid rgba(255,255,255,0.15)', colorScheme: 'dark' }}
           >
             {TIMEZONE_OPTIONS.map(tz => (
               <option key={tz.value} value={tz.value}>{tz.label}</option>
@@ -193,11 +193,11 @@ export default function SettingsPage() {
           </select>
 
           <div className="flex items-center gap-2 text-[12px]">
-            <span className="material-symbols-outlined text-gray-400" style={{ fontSize: 16 }}>public</span>
-            <span className="text-gray-500">
-              Current time in {currentTzOption?.short || timezone}: <span className="font-bold text-gray-700">{now}</span>
+            <span className="material-symbols-outlined text-white/50" style={{ fontSize: 16 }}>public</span>
+            <span className="text-white/60">
+              Current time in {currentTzOption?.short || timezone}: <span className="font-bold text-white/80">{now}</span>
             </span>
-            {saving && <span className="text-gray-400 ml-2">Saving...</span>}
+            {saving && <span className="text-white/50 ml-2">Saving...</span>}
             {saved && (
               <span className="text-emerald-600 font-semibold ml-2 flex items-center gap-1">
                 <span className="material-symbols-outlined" style={{ fontSize: 14 }}>check_circle</span>
@@ -216,10 +216,10 @@ export default function SettingsPage() {
             <span className="material-symbols-outlined" style={{ fontSize: 20 }}>event_available</span>
           </div>
           <div className="flex-1">
-            <h2 className="text-[15px] font-bold text-gray-900">Availability</h2>
-            <p className="text-[12px] text-gray-400">Set when clients can book meetings with you</p>
+            <h2 className="text-[15px] font-bold text-white">Availability</h2>
+            <p className="text-[12px] text-white/50">Set when clients can book meetings with you</p>
           </div>
-          {availSaving && <span className="text-[12px] text-gray-400">Saving...</span>}
+          {availSaving && <span className="text-[12px] text-white/50">Saving...</span>}
           {availSaved && (
             <span className="text-[12px] text-emerald-600 font-semibold flex items-center gap-1">
               <span className="material-symbols-outlined" style={{ fontSize: 14 }}>check_circle</span>
@@ -230,7 +230,7 @@ export default function SettingsPage() {
 
         {/* Available Days */}
         <div className="mb-5">
-          <label className="text-[11px] font-bold uppercase tracking-wider text-gray-400 mb-2 block">Available Days</label>
+          <label className="text-[11px] font-bold uppercase tracking-wider text-white/50 mb-2 block">Available Days</label>
           <div className="flex gap-2">
             {DAY_LABELS.map(({ key, label }) => {
               const active = avail.days[key as keyof typeof avail.days];
@@ -241,7 +241,7 @@ export default function SettingsPage() {
                   className={`w-12 h-12 rounded-xl text-[13px] font-bold transition-all ${
                     active
                       ? 'text-white shadow-md'
-                      : 'bg-gray-100 text-gray-400 hover:bg-gray-200'
+                      : 'bg-white/10 text-white/50 hover:bg-white/20'
                   }`}
                   style={active ? { background: `linear-gradient(135deg, ${gradientFrom}, ${gradientTo})` } : undefined}
                 >
@@ -254,22 +254,22 @@ export default function SettingsPage() {
 
         {/* Working Hours */}
         <div className="mb-5">
-          <label className="text-[11px] font-bold uppercase tracking-wider text-gray-400 mb-2 block">Working Hours</label>
+          <label className="text-[11px] font-bold uppercase tracking-wider text-white/50 mb-2 block">Working Hours</label>
           <div className="flex items-center gap-3">
             <select
               value={avail.startTime}
               onChange={(e) => saveAvailability({ ...avail, startTime: e.target.value })}
-              className="text-[13px] font-medium border rounded-xl px-3 py-2.5 bg-white text-gray-700 focus:outline-none focus:ring-2 focus:ring-indigo-200"
-              style={{ border: '1px solid rgba(0,0,0,0.1)' }}
+              className="text-[13px] font-medium border rounded-xl px-3 py-2.5 bg-white/10 text-white focus:outline-none focus:ring-2 focus:ring-white/30"
+              style={{ border: '1px solid rgba(255,255,255,0.15)', colorScheme: 'dark' }}
             >
               {TIME_OPTIONS.map(t => <option key={t.value} value={t.value}>{t.label}</option>)}
             </select>
-            <span className="text-[13px] font-semibold text-gray-400">to</span>
+            <span className="text-[13px] font-semibold text-white/50">to</span>
             <select
               value={avail.endTime}
               onChange={(e) => saveAvailability({ ...avail, endTime: e.target.value })}
-              className="text-[13px] font-medium border rounded-xl px-3 py-2.5 bg-white text-gray-700 focus:outline-none focus:ring-2 focus:ring-indigo-200"
-              style={{ border: '1px solid rgba(0,0,0,0.1)' }}
+              className="text-[13px] font-medium border rounded-xl px-3 py-2.5 bg-white/10 text-white focus:outline-none focus:ring-2 focus:ring-white/30"
+              style={{ border: '1px solid rgba(255,255,255,0.15)', colorScheme: 'dark' }}
             >
               {TIME_OPTIONS.map(t => <option key={t.value} value={t.value}>{t.label}</option>)}
             </select>
@@ -279,7 +279,7 @@ export default function SettingsPage() {
         {/* Slot Duration & Interval */}
         <div className="grid grid-cols-2 gap-4 mb-5">
           <div>
-            <label className="text-[11px] font-bold uppercase tracking-wider text-gray-400 mb-2 block">Meeting Duration</label>
+            <label className="text-[11px] font-bold uppercase tracking-wider text-white/50 mb-2 block">Meeting Duration</label>
             <div className="flex gap-2">
               {[15, 30, 45, 60].map(d => (
                 <button
@@ -288,7 +288,7 @@ export default function SettingsPage() {
                   className={`flex-1 py-2.5 rounded-xl text-[13px] font-bold transition-all ${
                     avail.slotDuration === d
                       ? 'text-white shadow-md'
-                      : 'bg-gray-100 text-gray-500 hover:bg-gray-200'
+                      : 'bg-white/10 text-white/60 hover:bg-white/20'
                   }`}
                   style={avail.slotDuration === d ? { background: `linear-gradient(135deg, ${gradientFrom}, ${gradientTo})` } : undefined}
                 >
@@ -298,7 +298,7 @@ export default function SettingsPage() {
             </div>
           </div>
           <div>
-            <label className="text-[11px] font-bold uppercase tracking-wider text-gray-400 mb-2 block">Slot Interval</label>
+            <label className="text-[11px] font-bold uppercase tracking-wider text-white/50 mb-2 block">Slot Interval</label>
             <div className="flex gap-2">
               {[{ key: 'hour', label: 'Hourly' }, { key: 'half', label: 'Every 30m' }].map(opt => (
                 <button
@@ -307,7 +307,7 @@ export default function SettingsPage() {
                   className={`flex-1 py-2.5 rounded-xl text-[13px] font-bold transition-all ${
                     avail.slotInterval === opt.key
                       ? 'text-white shadow-md'
-                      : 'bg-gray-100 text-gray-500 hover:bg-gray-200'
+                      : 'bg-white/10 text-white/60 hover:bg-white/20'
                   }`}
                   style={avail.slotInterval === opt.key ? { background: `linear-gradient(135deg, ${gradientFrom}, ${gradientTo})` } : undefined}
                 >
@@ -321,7 +321,7 @@ export default function SettingsPage() {
         {/* Buffer & Max Per Day */}
         <div className="grid grid-cols-2 gap-4">
           <div>
-            <label className="text-[11px] font-bold uppercase tracking-wider text-gray-400 mb-2 block">Buffer Between Meetings</label>
+            <label className="text-[11px] font-bold uppercase tracking-wider text-white/50 mb-2 block">Buffer Between Meetings</label>
             <div className="flex gap-2">
               {[0, 5, 10, 15, 30].map(b => (
                 <button
@@ -330,7 +330,7 @@ export default function SettingsPage() {
                   className={`flex-1 py-2.5 rounded-xl text-[12px] font-bold transition-all ${
                     avail.bufferMinutes === b
                       ? 'text-white shadow-md'
-                      : 'bg-gray-100 text-gray-500 hover:bg-gray-200'
+                      : 'bg-white/10 text-white/60 hover:bg-white/20'
                   }`}
                   style={avail.bufferMinutes === b ? { background: `linear-gradient(135deg, ${gradientFrom}, ${gradientTo})` } : undefined}
                 >
@@ -340,7 +340,7 @@ export default function SettingsPage() {
             </div>
           </div>
           <div>
-            <label className="text-[11px] font-bold uppercase tracking-wider text-gray-400 mb-2 block">Max Bookings / Day</label>
+            <label className="text-[11px] font-bold uppercase tracking-wider text-white/50 mb-2 block">Max Bookings / Day</label>
             <div className="flex gap-2">
               {[0, 2, 3, 5, 8].map(m => (
                 <button
@@ -349,7 +349,7 @@ export default function SettingsPage() {
                   className={`flex-1 py-2.5 rounded-xl text-[12px] font-bold transition-all ${
                     avail.maxPerDay === m
                       ? 'text-white shadow-md'
-                      : 'bg-gray-100 text-gray-500 hover:bg-gray-200'
+                      : 'bg-white/10 text-white/60 hover:bg-white/20'
                   }`}
                   style={avail.maxPerDay === m ? { background: `linear-gradient(135deg, ${gradientFrom}, ${gradientTo})` } : undefined}
                 >
@@ -368,36 +368,36 @@ export default function SettingsPage() {
             <span className="material-symbols-outlined" style={{ fontSize: 20 }}>calendar_month</span>
           </div>
           <div>
-            <h2 className="text-[15px] font-bold text-gray-900">Google Calendar</h2>
-            <p className="text-[12px] text-gray-400">Sync events between your schedule and Google Calendar</p>
+            <h2 className="text-[15px] font-bold text-white">Google Calendar</h2>
+            <p className="text-[12px] text-white/50">Sync events between your schedule and Google Calendar</p>
           </div>
         </div>
 
         {loadingGcal ? (
-          <div className="text-[12px] text-gray-400">Checking connection...</div>
+          <div className="text-[12px] text-white/50">Checking connection...</div>
         ) : gcalConnected ? (
           <div className="space-y-3">
-            <div className="flex items-center gap-2 px-4 py-3 rounded-xl bg-emerald-50 border border-emerald-200">
-              <span className="material-symbols-outlined text-emerald-600" style={{ fontSize: 18 }}>check_circle</span>
-              <span className="text-[13px] font-semibold text-emerald-700">Google Calendar Connected</span>
+            <div className="flex items-center gap-2 px-4 py-3 rounded-xl bg-emerald-400/10 border border-emerald-400/30">
+              <span className="material-symbols-outlined text-emerald-300" style={{ fontSize: 18 }}>check_circle</span>
+              <span className="text-[13px] font-semibold text-emerald-200">Google Calendar Connected</span>
             </div>
-            <p className="text-[12px] text-gray-400">
+            <p className="text-[12px] text-white/50">
               Events you create in the schedule or through the assistant will automatically sync to your Google Calendar.
             </p>
             <button
               onClick={disconnectGoogleCalendar}
-              className="text-[12px] font-medium text-red-500 hover:text-red-600 transition-colors"
+              className="text-[12px] font-medium text-red-300 hover:text-red-200 transition-colors"
             >
               Disconnect Google Calendar
             </button>
           </div>
         ) : (
           <div className="space-y-3">
-            <div className="flex items-center gap-2 px-4 py-3 rounded-xl bg-gray-50 border border-gray-200">
-              <span className="material-symbols-outlined text-gray-400" style={{ fontSize: 18 }}>link_off</span>
-              <span className="text-[13px] font-medium text-gray-500">Not connected</span>
+            <div className="flex items-center gap-2 px-4 py-3 rounded-xl bg-white/5 border border-white/10">
+              <span className="material-symbols-outlined text-white/50" style={{ fontSize: 18 }}>link_off</span>
+              <span className="text-[13px] font-medium text-white/60">Not connected</span>
             </div>
-            <p className="text-[12px] text-gray-400">
+            <p className="text-[12px] text-white/50">
               Connect your Google Calendar to automatically sync meetings, tasks, and events created in the portal.
             </p>
             <button
@@ -419,11 +419,11 @@ export default function SettingsPage() {
             <span className="material-symbols-outlined" style={{ fontSize: 20 }}>notifications</span>
           </div>
           <div>
-            <h2 className="text-[15px] font-bold text-gray-900">Notifications</h2>
-            <p className="text-[12px] text-gray-400">Email digests and alerts</p>
+            <h2 className="text-[15px] font-bold text-white">Notifications</h2>
+            <p className="text-[12px] text-white/50">Email digests and alerts</p>
           </div>
         </div>
-        <div className="text-[12px] text-gray-400">
+        <div className="text-[12px] text-white/50">
           Daily briefing emails are sent via your Make.com automation. Contact your admin to adjust email frequency or recipients.
         </div>
       </Card>
@@ -435,11 +435,11 @@ export default function SettingsPage() {
             <span className="material-symbols-outlined" style={{ fontSize: 20 }}>account_balance_wallet</span>
           </div>
           <div>
-            <h2 className="text-[15px] font-bold text-gray-900">Anthropic credit</h2>
-            <p className="text-[12px] text-gray-400">What the AI has to spend, and what it has spent</p>
+            <h2 className="text-[15px] font-bold text-white">Anthropic credit</h2>
+            <p className="text-[12px] text-white/50">What the AI has to spend, and what it has spent</p>
           </div>
         </div>
-        <div className="text-[12px] text-gray-400 mb-4">
+        <div className="text-[12px] text-white/50 mb-4">
           Every agent, campaign draft and content plan bills against one balance. Record a
           top-up after buying credit, and see which features are spending it.
         </div>
@@ -459,11 +459,11 @@ export default function SettingsPage() {
             <span className="material-symbols-outlined" style={{ fontSize: 20 }}>key</span>
           </div>
           <div>
-            <h2 className="text-[15px] font-bold text-gray-900">MCP access tokens</h2>
-            <p className="text-[12px] text-gray-400">Let Claude reach the portal from outside the browser</p>
+            <h2 className="text-[15px] font-bold text-white">MCP access tokens</h2>
+            <p className="text-[12px] text-white/50">Let Claude reach the portal from outside the browser</p>
           </div>
         </div>
-        <div className="text-[12px] text-gray-400 mb-4">
+        <div className="text-[12px] text-white/50 mb-4">
           Create a token to connect Claude Code, then ask it about the task board, the
           schedule or who is overloaded. Each token acts as one person and can be revoked
           on its own.
