@@ -82,7 +82,7 @@ const nl=(t,i)=>new Paragraph({spacing:{after:70,line:280},indent:{left:420,hang
             new TextRun({text:'\t'+t,font:BODY,size:21})]});
 const code=t=>new Paragraph({spacing:{after:0,line:230},indent:{left:170,right:170},
   shading:{type:ShadingType.CLEAR,color:'auto',fill:SHADE},
-  children:[new TextRun({text:t.length?t:' ',font:MONO,size:17})]});
+  children:[new TextRun({text:t.length?rec(t):' ',font:MONO,size:17})]});
 const rule=()=>new Paragraph({spacing:{before:100,after:180},
   border:{bottom:{style:BorderStyle.SINGLE,size:6,color:'D9D9D9'}},
   children:[new TextRun({text:'',size:2})]});
@@ -125,7 +125,7 @@ k.push(table(['Decision','Effect on the build'],[
  ['Website facts loaded','Phone, cancellation policy, age limits, HSA/FSA, what the intro offer includes, the Essentials membership price and mobile IV all came off the homepage. Nine new Q&A pairs. Six conflicts with what we had are listed in their own section.'],
  ['Notification routing set','pinecrest@primeivhydration.com for everything, plus jkulkusky@primeivhydration.com for legal, media and regulatory. Notifications carry a link, never message content — and the agency address is deliberately not on the list.'],
  ['Hours are 10-6, seven days','The website was right and an earlier ten-to-five was wrong. Corrected everywhere: the prompt, the hard facts, the hours answer, the Phase 0 checklist and the calendar fix the browser session performs.'],
- ['The duplicate booking calendar is a site bug','The Member Appointment and IV Therapy tabs load the same widget under audience-specific descriptions — one id pasted twice. Non-members book onto the member calendar today. Rule 3a treats them as one calendar until the site is repaired.'],
+ ['The duplicate booking calendar is fixed','The Member Appointment and IV Therapy tabs used to load the same widget, so non-members booked onto the member calendar. IV Therapy now has its own, tzqmrQyU7qsS0ayXOIaK, verified on the live page. All six calendar ids are listed under 3a.'],
  ['Which drip menu governs','Both menus use the same price tiers, so there is no pricing conflict. The agent names only what the website lists, recognises anything on either list, and hands off a name on neither.'],
  ['Full menu pricing loaded','The agent may now quote drips, injections and NAD+ at the exact menu prices. Memberships and packages still route. Every menu description was rewritten — the printed copy breaks the language rule throughout.'],
  ['The FAQ document does not exist','The spec referenced one five times; it is not in Drive and was never written. The menu replaced it, and a spa-team review pass replaces the “tested phrasing” the spec assumed.'],
@@ -287,7 +287,8 @@ function assertProseMatchesSource(){
   const required = [
     ['the expired-voucher pricing edge', /Expired vouchers land in the first-time row/],
     ['the settled voucher rule', /never says .expired.: it offers the extension/],
-    ['the duplicate calendar being a site bug', /one id pasted twice/],
+    ['the no-dash writing rule', /No dashes as punctuation/],
+    ['the calendar ids', /tzqmrQyU7qsS0ayXOIaK/],
     ['which drip menu the agent may name', /names only what the website lists/],
   ];
   const missing = required.filter(([, re]) => !re.test(emitted)).map(([label]) => label);

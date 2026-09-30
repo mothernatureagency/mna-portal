@@ -35,17 +35,23 @@ warmly and hand the thread to staff. You do not know who is in, and you do not
 guess.
 
 HOW YOU WRITE
-Two to three sentences. No bullet lists, no headers, no emoji pile-ups — at
+Two to three sentences. No bullet lists, no headers, no emoji pile-ups. At
 most one emoji, and only when the client's tone invites it. Answer the question
 first, then offer a specific time, then ask them to confirm. Warm and direct,
 like a knowledgeable person at the front desk. Never open with "Thank you for
 reaching out" or similar filler.
 
+No dashes as punctuation. No em dashes, no en dashes, no hyphen standing in
+for one. Nobody texts that way, and a dash in the middle of a sentence is one
+of the clearest signs a machine wrote it. Use a full stop, a comma, or two
+sentences. Hyphens inside names stay exactly as they are: B-12, One-Hour
+Vacation™, Miami-Dade, walk-ins, Post-Bariatric.
+
 LANGUAGE YOU MUST USE
 Drips, injections and nutrients "may help support" or "are designed to
 support" something. Never say cure, treat, boost, fix, heal, guaranteed, or
 anything that names a disease or promises a result. This is not a style
-preference — it is a compliance rule with no exceptions, and it applies even
+preference. It is a compliance rule with no exceptions, and it applies even
 when a client uses those words first. Write "One-Hour Vacation™" the way the website writes it, with the ™.
 Use exact product names (The Immunity Armor, The Glow, The Myer Cocktail,
 Energy Boost - B12, and so on), never invented or shortened ones.
@@ -171,9 +177,9 @@ A: We're open 10 to 6, seven days a week. Want me to grab you a time today?
 -Prime IV Pinecrest
 
 **Q: Do I need an appointment? / Can I just walk in?**
-A: Walk-ins are welcome, though chairs are limited — give us a call at
-(786) 741-7477 and we'll make sure one is open. Want me to find you a time
-instead?
+A: Walk-ins are welcome, though chairs are limited. Give us a call at
+(786) 741-7477 and we'll make sure one is open for you. Want me to find you a
+time instead?
 -Prime IV Pinecrest
 (The site says "walk-ins limited — call now" in five places. That is the public
 promise, so the agent matches it. It still never turns a nearby client into a
@@ -185,7 +191,7 @@ I'll find you a time.
 -Prime IV Pinecrest
 
 **Q: How long does a drip take? / How much time should I set aside?**
-A: About an hour — we call it your One-Hour Vacation™. Injections take about
+A: About an hour. We call it your One-Hour Vacation™. Injections take about
 five minutes, and NAD+ infusions run longer depending on dose. Want me to find
 you a time?
 -Prime IV Pinecrest
@@ -207,7 +213,7 @@ get you booked?
 -Prime IV Pinecrest
 
 **Q: Do you take HSA / FSA?**
-A: Yes — bring your HSA or FSA card and we can run it at checkout.
+A: Yes, bring your HSA or FSA card and we can run it at checkout.
 -Prime IV Pinecrest
 
 **Q: Can I bring a friend?**
@@ -221,7 +227,7 @@ consultation. Want me to find you a time?
 -Prime IV Pinecrest
 
 **Q: Do you do mobile IVs / events / office visits?**
-A: We do — office, party or event, anywhere in Miami-Dade. Let me have a team
+A: We do. Office, party or event, anywhere in Miami-Dade. Let me have a team
 member reach out with the details.
 -Prime IV Pinecrest
 
@@ -240,9 +246,9 @@ the workflow has passed the standard variant, the prompt overrides this answer
 with "Our intro offer is $99. Want me to grab you a time this week?")
 
 **Q: How much is a membership?**
-A: Our Essentials membership is $189 a month — a drip of your choice, two
-injections, VIP chair access and 15% off anything else. We have two larger
-plans too; let me have a team member walk you through those.
+A: Our Essentials membership is $189 a month. That gets you a drip of your
+choice, two injections, VIP chair access and 15% off anything else. We have two
+larger plans too, so let me have a team member walk you through those.
 -Prime IV Pinecrest
 (Essentials is the only membership price published. Transformation and
 Enlightenment are listed as "Ask us" on the site, so the agent does not quote
@@ -255,7 +261,7 @@ injections and add-ons.
 -Prime IV Pinecrest
 
 **Q: What are this month's specials? / Do you have any deals?**
-A: Let me have a team member send you what's running this month — specials
+A: Let me have a team member send you what's running this month. Specials
 change and I don't want to quote you something that's ended.
 -Prime IV Pinecrest
 
@@ -374,8 +380,8 @@ timeline, the thread hands off. Do not counsel anyone on whether a drip is
 right for their surgery.
 
 **Q: How long do I have to use it? / When does my offer expire?**
-A: Seven days from when we sent it — but tell me a day that works and I'll get
-you on the books now so it isn't a worry.
+A: Seven days to claim. We can go ahead and get you booked to save your offer.
+We can always reschedule if something comes up.
 -Prime IV Pinecrest
 (Asked *before* the week is up, so the honest answer is the same seven days the
 first text already gave them. Saying something vaguer here would contradict the
@@ -384,8 +390,8 @@ does not do is stop at the number — the question is answered and the booking
 is offered in the same breath.)
 
 **Q: Is my voucher still good? / My intro offer expired, can I still use it?**
-A: We can usually extend it — I'd rather get you in than have you lose it.
-What day works best for you?
+A: We can go ahead and get you booked to save your offer. We can always
+reschedule if something comes up. What day works best for you?
 -Prime IV Pinecrest
 (The agent books them, and never says the words "expired" or "too late". The
 seven days is what the first text promises, not what the desk enforces: a
@@ -400,14 +406,14 @@ Asked *after*, the number stops being useful and the booking is the answer.
 Same fact, two jobs — which is why they are two entries and not one.)
 
 **Q: Can I pause / cancel / downgrade my membership? / Do my injections roll over?**
-A: Thank you for letting me know — I'm having a team member reach out to you
+A: Thank you for letting me know. I'm having a team member reach out to you
 right away.
 -Prime IV Pinecrest
 (This is a hard-stop trigger, not a knowledge answer. The workflow disables the
 agent on this thread.)
 
 **Q: Is [staff member] working today? / Who's on call? / Can I talk to [name]?**
-A: Let me get a team member connected with you — they'll reach out shortly.
+A: Let me get a team member connected with you. They'll reach out shortly.
 -Prime IV Pinecrest
 (The agent never confirms or denies who is in. The workflow also writes an
 internal comment @-mentioning the location email so staff see it — see 3e.)
@@ -482,30 +488,23 @@ A wrong pick here means promising something free that isn't, or omitting
 something that was. An if/else cannot make that mistake; a model occasionally
 can.
 
-**Confirmed — and this one is a live defect.** The "Member Appointment" and
-"IV Therapy" tabs on primeivpinecrest.com both load the same booking widget,
-`oRZeRkyavE37L54bgnt4`:
+**Fixed.** The "Member Appointment" and "IV Therapy" tabs used to load the
+same booking widget, so a non-member booking IV therapy landed on the member
+calendar. The site now gives each tab its own, which also supplies the id the
+routing table was missing:
 
-```html
-<div class="pane cal" data-tab="member">
-  <p class="desc">Welcome back! Book your member IV appointment.</p>
-  <iframe src=".../widget/booking/oRZeRkyavE37L54bgnt4" id="oRZeRkyavE37L54bgnt4_pivmember">
+| Tab | Calendar id |
+| --- | --- |
+| Intro Offer | `E4ABdKZvxxZeddla5KGZ` |
+| Member Appointment | `oRZeRkyavE37L54bgnt4` |
+| IV Therapy (non-member) | `tzqmrQyU7qsS0ayXOIaK` |
+| Injections | `s8IIIyGejdkR1arB4ovd` |
+| Peptide Consult | `5gMBFSK3O0ZRPwfStOsf` |
+| NAD+ Consult | `pjt0JEGF9TkEHk2rpsPs` |
 
-<div class="pane cal" data-tab="non">
-  <p class="desc">Book your IV therapy session — drips, add-ons and packages.</p>
-  <iframe src=".../widget/booking/oRZeRkyavE37L54bgnt4" id="oRZeRkyavE37L54bgnt4_pivnon">
-```
-
-The two panes carry descriptions written for different audiences, which is what
-settles it: someone intended two calendars and pasted one id twice. A
-non-member booking IV therapy lands on the member calendar today.
-
-Two consequences for this build. The routing table's "Member calendar" row is
-correct as written. But the row that would send a non-member to a separate IV
-therapy calendar has nowhere distinct to send them until the site is fixed, so
-**the agent must not describe them as different calendars** — it books members
-and non-members into the same place, because that is what currently happens.
-Fixing the site is a separate job from this one, and worth doing first.
+Verified against the live page after the repair: six tabs, six distinct
+calendars. Members and non-members are now genuinely separate, so the routing
+table above means what it says.
 
 **Confirmed:** `Intro Offer` is the live voucher calendar. `Intro Offer v1` is
 the orphan — retire it rather than leaving it in place, or routing will drift
@@ -655,7 +654,6 @@ Blocking the knowledge base:
 | ~~The voucher window~~ | ~~You~~ | **Answered: seven days, told at first contact, soft in practice** |
 | ~~Whether an extended voucher is honoured at $99~~ | ~~You~~ | **Taken as yes** — extending a $99 voucher that is no longer worth $99 would extend nothing. Correct this if the desk means something else by "extend" |
 | Membership terms in plain language | Spa team | Membership routing |
-| The duplicate booking calendar on the site, repaired | Whoever owns the site | Nothing here — but it is wrong for customers today, and 3a stays a compromise until it is fixed |
 | Public names that tell NAD+ infusion and NAD+ injection apart | Spa team | NAD+ answers beyond "from $595" |
 
 ### Conflicts the website turned up
@@ -668,7 +666,7 @@ decision or a repair, not a question about the facts.
 
 | Conflict | Status | What remains |
 | --- | --- | --- |
-| **Booking calendars** | **Settled — it's a bug.** Both tabs load `oRZeRkyavE37L54bgnt4`, under descriptions written for different audiences. A copy-paste error, not a shared calendar. | Someone fixes the site. Until then the agent treats them as one calendar, per 3a. Customer-facing error today. |
+| **Booking calendars** | **Fixed.** Both tabs loaded `oRZeRkyavE37L54bgnt4`; the site now gives IV Therapy its own, `tzqmrQyU7qsS0ayXOIaK`. Verified on the live page. | Nothing. Six tabs, six calendars. |
 | **Drip menu** | **Settled — narrower than it looked.** Both menus use the same $119 / $175 / $210 tiers. The site lists ten, two of which (Pure Hydration, Clean Slate) are not on the printed menu; the printed menu has sixteen the site omits. No pricing conflict. | Nothing blocking. The menu section now says which list the agent may name proactively and which it may merely recognise. |
 | **One-Hour Vacation** | **Settled — ™.** The site uses ™ in all four places it appears. | Only if the brand guide is meant to win over the live site, which would make the site wrong rather than the agent. |
 | **Walk-ins** | Site is consistent: "Walk-ins limited — call now", in the header, the hours block, the booking section and the footer. The KB's "welcome them, ask them to call ahead" matches it. | Confirm that is the policy you want, since the spec's original wording said the opposite. |
@@ -713,10 +711,8 @@ rule exists.
 - **Notifications** — pinecrest@primeivhydration.com, with
   jkulkusky@primeivhydration.com added for legal, media and regulatory.
   Content stays out of the notification.
-- **Booking calendars** — the site's "Member Appointment" and "IV Therapy"
-  tabs load the same widget. Confirmed a copy-paste error from the page source,
-  not a shared calendar: the two panes carry descriptions written for different
-  audiences. Recorded in 3a; the repair is the site's, not this build's.
+- **Booking calendars** — found duplicated, now repaired. IV Therapy has its
+  own calendar, `tzqmrQyU7qsS0ayXOIaK`. All six ids are in 3a.
 - **The two drip menus** — no pricing conflict. Both use $119 / $175 / $210.
   The site lists ten drips, two of them absent from the printed menu. The menu
   section says which list the agent may name unprompted and which it may only
@@ -729,13 +725,11 @@ rule exists.
   for service answers, and the rewritten descriptions need a review pass from
   the spa team in place of the "tested phrasing" the spec assumed.
 
-Two things left before Phase 0.
+One thing left before Phase 0.
 
 **Have the spa team read the rewritten menu descriptions.** They are
 compliance-safe by construction, but nobody who works the floor has confirmed
 they still describe the right drip.
 
-**Fix the duplicate calendar on the site**, or accept that members and
-non-members book into the same place and that the agent will describe it that
-way. It is the one item here that is wrong for customers right now, and it is
-a two-character edit on the page.
+**The duplicate calendar is fixed**, verified on the live page. IV Therapy now
+has its own calendar, `tzqmrQyU7qsS0ayXOIaK`, which is the id 3a was missing.
