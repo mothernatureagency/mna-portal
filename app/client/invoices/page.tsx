@@ -21,13 +21,8 @@ type Invoice = {
   paid_date: string | null;
   notes: string | null;
   client_visible: boolean;
-};
-
-const PAYMENT_INFO = {
-  paypal: 'mn@mothernatureagency.com',
-  zelle: 'mn@mothernatureagency.com',
-  bankName: 'Bank of America',
-  accountName: 'Mother Nature Agency LLC',
+  pay_token: string | null;
+  payment_status: string | null;
 };
 
 const STATUS_STYLES: Record<string, { bg: string; text: string; label: string }> = {
@@ -154,25 +149,38 @@ export default function ClientInvoicesPage() {
                 </div>
               </div>
 
-              {/* Payment info */}
-              <div className="rounded-xl p-4 mb-4" style={{ background: 'rgba(74,184,206,0.06)', border: '1px solid rgba(74,184,206,0.15)' }}>
-                <div className="text-[11px] font-bold text-cyan-400 uppercase tracking-wider mb-3">Payment Methods</div>
-                <div className="grid grid-cols-2 gap-4 text-[12px]">
-                  <div>
-                    <div className="text-white/30 mb-0.5">PayPal</div>
-                    <div className="text-white font-semibold">{PAYMENT_INFO.paypal}</div>
-                  </div>
-                  <div>
-                    <div className="text-white/30 mb-0.5">Zelle</div>
-                    <div className="text-white font-semibold">{PAYMENT_INFO.zelle}</div>
-                  </div>
-                  <div className="col-span-2">
-                    <div className="text-white/30 mb-0.5">Wire Transfer</div>
-                    <div className="text-white font-semibold">{PAYMENT_INFO.bankName} — {PAYMENT_INFO.accountName}</div>
-                    <div className="text-white/40 text-[11px] mt-0.5">Contact mn@mothernatureagency.com for wire details</div>
+              {/* Pay online */}
+              {selected.status !== 'paid' && selected.payment_status === 'processing' && (
+                <div className="rounded-xl px-4 py-3 mb-4 text-[12px] text-cyan-300" style={{ background: 'rgba(74,184,206,0.08)', border: '1px solid rgba(74,184,206,0.2)' }}>
+                  Your bank payment is processing. It usually clears in 3–5 business days.
+                </div>
+              )}
+              {selected.status !== 'paid' && selected.payment_status !== 'processing' && selected.pay_token && (
+                <a
+                  href={`/pay/${selected.id}?t=${encodeURIComponent(selected.pay_token)}`}
+                  className="block text-center rounded-xl py-3 mb-4 text-[14px] font-bold text-white"
+                  style={{ background: 'linear-gradient(135deg, #0c6da4, #4ab8ce)' }}
+                >
+                  Pay Invoice — bank transfer or card
+                </a>
+              )}
+
+              {/* Other payment methods */}
+              {selected.status !== 'paid' && (
+                <div className="rounded-xl p-4 mb-4" style={{ background: 'rgba(74,184,206,0.06)', border: '1px solid rgba(74,184,206,0.15)' }}>
+                  <div className="text-[11px] font-bold text-cyan-400 uppercase tracking-wider mb-3">{selected.pay_token ? 'Other Ways to Pay' : 'Payment Methods'}</div>
+                  <div className="grid grid-cols-2 gap-4 text-[12px]">
+                    <div>
+                      <div className="text-white/30 mb-0.5">Zelle</div>
+                      <div className="text-white font-semibold">mn@mothernatureagency.com</div>
+                    </div>
+                    <div>
+                      <div className="text-white/30 mb-0.5">Check payable to</div>
+                      <div className="text-white font-semibold">Mother Nature Agency LLC</div>
+                    </div>
                   </div>
                 </div>
-              </div>
+              )}
 
               {selected.notes && (
                 <div className="text-[12px] text-white/40"><span className="font-bold text-white/50">Notes: </span>{selected.notes}</div>

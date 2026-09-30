@@ -48,6 +48,13 @@ function isPublicRoute(pathname: string) {
     pathname.startsWith('/api/reviews/run') ||
     pathname.startsWith('/api/reviews/pending') ||
     pathname.startsWith('/book') ||
+    // Invoice payment: the pay page and checkout redirect check the invoice's
+    // pay token themselves; Stripe's webhook is verified by signature; the
+    // reminder cron checks CRON_SECRET.
+    pathname.startsWith('/pay/') ||
+    pathname === '/api/pay/checkout' ||
+    pathname === '/api/stripe/webhook' ||
+    pathname === '/api/cron/invoice-reminders' ||
     pathname.startsWith('/api/booking') ||
     pathname.startsWith('/_next') ||
     pathname === '/favicon.ico'

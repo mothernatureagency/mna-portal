@@ -90,7 +90,14 @@ export async function PATCH(req: NextRequest) {
       fields.push(`${key} = $${values.length}`);
     }
   }
-  if (fields.length === 0) return NextResponse.json({ error: 'No fields to update' }, { status: 400 });
+  const { rows: before } = await query<{ status: string }>(`select status from invoices where id = $1`, [id]);
+  const prevStatus = before[0]?.status;
+  // Undoing a payment reopens the invoice for online payment.
+  if (prevStatus === 'paid' && body.status && body.status !== 'paid') fields.push('payment_status = null');
+  // A new due date restarts the reminder schedule.
+  if (body.due_date !== undefined) fields.push(`reminders_sent = '[]'::jsonb`);
+  if (fields.length === 0 && !body.resendEmail) return NextResponse.json({ error: 'No fields to update' }, { status: 400 });
+  if (fields.length === 0) fields.push('id = id');
 
   values.push(id);
   const { rows } = await query(
@@ -101,8 +108,9 @@ export async function PATCH(req: NextRequest) {
 
   const updated = rows[0];
 
-  // Send invoice email when status changes to 'sent'
-  if (body.status === 'sent') {
+  // Email the invoice when it's first sent (draft → sent), or on an explicit resend.
+  // Undoing a payment also sets 'sent' and must not re-email the client.
+  if ((body.status === 'sent' && prevStatus === 'draft') || body.resendEmail) {
     try {
       const emailResult = await sendInvoiceEmail(updated);
       return NextResponse.json({ invoice: updated, emailSent: emailResult.success, emailError: emailResult.error });

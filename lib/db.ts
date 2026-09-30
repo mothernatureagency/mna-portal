@@ -518,6 +518,17 @@ async function initSchema() {
                         client_visible boolean not null default false,
                         created_at timestamptz not null default now()
                   )`,
+                  // Online payment (Stripe) and reminder tracking.
+                  // pay_token: secret in the emailed pay link, so the pay page needs no login.
+                  // payment_status: null | 'processing' (ACH clearing) | 'paid' | 'failed'.
+                  // reminders_sent: stages already emailed — 'before', 'due', 'after'.
+                  `DO $$ BEGIN
+                    ALTER TABLE invoices ADD COLUMN IF NOT EXISTS pay_token text;
+                    ALTER TABLE invoices ADD COLUMN IF NOT EXISTS stripe_session_id text;
+                    ALTER TABLE invoices ADD COLUMN IF NOT EXISTS payment_status text;
+                    ALTER TABLE invoices ADD COLUMN IF NOT EXISTS reminders_sent jsonb NOT NULL DEFAULT '[]';
+                  EXCEPTION WHEN others THEN NULL;
+                  END $$`,
                   // User preferences (timezone, availability, etc.)
                   `create table if not exists user_preferences (
                         user_email text primary key,

@@ -14,6 +14,7 @@ interface SendEmailParams {
   subject: string;
   html: string;
   replyTo?: string;
+  attachments?: { filename: string; content: string }[]; // content is base64
 }
 
 export async function sendEmail(params: SendEmailParams): Promise<{ success: boolean; id?: string; error?: string }> {
@@ -35,6 +36,7 @@ export async function sendEmail(params: SendEmailParams): Promise<{ success: boo
         subject: params.subject,
         html: params.html,
         reply_to: params.replyTo || 'mn@mothernatureagency.com',
+        ...(params.attachments?.length ? { attachments: params.attachments } : {}),
       }),
     });
 
