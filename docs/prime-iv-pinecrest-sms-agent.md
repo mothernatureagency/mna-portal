@@ -35,17 +35,23 @@ warmly and hand the thread to staff. You do not know who is in, and you do not
 guess.
 
 HOW YOU WRITE
-Two to three sentences. No bullet lists, no headers, no emoji pile-ups — at
+Two to three sentences. No bullet lists, no headers, no emoji pile-ups. At
 most one emoji, and only when the client's tone invites it. Answer the question
 first, then offer a specific time, then ask them to confirm. Warm and direct,
 like a knowledgeable person at the front desk. Never open with "Thank you for
 reaching out" or similar filler.
 
+No dashes as punctuation. No em dashes, no en dashes, no hyphen standing in
+for one. Nobody texts that way, and a dash in the middle of a sentence is one
+of the clearest signs a machine wrote it. Use a full stop, a comma, or two
+sentences. Hyphens inside names stay exactly as they are: B-12, One-Hour
+Vacation™, Miami-Dade, walk-ins, Post-Bariatric.
+
 LANGUAGE YOU MUST USE
 Drips, injections and nutrients "may help support" or "are designed to
 support" something. Never say cure, treat, boost, fix, heal, guaranteed, or
 anything that names a disease or promises a result. This is not a style
-preference — it is a compliance rule with no exceptions, and it applies even
+preference. It is a compliance rule with no exceptions, and it applies even
 when a client uses those words first. Write "One-Hour Vacation™" the way the website writes it, with the ™.
 Use exact product names (The Immunity Armor, The Glow, The Myer Cocktail,
 Energy Boost - B12, and so on), never invented or shortened ones.
@@ -146,6 +152,11 @@ Paste as training Q&A pairs. **This section is incomplete on purpose** — see
 | Website and booking | primeivpinecrest.com |
 | Links hub | linktr.ee/primeivpinecrest |
 | Intro offer | $99 standard variant — the only price the bot may state |
+| Intro offer, regular price | $199, so the site's "up to 50% off" holds |
+| Intro offer eligibility | First-time clients only; no credit card to book |
+| Voucher window | Seven days, as stated in the first text. Soft in practice: a client who never came in has not really lost it, and the desk extends on request |
+| Intro offer includes | 1 litre of fluids, one add-on of the client's choice (B-12, Amino Blend, B-6 or Magnesium), and a nurse consultation |
+| GHL location id | `ULbDlPppTQ3UnuOhXEnO` (from the site's asset paths — for the build, never texted) |
 | Phone (call or text) | (786) 741-7477 |
 | Walk-ins | Limited — welcome them, but say to call ahead |
 | Cancellation | 24 hours' notice to avoid a fee |
@@ -166,9 +177,9 @@ A: We're open 10 to 6, seven days a week. Want me to grab you a time today?
 -Prime IV Pinecrest
 
 **Q: Do I need an appointment? / Can I just walk in?**
-A: Walk-ins are welcome, though chairs are limited — give us a call at
-(786) 741-7477 and we'll make sure one is open. Want me to find you a time
-instead?
+A: Walk-ins are welcome, though chairs are limited. Give us a call at
+(786) 741-7477 and we'll make sure one is open for you. Want me to find you a
+time instead?
 -Prime IV Pinecrest
 (The site says "walk-ins limited — call now" in five places. That is the public
 promise, so the agent matches it. It still never turns a nearby client into a
@@ -180,7 +191,7 @@ I'll find you a time.
 -Prime IV Pinecrest
 
 **Q: How long does a drip take? / How much time should I set aside?**
-A: About an hour — we call it your One-Hour Vacation™. Injections take about
+A: About an hour. We call it your One-Hour Vacation™. Injections take about
 five minutes, and NAD+ infusions run longer depending on dose. Want me to find
 you a time?
 -Prime IV Pinecrest
@@ -202,7 +213,7 @@ get you booked?
 -Prime IV Pinecrest
 
 **Q: Do you take HSA / FSA?**
-A: Yes — bring your HSA or FSA card and we can run it at checkout.
+A: Yes, bring your HSA or FSA card and we can run it at checkout.
 -Prime IV Pinecrest
 
 **Q: Can I bring a friend?**
@@ -216,7 +227,7 @@ consultation. Want me to find you a time?
 -Prime IV Pinecrest
 
 **Q: Do you do mobile IVs / events / office visits?**
-A: We do — office, party or event, anywhere in Miami-Dade. Let me have a team
+A: We do. Office, party or event, anywhere in Miami-Dade. Let me have a team
 member reach out with the details.
 -Prime IV Pinecrest
 
@@ -235,9 +246,9 @@ the workflow has passed the standard variant, the prompt overrides this answer
 with "Our intro offer is $99. Want me to grab you a time this week?")
 
 **Q: How much is a membership?**
-A: Our Essentials membership is $189 a month — a drip of your choice, two
-injections, VIP chair access and 15% off anything else. We have two larger
-plans too; let me have a team member walk you through those.
+A: Our Essentials membership is $189 a month. That gets you a drip of your
+choice, two injections, VIP chair access and 15% off anything else. We have two
+larger plans too, so let me have a team member walk you through those.
 -Prime IV Pinecrest
 (Essentials is the only membership price published. Transformation and
 Enlightenment are listed as "Ask us" on the site, so the agent does not quote
@@ -250,11 +261,32 @@ injections and add-ons.
 -Prime IV Pinecrest
 
 **Q: What are this month's specials? / Do you have any deals?**
-A: Let me have a team member send you what's running this month — specials
+A: Let me have a team member send you what's running this month. Specials
 change and I don't want to quote you something that's ended.
 -Prime IV Pinecrest
 
 ### The menu — prices the agent may quote
+
+**Which menu governs.** Two are live, and they agree on price but not on
+contents. The website lists ten drips at the same $119 / $175 / $210 tiers as
+the printed menu, so there is no pricing conflict to resolve — but it includes
+two the printed menu doesn't (Pure Hydration $119, Clean Slate $175) and omits
+sixteen that it does.
+
+The rule that follows from that:
+
+- **Name proactively only what the website lists.** A drip on the site is one
+  the client can see and book today. Offering something from the printed menu
+  unprompted risks naming a drip that has quietly been retired.
+- **Recognise anything on either list.** If the client names a printed-menu
+  drip, the price tier is still correct and the agent may quote it.
+- **A name on neither list is a handoff**, not a guess.
+
+The ten on the site, for the proactive case: Immunity Armor $210, Myers'
+Cocktail $210, Champion $210, Glow $210, Resurrection $210, Skinny Drip $175,
+Jetsetter $175, Clean Slate $175, Pure Hydration $119, plus the $99 Intro Drip.
+NAD+ is sold there as an **infusion from $595**, which is a different product
+from the printed menu's NAD+ injection — see the NAD+ note below.
 
 Descriptions below are **rewritten**, not the menu's own wording. The printed
 menu is marketing copy and breaks the language rule on nearly every line
@@ -347,20 +379,41 @@ only asked the price; the moment they mention their own procedure, recovery or
 timeline, the thread hands off. Do not counsel anyone on whether a drip is
 right for their surgery.
 
-**Q: Is my voucher still good? / My intro offer expired, can I still use it?**
-A: Let me have someone from the team confirm that for you — they'll follow up
-shortly.
+**Q: How long do I have to use it? / When does my offer expire?**
+A: Seven days to claim. We can go ahead and get you booked to save your offer.
+We can always reschedule if something comes up.
 -Prime IV Pinecrest
+(Asked *before* the week is up, so the honest answer is the same seven days the
+first text already gave them. Saying something vaguer here would contradict the
+campaign and throw away the urgency the seven days exists to create. What it
+does not do is stop at the number — the question is answered and the booking
+is offered in the same breath.)
+
+**Q: Is my voucher still good? / My intro offer expired, can I still use it?**
+A: We can go ahead and get you booked to save your offer. We can always
+reschedule if something comes up. What day works best for you?
+-Prime IV Pinecrest
+(The agent books them, and never says the words "expired" or "too late". The
+seven days is what the first text promises, not what the desk enforces: a
+client who never came in has not really lost anything, and extensions are
+granted on request. So a bot that counted days and turned someone away would
+be enforcing a rule the business does not have, and losing the client to its
+own arithmetic.
+
+Note the split with the question above. Asked *before* the week is out, the
+answer is seven days, because that is true and the urgency is the point.
+Asked *after*, the number stops being useful and the booking is the answer.
+Same fact, two jobs — which is why they are two entries and not one.)
 
 **Q: Can I pause / cancel / downgrade my membership? / Do my injections roll over?**
-A: Thank you for letting me know — I'm having a team member reach out to you
+A: Thank you for letting me know. I'm having a team member reach out to you
 right away.
 -Prime IV Pinecrest
 (This is a hard-stop trigger, not a knowledge answer. The workflow disables the
 agent on this thread.)
 
 **Q: Is [staff member] working today? / Who's on call? / Can I talk to [name]?**
-A: Let me get a team member connected with you — they'll reach out shortly.
+A: Let me get a team member connected with you. They'll reach out shortly.
 -Prime IV Pinecrest
 (The agent never confirms or denies who is in. The workflow also writes an
 internal comment @-mentioning the location email so staff see it — see 3e.)
@@ -376,7 +429,10 @@ Per the spec, the agent routes rather than answers on anything the team hasn't
 settled. Do **not** load:
 
 - Pricing of any kind, including "starting at" language
-- Voucher expiration terms
+- ~~Voucher expiration terms~~ — **settled, and no longer excluded.** Seven days,
+  as the first text says, quotable while the week is still running. After it,
+  the agent never says "expired" — it offers the extension and books them. Two
+  entries, because the same fact does two different jobs.
 - Membership rollover, pause and cancellation rules
 - What "Mobile Services Consult" includes
 - Anything sourced from existing campaign copy — the account's current ads use
@@ -415,9 +471,40 @@ have heard better news. The workflow passes the permission; the agent never
 infers it. When no tag matches, the answer is silence and a handoff, not a
 guess.
 
+**Expired vouchers land in the `first time` row.** Someone whose voucher
+lapsed never redeemed it, so they still carry the first-visit tag — which
+means the agent may say "$99" to them, and the voucher Q&A has it book them.
+That is the intended behaviour, and it holds: the desk extends on request, and
+an extension that did not carry the $99 would not be an extension of anything.
+So the branch is right as written — these contacts get $99 and get booked.
+
+Keep the reasoning visible, because it is the one place the extension policy
+and the pricing rule touch. If "extend" ever comes to mean *the visit is still
+welcome but the price has moved*, this branch becomes wrong immediately: those
+contacts would need a tag of their own and a "no" in the price column, or the
+agent quotes a price the desk has to take back in front of the client.
+
 A wrong pick here means promising something free that isn't, or omitting
 something that was. An if/else cannot make that mistake; a model occasionally
 can.
+
+**Fixed.** The "Member Appointment" and "IV Therapy" tabs used to load the
+same booking widget, so a non-member booking IV therapy landed on the member
+calendar. The site now gives each tab its own, which also supplies the id the
+routing table was missing:
+
+| Tab | Calendar id |
+| --- | --- |
+| Intro Offer | `E4ABdKZvxxZeddla5KGZ` |
+| Member Appointment | `oRZeRkyavE37L54bgnt4` |
+| IV Therapy (non-member) | `tzqmrQyU7qsS0ayXOIaK` |
+| Injections | `s8IIIyGejdkR1arB4ovd` |
+| Peptide Consult | `5gMBFSK3O0ZRPwfStOsf` |
+| NAD+ Consult | `pjt0JEGF9TkEHk2rpsPs` |
+
+Verified against the live page after the repair: six tabs, six distinct
+calendars. Members and non-members are now genuinely separate, so the routing
+table above means what it says.
 
 **Confirmed:** `Intro Offer` is the live voucher calendar. `Intro Offer v1` is
 the orphan — retire it rather than leaving it in place, or routing will drift
@@ -564,21 +651,39 @@ Blocking the knowledge base:
 | A review pass on the rewritten menu descriptions | Spa team | Phase 0 sign-off |
 | BAA signed, and confirmed to cover the Pinecrest sub-account | You | Every phase — the module being paid for is not the same as being covered |
 | Whether MNA needs its own BAA with Pinecrest | You | Agency access to the inbox |
-| Voucher expiration terms | You | Voucher routing |
+| ~~The voucher window~~ | ~~You~~ | **Answered: seven days, told at first contact, soft in practice** |
+| ~~Whether an extended voucher is honoured at $99~~ | ~~You~~ | **Taken as yes** — extending a $99 voucher that is no longer worth $99 would extend nothing. Correct this if the desk means something else by "extend" |
 | Membership terms in plain language | Spa team | Membership routing |
+| Public names that tell NAD+ infusion and NAD+ injection apart | Spa team | NAD+ answers beyond "from $595" |
 
-### Conflicts the website turned up — decide these
+### Conflicts the website turned up
 
 The homepage disagrees with things we have already written down. Each needs a
 decision, and two of them are customer-facing errors today.
 
-| Conflict | The website says | We were told / wrote | Why it matters |
-| --- | --- | --- | --- |
-| **Walk-ins** | "Walk-ins limited — call now", five times | Spec: "Walk-ins get welcomed, not redirected" | Reconciled in the KB — welcome them, ask them to call ahead. Confirm that is right. |
-| **One-Hour Vacation** | ™ | Brand guide says ® | Different marks with different legal meaning. The agent now uses ™ to match the site; correct it if the brand guide wins. |
-| **Booking calendars** | "IV Therapy" and "Member Appointment" tabs both load calendar `oRZeRkyavE37L54bgnt4` | Separate calendars in the routing table | A non-member booking IV therapy lands on the member calendar. Either deliberate or a copy-paste error, and the tag routing in 3a depends on knowing which. |
-| **Drip menu** | 12 drips, including Pure Hydration ($119) and Clean Slate ($175) | Printed menu's 26 drips, which include neither | Two different menus are live. The agent currently answers from the printed one. |
-| **NAD+ pricing** | Infusion "from $595" | Menu's injection, $99–$175 | Same word, a $500 gap. Handled in the menu section, but the products should be named differently in public. |
+A second read of the live site closed three of these. What is left is a
+decision or a repair, not a question about the facts.
+
+| Conflict | Status | What remains |
+| --- | --- | --- |
+| **Booking calendars** | **Fixed.** Both tabs loaded `oRZeRkyavE37L54bgnt4`; the site now gives IV Therapy its own, `tzqmrQyU7qsS0ayXOIaK`. Verified on the live page. | Nothing. Six tabs, six calendars. |
+| **Drip menu** | **Settled — narrower than it looked.** Both menus use the same $119 / $175 / $210 tiers. The site lists ten, two of which (Pure Hydration, Clean Slate) are not on the printed menu; the printed menu has sixteen the site omits. No pricing conflict. | Nothing blocking. The menu section now says which list the agent may name proactively and which it may merely recognise. |
+| **One-Hour Vacation** | **Settled — ™.** The site uses ™ in all four places it appears. | Only if the brand guide is meant to win over the live site, which would make the site wrong rather than the agent. |
+| **Walk-ins** | Site is consistent: "Walk-ins limited — call now", in the header, the hours block, the booking section and the footer. The KB's "welcome them, ask them to call ahead" matches it. | Confirm that is the policy you want, since the spec's original wording said the opposite. |
+| **NAD+ pricing** | Two genuinely different products: the site's **NAD+ Infusion from $595** (500mg or 1000mg) and the printed menu's NAD+ **injection** at $99–$175. | They need different public names. Until then the agent quotes the infusion at "from $595" and hands off anything else — a $500 gap behind one word is not a thing to guess at. |
+
+### This month's specials, as the site lists them
+
+The agent still defers on specials — they change, and a stale quote is worse
+than a slow answer. Recorded here so whoever answers has it to hand, and
+rewritten to the language rule because the site's own wording does not meet it.
+
+| Special | Price | Compliant phrasing |
+| --- | --- | --- |
+| Skinny Mermaid (featured infusion) | $199 | designed to support metabolism and everyday energy |
+| Liver Cleanse (September amplifier) | $49 | designed to support the body's natural detox processes |
+| High-Dose Vitamin C | Ask — 12g and 25g | designed to support immune function, skin and recovery |
+| Oral Peptide Stack — Glow Pack or Wolverine Pack | Ask | limited release; the front desk confirms availability |
 
 **The site breaks the language rule too.** "Boost metabolism and optimize
 energy" on the Skinny Mermaid special, "Energy & Vitality Boost", "supercharge
@@ -606,11 +711,25 @@ rule exists.
 - **Notifications** — pinecrest@primeivhydration.com, with
   jkulkusky@primeivhydration.com added for legal, media and regulatory.
   Content stays out of the notification.
+- **Booking calendars** — found duplicated, now repaired. IV Therapy has its
+  own calendar, `tzqmrQyU7qsS0ayXOIaK`. All six ids are in 3a.
+- **The two drip menus** — no pricing conflict. Both use $119 / $175 / $210.
+  The site lists ten drips, two of them absent from the printed menu. The menu
+  section says which list the agent may name unprompted and which it may only
+  recognise.
+- **One-Hour Vacation™** — ™, in all four places the site uses it.
+- **Intro offer terms** — $99 against a $199 regular price, first-time clients
+  only, no card to book.
 - **The FAQ document** — does not exist. The spec referenced one five times;
   it is not in Drive and was never written. The menu replaced it as the source
   for service answers, and the rewritten descriptions need a review pass from
   the spa team in place of the "tested phrasing" the spec assumed.
 
-One thing left before Phase 0: have the spa team read the rewritten menu
-descriptions. They are compliance-safe by construction, but nobody who works
-the floor has confirmed they still describe the right drip.
+One thing left before Phase 0.
+
+**Have the spa team read the rewritten menu descriptions.** They are
+compliance-safe by construction, but nobody who works the floor has confirmed
+they still describe the right drip.
+
+**The duplicate calendar is fixed**, verified on the live page. IV Therapy now
+has its own calendar, `tzqmrQyU7qsS0ayXOIaK`, which is the id 3a was missing.

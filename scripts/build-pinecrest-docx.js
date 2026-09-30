@@ -67,20 +67,22 @@ const PROMPT_TEXT=MD.match(/## 1\. System prompt[\s\S]*?```\n([\s\S]*?)```/)[1].
 const BODY='Calibri', MONO='Consolas';
 const NAVY='1C3D6E', GREY='595959', SHADE='F2F5F8';
 
+const PROSE=[];
+const rec=t=>{PROSE.push(t);return t;};
 const p=(t,o={})=>new Paragraph({spacing:{after:o.after??140,line:280},
-  children:[new TextRun({text:t,font:BODY,size:21,bold:o.bold,italics:o.italics,color:o.color})]});
+  children:[new TextRun({text:rec(t),font:BODY,size:21,bold:o.bold,italics:o.italics,color:o.color})]});
 const h1=t=>new Paragraph({heading:HeadingLevel.HEADING_1,spacing:{before:360,after:150},
   children:[new TextRun({text:t,font:BODY,size:30,bold:true,color:NAVY})]});
 const h2=t=>new Paragraph({heading:HeadingLevel.HEADING_2,spacing:{before:260,after:110},
   children:[new TextRun({text:t,font:BODY,size:23,bold:true,color:NAVY})]});
 const bul=t=>new Paragraph({numbering:{reference:'b',level:0},spacing:{after:70,line:280},
-  children:[new TextRun({text:t,font:BODY,size:21})]});
+  children:[new TextRun({text:rec(t),font:BODY,size:21})]});
 const nl=(t,i)=>new Paragraph({spacing:{after:70,line:280},indent:{left:420,hanging:420},
   children:[new TextRun({text:i+'.',font:BODY,size:21,bold:true}),
             new TextRun({text:'\t'+t,font:BODY,size:21})]});
 const code=t=>new Paragraph({spacing:{after:0,line:230},indent:{left:170,right:170},
   shading:{type:ShadingType.CLEAR,color:'auto',fill:SHADE},
-  children:[new TextRun({text:t.length?t:' ',font:MONO,size:17})]});
+  children:[new TextRun({text:t.length?rec(t):' ',font:MONO,size:17})]});
 const rule=()=>new Paragraph({spacing:{before:100,after:180},
   border:{bottom:{style:BorderStyle.SINGLE,size:6,color:'D9D9D9'}},
   children:[new TextRun({text:'',size:2})]});
@@ -92,7 +94,7 @@ function table(headers,rows,widths){
     shading:{type:ShadingType.CLEAR,color:'auto',fill:hdr?NAVY:'FFFFFF'},
     margins:{top:90,bottom:90,left:120,right:120},
     children:[new Paragraph({spacing:{after:0,line:250},
-      children:[new TextRun({text:t,font:BODY,size:19,bold:!!hdr,color:hdr?'FFFFFF':'000000'})]})]})) });
+      children:[new TextRun({text:rec(t),font:BODY,size:19,bold:!!hdr,color:hdr?'FFFFFF':'000000'})]})]})) });
   return new Table({columnWidths:widths,width:{size:total,type:WidthType.DXA},
     rows:[row(headers,true),...rows.map(r=>row(r,false))]});
 }
@@ -110,7 +112,7 @@ k.push(new Paragraph({spacing:{after:200},children:[new TextRun({
 k.push(rule());
 
 k.push(p('This is the paste-ready half of the build spec: the Conversation AI system prompt, the knowledge-base entries, and the workflow conditions that have to sit around the AI step rather than inside it.'));
-k.push(p('Do not connect this to live traffic yet. All five prerequisites in the spec come first — HIPAA module purchased and BAA signed, integration audit done, calendars corrected to 10–5 seven days, the pricing rule applied, and the retention and access policy set. This document assumes Phase 0, suggest-only.',{bold:true}));
+k.push(p('Do not connect this to live traffic yet. All five prerequisites in the spec come first — HIPAA module purchased and BAA signed, integration audit done, calendars corrected to 10–6 seven days, the pricing rule applied, and the retention and access policy set. This document assumes Phase 0, suggest-only.',{bold:true}));
 k.push(p('Field names may differ. Nobody has opened the Conversation AI settings screen on this account yet, so the headings below follow HighLevel’s usual layout. Each block is self-contained, so if a field is named differently on this plan, the block still pastes somewhere sensible.'));
 
 k.push(h1('Decisions applied in this version'));
@@ -122,7 +124,9 @@ k.push(table(['Decision','Effect on the build'],[
  ['“Intro Offer” is the live voucher calendar','Tag routing targets it. “Intro Offer v1” is the orphan and should be retired, not left in place.'],
  ['Website facts loaded','Phone, cancellation policy, age limits, HSA/FSA, what the intro offer includes, the Essentials membership price and mobile IV all came off the homepage. Nine new Q&A pairs. Six conflicts with what we had are listed in their own section.'],
  ['Notification routing set','pinecrest@primeivhydration.com for everything, plus jkulkusky@primeivhydration.com for legal, media and regulatory. Notifications carry a link, never message content — and the agency address is deliberately not on the list.'],
- ['Hours are 10-5, not 10-6','Corrected everywhere: the prompt, the hard facts, the hours answer, the Phase 0 checklist and the calendar fix the browser session performs. A 5:00 close also changes what rule 3b means.'],
+ ['Hours are 10-6, seven days','The website was right and an earlier ten-to-five was wrong. Corrected everywhere: the prompt, the hard facts, the hours answer, the Phase 0 checklist and the calendar fix the browser session performs.'],
+ ['The duplicate booking calendar is fixed','The Member Appointment and IV Therapy tabs used to load the same widget, so non-members booked onto the member calendar. IV Therapy now has its own, tzqmrQyU7qsS0ayXOIaK, verified on the live page. All six calendar ids are listed under 3a.'],
+ ['Which drip menu governs','Both menus use the same price tiers, so there is no pricing conflict. The agent names only what the website lists, recognises anything on either list, and hands off a name on neither.'],
  ['Full menu pricing loaded','The agent may now quote drips, injections and NAD+ at the exact menu prices. Memberships and packages still route. Every menu description was rewritten — the printed copy breaks the language rule throughout.'],
  ['The FAQ document does not exist','The spec referenced one five times; it is not in Drive and was never written. The menu replaced it, and a spa-team review pass replaces the “tested phrasing” the spec assumed.'],
  ['Corrected since the first Word version','The intro-offer price is one KB entry that defers, overridden by the prompt — two entries keyed on the same question would collide. Rule 3d now names who sends the handoff line, so it cannot go out twice.'],
@@ -171,10 +175,10 @@ k.push(h2('Explicitly excluded from the knowledge base'));
 k.push(p('The agent routes rather than answers on anything the team has not settled. Do not load:'));
 ['Membership, package and bundle pricing, discounts, promo codes and “starting at” language — menu prices are fine',
  'The printed menu’s own descriptions. Load the rewritten wording only.',
- 'Voucher expiration terms',
+ 'Voucher expiration terms are no longer excluded — settled. Seven days, as the first text says, quotable while the week is still running. After it, the agent never says “expired”: it offers the extension and books them.',
  'Membership rollover, pause and cancellation rules',
  'What “Mobile Services Consult” includes',
- 'Anything sourced from existing campaign copy. The account’s current ads use “boost your energy” and “boost metabolism”, which violate the language rule. Build from the FAQ document only.'
+ 'Anything sourced from existing campaign copy. The account’s current ads use “boost your energy” and “boost metabolism”, which violate the language rule.'
 ].forEach(t=>k.push(bul(t)));
 
 k.push(h1('3. Workflow scaffolding'));
@@ -192,11 +196,12 @@ k.push(table(['Tag state','Offer passed to agent','May say “$99”?','Calendar
 ],[2500,2400,2000,2400]));
 k.push(gap());
 k.push(p('The price column is why this branch matters more now than it did before. The agent is allowed to say “$99” — but saying it to a contact entitled to the free B-12 variant is promising the wrong thing to the one person who should have heard better news. The workflow passes the permission; the agent never infers it. When no tag matches, the answer is silence and a handoff, not a guess.'));
+k.push(p('Expired vouchers land in the first-time row. Someone whose voucher lapsed never redeemed it, so they still carry the first-visit tag — which means the agent may say “$99” to them, and the voucher answer has it book them. That is intended as long as an extended voucher is honoured at $99. If it is not, this branch is wrong: those contacts need a tag of their own and a “no” in the price column, or the agent promises a price the desk then has to take back in front of the client.'));
 k.push(p('“Intro Offer” is confirmed as the live voucher calendar. “Intro Offer v1” is the orphan — retire it, or routing drifts back to it the next time someone edits calendars by name.'));
 
 k.push(h2('3b. Hard stop — bookings at 4:00 PM or later'));
 k.push(p('The agent may offer a 4:00 PM or later slot but must never confirm one. After the AI step: if the requested time is 16:00 or later, write an internal comment on the conversation, notify staff, and send only “Let me get that confirmed for you — someone will text you right back.”'));
-k.push(p('This rule reads differently now that closing is 5:00, not 6:00. A drip runs about an hour, so 4:00 PM is the last start that finishes at close, and anything later cannot finish before the doors shut. The rule is effectively “the last slot of the day always needs a human” — a sane place to put one. Worth deciding whether the agent should offer anything after 4:00 PM at all; right now it may offer and simply cannot confirm.'));
+k.push(p('With a 6:00 close and a drip running about an hour, 4:00 PM is not the last slot that fits — so this rule is about staffing rather than closing time. It is the client’s rule, kept as given. Worth deciding whether the agent should offer anything after 4:00 PM at all; right now it may offer and simply cannot confirm.'));
 
 k.push(h2('3c. Hard stop — five new bookings per day'));
 k.push(p('Requires counting, so it cannot be a prompt rule. Before the AI step, count today’s bookings on the intro calendar. At five or more, set a flag the agent sees, and have it collect a preferred time and hand off instead of offering slots.'));
@@ -245,12 +250,62 @@ k.push(p('The site breaks the language rule too: "Boost metabolism and optimize 
 k.push(h1('5. What is still needed'));
 k.push(table(['Needed','From','Blocks'],[
  ['A review pass on the rewritten menu descriptions','Spa team','Phase 0 sign-off'],
- ['Voucher expiration terms','You','Voucher routing'],
+
  ['Membership terms in plain language','Spa team','Membership routing'],
  ['What “Mobile Services Consult” includes','Spa team','Service questions'],
 ],[4400,1900,3000]));
 k.push(gap());
-k.push(p('Everything above is drafted so the FAQ pairs drop in without rewriting the prompt. Send the FAQ document and the knowledge base finishes in one pass.'));
+k.push(p('There is no FAQ document — the spec referenced one five times and it was never written. The menu replaced it as the source for service answers, so what finishes the knowledge base is a spa-team review pass over the rewritten descriptions, not a file.'));
+
+/**
+ * The prose below is hand-written, while the tables and Q&A come out of the
+ * markdown. That split has already shipped a document asserting both 10-6 and
+ * 10-5 hours, because the markdown was corrected and this file was not. So:
+ * read the load-bearing facts out of the markdown and refuse to build if the
+ * hard-coded prose still disagrees with them.
+ */
+function assertProseMatchesSource(){
+  const self = fs.readFileSync(__filename, 'utf8');
+  // strip this function so its own example strings can't trip it
+  const prose = self.replace(/\/\*\*[\s\S]*?function assertProseMatchesSource[\s\S]*?\n}\n/, '');
+
+  const hours = (MD.match(/^\| Hours \| (.+?) \|$/m) || [])[1] || '';
+  if(!hours) throw new Error('Could not find the Hours row in the markdown.');
+  const closesAtSix = /6:00 PM/.test(hours);
+
+  const wrong = (closesAtSix
+    ? [/10\s*[–-]\s*5\b/, /closing is 5:00/, /\b5:00 close\b/]
+    : [/10\s*[–-]\s*6\b/, /closing is 6:00/, /\b6:00 close\b/])
+    // Superseded rules that would contradict the knowledge base if they
+    // survived anywhere in the prose.
+    .concat([/Never state the window/, /the number stays out/]);
+
+  // Omissions, not just contradictions. Decisions that were settled in the
+  // markdown have twice failed to reach this file; these are the ones whose
+  // absence would change what somebody builds.
+  const emitted = PROSE.join('\n');
+  const required = [
+    ['the expired-voucher pricing edge', /Expired vouchers land in the first-time row/],
+    ['the settled voucher rule', /never says .expired.: it offers the extension/],
+    ['the no-dash writing rule', /No dashes as punctuation/],
+    ['the calendar ids', /tzqmrQyU7qsS0ayXOIaK/],
+    ['which drip menu the agent may name', /names only what the website lists/],
+  ];
+  const missing = required.filter(([, re]) => !re.test(emitted)).map(([label]) => label);
+  if(missing.length){
+    throw new Error('The document is missing settled decisions:\n  - ' + missing.join('\n  - '));
+  }
+
+  const hits = wrong.filter(re => re.test(prose)).map(String);
+  if(hits.length){
+    throw new Error(
+      'The hard-coded prose contradicts the markdown.\n' +
+      '  markdown says Hours = ' + hours + '\n' +
+      '  but this script still contains: ' + hits.join(', ') + '\n' +
+      'Fix the prose rather than the check.');
+  }
+}
+assertProseMatchesSource();
 
 const doc=new Document({
   numbering:{config:[{reference:'b',levels:[{level:0,format:LevelFormat.BULLET,text:'•',alignment:AlignmentType.LEFT,
