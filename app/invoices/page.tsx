@@ -25,6 +25,8 @@ type Invoice = {
   notes: string | null;
   client_visible: boolean;
   created_at: string;
+  pay_token: string | null;
+  payment_status: string | null;
 };
 
 const STATUS_STYLES: Record<string, { bg: string; text: string }> = {
@@ -132,13 +134,53 @@ export default function InvoicesPage() {
   }
 
   async function updateStatus(id: string, status: string, extra?: Record<string, any>) {
-    await fetch('/api/invoices', {
+    const res = await fetch('/api/invoices', {
       method: 'PATCH',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ id, status, ...extra }),
     });
+    const data = await res.json().catch(() => ({}));
+    if (data.emailSent === false) alert(`Invoice updated, but the email was not sent:\n${data.emailError || 'unknown error'}`);
     fetchInvoices();
     setSelectedInvoice(null);
+  }
+
+  // Billing email for the open invoice's client (client_kv 'billing_email')
+  const [billingEmail, setBillingEmail] = useState('');
+  const [emailBusy, setEmailBusy] = useState(false);
+  const [copied, setCopied] = useState(false);
+  const selectedClientId = selectedInvoice?.client_id;
+  useEffect(() => {
+    setBillingEmail('');
+    setCopied(false);
+    if (!selectedClientId) return;
+    fetch(`/api/client-kv?clientId=${encodeURIComponent(selectedClientId)}&key=billing_email`)
+      .then(r => r.json())
+      .then(d => setBillingEmail(typeof d.value === 'string' ? d.value : ''))
+      .catch(() => {});
+  }, [selectedClientId]);
+
+  async function saveBillingEmail() {
+    if (!selectedClientId) return;
+    await fetch('/api/client-kv', {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ clientId: selectedClientId, key: 'billing_email', value: billingEmail.trim() }),
+    });
+  }
+
+  async function resendEmail() {
+    if (!selectedInvoice) return;
+    setEmailBusy(true);
+    const res = await fetch('/api/invoices', {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ id: selectedInvoice.id, resendEmail: true }),
+    });
+    const data = await res.json().catch(() => ({}));
+    setEmailBusy(false);
+    alert(data.emailSent ? 'Invoice email sent.' : `Email not sent:\n${data.emailError || 'unknown error'}`);
+    fetchInvoices();
   }
 
   async function patchInvoice(fields: Record<string, any>) {
@@ -483,6 +525,14 @@ export default function InvoicesPage() {
                 <div>
                   <div className="text-[10px] font-bold text-white/30 uppercase tracking-wider mb-1">Bill To</div>
                   <div className="text-[14px] font-bold text-white">{clients.find(c => c.id === selectedInvoice.client_id)?.name || selectedInvoice.client_id}</div>
+                  <input
+                    type="text"
+                    value={billingEmail}
+                    onChange={(e) => setBillingEmail(e.target.value)}
+                    onBlur={saveBillingEmail}
+                    placeholder="Billing email (comma-separate several)"
+                    className="mt-1.5 w-full text-[12px] text-white/70 bg-white/5 border border-white/10 rounded-lg px-2.5 py-1.5 outline-none focus:border-cyan-500/50 placeholder:text-white/25"
+                  />
                 </div>
                 <div className="text-right">
                   <div className="text-[10px] font-bold text-white/30 uppercase tracking-wider mb-1">Due Date</div>
@@ -632,6 +682,17 @@ export default function InvoicesPage() {
                 />
               </div>
 
+              {selectedInvoice.payment_status === 'processing' && selectedInvoice.status !== 'paid' && (
+                <div className="rounded-xl px-4 py-3 mb-4 text-[12px] text-cyan-300" style={{ background: 'rgba(74,184,206,0.08)', border: '1px solid rgba(74,184,206,0.2)' }}>
+                  Bank payment submitted through Square. It clears in 2–3 business days and will mark itself paid.
+                </div>
+              )}
+              {selectedInvoice.payment_status === 'failed' && selectedInvoice.status !== 'paid' && (
+                <div className="rounded-xl px-4 py-3 mb-4 text-[12px] text-rose-300" style={{ background: 'rgba(239,68,68,0.08)', border: '1px solid rgba(239,68,68,0.2)' }}>
+                  The client's last bank payment failed. Details are in the Square dashboard.
+                </div>
+              )}
+
               {/* Actions */}
               <div className="flex flex-wrap gap-2">
                 {selectedInvoice.status === 'draft' && (
@@ -659,6 +720,27 @@ export default function InvoicesPage() {
                     >
                       Mark as Paid
                     </button>
+                    <button
+                      onClick={resendEmail}
+                      disabled={emailBusy}
+                      className="px-4 py-2 rounded-xl text-[12px] font-semibold text-white/70 bg-white/5 hover:text-white flex items-center gap-1.5 disabled:opacity-50"
+                    >
+                      <span className="material-symbols-outlined" style={{ fontSize: 14 }}>send</span>
+                      {emailBusy ? 'Sending…' : 'Resend Email'}
+                    </button>
+                    {selectedInvoice.pay_token && (
+                      <button
+                        onClick={async () => {
+                          const url = `${window.location.origin}/pay/${selectedInvoice.id}?t=${encodeURIComponent(selectedInvoice.pay_token!)}`;
+                          await navigator.clipboard.writeText(url);
+                          setCopied(true);
+                        }}
+                        className="px-4 py-2 rounded-xl text-[12px] font-semibold text-white/70 bg-white/5 hover:text-white flex items-center gap-1.5"
+                      >
+                        <span className="material-symbols-outlined" style={{ fontSize: 14 }}>link</span>
+                        {copied ? 'Copied!' : 'Copy Pay Link'}
+                      </button>
+                    )}
                     <button
                       onClick={() => updateStatus(selectedInvoice.id, 'draft', { client_visible: false, issued_date: null })}
                       className="px-4 py-2 rounded-xl text-[12px] font-semibold text-white/50 bg-white/5 hover:text-white flex items-center gap-1.5"
