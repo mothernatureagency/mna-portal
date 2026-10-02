@@ -152,7 +152,7 @@ export default function ClientInvoicesPage() {
               {/* Pay online */}
               {selected.status !== 'paid' && selected.payment_status === 'processing' && (
                 <div className="rounded-xl px-4 py-3 mb-4 text-[12px] text-cyan-300" style={{ background: 'rgba(74,184,206,0.08)', border: '1px solid rgba(74,184,206,0.2)' }}>
-                  Your bank payment is processing. It usually clears in 3–5 business days.
+                  Your bank payment is processing. It usually clears in 2–3 business days.
                 </div>
               )}
               {selected.status !== 'paid' && selected.payment_status !== 'processing' && selected.pay_token && (

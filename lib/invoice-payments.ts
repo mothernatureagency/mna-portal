@@ -62,17 +62,17 @@ export function todayCentral(): string {
 }
 
 /**
- * Mark an invoice paid from a completed Stripe payment. Idempotent: returns
- * the updated row the first time, null if it was already paid or not found.
+ * Mark an invoice paid from a completed online (Square) payment. Idempotent:
+ * returns the updated row the first time, null if it was already paid or not found.
  */
-export async function recordStripePayment(invoiceId: string, method: 'bank' | 'card') {
+export async function recordOnlinePayment(invoiceId: string, method: 'bank' | 'card', paymentId: string) {
   const { rows } = await query(
     `update invoices
         set status = 'paid', payment_status = 'paid', paid_date = $2,
-            paid_amount = total, payment_method = $3
+            paid_amount = total, payment_method = $3, square_payment_id = $4
       where id = $1 and status <> 'paid'
       returning *`,
-    [invoiceId, todayCentral(), method === 'card' ? 'Card (Stripe)' : 'Bank transfer (Stripe)']
+    [invoiceId, todayCentral(), method === 'card' ? 'Card (Square)' : 'Bank transfer (Square)', paymentId]
   );
   return rows[0] || null;
 }

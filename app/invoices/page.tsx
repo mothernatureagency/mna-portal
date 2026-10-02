@@ -684,12 +684,12 @@ export default function InvoicesPage() {
 
               {selectedInvoice.payment_status === 'processing' && selectedInvoice.status !== 'paid' && (
                 <div className="rounded-xl px-4 py-3 mb-4 text-[12px] text-cyan-300" style={{ background: 'rgba(74,184,206,0.08)', border: '1px solid rgba(74,184,206,0.2)' }}>
-                  Bank payment submitted through Stripe. It clears in 3–5 business days and will mark itself paid.
+                  Bank payment submitted through Square. It clears in 2–3 business days and will mark itself paid.
                 </div>
               )}
               {selectedInvoice.payment_status === 'failed' && selectedInvoice.status !== 'paid' && (
                 <div className="rounded-xl px-4 py-3 mb-4 text-[12px] text-rose-300" style={{ background: 'rgba(239,68,68,0.08)', border: '1px solid rgba(239,68,68,0.2)' }}>
-                  The client's last bank payment failed. Details are in the Stripe dashboard.
+                  The client's last bank payment failed. Details are in the Square dashboard.
                 </div>
               )}
 

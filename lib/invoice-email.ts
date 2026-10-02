@@ -6,7 +6,7 @@
 import { sendEmail } from './send-email';
 import { clients } from './clients';
 import { buildInvoicePdf } from './invoice-pdf';
-import { stripeConfigured } from './stripe';
+import { squareConfigured } from './square';
 import { CARD_FEE_PERCENT, PORTAL_URL, ensurePayToken, getBillingEmails, payUrl } from './invoice-payments';
 
 const OWNER_EMAIL = 'mn@mothernatureagency.com';
@@ -226,7 +226,7 @@ export async function sendInvoiceEmail(
     return { success: false, error: `No billing email saved for ${getClientName(invoice.client_id)}. Add one on the invoice, then use Resend Email.` };
   }
 
-  const link = stripeConfigured() ? payUrl(invoice.id, await ensurePayToken(invoice.id)) : null;
+  const link = squareConfigured() ? payUrl(invoice.id, await ensurePayToken(invoice.id)) : null;
 
   const pdf = await buildInvoicePdf({
     ...invoice,
@@ -296,6 +296,6 @@ export async function sendPaymentFailedEmail(invoice: InvoiceData) {
       A bank transfer for invoice <strong>${esc(invoice.invoice_number)}</strong> from
       <strong>${esc(clientName)}</strong> (${formatCurrency(invoice.total)}) did not go through.
       The invoice is still open, and the client can try again from the same pay link.<br><br>
-      See the Stripe dashboard for the reason.`),
+      See the Square dashboard for the reason.`),
   });
 }

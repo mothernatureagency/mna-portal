@@ -1,6 +1,7 @@
 import { ensureSchema, query } from '@/lib/db';
 import { clients } from '@/lib/clients';
-import { stripeConfigured } from '@/lib/stripe';
+import { squareConfigured, squarePublicConfig } from '@/lib/square';
+import SquarePayForm from './SquarePayForm';
 import { CARD_FEE_PERCENT, cardFee, tokenMatches } from '@/lib/invoice-payments';
 
 export const runtime = 'nodejs';
@@ -48,7 +49,7 @@ export default async function PayInvoicePage({
   searchParams,
 }: {
   params: { id: string };
-  searchParams: { t?: string; result?: string };
+  searchParams: { t?: string };
 }) {
   await ensureSchema();
   const token = searchParams.t || '';
@@ -83,52 +84,45 @@ export default async function PayInvoicePage({
   if (inv.status === 'cancelled') {
     return <Shell>{header}<Message tone="warn" title="Invoice cancelled" body="This invoice has been cancelled and doesn't need to be paid." /></Shell>;
   }
-  if (inv.payment_status === 'processing' || searchParams.result === 'success') {
+  if (inv.payment_status === 'processing') {
     return (
       <Shell>
         {header}
         <Message
           tone="good"
           title="Payment submitted — thank you!"
-          body="Card payments confirm right away. Bank transfers take 3–5 business days to clear; we'll email you a receipt when it does."
+          body="Your bank transfer is processing and takes 2–3 business days to clear. We'll email you a receipt when it does."
         />
       </Shell>
     );
   }
-  if (!stripeConfigured()) {
+  if (!squareConfigured()) {
     return <Shell>{header}<Message title="Online payment unavailable" body="Please pay by Zelle to mn@mothernatureagency.com or by check payable to Mother Nature Agency LLC." /></Shell>;
   }
 
-  const fee = cardFee(total);
-  const base = `/api/pay/checkout?id=${inv.id}&t=${encodeURIComponent(token)}`;
-  const btn: React.CSSProperties = { display: 'block', textDecoration: 'none', borderRadius: 12, padding: '16px 20px', marginBottom: 12 };
+  const sq = squarePublicConfig();
 
   return (
     <Shell>
       {header}
-      {searchParams.result === 'cancelled' && (
+      {inv.payment_status === 'failed' && (
         <div style={{ fontSize: 13, color: '#b45309', background: '#fffbeb', borderRadius: 10, padding: '10px 14px', marginBottom: 16, textAlign: 'center' }}>
-          Payment was not completed. You can try again below.
+          Your last bank payment didn't go through. Please try again below.
         </div>
       )}
-      <a href={`${base}&method=bank`} style={{ ...btn, background: '#0c6da4', color: 'white' }}>
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-          <span style={{ fontSize: 16, fontWeight: 700 }}>Pay by bank transfer</span>
-          <span style={{ fontSize: 16, fontWeight: 700 }}>{money(total)}</span>
-        </div>
-        <div style={{ fontSize: 12, opacity: 0.85, marginTop: 4 }}>No fee · connect your bank account securely</div>
-      </a>
-      <a href={`${base}&method=card`} style={{ ...btn, background: 'white', color: '#0c6da4', border: '2px solid #0c6da4' }}>
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-          <span style={{ fontSize: 16, fontWeight: 700 }}>Pay by card</span>
-          <span style={{ fontSize: 16, fontWeight: 700 }}>{money(total + fee)}</span>
-        </div>
-        <div style={{ fontSize: 12, color: '#666', marginTop: 4 }}>
-          {CARD_FEE_PERCENT > 0 ? `Includes ${CARD_FEE_PERCENT}% card processing fee (${money(fee)})` : 'Credit or debit card'}
-        </div>
-      </a>
+      <SquarePayForm
+        invoiceId={inv.id}
+        token={token}
+        total={total}
+        cardFee={cardFee(total)}
+        cardFeePercent={CARD_FEE_PERCENT}
+        defaultName=""
+        applicationId={sq.applicationId}
+        locationId={sq.locationId}
+        sdkUrl={sq.sdkUrl}
+      />
       <div style={{ fontSize: 12, color: '#888', textAlign: 'center', marginTop: 16, lineHeight: 1.6 }}>
-        Payments are processed securely by Stripe.<br />
+        Payments are processed securely by Square.<br />
         Prefer Zelle? Send to mn@mothernatureagency.com with the invoice number.
       </div>
     </Shell>
