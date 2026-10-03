@@ -251,6 +251,27 @@ async function initSchema() {
                         updated_at timestamptz not null default now()
                   )`,
                   `create index if not exists graphic_projects_client_idx on graphic_projects (client_id)`,
+                  // Brand kits. A kit belongs either to one client
+                  // (scope='client') or to a group of them (scope='group') —
+                  // every Prime IV location shares the franchise's type, logos
+                  // and palette, and overrides only what's genuinely its own.
+                  // A client kit stores just the fields it overrides, so the
+                  // two merge field by field rather than all-or-nothing.
+                  `create table if not exists brand_kits (
+                        id uuid primary key default uuid_generate_v4(),
+                        scope text not null default 'client',
+                        owner_key text not null,
+                        name text,
+                        fields jsonb not null default '{}',
+                        created_at timestamptz not null default now(),
+                        updated_at timestamptz not null default now(),
+                        unique (scope, owner_key)
+                  )`,
+                  // Which group a client kit draws from. Set explicitly here so it
+                  // works for built-in clients too (they aren't in custom_clients).
+                  // Null means "work it out from the client id".
+                  `alter table brand_kits add column if not exists group_key text`,
+                  `alter table custom_clients add column if not exists brand_group text`,
                   // Kids' journal entries. owner_email = the kid's email
                   // (marissa@... / kyle@...). author = 'kid' or 'mom'.
                   // shared = none | mom | ai | both — what's allowed to read it.

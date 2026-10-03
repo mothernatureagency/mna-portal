@@ -1,57 +1,73 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { uploadPublicMedia } from '@/lib/media-store';
+import { buildImagePrompt } from '@/lib/graphic-imagery';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
 export const maxDuration = 300;
 
 /**
- * Optional: generate a photographic layer for an artboard.
+ * Generate the photographic layer of an artboard.
  *
- * The artboard itself is HTML — that is what keeps type crisp and brand hexes
- * exact. This is for the thing HTML can't make: a background photograph or
- * texture to sit behind the layout. The generated image lands in the media
- * bucket and comes back as a normal asset URL the designer can reference.
+ * The artboard is HTML, which is what keeps type crisp and brand hexes exact.
+ * This is the thing HTML cannot make: a real-looking face. For a wellness
+ * brand that is not decoration - the face is the piece, and the layout is
+ * what sits over it.
  *
- * Needs OPENAI_API_KEY in Vercel env. Without it this returns 503 and the lab
- * simply carries on with CSS-built backgrounds and uploaded photos — the same
- * way the video lab degrades without HeyGen.
+ * Generation returns more than one option because picking beats re-rolling:
+ * two frames of the same brief differ mostly in the expression, and the
+ * expression is the whole job.
+ *
+ * Needs OPENAI_API_KEY. Without it this returns 503 and the lab falls back to
+ * uploaded photos and type-led design.
  *
  * POST /api/graphic-projects/image
- * body: { prompt, size?: '1024x1024' | '1024x1536' | '1536x1024', quality?: 'low'|'medium'|'high' }
- * → { url }
+ * body: { subject, styleId?, copySpace?, brandNote?, aspect?, count?, quality? }
+ * -> { images: [{ url }], prompt }
  */
 
-const SIZES = new Set(['1024x1024', '1024x1536', '1536x1024']);
+const SIZE_BY_ASPECT: Record<string, string> = {
+  square: '1024x1024',
+  portrait: '1024x1536',
+  landscape: '1536x1024',
+};
 
 export async function POST(req: NextRequest) {
   const key = process.env.OPENAI_API_KEY;
   if (!key) {
     return NextResponse.json(
-      { error: 'OPENAI_API_KEY not set. Add it in Vercel env to generate photo backgrounds. Until then, build backgrounds from CSS or upload a photo.' },
+      {
+        error:
+          'OPENAI_API_KEY is not set, so photographic imagery cannot be generated. Add it in the Vercel environment variables to turn this on. Until then, upload a real photo or let the designer build the piece from type.',
+      },
       { status: 503 },
     );
   }
 
   let b: any; try { b = await req.json(); } catch { return NextResponse.json({ error: 'Invalid JSON' }, { status: 400 }); }
-  const { prompt, size, quality } = b || {};
-  if (!prompt || !String(prompt).trim()) return NextResponse.json({ error: 'prompt required' }, { status: 400 });
+  const { subject, styleId, copySpace, brandNote, aspect, count, quality } = b || {};
+  if (!subject || !String(subject).trim()) {
+    return NextResponse.json({ error: 'Say what the photo is of' }, { status: 400 });
+  }
 
-  const useSize = SIZES.has(size) ? size : '1024x1024';
+  const size = SIZE_BY_ASPECT[aspect] || SIZE_BY_ASPECT.square;
+  // Two by default: enough to choose an expression from without doubling the
+  // wait or the bill on every click.
+  const n = Math.min(4, Math.max(1, Number(count) || 2));
+  const useQuality = quality === 'low' || quality === 'medium' || quality === 'high' ? quality : 'high';
+
+  const prompt = buildImagePrompt({
+    subject: String(subject),
+    styleId,
+    brandNote: typeof brandNote === 'string' ? brandNote : undefined,
+    copySpace,
+  });
 
   try {
     const r = await fetch('https://api.openai.com/v1/images/generations', {
       method: 'POST',
       headers: { Authorization: `Bearer ${key}`, 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        model: 'gpt-image-1',
-        // No text in the image — every word on the piece is real DOM text on
-        // the artboard, so the generated layer is imagery only.
-        prompt: `${String(prompt).slice(0, 3000)}\n\nPhotographic background layer only. No text, no words, no letters, no logos, no watermarks, no UI. Leave the composition open enough that a headline can sit over it.`,
-        size: useSize,
-        quality: quality === 'low' || quality === 'high' ? quality : 'medium',
-        n: 1,
-      }),
+      body: JSON.stringify({ model: 'gpt-image-1', prompt: prompt.slice(0, 30000), size, quality: useQuality, n }),
     });
 
     const data = await r.json().catch(() => null);
@@ -60,21 +76,36 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: msg }, { status: r.status === 401 ? 401 : 502 });
     }
 
-    const b64 = data?.data?.[0]?.b64_json;
-    const remote = data?.data?.[0]?.url;
-    let bytes: Uint8Array;
-    if (b64) {
-      bytes = new Uint8Array(Buffer.from(b64, 'base64'));
-    } else if (remote) {
-      const img = await fetch(remote);
-      if (!img.ok) return NextResponse.json({ error: 'Could not download the generated image' }, { status: 502 });
-      bytes = new Uint8Array(await img.arrayBuffer());
-    } else {
-      return NextResponse.json({ error: 'The image API returned nothing usable' }, { status: 502 });
+    const items: any[] = Array.isArray(data?.data) ? data.data : [];
+    if (!items.length) return NextResponse.json({ error: 'The image API returned nothing usable' }, { status: 502 });
+
+    const images: { url: string }[] = [];
+    const failures: string[] = [];
+    for (const item of items) {
+      try {
+        let bytes: Uint8Array;
+        if (item.b64_json) {
+          bytes = new Uint8Array(Buffer.from(item.b64_json, 'base64'));
+        } else if (item.url) {
+          const img = await fetch(item.url);
+          if (!img.ok) { failures.push(`download failed (${img.status})`); continue; }
+          bytes = new Uint8Array(await img.arrayBuffer());
+        } else {
+          continue;
+        }
+        images.push({ url: await uploadPublicMedia(bytes, 'image/png', { prefix: 'graphics' }) });
+      } catch (e: any) {
+        failures.push(e?.message || 'could not be saved');
+      }
     }
 
-    const url = await uploadPublicMedia(bytes, 'image/png', { prefix: 'graphics' });
-    return NextResponse.json({ url });
+    if (!images.length) {
+      return NextResponse.json(
+        { error: `The images were generated but none could be saved: ${failures.join('; ')}` },
+        { status: 502 },
+      );
+    }
+    return NextResponse.json({ images, prompt, ...(failures.length ? { warning: `${failures.length} of ${items.length} could not be saved` } : {}) });
   } catch (e: any) {
     return NextResponse.json({ error: e?.message || 'Image generation failed' }, { status: 500 });
   }
