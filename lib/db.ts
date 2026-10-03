@@ -937,3 +937,18 @@ export async function query<T = any>(text: string, params?: any[]): Promise<{ ro
 export async function closePool() {
         await getPool().end();
 }
+
+/** Keep approval checks and their writes on one connection and transaction. */
+export async function transaction<T>(fn: (client: import('pg').PoolClient) => Promise<T>): Promise<T> {
+  await ensureSchema();
+  const client = await getPool().connect();
+  try {
+    await client.query('BEGIN');
+    const result = await fn(client);
+    await client.query('COMMIT');
+    return result;
+  } catch (error) {
+    await client.query('ROLLBACK');
+    throw error;
+  } finally { client.release(); }
+}

@@ -17,6 +17,8 @@ function isPublicRoute(pathname: string) {
     pathname === '/api/mcp' ||
     pathname === '/api/mcp/' ||
     pathname === '/api/mcp/health' ||
+    // This worker requires the Vercel CRON_SECRET bearer header itself.
+    pathname === '/api/operations/monitor' ||
     // MCP clients probe /.well-known/oauth-* to discover how to authenticate.
     // This server uses static bearer tokens and publishes no OAuth metadata,
     // so the honest answer is 404. Without this the middleware redirects the

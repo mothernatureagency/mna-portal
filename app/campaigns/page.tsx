@@ -1,4 +1,7 @@
 'use client';
+import SmsPreview from '@/components/campaigns/SmsPreview';
+import NewsletterPreview from '@/components/campaigns/NewsletterPreview';
+import { campaignIssues, campaignReviewVersion } from '@/lib/campaign-checks';
 import React, { useEffect, useMemo, useState } from 'react';
 import { useClient } from '@/context/ClientContext';
 import { createClient } from '@/lib/supabase/client';
@@ -83,7 +86,6 @@ export default function CampaignsPage() {
   const [recommendations, setRecommendations] = useState<any[]>([]);
   const [loadingRecs, setLoadingRecs] = useState(false);
   const [showRecs, setShowRecs] = useState(false);
-  const [selectedNonMemberTier, setSelectedNonMemberTier] = useState<Record<string, number>>({});
 
   const [newCampaign, setNewCampaign] = useState({
     campaign_type: 'email' as 'email' | 'sms',
@@ -673,130 +675,9 @@ export default function CampaignsPage() {
                         </div>
                       </div>
                     ) : c.body && c.campaign_type === 'sms' ? (
-                      /* SMS: split into Member / Non-Member sections */
-                      (() => {
-                        const body = c.body || '';
-                        // Parse member and non-member copy from the generated text
-                        const memberMatch = body.match(/MEMBER\s*(?:COPY)?[:\s]*\n?([\s\S]*?)(?=NON[- ]?MEMBER|$)/i);
-                        const nonMemberMatch = body.match(/NON[- ]?MEMBER\s*(?:COPY)?[:\s]*\n?([\s\S]*?)$/i);
-                        const memberCopy = memberMatch ? memberMatch[1].trim() : '';
-                        const nonMemberCopy = nonMemberMatch ? nonMemberMatch[1].trim() : '';
-                        const hasSplit = memberCopy || nonMemberCopy;
-
-                        // Segment calc helper
-                        const calcSegments = (text: string) => {
-                          const len = text.length;
-                          return len === 0 ? 1 : len <= 160 ? 1 : Math.ceil(len / 153);
-                        };
-                        const rate = 0.0079;
-                        const memberSegments = calcSegments(memberCopy);
-                        const nonMemberSegments = calcSegments(nonMemberCopy);
-                        const nonMemberTiers = [500, 1000, 2500, 5000];
-
-                        return (
-                          <div className="space-y-4">
-                            {hasSplit ? (
-                              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                                {/* Member */}
-                                <div>
-                                  <div className="text-[11px] font-bold text-emerald-300 uppercase tracking-wider mb-2 flex items-center gap-1.5">
-                                    <span className="material-symbols-outlined" style={{ fontSize: 14 }}>loyalty</span>
-                                    Member
-                                  </div>
-                                  <div className="text-[12px] text-white/80 whitespace-pre-wrap bg-emerald-500/10 rounded-xl p-4 border border-emerald-500/20">
-                                    {memberCopy}
-                                  </div>
-                                  <div className="text-[10px] text-white/40 mt-1">{memberCopy.length} chars · {memberSegments} segment{memberSegments > 1 ? 's' : ''}</div>
-                                </div>
-                                {/* Non-Member */}
-                                <div>
-                                  <div className="text-[11px] font-bold text-amber-300 uppercase tracking-wider mb-2 flex items-center gap-1.5">
-                                    <span className="material-symbols-outlined" style={{ fontSize: 14 }}>person_add</span>
-                                    Non-Member
-                                  </div>
-                                  <div className="text-[12px] text-white/80 whitespace-pre-wrap bg-amber-500/10 rounded-xl p-4 border border-amber-500/20">
-                                    {nonMemberCopy}
-                                  </div>
-                                  <div className="text-[10px] text-white/40 mt-1">{nonMemberCopy.length} chars · {nonMemberSegments} segment{nonMemberSegments > 1 ? 's' : ''}</div>
-                                </div>
-                              </div>
-                            ) : (
-                              <div className="text-[12px] text-white/80 whitespace-pre-wrap bg-white/5 rounded-xl p-4 border border-white/10 max-h-80 overflow-y-auto">
-                                {body}
-                              </div>
-                            )}
-
-                            {/* Cost Breakdown */}
-                            <div>
-                              <div className="text-[11px] font-bold uppercase tracking-wider text-white/50 mb-2">
-                                SMS Cost Estimate
-                                <span className="text-[9px] font-normal text-white/30 ml-2">SMS only · does not include MMS</span>
-                              </div>
-                              <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                                {/* Member cost */}
-                                <div className="bg-emerald-500/5 rounded-xl p-4 border border-emerald-500/15">
-                                  <div className="text-[11px] font-bold text-emerald-300 mb-2 flex items-center gap-1.5">
-                                    <span className="material-symbols-outlined" style={{ fontSize: 14 }}>loyalty</span>
-                                    Member Cost
-                                    <span className="text-[9px] font-normal text-white/30 ml-1">per 100 members</span>
-                                  </div>
-                                  <div className="flex items-baseline justify-between">
-                                    <span className="text-[11px] text-white/60">{memberSegments} seg × 100 × $0.0079</span>
-                                    <span className="text-[18px] font-black text-emerald-300">${(memberSegments * 100 * rate).toFixed(2)}</span>
-                                  </div>
-                                  <div className="mt-2 grid grid-cols-4 gap-2 text-center">
-                                    {[100, 200, 500, 1000].map((n) => (
-                                      <div key={n} className="bg-white/5 rounded-lg py-1.5 px-1">
-                                        <div className="text-[9px] text-white/40">{n}</div>
-                                        <div className="text-[11px] font-bold text-white">${(memberSegments * n * rate).toFixed(2)}</div>
-                                      </div>
-                                    ))}
-                                  </div>
-                                </div>
-                                {/* Non-Member cost */}
-                                {(() => {
-                                  const selected = selectedNonMemberTier[c.id] || 0;
-                                  return (
-                                    <div className="bg-amber-500/5 rounded-xl p-4 border border-amber-500/15">
-                                      <div className="text-[11px] font-bold text-amber-300 mb-2 flex items-center gap-1.5">
-                                        <span className="material-symbols-outlined" style={{ fontSize: 14 }}>person_add</span>
-                                        Non-Member Cost
-                                        <span className="text-[9px] font-normal text-white/30 ml-1">select quantity</span>
-                                      </div>
-                                      <div className="grid grid-cols-4 gap-2 text-center mb-3">
-                                        {nonMemberTiers.map((n) => (
-                                          <button
-                                            key={n}
-                                            onClick={() => setSelectedNonMemberTier((prev) => ({ ...prev, [c.id]: n }))}
-                                            className={`rounded-lg py-2 px-1 transition-all border ${
-                                              selected === n
-                                                ? 'bg-amber-500/20 border-amber-400/40 ring-1 ring-amber-400/30'
-                                                : 'bg-white/5 border-white/10 hover:bg-white/10'
-                                            }`}
-                                          >
-                                            <div className={`text-[10px] font-bold ${selected === n ? 'text-amber-200' : 'text-white/50'}`}>{n.toLocaleString()}</div>
-                                            <div className="text-[9px] text-white/30">sms</div>
-                                          </button>
-                                        ))}
-                                      </div>
-                                      {selected > 0 ? (
-                                        <div className="bg-amber-500/10 rounded-lg p-3 border border-amber-500/20">
-                                          <div className="flex items-baseline justify-between">
-                                            <span className="text-[11px] text-white/60">{nonMemberSegments} seg × {selected.toLocaleString()} × $0.0079</span>
-                                            <span className="text-[20px] font-black text-amber-200">${(nonMemberSegments * selected * rate).toFixed(2)}</span>
-                                          </div>
-                                        </div>
-                                      ) : (
-                                        <div className="text-[11px] text-white/30 text-center py-1">Select a quantity above to calculate</div>
-                                      )}
-                                    </div>
-                                  );
-                                })()}
-                              </div>
-                            </div>
-                          </div>
-                        );
-                      })()
+                      <SmsPreview body={c.body} audienceCount={c.audience_count}/>
+                    ) : c.body && c.campaign_type === 'email' && /^\s*(?:<!doctype|<html)/i.test(c.body) ? (
+                      <NewsletterPreview html={c.body}/>
                     ) : c.body ? (
                       <div className="text-[12px] text-white/80 whitespace-pre-wrap bg-white/5 rounded-xl p-4 border border-white/10 max-h-80 overflow-y-auto">
                         {c.body}
@@ -881,6 +762,7 @@ export default function CampaignsPage() {
                     </div>
                   )}
 
+                  {campaignIssues(c).length > 0 && <div className="rounded-lg bg-amber-500/10 p-3 text-amber-200 text-xs"><strong>Before approval</strong><ul className="list-disc pl-4 mt-2">{campaignIssues(c).map(issue=><li key={issue}>{issue}</li>)}</ul></div>}
                   {/* Staff action buttons */}
                   {isStaff && (
                     <div className="flex gap-2 flex-wrap pt-2 border-t border-white/10">
@@ -895,7 +777,8 @@ export default function CampaignsPage() {
                       )}
                       {(c.status === 'pending_review' || c.status === 'changes_requested') && (
                         <button
-                          onClick={() => patchCampaign(c.id, { status: 'approved' })}
+                          onClick={() => patchCampaign(c.id, { status: 'approved', reviewed_version: campaignReviewVersion(c) }).catch(e => alert(e.message))}
+                          disabled={campaignIssues(c).length > 0}
                           className="text-[11px] font-bold px-4 py-2 rounded-lg bg-emerald-500/20 text-emerald-200 hover:bg-emerald-500/30"
                         >
                           Approve for sending
