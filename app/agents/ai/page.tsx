@@ -14,6 +14,8 @@ export default function AIAgentsPage() {
         <p className="text-white/60 mt-1">Your always-on team for Mother Nature Agency. Click any agent to chat.</p>
       </div>
 
+      <Link href="/agents/operations" className="glass-card p-5 block text-emerald-300">Open Agent Operations: monthly plans, Claude + OpenAI handoffs, campaign review and manager monitoring</Link>
+
       <div className="grid grid-cols-1 sm:grid-cols-4 gap-4">
         <div className="glass-card p-5">
           <div className="text-xs uppercase tracking-wider text-white/50 font-semibold">Total Agents</div>

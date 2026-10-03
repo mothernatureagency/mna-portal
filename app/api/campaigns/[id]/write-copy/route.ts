@@ -1,5 +1,7 @@
+import { campaignAccess } from '@/lib/campaign-access';
+import { COPY_STYLE } from '@/lib/campaign-checks';
 import { NextRequest, NextResponse } from 'next/server';
-import { ensureSchema, query } from '@/lib/db';
+import { ensureSchema, query, transaction } from '@/lib/db';
 import { clients } from '@/lib/clients';
 import Anthropic from '@anthropic-ai/sdk';
 import { anthropicFor } from '@/lib/anthropic';
@@ -11,26 +13,12 @@ const MODEL = 'claude-haiku-4-5';
 
 /** Fetch upcoming content calendar items for the client to give AI context */
 async function getContentContext(clientId: string): Promise<string> {
-  // Find the project(s) for this client
-  const { rows: projects } = await query(
-    `select p.id, p.client_name from projects p where lower(p.client_name) like '%' || lower($1) || '%' limit 5`,
-    [clientId.replace(/-/g, ' ')]
-  );
-  if (projects.length === 0) {
-    // Try direct match with client_name containing the id
-    const { rows: p2 } = await query(`select id, client_name from projects limit 10`);
-    // Fallback: just grab posts from the last/next 30 days across all projects
-    const { rows: posts } = await query(
-      `select post_date, platform, content_type, title, caption
-       from content_calendar
-       where post_date >= current_date - interval '7 days'
-         and post_date <= current_date + interval '30 days'
-       order by post_date asc
-       limit 20`
-    );
-    if (posts.length === 0) return '';
-    return formatContentContext(posts);
-  }
+  const known = clients.find(c => c.id === clientId);
+  const custom = known ? null : (await query('select name from custom_clients where id=$1',[clientId])).rows[0];
+  const clientName = known?.name || custom?.name;
+  if (!clientName) return '';
+  const { rows: projects } = await query('select id from projects where client_name=$1',[clientName]);
+  if (!projects.length) return '';
 
   const projectIds = projects.map((p: any) => p.id);
   const placeholders = projectIds.map((_: any, i: number) => `$${i + 1}`).join(',');
@@ -63,6 +51,8 @@ function formatContentContext(posts: any[]): string {
 }
 
 export async function POST(req: NextRequest, { params }: { params: { id: string } }) {
+  const access = await campaignAccess();
+  if (!access?.staff) return NextResponse.json({error:'Staff sign-in required'},{status:403});
   await ensureSchema();
   const { id } = params;
 
@@ -70,6 +60,7 @@ export async function POST(req: NextRequest, { params }: { params: { id: string 
   const { rows } = await query('select * from campaigns where id = $1', [id]);
   if (rows.length === 0) return NextResponse.json({ error: 'Campaign not found' }, { status: 404 });
   const campaign = rows[0];
+  if (campaign.sent_at) return NextResponse.json({error:'Sent campaigns cannot be rewritten.'},{status:409});
 
   // Fetch content calendar context
   const contentContext = await getContentContext(campaign.client_id);
@@ -156,11 +147,11 @@ Rules:
 - Align messaging with the social content themes when relevant (reference promotions, topics, or hooks from the calendar)${guidanceBlock}`;
   }
 
-  const client = anthropicFor({ source: 'campaigns/[id]/write-copy' });
+  const client = anthropicFor({ source: 'campaigns/[id]/write-copy', clientId:campaign.client_id, actor:access.email });
   const message = await client.messages.create({
     model: MODEL,
     max_tokens: 1500,
-    system: 'You are the Email & SMS Copywriter Agent for Mother Nature Agency, a marketing agency for wellness and IV therapy clinics. You write high-converting email and SMS marketing copy. You have access to the client\'s social media content calendar so you can align messaging across channels. Write like a real person, not AI. Sound warm, human, and on-brand. No filler.',
+    system: 'You are the Email & SMS Copywriter Agent for Mother Nature Agency, a marketing agency for wellness and IV therapy clinics. You write high-converting email and SMS marketing copy. You have access to the client\'s social media content calendar so you can align messaging across channels. Write like a real person, not AI. Sound warm, human, and on-brand. No filler.' + COPY_STYLE,
     messages: [{ role: 'user', content: prompt }],
   });
 
@@ -187,10 +178,14 @@ Rules:
     subject = `Weekly Wrap-Up: MNA X ${clientName} ${dateStr}`;
   }
 
-  const { rows: updated } = await query(
-    'update campaigns set body = $1, subject = $2 where id = $3 returning *',
-    [generatedText, subject, id]
-  );
+  const updated = await transaction(async db => {
+    const latest = (await db.query('select * from campaigns where id=$1 for update',[id])).rows[0];
+    if (!latest || latest.sent_at || latest.body !== campaign.body || latest.subject !== campaign.subject || latest.status !== campaign.status) return null;
+    return (await db.query(
+      "update campaigns set body=$1,subject=$2,status='pending_review',approved_at=null where id=$3 returning *",
+      [generatedText,subject,id])).rows[0];
+  });
+  if (!updated) return NextResponse.json({error:'Campaign changed while drafting. Reload before trying again.'},{status:409});
 
-  return NextResponse.json({ campaign: updated[0] });
+  return NextResponse.json({ campaign: updated });
 }
